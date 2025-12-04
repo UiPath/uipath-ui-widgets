@@ -13,6 +13,7 @@ export const DataTable = ({
   className = '',
   pageSize,
   columnConfig,
+  rowClassRules,
 }: DataTableProps) => {
   const [rowData, setRowData] = useState<unknown[]>([]);
   const [originalData, setOriginalData] = useState<unknown[]>([]);
@@ -188,6 +189,7 @@ export const DataTable = ({
           }}
           theme={themeQuartz}
           onCellValueChanged={handleCellValueChanged}
+          rowClassRules={rowClassRules}
         />
       </div>
 
