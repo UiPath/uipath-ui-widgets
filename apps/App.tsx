@@ -70,7 +70,14 @@ function App({ uipathSdk }: AppProps) {
                 <DataTable
                   sdk={uipathSdk}
                   entityId={selectedEntityId}
-                  className="datatable-container"
+                  pageSize={20}
+                  columnConfig={{
+                    'Edition Name': {
+                      sortable: false,
+                      filter: false,
+                      editable: false
+                    }
+                  }}
                 />
               </Box>
             ) : (
