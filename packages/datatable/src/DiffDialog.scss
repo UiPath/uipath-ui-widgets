@@ -62,7 +62,7 @@
 
       .datatable-diff-row {
         margin-bottom: 24px;
-      
+
         h3 {
           margin: 0 0 12px 0;
           font-size: 16px;
@@ -94,10 +94,45 @@
               background-color: #ffebee;
               color: #c62828;
             }
-            
+
             .datatable-diff-new {
               background-color: #e8f5e9;
               color: #2e7d32;
+              position: relative;
+
+              .datatable-diff-new-content {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+
+                span {
+                  flex: 1;
+                }
+
+                .datatable-button-revert-field {
+                  background: none;
+                  border: none;
+                  cursor: pointer;
+                  padding: 4px;
+                  display: inline-flex;
+                  align-items: center;
+                  justify-content: center;
+                  border-radius: 4px;
+                  color: #f57c00;
+                  opacity: 0;
+                  transition: opacity 0.2s, background-color 0.2s;
+                  flex-shrink: 0;
+
+                  &:hover {
+                    background-color: rgba(245, 124, 0, 0.1);
+                  }
+                }
+              }
+            }
+
+            &:hover .datatable-diff-new .datatable-button-revert-field {
+              opacity: 1;
             }
           }
         }
