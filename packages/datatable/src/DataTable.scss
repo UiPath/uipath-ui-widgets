@@ -5,43 +5,6 @@
   flex-direction: column;
   gap: 16px;
 
-  .datatable-toolbar {
-    display: flex;
-    gap: 8px;
-
-    .datatable-refresh-button, .datatable-diff-button {
-      padding: 8px 16px;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: background-color 0.2s;
-
-      &:disabled {
-        background-color: #ccc;
-        cursor: not-allowed;
-      }
-    }
-
-    .datatable-refresh-button {
-      background-color: #1976d2;
-    
-      &:hover:not(:disabled) {
-        background-color: #1565c0;
-      }
-    }
-    
-    .datatable-diff-button {
-      background-color: #2e7d32;
-    
-      &:hover:not(:disabled) {
-        background-color: #1b5e20;
-      }
-    }
-  }
-
   .datatable-grid-wrapper {
     flex: 1;
   }
