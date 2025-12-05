@@ -1,14 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { GridApi, GridReadyEvent, IRowNode, themeQuartz } from 'ag-grid-community';
-import { AgGridReact } from 'ag-grid-react';
-import { useEffect, useMemo, useState } from 'react';
 import { DiffDialog } from '@uipath/datatable/components/DiffDialog';
 import { Toolbar } from '@uipath/datatable/components/Toolbar';
-import './DataTable.scss';
 import { useEntityData } from '@uipath/datatable/hooks/useEntityData';
 import { useRowEditing } from '@uipath/datatable/hooks/useRowEditing';
 import type { DataTableProps } from '@uipath/datatable/types';
 import { getDiffData } from '@uipath/datatable/utils/dataUtils';
+import { GridApi, GridReadyEvent, IRowNode, themeQuartz } from 'ag-grid-community';
+import { AgGridReact } from 'ag-grid-react';
+import { useEffect, useMemo, useState } from 'react';
+import './DataTable.scss';
 
 export const DataTable = ({
   sdk,
