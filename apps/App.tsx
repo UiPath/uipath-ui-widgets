@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useMemo } from 'react';
 import { Box, Container, Grid, List, ListItem, ListItemButton, ListItemText } from '@mui/material'
 import { DataTable } from '@uipath/ui-widgets-datatable'
 import type { UiPath } from '@uipath/uipath-typescript';
+import './App.css'
 
 interface AppProps {
   uipathSdk: UiPath;
@@ -23,8 +25,17 @@ function App({ uipathSdk }: AppProps) {
       sortable: false,
       filter: false,
       editable: false
+    },
+    'Inventory Left': {
+      cellClassRules: {
+        'datatable-cell-low-inventory': (params: any) => params.data.inventoryLeft < 3 // params.data = entity record
+      }
     }
   }), []);
+
+  const rowClassRules = useMemo(() => ({
+    'datatable-row-low-inventory': (params: any) => params.data.inventoryLeft < 5
+  }), [])
 
   useEffect(() => {
     const fetchEntities = async () => {
@@ -80,6 +91,7 @@ function App({ uipathSdk }: AppProps) {
                   entityId={selectedEntityId}
                   pageSize={20}
                   columnConfig={columnConfig}
+                  rowClassRules={rowClassRules}
                 />
               </Box>
             ) : (
