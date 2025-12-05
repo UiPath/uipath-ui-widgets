@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Box, Container, Grid, List, ListItem, ListItemButton, ListItemText } from '@mui/material'
 import { DataTable } from '@uipath/ui-widgets-datatable'
 import type { UiPath } from '@uipath/uipath-typescript';
@@ -17,6 +17,14 @@ function App({ uipathSdk }: AppProps) {
   const [entities, setEntities] = useState<Entity[]>([]);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const columnConfig = useMemo(() => ({
+    'Edition Name': {
+      sortable: false,
+      filter: false,
+      editable: false
+    }
+  }), []);
 
   useEffect(() => {
     const fetchEntities = async () => {
@@ -71,13 +79,7 @@ function App({ uipathSdk }: AppProps) {
                   sdk={uipathSdk}
                   entityId={selectedEntityId}
                   pageSize={20}
-                  columnConfig={{
-                    'Edition Name': {
-                      sortable: false,
-                      filter: false,
-                      editable: false
-                    }
-                  }}
+                  columnConfig={columnConfig}
                 />
               </Box>
             ) : (
