@@ -1,4 +1,4 @@
-import { UiPath } from "@uipath/uipath-typescript";
+import { EntityRecord, UiPath } from "@uipath/uipath-typescript";
 import { ColDef, RowClassRules } from "ag-grid-community";
 
 export interface DataTableProps {
@@ -8,4 +8,9 @@ export interface DataTableProps {
   pageSize?: number;
   columnConfig?: Record<string, ColDef>;
   rowClassRules?: RowClassRules;
+}
+
+export interface GridRow extends EntityRecord {
+  _isExpandedRow?: boolean;
+  _groupedRecords?: GridRow[]
 }

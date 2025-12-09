@@ -1,6 +1,7 @@
 .datatable-toolbar {
   display: flex;
   gap: 8px;
+  align-items: center;
 
   .datatable-toolbar-button {
     padding: 8px 16px;
@@ -36,6 +37,40 @@
     &:disabled {
       background-color: #ccc;
       cursor: not-allowed;
+    }
+  }
+
+  .datatable-group-by-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+
+    .datatable-group-by-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: #333;
+    }
+
+    .datatable-group-by-select {
+      padding: 6px 12px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background-color: white;
+      cursor: pointer;
+      min-width: 150px;
+      transition: border-color 0.2s;
+
+      &:hover {
+        border-color: #1976d2;
+      }
+
+      &:focus {
+        outline: none;
+        border-color: #1976d2;
+        box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+      }
     }
   }
 }
