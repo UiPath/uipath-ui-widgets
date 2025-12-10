@@ -14,6 +14,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@uipath/ui-widgets-datatable': path.resolve(__dirname, './packages/datatable/src'),
+      '@uipath/datatable': path.resolve(__dirname, './packages/datatable/src'),
     },
     dedupe: ["react", "react-dom"],
   },

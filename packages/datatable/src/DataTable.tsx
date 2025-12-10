@@ -1,11 +1,13 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useState, useCallback } from 'react';
+import { themeQuartz } from 'ag-grid-community';
 import { AgGridReact } from 'ag-grid-react';
-import type { DataTableProps } from './types';
-import { ColDef, themeQuartz, CellValueChangedEvent } from 'ag-grid-community';
-import { EntityGetResponse, FieldMetaData } from '@uipath/uipath-typescript';
-import { DiffDialog } from './DiffDialog';
+import { useEffect, useState } from 'react';
+import { DiffDialog } from '@uipath/datatable/components/DiffDialog';
+import { Toolbar } from '@uipath/datatable/components/Toolbar';
 import './DataTable.scss';
+import { useEntityData } from '@uipath/datatable/hooks/useEntityData';
+import { useRowEditing } from '@uipath/datatable/hooks/useRowEditing';
+import type { DataTableProps } from '@uipath/datatable/types';
+import { getDiffData } from '@uipath/datatable/utils/dataUtils';
 
 export const DataTable = ({
   sdk,
@@ -15,132 +17,60 @@ export const DataTable = ({
   columnConfig,
   rowClassRules,
 }: DataTableProps) => {
-  const [rowData, setRowData] = useState<unknown[]>([]);
-  const [originalData, setOriginalData] = useState<unknown[]>([]);
-  const [editedRows, setEditedRows] = useState<Map<string, any>>(new Map());
-  const [columnDefs, setColumnDefs] = useState<ColDef[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [entity, setEntity] = useState<EntityGetResponse>();
   const [showDiffDialog, setShowDiffDialog] = useState(false);
 
-  const getFieldValue = (value: any, field: FieldMetaData | undefined) => {
-    if (field?.isForeignKey) {
-      const referenceFieldName = field.referenceField?.definition?.name;
-      return referenceFieldName ? value?.[referenceFieldName] : value;
-    }
-    return value;
-  };
+  const openDiffDialog = () => setShowDiffDialog(true);
 
-  const fetchEntityRecords = useCallback(async () => {
+  const closeDiffDialog = () => setShowDiffDialog(false);
+
+  const {
+    rowData,
+    setRowData,
+    originalData,
+    columnDefs,
+    loading,
+    error,
+    entity,
+    fetchEntityRecords,
+  } = useEntityData(sdk, entityId, columnConfig);
+
+  const {
+    editedRows,
+    handleCellValueChanged,
+    commitUpdates,
+    revertAllUpdates,
+    revertSingleCellUpdate,
+  } = useRowEditing(originalData, setRowData, fetchEntityRecords);
+
+  const handleCommit = async () => {
     try {
-      setLoading(true);
-      setError(null);
-
-      const fetchedEntity = await sdk.entities.getById(entityId);
-      setEntity(fetchedEntity);
-      const entityFieldsMap = new Map(fetchedEntity.fields.map(field => [field.name, field]));
-
-      const records = await fetchedEntity.getRecords({
-        expansionLevel: 2,
-      });
-      const items = records.items;
-
-      if (items.length > 0) {
-        const columns: ColDef[] = fetchedEntity.fields.filter(f => !f.isSystemField).map((f) => ({
-          field: f.name,
-          headerName: f.displayName,
-          valueGetter: (params) => getFieldValue(params.data?.[f.name], entityFieldsMap.get(f.name)),
-          tooltipValueGetter: (params) => getFieldValue(params.data?.[f.name], entityFieldsMap.get(f.name)),
-          ...columnConfig?.[f.displayName],
-        }));
-        setColumnDefs(columns);
-      }
-
-      setRowData(items);
-      setOriginalData(JSON.parse(JSON.stringify(items))); // Deep clone
-      setEditedRows(new Map()); // Clear edits on refresh
+      closeDiffDialog();
+      await commitUpdates(entity);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch entity records');
-    } finally {
-      setLoading(false);
+      console.error(err);
     }
-  }, [entityId, sdk, columnConfig]);
-
-  const handleCellValueChanged = (event: CellValueChangedEvent) => {
-    const rowId = event.data.Id;
-    if (!rowId) return;
-
-    setEditedRows((prev) => {
-      const updated = new Map(prev);
-      updated.set(rowId, event.data);
-      return updated;
-    });
   };
 
-  const handleCommitChanges = async () => {
+  const handleRevertAll = () => {
     try {
-      setShowDiffDialog(false);
-      const rowsToUpdate = Array.from(editedRows.values());
-      await entity?.update(rowsToUpdate);
-
-      // Clear edits and refresh
-      setEditedRows(new Map());
-      await fetchEntityRecords();
+      closeDiffDialog();
+      revertAllUpdates();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to commit changes');
+      console.error(err);
     }
   };
 
-  const handleCancelChanges = () => {
-    // Revert all changes
-    setRowData(JSON.parse(JSON.stringify(originalData)));
-    setEditedRows(new Map());
-    setShowDiffDialog(false);
-  };
-
-  const handleRevertField = (rowId: string, fieldKey: string, originalValue: any) => {
-    // Restore original field value in the row data
-    setRowData((prev) => {
-      return prev.map((row: any) => {
-        if (row.Id === rowId) {
-          return { ...row, [fieldKey]: originalValue };
-        }
-        return row;
-      });
-    });
-
-    // Update edited rows map
-    setEditedRows((prev) => {
-      const updated = new Map(prev);
-      const editedRow = updated.get(rowId);
-
-      if (editedRow) {
-        const newEditedRow = { ...editedRow, [fieldKey]: originalValue };
-
-        // Check if this row still has any changes
-        const originalRow = originalData.find((row: any) => row.Id === rowId) as any;
-        const hasChanges = Object.keys(newEditedRow).some(
-          (key) => JSON.stringify(originalRow?.[key]) !== JSON.stringify(newEditedRow[key])
-        );
-
-        if (hasChanges) {
-          updated.set(rowId, newEditedRow);
-        } else {
-          updated.delete(rowId);
-        }
-      }
-
-      return updated;
-    });
-  };
+  const refreshComponent = () => {
+    fetchEntityRecords();
+    revertAllUpdates();
+  }
 
   useEffect(() => {
     if (entityId && sdk) {
-      fetchEntityRecords();
+      refreshComponent();
     }
-  }, [entityId, sdk, fetchEntityRecords]);
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entityId, sdk]);
 
   if (loading) {
     return <div className="datatable-loading">Loading...</div>;
@@ -154,25 +84,13 @@ export const DataTable = ({
     return <div className="datatable-empty">No data available</div>;
   }
 
-  const getDiffData = () => {
-    return Array.from(editedRows.entries()).map(([rowId, editedRow]) => {
-      const original = originalData.find((row: any) => row.Id === rowId);
-      return { rowId, original, edited: editedRow };
-    });
-  };
-
   return (
     <div className={`datatable-container ${className}`}>
-      <div className="datatable-toolbar">
-        <button onClick={fetchEntityRecords} className="datatable-refresh-button">Refresh</button>
-        <button
-          onClick={() => setShowDiffDialog(true)}
-          className="datatable-diff-button"
-          disabled={editedRows.size === 0}
-        >
-          Show Diff ({editedRows.size})
-        </button>
-      </div>
+      <Toolbar
+        onRefresh={refreshComponent}
+        onShowDiff={openDiffDialog}
+        editedRowsCount={editedRows.size}
+      />
       <div className="datatable-grid-wrapper">
         <AgGridReact
           rowData={rowData}
@@ -195,11 +113,11 @@ export const DataTable = ({
 
       <DiffDialog
         isOpen={showDiffDialog}
-        onClose={() => setShowDiffDialog(false)}
-        onCommit={handleCommitChanges}
-        onRevertAll={handleCancelChanges}
-        onRevertField={handleRevertField}
-        diffData={getDiffData()}
+        onClose={closeDiffDialog}
+        onCommit={handleCommit}
+        onRevertAll={handleRevertAll}
+        onRevertField={revertSingleCellUpdate}
+        diffData={getDiffData(editedRows, originalData)}
       />
     </div>
   );

@@ -15,7 +15,11 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": false
+    "noEmit": false,
+    "baseUrl": "./src",
+    "paths": {
+      "@uipath/datatable/*": ["./*"]
+    }
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]
