@@ -2,7 +2,7 @@
   display: flex;
   gap: 8px;
 
-  .datatable-refresh-button, .datatable-diff-button, .datatable-delete-button {
+  .datatable-toolbar-button {
     padding: 8px 16px;
     color: white;
     border: none;
@@ -11,34 +11,31 @@
     font-size: 14px;
     font-weight: 500;
     transition: background-color 0.2s;
+    background-color: #757575;
+
+    &.primary {
+      background-color: #1976d2;
+
+      &:hover:not(:disabled) {
+        background-color: #115293;
+      }
+    }
+
+    &.destructive {
+      background-color: #d32f2f;
+
+      &:hover:not(:disabled) {
+        background-color: #9a0007;
+      }
+    }
+
+    &:hover:not(:disabled) {
+      background-color: #616161;
+    }
 
     &:disabled {
       background-color: #ccc;
       cursor: not-allowed;
-    }
-  }
-
-  .datatable-refresh-button {
-    background-color: #1976d2;
-
-    &:hover:not(:disabled) {
-      background-color: #1565c0;
-    }
-  }
-
-  .datatable-diff-button {
-    background-color: #2e7d32;
-
-    &:hover:not(:disabled) {
-      background-color: #1b5e20;
-    }
-  }
-
-  .datatable-delete-button {
-    background-color: #d32f2f;
-
-    &:hover:not(:disabled) {
-      background-color: #c62828;
     }
   }
 }
