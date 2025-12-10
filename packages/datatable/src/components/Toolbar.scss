@@ -2,7 +2,7 @@
   display: flex;
   gap: 8px;
 
-  .datatable-refresh-button, .datatable-diff-button {
+  .datatable-refresh-button, .datatable-diff-button, .datatable-delete-button {
     padding: 8px 16px;
     color: white;
     border: none;
@@ -31,6 +31,14 @@
 
     &:hover:not(:disabled) {
       background-color: #1b5e20;
+    }
+  }
+
+  .datatable-delete-button {
+    background-color: #d32f2f;
+
+    &:hover:not(:disabled) {
+      background-color: #c62828;
     }
   }
 }

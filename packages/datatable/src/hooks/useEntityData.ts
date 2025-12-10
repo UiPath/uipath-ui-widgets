@@ -63,6 +63,7 @@ export const useEntityData = (
     columnDefs,
     loading,
     error,
+    setError,
     entity,
     fetchEntityRecords,
   };

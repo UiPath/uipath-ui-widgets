@@ -1,6 +1,7 @@
-import { themeQuartz } from 'ag-grid-community';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { GridApi, GridReadyEvent, IRowNode, themeQuartz } from 'ag-grid-community';
 import { AgGridReact } from 'ag-grid-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DiffDialog } from '@uipath/datatable/components/DiffDialog';
 import { Toolbar } from '@uipath/datatable/components/Toolbar';
 import './DataTable.scss';
@@ -13,11 +14,13 @@ export const DataTable = ({
   sdk,
   entityId,
   className = '',
-  pageSize,
+  pageSize = 50,
   columnConfig,
   rowClassRules,
 }: DataTableProps) => {
   const [showDiffDialog, setShowDiffDialog] = useState(false);
+  const [gridApi, setGridApi] = useState<GridApi>();
+  const [selectedRowsCount, setSelectedRowsCount] = useState(0);
 
   const openDiffDialog = () => setShowDiffDialog(true);
 
@@ -30,6 +33,7 @@ export const DataTable = ({
     columnDefs,
     loading,
     error,
+    setError,
     entity,
     fetchEntityRecords,
   } = useEntityData(sdk, entityId, columnConfig);
@@ -65,6 +69,51 @@ export const DataTable = ({
     revertAllUpdates();
   }
 
+  const rowSelection = useMemo(() => { 
+    return { 
+      mode: 'multiRow' as const
+    };
+  }, []);
+
+  const onGridReady = (params: GridReadyEvent) => {
+    setGridApi(params.api);
+  };
+
+  const onSelectionChanged = () => {
+    if (!gridApi) return;
+    const selectedRows = gridApi.getSelectedRows();
+    setSelectedRowsCount(selectedRows.length);
+  };
+
+  const handleDeleteRecords = async () => {
+    if (!gridApi) return;
+
+    const selectedNodes: IRowNode[] = gridApi.getSelectedNodes();
+    const selectedDataIds = selectedNodes.map((node) => node.data.Id);
+
+    // Confirm before deleting
+    const recordText = selectedDataIds.length === 1 ? 'record' : 'records';
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${selectedDataIds.length} ${recordText}? This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    // Remove selected rows from rowData
+    const updatedRowData = rowData.filter((r: any) => !selectedDataIds.includes(r.Id));
+    setRowData(updatedRowData);
+
+    // Clear selection
+    gridApi.deselectAll();
+    setSelectedRowsCount(0);
+
+    try {
+      await entity?.delete(selectedDataIds);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete entity records')
+    }
+  };
+
   useEffect(() => {
     if (entityId && sdk) {
       refreshComponent();
@@ -89,14 +138,16 @@ export const DataTable = ({
       <Toolbar
         onRefresh={refreshComponent}
         onShowDiff={openDiffDialog}
+        onDelete={handleDeleteRecords}
         editedRowsCount={editedRows.size}
+        selectedRowsCount={selectedRowsCount}
       />
       <div className="datatable-grid-wrapper">
         <AgGridReact
           rowData={rowData}
           columnDefs={columnDefs}
           pagination={true}
-          paginationPageSize={pageSize || 50}
+          paginationPageSize={pageSize}
           defaultColDef={{
             sortable: true,
             filter: true,
@@ -107,7 +158,10 @@ export const DataTable = ({
           }}
           theme={themeQuartz}
           onCellValueChanged={handleCellValueChanged}
+          rowSelection={rowSelection}
           rowClassRules={rowClassRules}
+          onGridReady={onGridReady}
+          onSelectionChanged={onSelectionChanged}
         />
       </div>
 
