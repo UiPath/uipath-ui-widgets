@@ -43,6 +43,7 @@ export const DataTable = ({
   const [loading, setLoading] = useState(true);
   const expandedRowsRef = useRef<Set<string>>(new Set());
   const gridApiRef = useRef<GridApi | null>(null);
+  const rowHeightCache = useRef<Map<string, number>>(new Map());
 
   const openDiffDialog = () => setShowDiffDialog(true);
 
@@ -68,6 +69,7 @@ export const DataTable = ({
   const handleGroupByChange = (column: string) => {
     setSelectedGroupBy(column);
     setExpandedRows(new Set());
+    rowHeightCache.current.clear();
   };
 
   // Sync ref with state
@@ -110,13 +112,16 @@ export const DataTable = ({
             const refEntityRecords = (await refEntity.getRecords()).items;
             setRefEntityData(refEntityRecords);
 
-            const entityFieldsMap = new Map(refEntity.fields.map(field => [field.name, field]));
-            const columns: ColDef[] = refEntity.fields.filter(f => !f.isSystemField).map((f) => ({
-              field: f.name,
-              headerName: f.displayName,
-              valueGetter: (params) => getFieldValue(params.data?.[f.name], entityFieldsMap.get(f.name)),
-              tooltipValueGetter: (params) => getFieldValue(params.data?.[f.name], entityFieldsMap.get(f.name)),
-            }));
+            const columns: ColDef[] = refEntity.fields.filter(f => !f.isSystemField).map((f) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const valueGetter = (params: any) => getFieldValue(params.data?.[f.name], f)
+              return {
+                field: f.name,
+                headerName: f.displayName,
+                valueGetter: valueGetter,
+                tooltipValueGetter: valueGetter,
+              }
+            });
             columns[0].cellRenderer = expandButtonCellRenderer;
             setColumnDefs(columns);
           }
@@ -230,14 +235,31 @@ export const DataTable = ({
   }, [entity, selectedGroupBy]);
 
   const getRowHeight = useCallback((params: RowHeightParams<GridRow>) => {
-    if (params.data?._isExpandedRow) {
-      const detailCount = params.data._groupedRecords?.length || 0;
-      const headerHeight = 48;
-      const rowHeight = 42;
-      const gridPadding = 40;
-      return headerHeight + (detailCount * rowHeight) + gridPadding;
+    if (!params.data?._isExpandedRow) {
+      return undefined; // ag-grid will automatically calc height of parent rows
     }
-    return 42;
+
+    const cacheKey = `detail-${params.data.Id}`;
+    if (rowHeightCache.current.has(cacheKey)) {
+      return rowHeightCache.current.get(cacheKey)!;
+    }
+
+    // Calculate estimated height
+    const detailCount = params.data._groupedRecords?.length || 0;
+    const estimatedHeight = 48 + (detailCount * 42) + 40; // Default size of header + rows + padding
+
+    // Schedule re-measure after DOM renders. Without this, height calc is not working fine.
+    setTimeout(() => {
+      const row = document.querySelector(`[row-id="${cacheKey}"] .detail-row-content`);
+      const actualHeight = row?.getBoundingClientRect().height;
+      if (actualHeight && actualHeight > 0) {
+        rowHeightCache.current.set(cacheKey, actualHeight);
+        gridApiRef.current?.onRowHeightChanged();
+      }
+    }, 100);
+
+    // First return an estimated height. When DOM renders, then return actual height
+    return estimatedHeight;
   }, []);
 
   const getRowClass = useCallback((params: RowClassParams<GridRow>) => {

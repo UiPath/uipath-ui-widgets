@@ -23,7 +23,6 @@ export const useEntityData = (
 
       const fetchedEntity = await sdk.entities.getById(entityId);
       setEntity(fetchedEntity);
-      const entityFieldsMap = new Map(fetchedEntity.fields.map(field => [field.name, field]));
 
       const records = await fetchedEntity.getRecords({
         expansionLevel: 2,
@@ -34,7 +33,7 @@ export const useEntityData = (
         const nonSystemFields = fetchedEntity.fields.filter(f => !f.isSystemField);
         const columns: ColDef[] = nonSystemFields.map((f) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const valueGetter = (params: any) => getFieldValue(params.data?.[f.name], entityFieldsMap.get(f.name))
+          const valueGetter = (params: any) => getFieldValue(params.data?.[f.name], f)
           return {
             field: f.name,
             headerName: f.displayName,
