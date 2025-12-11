@@ -7,7 +7,7 @@ import { useEntityData } from '@uipath/datatable/hooks/useEntityData';
 import { useRowEditing } from '@uipath/datatable/hooks/useRowEditing';
 import type { DataTableProps } from '@uipath/datatable/types';
 import { GridRow } from '@uipath/datatable/types';
-import { getDiffData } from '@uipath/datatable/utils/dataUtils';
+import { deepClone, getDiffData } from '@uipath/datatable/utils/dataUtils';
 import { getFieldValue } from '@uipath/datatable/utils/fieldUtils';
 import type {
   ColDef,
@@ -113,7 +113,6 @@ export const DataTable = ({
             setRefEntityData(refEntityRecords);
 
             const columns: ColDef[] = refEntity.fields.filter(f => !f.isSystemField).map((f) => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const valueGetter = (params: any) => getFieldValue(params.data?.[f.name], f)
               return {
                 field: f.name,
@@ -163,7 +162,7 @@ export const DataTable = ({
         gridApiRef.current.refreshCells({ force: true });
       }
     } else if (!selectedGroupBy) {
-      setRowData(originalData);
+      setRowData(deepClone(originalData));
     }
   }, [expandedRows, refEntityData, selectedGroupBy, originalData, setRowData, entity?.fields]);
 
@@ -447,10 +446,10 @@ export const DataTable = ({
           }}
           theme={themeQuartz}
           onCellValueChanged={handleCellValueChanged}
-          rowSelection={rowSelection}
+          rowSelection={!isMasterDetailMode ? rowSelection : undefined}
           rowClassRules={rowClassRules}
           onGridReady={onGridReady}
-          onSelectionChanged={onSelectionChanged}
+          onSelectionChanged={!isMasterDetailMode ? onSelectionChanged : undefined}
           {...(isMasterDetailMode && {
             getRowHeight,
             getRowClass,

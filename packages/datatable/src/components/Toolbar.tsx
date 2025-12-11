@@ -51,6 +51,7 @@ export const Toolbar = ({
       <button
         onClick={onAddRow}
         className="datatable-toolbar-button datatable-add-button primary"
+        disabled={!!selectedGroupBy}
       >
         Add Row
       </button>
