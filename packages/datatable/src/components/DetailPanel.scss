@@ -1,0 +1,14 @@
+.detail-panel {
+  padding: 20px;
+  background-color: #f8fafc;
+
+  .detail-panel-grid {
+    background-color: white;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .ag-center-cols-container, .ag-center-cols-viewport {
+    min-height: unset;
+  }
+}

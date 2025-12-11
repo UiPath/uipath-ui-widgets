@@ -7,9 +7,12 @@ interface ToolbarProps {
   onAddRow: () => void;
   onInsertRecord: () => void;
   onDiscardNewRecords: () => void;
+  onGroupByChange?: (column: string) => void;
   editedRowsCount: number;
   selectedRowsCount: number;
   newRecordsCount: number;
+  groupableColumns?: string[];
+  selectedGroupBy?: string;
 }
 
 export const Toolbar = ({
@@ -21,9 +24,17 @@ export const Toolbar = ({
   onDiscardNewRecords,
   editedRowsCount,
   selectedRowsCount,
-  newRecordsCount
+  newRecordsCount,
+  groupableColumns = [],
+  selectedGroupBy = '',
+  onGroupByChange,
 }: ToolbarProps) => {
   const hasNewRecords = newRecordsCount > 0;
+  const handleGroupByChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (onGroupByChange) {
+      onGroupByChange(e.target.value);
+    }
+  };
 
   return (
     <div className="datatable-toolbar">
@@ -66,6 +77,26 @@ export const Toolbar = ({
       >
         Delete Records ({selectedRowsCount})
       </button>
+      {groupableColumns.length > 0 && (
+        <div className="datatable-group-by-container">
+          <label htmlFor="group-by-select" className="datatable-group-by-label">
+            Group by:
+          </label>
+          <select
+            id="group-by-select"
+            className="datatable-group-by-select"
+            value={selectedGroupBy}
+            onChange={handleGroupByChange}
+          >
+            <option value="">None</option>
+            {groupableColumns.map((column) => (
+              <option key={column} value={column}>
+                {column}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 };

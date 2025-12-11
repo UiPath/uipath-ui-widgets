@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { GridRow } from '@uipath/datatable/types';
+import { deepClone, hasRowChanges } from '@uipath/datatable/utils/dataUtils';
 import { EntityGetResponse } from '@uipath/uipath-typescript';
 import { CellValueChangedEvent } from 'ag-grid-community';
 import { useState } from 'react';
-import { deepClone, hasRowChanges } from '@uipath/datatable/utils/dataUtils';
 
 export const useRowEditing = (
-  originalData: unknown[],
-  setRowData: React.Dispatch<React.SetStateAction<unknown[]>>,
+  originalData: GridRow[],
+  setRowData: React.Dispatch<React.SetStateAction<GridRow[]>>,
   fetchEntityRecords: () => Promise<void>
 ) => {
   const [editedRows, setEditedRows] = useState<Map<string, any>>(new Map());
