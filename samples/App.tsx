@@ -26,15 +26,15 @@ function App({ uipathSdk }: AppProps) {
       filter: false,
       editable: false
     },
-    'Inventory Left': {
-      cellClassRules: {
-        'datatable-cell-low-inventory': (params: any) => params.data.inventoryLeft < 3 // params.data = entity record
-      }
-    }
+    // 'Inventory Left': {
+    //   cellClassRules: {
+    //     'datatable-cell-low-inventory': (params: any) => params.data.inventoryLeft < 3 // params.data = entity record
+    //   }
+    // }
   }), []);
 
   const rowClassRules = useMemo(() => ({
-    'datatable-row-low-inventory': (params: any) => params.data.inventoryLeft < 5
+    // 'datatable-row-low-inventory': (params: any) => params.data.inventoryLeft < 5
   }), [])
 
   useEffect(() => {
