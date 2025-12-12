@@ -1,6 +1,6 @@
 # @uipath/ui-widgets-datatable
 
-A React datatable component for displaying UiPath Data Fabric Entity records using AG Grid.
+A feature-rich React datatable component for UiPath Data Fabric Entity records, built on ag-Grid Community Edition.
 
 ## Installation
 
@@ -10,30 +10,33 @@ npm install @uipath/ui-widgets-datatable
 
 ## Features
 
-- Automatically fetches entity records from UiPath Data Fabric
-- Displays data in a powerful AG Grid table
-- Auto-generates columns from entity data
-- Built-in sorting, filtering, and resizing
-- Optional pagination support
-- Loading and error states
+- **CRUD Operations**: Create, Read, Update, Delete records
+- **Master-Detail View**: Expandable row grouping with relationship navigation
+- **Cell Editing**: Inline editing with diff visualization and batch updates
+- **Batch Operations**: Multiple row selection and bulk delete
+- **Auto-generated Columns**: Intelligent column generation from entity schema
+- **Sorting & Filtering**: Built-in column sorting and filtering
+- **Pagination**: Configurable page sizes
+- **Type Safety**: Full TypeScript support with exported types
+- **Optimized Bundle**: Minified output (14.96 KB) with tree-shaking support
+- **Empty States**: Graceful handling of loading, error, and no-data scenarios
 
-## Usage
+## Quick Start
 
 ```tsx
 import { DataTable } from '@uipath/ui-widgets-datatable';
-import { UiPathSDK } from '@uipath/uipath-typescript';
+import { UiPath } from '@uipath/uipath-typescript';
 
 function App() {
-  const uipathSdk = new UiPathSDK({
+  const sdk = new UiPath({
     // SDK configuration
   });
 
   return (
     <DataTable
+      sdk={sdk}
       entityId="your-entity-id"
-      uipathSdk={uipathSdk}
       pageSize={50}
-      expansionLevel={1}
     />
   );
 }
@@ -43,27 +46,72 @@ function App() {
 
 ### DataTable
 
-- `entityId` (required): UUID of the entity to fetch records from
-- `uipathSdk` (required): UiPath SDK instance
-- `className` (optional): Additional CSS class name for styling
-- `expansionLevel` (optional): Expansion level for nested data (default: 0)
-- `pageSize` (optional): Number of records per page. Enables pagination if provided
+| Prop | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `sdk` | `UiPath` | Yes | - | UiPath SDK instance |
+| `entityId` | `string` | Yes | - | UUID of the entity to display |
+| `pageSize` | `number` | No | `50` | Number of records per page |
+| `className` | `string` | No | `'datatable'` | Additional CSS class name |
+| `columnConfig` | `Record<string, ColDef>` | No | `{}` | Custom ag-Grid column definitions |
+| `rowClassRules` | `RowClassRules` | No | - | Conditional row styling rules |
 
-## Example with Options
+## Advanced Usage
+
+### Custom Column Configuration
 
 ```tsx
 <DataTable
+  sdk={sdk}
   entityId="abc-123-def-456"
-  uipathSdk={uipathSdk}
-  className="custom-table"
-  expansionLevel={2}
-  pageSize={100}
+  columnConfig={{
+    Name: {
+      pinned: 'left',
+      width: 200,
+      cellStyle: { fontWeight: 'bold' }
+    },
+    Email: {
+      filter: 'agTextColumnFilter'
+    }
+  }}
 />
 ```
 
-## AG Grid Styling
+### Custom Row Styling
 
-The component uses the `ag-theme-alpine` theme. You can customize it by overriding CSS variables or applying your own theme.
+```tsx
+<DataTable
+  sdk={sdk}
+  entityId="abc-123-def-456"
+  rowClassRules={{
+    'row-highlight': (params) => params.data.Status === 'Active',
+    'row-disabled': (params) => params.data.IsDeleted
+  }}
+  className="custom-table"
+/>
+```
+
+## TypeScript Support
+
+The package exports TypeScript types for custom implementations:
+
+```tsx
+import type { DataTableProps, GridRow } from '@uipath/ui-widgets-datatable';
+
+// Use types in your components
+const MyComponent: React.FC<DataTableProps> = (props) => {
+  // Your implementation
+};
+```
+
+## Styling
+
+The component uses ag-Grid's `themeQuartz`. Import the package styles in your application:
+
+```tsx
+import '@uipath/ui-widgets-datatable/dist/index.css';
+```
+
+For custom styling, override CSS variables or add custom classes via the `className` prop.
 
 ## Requirements
 

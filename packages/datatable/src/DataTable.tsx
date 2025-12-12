@@ -1,54 +1,58 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { CellWithExpandButton } from '@uipath/datatable/components/CellWithExpandButton';
-import { DetailPanel } from '@uipath/datatable/components/DetailPanel';
-import { DiffDialog } from '@uipath/datatable/components/DiffDialog';
-import { Toolbar } from '@uipath/datatable/components/Toolbar';
-import { useEntityData } from '@uipath/datatable/hooks/useEntityData';
-import { useRowEditing } from '@uipath/datatable/hooks/useRowEditing';
-import type { DataTableProps } from '@uipath/datatable/types';
-import { GridRow } from '@uipath/datatable/types';
-import { deepClone, getDiffData } from '@uipath/datatable/utils/dataUtils';
-import { getFieldValue } from '@uipath/datatable/utils/fieldUtils';
-import type {
-  ColDef,
-  GetRowIdParams,
-  GridApi,
-  GridReadyEvent,
-  ICellRendererParams,
-  IRowNode,
-  IsFullWidthRowParams,
-  RowClassParams,
-  RowHeightParams,
-} from 'ag-grid-community';
+import type { CellValueChangedEvent, GridApi, ICellRendererParams, IRowNode } from 'ag-grid-community';
 import { themeQuartz } from 'ag-grid-community';
 import { AgGridReact } from 'ag-grid-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { DiffDialog } from '@uipath/datatable/components/DiffDialog';
+import { EmptyState } from '@uipath/datatable/components/EmptyState';
+import { ErrorState } from '@uipath/datatable/components/ErrorState';
+import { LoadingState } from '@uipath/datatable/components/LoadingState';
+import { Toolbar } from '@uipath/datatable/components/Toolbar';
+import { DEFAULT_CLASS_NAME, DEFAULT_PAGE_SIZE } from '@uipath/datatable/constants/defaults';
+import { useEntityData } from '@uipath/datatable/hooks/useEntityData';
+import { useGridApi } from '@uipath/datatable/hooks/useGridApi';
+import { useGridCallbacks } from '@uipath/datatable/hooks/useGridCallbacks';
+import { useMasterDetail } from '@uipath/datatable/hooks/useMasterDetail';
+import { useNewRecords } from '@uipath/datatable/hooks/useNewRecords';
+import { useRowEditing } from '@uipath/datatable/hooks/useRowEditing';
+import type { DataTableProps } from '@uipath/datatable/types';
+import { getDiffData } from '@uipath/datatable/utils/dataUtils';
+import { getDefaultColDef, getRowSelection } from '@uipath/datatable/utils/gridConfig';
+
 import './DataTable.scss';
 
+/**
+ * DataTable Component
+ *
+ * A feature-rich data table component built on top of ag-Grid with support for:
+ * - CRUD operations (Create, Read, Update, Delete)
+ * - Master-detail view with grouping
+ * - Cell editing with diff visualization
+ * - Batch operations
+ * - Row selection
+ *
+ * @example
+ * ```tsx
+ * <DataTable
+ *   sdk={uiPathSDK}
+ *   entityId="user-entity-id"
+ *   pageSize={50}
+ * />
+ * ```
+ */
 export const DataTable = ({
   sdk,
   entityId,
-  className = '',
-  pageSize = 50,
+  className = DEFAULT_CLASS_NAME,
+  pageSize = DEFAULT_PAGE_SIZE,
   columnConfig,
   rowClassRules,
 }: DataTableProps) => {
   const [showDiffDialog, setShowDiffDialog] = useState(false);
-  const [gridApi, setGridApi] = useState<GridApi>();
-  const [selectedRowsCount, setSelectedRowsCount] = useState(0);
-  const [newRecords, setNewRecords] = useState<Map<string, any>>(new Map());
-  const [selectedGroupBy, setSelectedGroupBy] = useState<string>('');
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const [refEntityData, setRefEntityData] = useState<GridRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const expandedRowsRef = useRef<Set<string>>(new Set());
   const gridApiRef = useRef<GridApi | null>(null);
-  const rowHeightCache = useRef<Map<string, number>>(new Map());
 
-  const openDiffDialog = () => setShowDiffDialog(true);
-
-  const closeDiffDialog = () => setShowDiffDialog(false);
-
+  // Entity data management
   const {
     rowData,
     setRowData,
@@ -62,307 +66,124 @@ export const DataTable = ({
     fetchEntityRecords,
   } = useEntityData(sdk, entityId, columnConfig);
 
-  const groupableColumns = entity?.fields
-    .filter((field) => field.isForeignKey && !field.isSystemField)
-    .map((field) => field.displayName || field.name) || [];
+  // Grid API and selection
+  const { gridApi, selectedRowsCount, onGridReady: baseOnGridReady, onSelectionChanged } = useGridApi();
 
-  const handleGroupByChange = (column: string) => {
-    setSelectedGroupBy(column);
-    setExpandedRows(new Set());
-    rowHeightCache.current.clear();
-  };
-
-  // Sync ref with state
-  useEffect(() => {
-    expandedRowsRef.current = expandedRows;
-  }, [expandedRows]);
-
-  const toggleExpand = useCallback((rowId: string) => {
-    setExpandedRows((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(rowId)) {
-        newSet.delete(rowId);
-      } else {
-        newSet.add(rowId);
-      }
-      return newSet;
-    });
-  }, []);
-
-  // Stable cell renderer function that reads from ref
-  const expandButtonCellRenderer = useCallback((params: ICellRendererParams) => {
-    if (params.data?._isDetailRow) return null;
-    return CellWithExpandButton({
-      cellName: params.value,
-      cellId: params.data.Id,
-      isExpanded: expandedRowsRef.current.has(params.data.Id),
-      onToggleExpand: toggleExpand,
-    });
-  }, [toggleExpand]);
-
-  // Fetch reference entity data when group by is selected
-  useEffect(() => {
-    const fetchRefEntityData = async () => {
-      if (selectedGroupBy && entity) {
-        setLoading(true);
-        try {
-          const refEntityId = entity?.fields.find(f => f.displayName === selectedGroupBy)?.referenceEntity?.id;
-          if (refEntityId) {
-            const refEntity = await sdk.entities.getById(refEntityId);
-            const refEntityRecords = (await refEntity.getRecords()).items;
-            setRefEntityData(refEntityRecords);
-
-            const columns: ColDef[] = refEntity.fields.filter(f => !f.isSystemField).map((f) => {
-              const valueGetter = (params: any) => getFieldValue(params.data?.[f.name], f)
-              return {
-                field: f.name,
-                headerName: f.displayName,
-                valueGetter: valueGetter,
-                tooltipValueGetter: valueGetter,
-              }
-            });
-            columns[0].cellRenderer = expandButtonCellRenderer;
-            setColumnDefs(columns);
-          }
-        } finally {
-          setLoading(false);
-        }
-      } else if (!selectedGroupBy) {
-        setRefEntityData([]);
-        setColumnDefs(originalColumnDefs);
-      }
-    };
-
-    fetchRefEntityData();
-  }, [entity, selectedGroupBy, sdk, originalColumnDefs, setColumnDefs, expandButtonCellRenderer]);
-
-  // Flatten row data with detail rows when expandedRows changes
-  useEffect(() => {
-    if (selectedGroupBy && refEntityData.length > 0) {
-      const newRows: GridRow[] = [];
-
-      refEntityData.forEach((record) => {
-        newRows.push(record);
-
-        if (expandedRows.has(record.Id)) {
-          const groupByFieldName = entity?.fields.find(f => f.displayName === selectedGroupBy)?.name || '';
-          const groupedRecords = originalData.filter(r => r[groupByFieldName]?.Id === record.Id);
-          newRows.push({
-            ...record,
-            _isExpandedRow: true,
-            _groupedRecords: groupedRecords
-          });
-        }
-      });
-
-      setRowData(newRows);
-
-      // Refresh cells to update expand button state
-      if (gridApiRef.current) {
-        gridApiRef.current.refreshCells({ force: true });
-      }
-    } else if (!selectedGroupBy) {
-      setRowData(deepClone(originalData));
-    }
-  }, [expandedRows, refEntityData, selectedGroupBy, originalData, setRowData, entity?.fields]);
-
+  // Row editing
   const {
     editedRows,
-    handleCellValueChanged: originalHandleCellValueChanged,
+    handleCellValueChanged: baseHandleCellValueChanged,
     commitUpdates,
     revertAllUpdates,
     revertSingleCellUpdate,
   } = useRowEditing(originalData, setRowData, fetchEntityRecords);
 
-  const handleCellValueChanged = (event: any) => {
-    const rowId = event.data.Id;
+  // New records management
+  const {
+    newRecords,
+    setNewRecords,
+    handleAddRow,
+    handleInsertRecord,
+    handleDiscardNewRecords,
+    trackNewRecordChange,
+  } = useNewRecords(columnDefs, rowData, setRowData, entity, fetchEntityRecords, setError);
 
-    // Check if this is a new record (has temp ID)
-    if (rowId && rowId.startsWith('temp-')) {
-      setNewRecords((prev) => {
-        const updated = new Map(prev);
-        updated.set(rowId, event.data);
-        return updated;
-      });
-    } else {
-      // Handle existing record edits
-      originalHandleCellValueChanged(event);
-    }
-  };
+  // Grid callbacks refs (must be declared before use)
+  const expandedRowsRef = useRef<Set<string>>(new Set());
+  const rowHeightCacheRef = useRef<Map<string, number>>(new Map());
 
-  const handleCommit = async () => {
+  // Placeholder ref for gridCallbacks - will be populated after gridCallbacks is created
+  const gridCallbacksRef = useRef<{
+    expandButtonCellRenderer: (params: ICellRendererParams) => React.ReactNode;
+  } | undefined>(undefined);
+
+  // Master-detail with grouping
+  const {
+    selectedGroupBy,
+    expandedRows,
+    groupableColumns,
+    handleGroupByChange,
+    toggleExpand,
+  } = useMasterDetail(
+    sdk,
+    entity,
+    originalData,
+    setRowData,
+    setColumnDefs,
+    originalColumnDefs,
+    (params) => gridCallbacksRef.current?.expandButtonCellRenderer(params) ?? null,
+    { current: gridApiRef.current ? { api: gridApiRef.current } : null } as React.MutableRefObject<{ api?: { refreshCells?: (params?: unknown) => void } } | null>,
+    rowHeightCacheRef,
+    setLoading
+  );
+
+  useEffect(() => {
+    expandedRowsRef.current = expandedRows;
+  }, [expandedRows]);
+
+  const gridCallbacks = useGridCallbacks(
+    entity,
+    selectedGroupBy,
+    expandedRowsRef,
+    toggleExpand
+  );
+
+  // Update the ref with the gridCallbacks
+  gridCallbacksRef.current = gridCallbacks;
+
+  // Enhanced grid ready handler that combines grid API setup with base handler
+  const onGridReady = useCallback(
+    (params: { api: GridApi }) => {
+      gridApiRef.current = params.api;
+      baseOnGridReady(params);
+    },
+    [baseOnGridReady]
+  );
+
+  // Dialog handlers
+  const openDiffDialog = useCallback(() => setShowDiffDialog(true), []);
+  const closeDiffDialog = useCallback(() => setShowDiffDialog(false), []);
+
+  // Combined cell value changed handler
+  const handleCellValueChanged = useCallback(
+    (event: CellValueChangedEvent) => {
+      const rowId = event.data?.Id;
+
+      // Check if this is a new record (has temp ID)
+      if (event.data) {
+        trackNewRecordChange(rowId, event.data);
+      }
+
+      // If not a new record, handle as edit
+      if (!rowId || !rowId.startsWith('temp-')) {
+        baseHandleCellValueChanged(event);
+      }
+    },
+    [trackNewRecordChange, baseHandleCellValueChanged]
+  );
+
+  // Commit changes handler
+  const handleCommit = useCallback(async () => {
     try {
       closeDiffDialog();
       await commitUpdates(entity);
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [closeDiffDialog, commitUpdates, entity]);
 
-  const handleRevertAll = () => {
+  // Revert all changes handler
+  const handleRevertAll = useCallback(() => {
     try {
       closeDiffDialog();
       revertAllUpdates();
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [closeDiffDialog, revertAllUpdates]);
 
-  const refreshComponent = (async () => {
-    setLoading(true);
-    try {
-      setExpandedRows(new Set());
-      setSelectedGroupBy('');
-      setNewRecords(new Map())
-      revertAllUpdates();
-      await fetchEntityRecords();
-    } finally {
-      setLoading(false);
-    }
-  })
-
-  const isFullWidthRow = useCallback((params: IsFullWidthRowParams<GridRow>) => {
-    return params.rowNode.data?._isExpandedRow === true;
-  }, []);
-
-  const fullWidthCellRenderer = useCallback((props: ICellRendererParams<GridRow>) => {
-    return (
-      <div className="detail-row-content">
-        <DetailPanel rowData={props.data?._groupedRecords || []} groupByFieldDisplayName={selectedGroupBy} groupByFieldId={props.data?.Id} entity={entity} />
-      </div>
-    );
-  }, [entity, selectedGroupBy]);
-
-  const getRowHeight = useCallback((params: RowHeightParams<GridRow>) => {
-    if (!params.data?._isExpandedRow) {
-      return undefined; // ag-grid will automatically calc height of parent rows
-    }
-
-    const cacheKey = `detail-${params.data.Id}`;
-    if (rowHeightCache.current.has(cacheKey)) {
-      return rowHeightCache.current.get(cacheKey)!;
-    }
-
-    // Calculate estimated height
-    const detailCount = params.data._groupedRecords?.length || 0;
-    const estimatedHeight = 48 + (detailCount * 42) + 40; // Default size of header + rows + padding
-
-    // Schedule re-measure after DOM renders. Without this, height calc is not working fine.
-    setTimeout(() => {
-      const row = document.querySelector(`[row-id="${cacheKey}"] .detail-row-content`);
-      const actualHeight = row?.getBoundingClientRect().height;
-      if (actualHeight && actualHeight > 0) {
-        rowHeightCache.current.set(cacheKey, actualHeight);
-        gridApiRef.current?.onRowHeightChanged();
-      }
-    }, 100);
-
-    // First return an estimated height. When DOM renders, then return actual height
-    return estimatedHeight;
-  }, []);
-
-  const getRowClass = useCallback((params: RowClassParams<GridRow>) => {
-    return params.data?._isExpandedRow ? 'detail-row' : 'master-row';
-  }, []);
-
-  const getRowId = useCallback((params: GetRowIdParams<GridRow>): string => {
-    if (!params.data) return `row-${Math.random()}`;
-    if (params.data._isExpandedRow) {
-      return `detail-${params.data.Id || params.data.id || Math.random()}`;
-    }
-    return params.data.Id || params.data.id || `row-${Math.random()}`;
-  }, []);
-
-  const onGridReady = useCallback((params: GridReadyEvent) => {
-    gridApiRef.current = params.api;
-    params.api.sizeColumnsToFit();
-    setGridApi(params.api);
-  }, []);
-
-  const rowSelection = useMemo(() => { 
-    return { 
-      mode: 'multiRow' as const
-    };
-  }, []);
-
-  const onSelectionChanged = () => {
-    if (!gridApi) return;
-    const selectedRows = gridApi.getSelectedRows();
-    setSelectedRowsCount(selectedRows.length);
-  };
-
-  const handleAddRow = () => {
-    if (!gridApi) return;
-
-    // Create a new empty record with all column fields
-    const newRecord: any = {};
-    columnDefs.forEach((colDef: any) => {
-      if (colDef.field && colDef.field !== 'Id') {
-        newRecord[colDef.field] = '';
-      }
-    });
-
-    // Add a temporary ID for the new record
-    const tempId = `temp-${Date.now()}`;
-    newRecord.Id = tempId;
-
-    // Track this as a new record
-    setNewRecords((prev) => {
-      const updated = new Map(prev);
-      updated.set(tempId, newRecord);
-      return updated;
-    });
-
-    // Add the new record to the top of the data
-    const updatedRowData = [newRecord, ...rowData];
-    setRowData(updatedRowData);
-  };
-
-  const handleInsertRecord = async () => {
-    if (!entity || newRecords.size === 0) return;
-
-    try {
-      // Get all new records and prepare them for insertion (remove temp IDs)
-      const recordsToInsert = Array.from(newRecords.values()).map((record) => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { Id, ...recordWithoutId } = record;
-        return recordWithoutId;
-      });
-
-      // Insert via SDK
-      await entity.insert(recordsToInsert);
-
-      // Clear new records tracking
-      setNewRecords(new Map());
-
-      // Refresh the data to show the newly inserted records with real IDs
-      await fetchEntityRecords();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to insert records');
-    }
-  };
-
-  const handleDiscardNewRecords = () => {
-    if (newRecords.size === 0) return;
-
-    // Confirm before discarding
-    const recordText = newRecords.size === 1 ? 'row' : 'rows';
-    const confirmed = window.confirm(
-      `Are you sure you want to discard ${newRecords.size} new ${recordText}? This action cannot be undone.`
-    );
-
-    if (!confirmed) return;
-
-    // Remove all new records from the row data
-    const newRecordIds = Array.from(newRecords.keys());
-    const updatedRowData = rowData.filter((row: any) => !newRecordIds.includes(row.Id));
-    setRowData(updatedRowData);
-
-    // Clear new records tracking
-    setNewRecords(new Map());
-  };
-
-  const handleDeleteRecords = async () => {
+  // Delete records handler
+  const handleDeleteRecords = useCallback(async () => {
     if (!gridApi) return;
 
     const selectedNodes: IRowNode[] = gridApi.getSelectedNodes();
@@ -377,20 +198,32 @@ export const DataTable = ({
     if (!confirmed) return;
 
     // Remove selected rows from rowData
-    const updatedRowData = rowData.filter((r: any) => !selectedDataIds.includes(r.Id));
+    const updatedRowData = rowData.filter((r) => !selectedDataIds.includes(r.Id));
     setRowData(updatedRowData);
 
     // Clear selection
     gridApi.deselectAll();
-    setSelectedRowsCount(0);
 
     try {
       await entity?.delete(selectedDataIds);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete entity records')
+      setError(err instanceof Error ? err.message : 'Failed to delete entity records');
     }
-  };
+  }, [gridApi, rowData, setRowData, entity, setError]);
 
+  // Refresh component
+  const refreshComponent = useCallback(async () => {
+    setLoading(true);
+    try {
+      setNewRecords(new Map());
+      revertAllUpdates();
+      await fetchEntityRecords();
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchEntityRecords, revertAllUpdates, setNewRecords]);
+
+  // Initial data fetch on mount or when entityId/sdk changes
   useEffect(() => {
     if (entityId && sdk) {
       refreshComponent();
@@ -398,22 +231,32 @@ export const DataTable = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entityId, sdk]);
 
-  if (loading) {
-    return <div className="datatable-loading">Loading...</div>;
-  }
-
-  if (error) {
-    return <div className="datatable-error">Error: {error}</div>;
-  }
-
-  if (!rowData || rowData.length === 0) {
-    return <div className="datatable-empty">No data available</div>;
-  }
-
+  // Memoized values
   const isMasterDetailMode = !!selectedGroupBy;
+  const rowSelection = useMemo(() => getRowSelection(), []);
+  const defaultColDef = useMemo(() => getDefaultColDef(!isMasterDetailMode), [isMasterDetailMode]);
+  const diffData = useMemo(() => getDiffData(editedRows, originalData), [editedRows, originalData]);
 
+  // Render loading state
+  if (loading) {
+    return <LoadingState />;
+  }
+
+  // Render error state
+  if (error) {
+    return <ErrorState error={error} />;
+  }
+
+  // Render empty state
+  if (!rowData || rowData.length === 0) {
+    return <EmptyState />;
+  }
+
+  // Main render
   return (
-    <div className={`datatable-container ${isMasterDetailMode ? 'datatable-master-detail' : ''} ${className}`}>
+    <div
+      className={`datatable-container ${isMasterDetailMode ? 'datatable-master-detail' : ''} ${className}`}
+    >
       <Toolbar
         onRefresh={refreshComponent}
         onShowDiff={openDiffDialog}
@@ -421,12 +264,12 @@ export const DataTable = ({
         onAddRow={handleAddRow}
         onInsertRecord={handleInsertRecord}
         onDiscardNewRecords={handleDiscardNewRecords}
+        onGroupByChange={handleGroupByChange}
         editedRowsCount={editedRows.size}
         selectedRowsCount={selectedRowsCount}
         newRecordsCount={newRecords.size}
         groupableColumns={groupableColumns}
         selectedGroupBy={selectedGroupBy}
-        onGroupByChange={handleGroupByChange}
       />
 
       <div className="datatable-grid-wrapper">
@@ -436,27 +279,21 @@ export const DataTable = ({
           columnDefs={columnDefs}
           pagination={true}
           paginationPageSize={pageSize}
-          defaultColDef={{
-            sortable: true,
-            filter: true,
-            resizable: true,
-            editable: !isMasterDetailMode,
-            flex: 1,
-            minWidth: 100,
-          }}
+          defaultColDef={defaultColDef}
           theme={themeQuartz}
           onCellValueChanged={handleCellValueChanged}
-          rowSelection={!isMasterDetailMode ? rowSelection : undefined}
           rowClassRules={rowClassRules}
           onGridReady={onGridReady}
-          onSelectionChanged={!isMasterDetailMode ? onSelectionChanged : undefined}
+          {...(!isMasterDetailMode && {
+            rowSelection: rowSelection,
+            onSelectionChanged: onSelectionChanged,
+          })}
           {...(isMasterDetailMode && {
-            getRowHeight,
-            getRowClass,
-            getRowId,
-            onGridReady,
-            isFullWidthRow,
-            fullWidthCellRenderer,
+            getRowHeight: gridCallbacks.getRowHeight,
+            getRowClass: gridCallbacks.getRowClass,
+            getRowId: gridCallbacks.getRowId,
+            isFullWidthRow: gridCallbacks.isFullWidthRow,
+            fullWidthCellRenderer: gridCallbacks.fullWidthCellRenderer,
             suppressScrollOnNewData: true,
             maintainColumnOrder: true,
             suppressRowTransform: true,
@@ -470,7 +307,7 @@ export const DataTable = ({
         onCommit={handleCommit}
         onRevertAll={handleRevertAll}
         onRevertField={revertSingleCellUpdate}
-        diffData={getDiffData(editedRows, originalData)}
+        diffData={diffData}
       />
     </div>
   );

@@ -3,11 +3,34 @@
   "version": "1.0.0",
   "description": "A simple React datatable component",
   "main": "dist/index.js",
-  "module": "dist/index.esm.js",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.scss",
+    "dist/**/*.css",
+    "README.md"
+  ],
+  "sideEffects": [
+    "*.scss",
+    "*.css"
+  ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "build:analyze": "tsup --metafile",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build"
   },
   "keywords": [
     "react",
@@ -24,11 +47,13 @@
   "devDependencies": {
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
+    "esbuild": "^0.27.1",
+    "tsup": "^8.5.1",
     "typescript": "~5.9.3"
   },
   "dependencies": {
     "@uipath/uipath-typescript": "^1.0.0-beta.16",
-    "ag-grid-react": "^34.3.1",
-    "ag-grid-community": "^34.3.1"
+    "ag-grid-community": "^34.3.1",
+    "ag-grid-react": "^34.3.1"
   }
 }

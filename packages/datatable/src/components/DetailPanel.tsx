@@ -1,10 +1,10 @@
+import { memo, useMemo } from 'react';
 import { GridRow } from '@uipath/datatable/types';
 import { getFieldValue } from '@uipath/datatable/utils/fieldUtils';
 import { EntityGetResponse } from '@uipath/uipath-typescript';
 import type { ColDef } from 'ag-grid-community';
 import { themeQuartz } from 'ag-grid-community';
 import { AgGridReact } from 'ag-grid-react';
-import { useMemo } from 'react';
 import './DetailPanel.scss';
 
 interface DetailPanelProps {
@@ -14,38 +14,58 @@ interface DetailPanelProps {
   entity: EntityGetResponse | undefined;
 }
 
-export const DetailPanel = ({ rowData, groupByFieldDisplayName, entity }: DetailPanelProps) => {
-  const columnDefs = useMemo<ColDef<GridRow>[]>(() => {
-    if (!entity) return [];
+/**
+ * Detail panel component for displaying grouped records in master-detail view
+ * Memoized to prevent unnecessary re-renders
+ */
+export const DetailPanel = memo<DetailPanelProps>(
+  ({ rowData, groupByFieldDisplayName, entity }) => {
+    const columnDefs = useMemo<ColDef<GridRow>[]>(() => {
+      if (!entity) return [];
 
-    const entityFieldsMap = new Map(entity.fields.map(field => [field.name, field]));
-    return entity.fields.filter(f => !f.isSystemField && f.displayName !== groupByFieldDisplayName).map((f) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const valueGetter = (params: any) => getFieldValue(params.data?.[f.name], entityFieldsMap.get(f.name))
-      return{
-        field: f.name,
-        headerName: f.displayName,
-        valueGetter: valueGetter,
-        tooltipValueGetter: valueGetter,
-      }
-    });
-  }, [entity, groupByFieldDisplayName])
+      return entity.fields
+        .filter((f) => !f.isSystemField && f.displayName !== groupByFieldDisplayName)
+        .map((f) => {
+          const valueGetter = (params: { data?: GridRow }) =>
+            getFieldValue(params.data?.[f.name], f);
+          return {
+            field: f.name,
+            headerName: f.displayName,
+            valueGetter,
+            tooltipValueGetter: valueGetter,
+          };
+        });
+    }, [entity, groupByFieldDisplayName]);
 
-  return (
-    <div className="detail-panel">
-      <div className="detail-panel-grid">
-        <AgGridReact
-          rowData={rowData}
-          columnDefs={columnDefs}
-          domLayout="autoHeight"
-          defaultColDef={{
-            sortable: true,
-            resizable: true,
-            flex: 1
-          }}
-          theme={themeQuartz}
-        />
+    // Show message if no data
+    if (!rowData || rowData.length === 0) {
+      return (
+        <div className="detail-panel">
+          <div className="detail-panel-empty">
+            No records found in this group
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="detail-panel">
+        <div className="detail-panel-grid">
+          <AgGridReact
+            rowData={rowData}
+            columnDefs={columnDefs}
+            domLayout="autoHeight"
+            defaultColDef={{
+              sortable: true,
+              resizable: true,
+              flex: 1,
+            }}
+            theme={themeQuartz}
+          />
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  }
+);
+
+DetailPanel.displayName = 'DetailPanel';

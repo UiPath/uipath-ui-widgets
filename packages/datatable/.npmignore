@@ -1,0 +1,23 @@
+# Source files
+src/
+
+# Development files
+tsconfig.json
+.DS_Store
+*.log
+
+# Testing
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# Build artifacts (keep only dist/)
+node_modules/
+
+# Documentation (optional - remove if you want to include)
+# README.md
+
+# Git
+.git/
+.gitignore
