@@ -4,6 +4,7 @@ import { DetailPanel } from '@uipath/datatable/components/DetailPanel';
 import { DiffDialog } from '@uipath/datatable/components/DiffDialog';
 import { Toolbar } from '@uipath/datatable/components/Toolbar';
 import { useEntityData } from '@uipath/datatable/hooks/useEntityData';
+import { useEntityRecordsCache } from '@uipath/datatable/hooks/useEntityRecordsCache';
 import { useRowEditing } from '@uipath/datatable/hooks/useRowEditing';
 import type { DataTableProps } from '@uipath/datatable/types';
 import { GridRow } from '@uipath/datatable/types';
@@ -44,6 +45,7 @@ export const DataTable = ({
   const expandedRowsRef = useRef<Set<string>>(new Set());
   const gridApiRef = useRef<GridApi | null>(null);
   const rowHeightCache = useRef<Map<string, number>>(new Map());
+  const { getRecords, clearCache } = useEntityRecordsCache(sdk);
 
   const openDiffDialog = () => setShowDiffDialog(true);
 
@@ -109,7 +111,7 @@ export const DataTable = ({
           const refEntityId = entity?.fields.find(f => f.displayName === selectedGroupBy)?.referenceEntity?.id;
           if (refEntityId) {
             const refEntity = await sdk.entities.getById(refEntityId);
-            const refEntityRecords = (await refEntity.getRecords()).items;
+            const refEntityRecords = await getRecords(refEntityId);
             setRefEntityData(refEntityRecords);
 
             const columns: ColDef[] = refEntity.fields.filter(f => !f.isSystemField).map((f) => {
@@ -134,7 +136,7 @@ export const DataTable = ({
     };
 
     fetchRefEntityData();
-  }, [entity, selectedGroupBy, sdk, originalColumnDefs, setColumnDefs, expandButtonCellRenderer]);
+  }, [entity, selectedGroupBy, sdk, originalColumnDefs, setColumnDefs, expandButtonCellRenderer, getRecords]);
 
   // Flatten row data with detail rows when expandedRows changes
   useEffect(() => {
@@ -215,6 +217,7 @@ export const DataTable = ({
       setSelectedGroupBy('');
       setNewRecords(new Map())
       revertAllUpdates();
+      clearCache();
       await fetchEntityRecords();
     } finally {
       setLoading(false);

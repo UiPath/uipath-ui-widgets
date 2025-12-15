@@ -1,3 +1,4 @@
+import { useEntityRecordsCache } from '@uipath/datatable/hooks/useEntityRecordsCache';
 import { GridRow } from '@uipath/datatable/types';
 import { FieldMetaData, UiPath } from "@uipath/uipath-typescript";
 import { CustomCellEditorProps } from 'ag-grid-react';
@@ -16,6 +17,7 @@ export const RefFieldCellEditor = ({ sdk, field, entityRecord, onValueChange }: 
   const selectElementRef = useRef<HTMLSelectElement>(null);
   const hasFetchedRef = useRef(false);
   const recordsMapRef = useRef<Map<string, GridRow>>(new Map());
+  const { getRecords } = useEntityRecordsCache(sdk);
 
   const referenceEntityId = field.referenceEntity?.id;
   const referenceFieldName = field.referenceField?.definition?.name;
@@ -25,21 +27,21 @@ export const RefFieldCellEditor = ({ sdk, field, entityRecord, onValueChange }: 
 
     const fetchRecords = async () => {
       hasFetchedRef.current = true;
-      const records = await sdk.entities.getRecordsById(referenceEntityId || '');
+      const records = await getRecords(referenceEntityId || '');
 
       // Build Map for fast lookups
       recordsMapRef.current = new Map(
-        records.items.map(r => [r.Id, r])
+        records.map(r => [r.Id, r])
       );
 
-      setFieldOptions(records.items.map((r) => {
+      setFieldOptions(records.map((r) => {
         const displayName = r[referenceFieldName || ''];
         return <option key={r.Id} value={r.Id}>{displayName}</option>
       }));
     }
 
     fetchRecords();
-  }, [referenceEntityId, referenceFieldName, sdk]);
+  }, [referenceEntityId, referenceFieldName, sdk, getRecords]);
 
   useEffect(() => {
     if (fieldOptions.length > 0 && selectElementRef.current) {
