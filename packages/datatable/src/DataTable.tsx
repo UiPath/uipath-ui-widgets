@@ -172,7 +172,7 @@ export const DataTable = ({
     commitUpdates,
     revertAllUpdates,
     revertSingleCellUpdate,
-  } = useRowEditing(originalData, setRowData, fetchEntityRecords);
+  } = useRowEditing(originalData, setRowData);
 
   const handleCellValueChanged = (event: any) => {
     const rowId = event.data.Id;
@@ -465,6 +465,7 @@ export const DataTable = ({
       </div>
 
       <DiffDialog
+        entity={entity}
         isOpen={showDiffDialog}
         onClose={closeDiffDialog}
         onCommit={handleCommit}

@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { getFieldValue } from '@uipath/datatable/utils/fieldUtils';
+import { EntityGetResponse } from '@uipath/uipath-typescript';
+import { useMemo } from 'react';
 import './DiffDialog.scss';
 
 interface DiffDialogProps {
+  entity: EntityGetResponse | undefined;
   isOpen: boolean;
   onClose: () => void;
   onCommit: () => void;
@@ -15,6 +19,7 @@ interface DiffDialogProps {
 }
 
 export const DiffDialog = ({
+  entity,
   isOpen,
   onClose,
   onCommit,
@@ -22,6 +27,10 @@ export const DiffDialog = ({
   onRevertField,
   diffData,
 }: DiffDialogProps) => {
+  const fieldsMap = useMemo(() => {
+    return new Map(entity?.fields.map(f => [f.name, f]) || []);
+  }, [entity]);
+
   if (!isOpen) return null;
 
   return (
@@ -50,14 +59,15 @@ export const DiffDialog = ({
                     const originalValue = original?.[key];
                     const editedValue = edited[key];
                     const hasChanged = JSON.stringify(originalValue) !== JSON.stringify(editedValue);
+                    const field = fieldsMap.get(key);
 
                     return hasChanged ? (
                       <tr key={key} className="datatable-diff-changed">
                         <td>{key}</td>
-                        <td className="datatable-diff-old">{originalValue}</td>
+                        <td className="datatable-diff-old">{field ? getFieldValue(originalValue, field) : originalValue}</td>
                         <td className="datatable-diff-new">
                           <div className="datatable-diff-new-content">
-                            <span>{editedValue}</span>
+                            <span>{field ? getFieldValue(editedValue, field) : editedValue}</span>
                             <button
                               onClick={() => onRevertField(rowId, key, originalValue)}
                               className="datatable-button-revert-field"

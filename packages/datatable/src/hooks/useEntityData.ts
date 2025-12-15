@@ -1,6 +1,6 @@
 import { GridRow } from '@uipath/datatable/types';
 import { deepClone } from '@uipath/datatable/utils/dataUtils';
-import { getFieldValue } from '@uipath/datatable/utils/fieldUtils';
+import { getFieldValue, createValueSetter, createCellEditorSelector } from '@uipath/datatable/utils/fieldUtils';
 import { EntityGetResponse, UiPath } from '@uipath/uipath-typescript';
 import { ColDef } from 'ag-grid-community';
 import { useCallback, useState } from 'react';
@@ -39,6 +39,8 @@ export const useEntityData = (
             headerName: f.displayName,
             valueGetter: valueGetter,
             tooltipValueGetter: valueGetter,
+            valueSetter: createValueSetter(f.name),
+            cellEditorSelector: createCellEditorSelector(f, sdk),
             ...columnConfig?.[f.displayName],
           }
         });
