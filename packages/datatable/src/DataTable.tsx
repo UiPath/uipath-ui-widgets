@@ -409,10 +409,6 @@ export const DataTable = ({
     return <div className="datatable-error">Error: {error}</div>;
   }
 
-  if (!rowData || rowData.length === 0) {
-    return <div className="datatable-empty">No data available</div>;
-  }
-
   const isMasterDetailMode = !!selectedGroupBy;
 
   return (
