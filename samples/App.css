@@ -399,7 +399,8 @@
 .datatable-wrapper .ag-header-cell-label {
   display: flex !important;
   align-items: center !important;
-  gap: 8px !important;
+  gap: 6px !important;
+  width: 100% !important;
 }
 
 /* Sort Icons */
@@ -409,7 +410,6 @@
 .datatable-wrapper .ag-sort-indicator-icon {
   color: white !important;
   opacity: 0.9;
-  margin-left: 6px !important;
   flex-shrink: 0 !important;
 }
 
@@ -424,7 +424,6 @@
 .datatable-wrapper .ag-icon-menu {
   color: white !important;
   opacity: 0.85;
-  margin-left: 6px !important;
   flex-shrink: 0 !important;
 }
 
@@ -446,20 +445,18 @@
 
 .datatable-wrapper .ag-sort-order {
   color: white !important;
-  margin-left: 4px !important;
 }
 
 /* Sort indicator container */
 .datatable-wrapper .ag-sort-indicator-container {
-  margin-left: 6px !important;
   display: flex !important;
   align-items: center !important;
   gap: 4px !important;
+  flex-shrink: 0 !important;
 }
 
 /* Filter menu button spacing */
 .datatable-wrapper .ag-header-cell-menu-button {
-  margin-left: 6px !important;
   display: flex !important;
   align-items: center !important;
   flex-shrink: 0 !important;
@@ -560,8 +557,9 @@
 .datatable-wrapper .ag-header-cell-comp-wrapper {
   display: flex !important;
   align-items: center !important;
-  gap: 6px !important;
+  justify-content: space-between !important;
   flex: 1 !important;
+  width: 100% !important;
 }
 
 .datatable-wrapper .ag-header-cell-resize {
@@ -1191,6 +1189,25 @@
   border: 2px solid var(--teal-100) !important;
 }
 
+/* Center text content within detail panel table cells */
+.detail-panel .ag-cell {
+  display: flex !important;
+  align-items: center !important;
+  padding: 12px 16px !important;
+  line-height: 1.5 !important;
+}
+
+.detail-panel .ag-header-cell {
+  display: flex !important;
+  align-items: center !important;
+  padding: 12px 16px !important;
+}
+
+.detail-panel .ag-theme-quartz,
+.detail-panel .ag-theme-alpine {
+  --ag-cell-horizontal-padding: 16px;
+}
+
 .detail-panel::before {
   content: '↳ Details';
   display: block;
@@ -1209,6 +1226,9 @@
 
 .expand-button-cell {
   gap: 10px !important;
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
 }
 
 .expand-button {
@@ -1221,6 +1241,10 @@
   height: 28px !important;
   box-shadow: var(--shadow-sm) !important;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  flex-shrink: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .expand-button:hover {
@@ -1246,11 +1270,58 @@
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
   width: 16px !important;
   height: 16px !important;
+  display: block !important;
+  margin: 0 auto !important;
 }
 
 .cell-value {
   font-weight: 400 !important;
   color: var(--text-primary) !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* ========================================
+   GROUP BY / MASTER-DETAIL ROW STYLING
+   ======================================== */
+
+/* Master row (grouped row) styling */
+.datatable-wrapper .ag-row-group {
+  background: linear-gradient(90deg, var(--teal-50) 0%, #ffffff 100%) !important;
+  font-weight: 500 !important;
+  border-left: 4px solid var(--teal-500) !important;
+}
+
+.datatable-wrapper .ag-row-group:hover {
+  background: linear-gradient(90deg, var(--teal-100) 0%, var(--teal-50) 100%) !important;
+}
+
+/* Ensure expand button in grouped rows is centered */
+.datatable-wrapper .ag-row-group .expand-button-cell {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  height: 100% !important;
+  padding: 0 16px !important;
+}
+
+.datatable-wrapper .ag-row-group .expand-button {
+  margin: 0 !important;
+}
+
+.datatable-wrapper .ag-cell:has(.expand-button-cell) {
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.datatable-wrapper .expand-button-cell {
+  padding: 0 16px !important;
+}
+
+/* Full width detail rows */
+.datatable-wrapper .ag-full-width-row {
+  background: var(--teal-50) !important;
 }
 
 /* ========================================
