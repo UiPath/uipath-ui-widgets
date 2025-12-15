@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useMemo } from 'react';
-import { Box, Container, Grid, List, ListItem, ListItemButton, ListItemText } from '@mui/material'
+import { List, ListItem, ListItemButton, ListItemText } from '@mui/material'
 import { DataTable } from '@uipath/ui-widgets-datatable'
 import type { UiPath } from '@uipath/uipath-typescript';
 import './App.css'
@@ -54,38 +54,56 @@ function App({ uipathSdk }: AppProps) {
   }, [uipathSdk]);
 
   return (
-    <Container maxWidth="xl">
-      <Box sx={{ bgcolor: '#eee', height: '98vh' }}>
-        <Grid container spacing={2}>
-          <Grid size={3} sx={{bgcolor: '#ddd'}}>
-            <List sx={{ height: '95vh', overflowY: 'auto' }}>
-              {loading ? (
-                <ListItem>
-                  <ListItemText primary="Loading entities..." />
+    <div className="app-container">
+      <div className="app-header">
+        <h1>UIPath UI Widgets</h1>
+        <p>Explore and manage your data entities with elegance</p>
+      </div>
+      
+      <div className="app-grid">
+        <div className="entity-sidebar">
+          <div className="entity-sidebar-header">
+            📊 Data Entities
+          </div>
+          <List className="entity-list">
+            {loading ? (
+              <div className="loading-container">
+                <div className="loading-spinner"></div>
+                <div className="loading-text">Loading entities...</div>
+              </div>
+            ) : entities.length === 0 ? (
+              <ListItem>
+                <ListItemText primary="No entities found" />
+              </ListItem>
+            ) : (
+              entities.map((entity) => (
+                <ListItem key={entity.id} disablePadding className="entity-list-item">
+                  <ListItemButton
+                    className="entity-list-button"
+                    selected={selectedEntityId === entity.id}
+                    onClick={() => setSelectedEntityId(entity.id)}
+                  >
+                    <ListItemText
+                      className="entity-list-text"
+                      primary={entity.displayName || entity.name}
+                    />
+                  </ListItemButton>
                 </ListItem>
-              ) : entities.length === 0 ? (
-                <ListItem>
-                  <ListItemText primary="No entities found" />
-                </ListItem>
-              ) : (
-                entities.map((entity) => (
-                  <ListItem key={entity.id} disablePadding>
-                    <ListItemButton
-                      selected={selectedEntityId === entity.id}
-                      onClick={() => setSelectedEntityId(entity.id)}
-                    >
-                      <ListItemText
-                        primary={entity.displayName || entity.name}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                ))
-              )}
-            </List>
-          </Grid>
-          <Grid size={9}>
-            {selectedEntityId ? (
-              <Box sx={{height: '500px', marginTop: 2, marginRight: 2}}>
+              ))
+            )}
+          </List>
+        </div>
+
+        <div className="content-area">
+          {selectedEntityId ? (
+            <>
+              <div className="content-header">
+                <div className="content-header-icon">📋</div>
+                <h2 className="content-header-title">
+                  {entities.find(e => e.id === selectedEntityId)?.displayName || 'Entity Data'}
+                </h2>
+              </div>
+              <div className="datatable-wrapper">
                 <DataTable
                   sdk={uipathSdk}
                   entityId={selectedEntityId}
@@ -93,16 +111,20 @@ function App({ uipathSdk }: AppProps) {
                   columnConfig={columnConfig}
                   rowClassRules={rowClassRules}
                 />
-              </Box>
-            ) : (
-              <Box sx={{ p: 2 }}>
-                <p>Select an entity from the list to view its data</p>
-              </Box>
-            )}
-          </Grid>
-        </Grid>
-      </Box>
-    </Container>
+              </div>
+            </>
+          ) : (
+            <div className="empty-state">
+              <div className="empty-state-icon">🔍</div>
+              <h3 className="empty-state-title">No Entity Selected</h3>
+              <p className="empty-state-description">
+                Please select an entity from the sidebar to view and manage its data records
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
