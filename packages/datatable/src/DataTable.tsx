@@ -256,7 +256,7 @@ export const DataTable = ({
       const actualHeight = row?.getBoundingClientRect().height;
       if (actualHeight && actualHeight > 0) {
         rowHeightCache.current.set(cacheKey, actualHeight);
-        gridApiRef.current?.onRowHeightChanged();
+        params.node.setRowHeight(actualHeight);
       }
     }, 100);
 

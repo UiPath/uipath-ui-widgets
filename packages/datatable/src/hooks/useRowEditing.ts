@@ -24,9 +24,9 @@ export const useRowEditing = (
 
   const commitUpdates = async (entity: EntityGetResponse | undefined) => {
     try {
+      setEditedRows(new Map());
       const rowsToUpdate = Array.from(editedRows.values());
       await entity?.update(rowsToUpdate);
-      setEditedRows(new Map());
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Failed to commit changes');
     }
