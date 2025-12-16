@@ -99,12 +99,15 @@
               background-color: #e8f5e9;
               color: #2e7d32;
               position: relative;
+              display: flex;
+              align-items: center;
 
               .datatable-diff-new-content {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
                 gap: 8px;
+                width: 100%;
 
                 span {
                   flex: 1;

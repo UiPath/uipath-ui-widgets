@@ -8,7 +8,6 @@ import { useState } from 'react';
 export const useRowEditing = (
   originalData: GridRow[],
   setRowData: React.Dispatch<React.SetStateAction<GridRow[]>>,
-  fetchEntityRecords: () => Promise<void>
 ) => {
   const [editedRows, setEditedRows] = useState<Map<string, any>>(new Map());
 
@@ -25,10 +24,9 @@ export const useRowEditing = (
 
   const commitUpdates = async (entity: EntityGetResponse | undefined) => {
     try {
+      setEditedRows(new Map());
       const rowsToUpdate = Array.from(editedRows.values());
       await entity?.update(rowsToUpdate);
-      setEditedRows(new Map());
-      await fetchEntityRecords();
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Failed to commit changes');
     }
