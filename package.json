@@ -3,11 +3,18 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "rolldown-vite",
+    "build": "npm run build --workspaces",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "rolldown-vite preview",
+    "test": "npm test --workspaces --if-present",
+    "test:watch": "npm run test:watch --workspaces --if-present",
+    "test:ui": "npm run test:ui --workspaces --if-present",
+    "test:coverage": "npm run test:coverage --workspaces --if-present"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -30,12 +37,9 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "rolldown-vite": "7.2.5",
     "sass-embedded": "^1.93.3",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.46.4",
-    "vite": "npm:rolldown-vite@7.2.5"
-  },
-  "overrides": {
-    "vite": "npm:rolldown-vite@7.2.5"
+    "typescript-eslint": "^8.46.4"
   }
 }

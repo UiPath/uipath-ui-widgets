@@ -32,7 +32,11 @@ build
 
 # Testing
 coverage
+**/coverage
 .nyc_output
+*.lcov
+.vitest
+**/.vitest
 
 # Cache
 .cache
