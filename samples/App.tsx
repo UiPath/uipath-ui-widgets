@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useMemo } from 'react';
 import { List, ListItem, ListItemButton, ListItemText } from '@mui/material'
 import { DataTable } from '@uipath/ui-widgets-datatable'

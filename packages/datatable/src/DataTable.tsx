@@ -282,8 +282,8 @@ export const DataTable = ({
     setGridApi(params.api);
   }, []);
 
-  const rowSelection = useMemo(() => { 
-    return { 
+  const rowSelection = useMemo(() => {
+    return {
       mode: 'multiRow' as const
     };
   }, []);

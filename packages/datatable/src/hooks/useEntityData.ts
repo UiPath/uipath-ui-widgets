@@ -52,7 +52,7 @@ export const useEntityData = (
       setOriginalData(deepClone(items));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch entity records');
-      throw err;
+      // Error is caught and set in state, no need to re-throw
     }
   }, [entityId, sdk, columnConfig]);
 

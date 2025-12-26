@@ -18,6 +18,17 @@ interface DiffDialogProps {
   }>;
 }
 
+// Helper function to safely convert any value to a displayable string
+const valueToString = (value: any): string => {
+  if (value === null || value === undefined) {
+    return String(value);
+  }
+  if (typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
 export const DiffDialog = ({
   entity,
   isOpen,
@@ -64,10 +75,10 @@ export const DiffDialog = ({
                     return hasChanged ? (
                       <tr key={key} className="datatable-diff-changed">
                         <td>{key}</td>
-                        <td className="datatable-diff-old">{field ? getFieldValue(originalValue, field) : originalValue}</td>
+                        <td className="datatable-diff-old">{field ? getFieldValue(originalValue, field) : valueToString(originalValue)}</td>
                         <td className="datatable-diff-new">
                           <div className="datatable-diff-new-content">
-                            <span>{field ? getFieldValue(editedValue, field) : editedValue}</span>
+                            <span>{field ? getFieldValue(editedValue, field) : valueToString(editedValue)}</span>
                             <button
                               onClick={() => onRevertField(rowId, key, originalValue)}
                               className="datatable-button-revert-field"

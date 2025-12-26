@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export const deepClone = <T>(data: T): T => {
+  if (data === null || data === undefined) {
+    return data;
+  }
   return JSON.parse(JSON.stringify(data));
 };
 

@@ -1,6 +1,18 @@
 # @uipath/ui-widgets-datatable
 
-A React datatable component for displaying UiPath Data Fabric Entity records using AG Grid.
+A powerful and flexible React datatable component built with ag-Grid, designed for UiPath entity management.
+
+## Features
+
+- 🔄 **CRUD Operations**: Full support for Create, Read, Update, Delete operations
+- 📊 **Master-Detail View**: Group data by foreign key relationships
+- ✏️ **Inline Editing**: Edit cells directly with support for different field types
+- 🔍 **Filtering & Sorting**: Built-in filtering and sorting capabilities
+- 📄 **Pagination**: Efficient data pagination
+- 🎨 **Customizable**: Flexible column configuration and styling
+- 🔗 **Foreign Key Support**: Special handling for relationship fields
+- 📝 **Diff Viewer**: Review changes before committing
+- ✅ **Fully Tested**: Comprehensive unit test coverage
 
 ## Installation
 
@@ -8,65 +20,173 @@ A React datatable component for displaying UiPath Data Fabric Entity records usi
 npm install @uipath/ui-widgets-datatable
 ```
 
-## Features
-
-- Automatically fetches entity records from UiPath Data Fabric
-- Displays data in a powerful AG Grid table
-- Auto-generates columns from entity data
-- Built-in sorting, filtering, and resizing
-- Optional pagination support
-- Loading and error states
-
 ## Usage
 
 ```tsx
-import { DataTable } from '@uipath/ui-widgets-datatable';
-import { UiPathSDK } from '@uipath/uipath-typescript';
+import { DataTable } from '@uipath/ui-widgets-datatable'
+import { UiPath } from '@uipath/uipath-typescript'
 
 function App() {
-  const uipathSdk = new UiPathSDK({
-    // SDK configuration
-  });
+  const sdk = new UiPath({ /* config */ })
 
   return (
     <DataTable
+      sdk={sdk}
       entityId="your-entity-id"
-      uipathSdk={uipathSdk}
       pageSize={50}
-      expansionLevel={1}
     />
-  );
+  )
 }
 ```
 
 ## Props
 
-### DataTable
+| Prop | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `sdk` | `UiPath` | Yes | - | UiPath SDK instance |
+| `entityId` | `string` | Yes | - | ID of the entity to display |
+| `className` | `string` | No | `''` | Additional CSS class name |
+| `pageSize` | `number` | No | `50` | Number of rows per page |
+| `columnConfig` | `Record<string, ColDef>` | No | - | Custom column configuration |
+| `rowClassRules` | `RowClassRules` | No | - | Custom row styling rules |
 
-- `entityId` (required): UUID of the entity to fetch records from
-- `uipathSdk` (required): UiPath SDK instance
-- `className` (optional): Additional CSS class name for styling
-- `expansionLevel` (optional): Expansion level for nested data (default: 0)
-- `pageSize` (optional): Number of records per page. Enables pagination if provided
+## Features in Detail
 
-## Example with Options
+### CRUD Operations
+
+#### Create
+- Click "Add Row" to add a new row
+- Fill in the data
+- Click "Insert Records" to save
+
+#### Read
+- Data is automatically loaded on mount
+- Click "Refresh" to reload data
+
+#### Update
+- Click any cell to edit (when not in master-detail mode)
+- Changes are tracked automatically
+- Click "Show Diff" to review changes
+- Click "Commit Changes" to save
+
+#### Delete
+- Select rows using checkboxes
+- Click "Delete Records"
+- Confirm deletion
+
+### Master-Detail View
+
+Group records by foreign key relationships:
+
+1. Select a groupable column from the "Group by" dropdown
+2. Click the expand button to view related records
+3. Related records are displayed in a nested grid
+
+### Field Types
+
+The datatable automatically handles different field types:
+
+- **Text**: Standard text input
+- **Number**: Numeric input
+- **Date**: Date picker
+- **Foreign Key**: Dropdown with reference entity records
+
+### Custom Column Configuration
 
 ```tsx
 <DataTable
-  entityId="abc-123-def-456"
-  uipathSdk={uipathSdk}
-  className="custom-table"
-  expansionLevel={2}
-  pageSize={100}
+  sdk={sdk}
+  entityId="entity-id"
+  columnConfig={{
+    'Column Name': {
+      width: 200,
+      editable: false,
+      cellStyle: { color: 'blue' },
+    },
+  }}
 />
 ```
 
-## AG Grid Styling
+### Custom Row Styling
 
-The component uses the `ag-theme-alpine` theme. You can customize it by overriding CSS variables or applying your own theme.
+```tsx
+<DataTable
+  sdk={sdk}
+  entityId="entity-id"
+  rowClassRules={{
+    'row-highlight': (params) => params.data.status === 'Active',
+    'row-disabled': (params) => params.data.status === 'Inactive',
+  }}
+/>
+```
 
-## Requirements
+## Development
 
-- React 19.2.0+
-- UiPath TypeScript SDK
-- AG Grid React 34.3.1+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm test -- --watch
+
+# Run tests with UI
+npm run test:ui
+
+# Generate coverage report
+npm run test:coverage
+```
+
+### Building
+
+```bash
+npm run build
+```
+
+## Architecture
+
+### Components
+
+- **DataTable**: Main component that orchestrates the entire datatable
+- **Toolbar**: Action buttons and controls
+- **DiffDialog**: Modal for reviewing changes
+- **DetailPanel**: Nested grid for master-detail view
+- **CellWithExpandButton**: Custom cell renderer with expand/collapse
+- **RefFieldCellEditor**: Custom editor for foreign key fields
+
+### Hooks
+
+- **useEntityData**: Manages entity data fetching and column definitions
+- **useRowEditing**: Handles row editing state and operations
+- **useEntityRecordsCache**: Caches entity records for performance
+
+### Utils
+
+- **dataUtils**: Data manipulation utilities (deepClone, getDiffData, hasRowChanges)
+- **fieldUtils**: Field-related utilities (getFieldValue, createValueSetter, createCellEditorSelector)
+
+## Testing
+
+This package includes comprehensive unit tests following best practices:
+
+- **Utils**: 100% coverage of utility functions
+- **Hooks**: Full coverage of custom hooks with various scenarios
+- **Components**: Component rendering, user interactions, and edge cases
+
+See [TEST_GUIDE.md](../../TEST_GUIDE.md) for detailed testing guidelines.
+
+## Browser Support
+
+- Chrome (latest)
+- Firefox (latest)
+- Safari (latest)
+- Edge (latest)
+
+## License
+
+MIT
+
+## Contributing
+
+Contributions are welcome! Please follow the testing guidelines and ensure all tests pass before submitting a PR.

@@ -44,5 +44,5 @@ export const createCellEditorSelector = (
 };
 
 export const isFieldTypeDate = (field: FieldMetaData): boolean => {
-  return field.fieldDataType.name === EntityFieldDataType.DATE
+  return field.fieldDataType?.name === EntityFieldDataType.DATE
 }
