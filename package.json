@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "rolldown-vite",
+    "dev": "vite",
     "build": "npm run build --workspaces",
     "lint": "eslint .",
     "preview": "rolldown-vite preview",
