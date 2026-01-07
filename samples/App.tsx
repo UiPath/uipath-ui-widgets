@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { List, ListItem, ListItemButton, ListItemText } from '@mui/material'
 import { DataTable } from '@uipath/ui-widgets-datatable'
+import { MultiFileUpload } from '@uipath/ui-widgets-multi-file-upload'
 import type { UiPath } from '@uipath/uipath-typescript';
 import './App.css'
 
@@ -114,11 +115,16 @@ function App({ uipathSdk }: AppProps) {
             </>
           ) : (
             <div className="empty-state">
-              <div className="empty-state-icon">🔍</div>
-              <h3 className="empty-state-title">No Entity Selected</h3>
-              <p className="empty-state-description">
-                Please select an entity from the sidebar to view and manage its data records
-              </p>
+              <MultiFileUpload
+                sdk={uipathSdk}
+                bucketId={334332}
+                folderId={893883}
+                maxFileSize={20971520}
+                accept="image/*"
+                onUploadError={(error: Error) => {
+                  console.error('Upload error:', error);
+                }}
+              />
             </div>
           )}
         </div>

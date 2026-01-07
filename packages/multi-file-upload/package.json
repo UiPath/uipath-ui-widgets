@@ -1,0 +1,35 @@
+{
+  "name": "@uipath/ui-widgets-multi-file-upload",
+  "version": "1.0.0",
+  "description": "A React multi-file upload component",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc && npm run copy-styles",
+    "copy-styles": "find src -name '*.scss' -exec sh -c 'mkdir -p dist/$(dirname ${1#src/}) && cp $1 dist/${1#src/}' _ {} \\;"
+  },
+  "keywords": [
+    "react",
+    "multi-file-upload",
+    "upload",
+    "ui-widgets"
+  ],
+  "author": "",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "~5.9.3"
+  },
+  "dependencies": {
+    "@uipath/apollo-wind": "^0.6.3",
+    "@uipath/uipath-typescript": "^1.0.0-beta.16",
+    "postcss": "^8.5.6"
+  }
+}

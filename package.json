@@ -21,7 +21,9 @@
     "@emotion/styled": "^11.14.1",
     "@fontsource/roboto": "^5.2.9",
     "@mui/material": "^7.3.5",
+    "@uipath/apollo-wind": "^0.6.3",
     "@uipath/ui-widgets-datatable": "file:./packages/datatable/dist",
+    "@uipath/ui-widgets-multi-file-upload": "file:./packages/multi-file-upload/dist",
     "@uipath/uipath-typescript": "^1.0.0-beta.16",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
