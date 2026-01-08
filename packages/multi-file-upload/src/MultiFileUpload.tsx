@@ -1,6 +1,16 @@
-import { Button, FileUpload } from "@uipath/apollo-wind";
-import { FC, useCallback, useState } from 'react';
 import './MultiFileUpload.scss';
+
+import {
+  FC,
+  useCallback,
+  useState,
+} from 'react';
+
+import {
+  Button,
+  FileUpload,
+} from '@uipath/apollo-wind';
+
 import { MultiFileUploadProps } from './types';
 
 export const MultiFileUpload: FC<MultiFileUploadProps> = ({
@@ -17,12 +27,12 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
   const uploadFiles = useCallback(async () => {
     try {
       await Promise.all(
-        files.map(file =>
+        files.map((file) =>
           sdk.buckets.uploadFile({
             bucketId,
             folderId,
-            path: (path || '') + file.name,
-            content: file
+            path: (path || "") + file.name,
+            content: file,
           })
         )
       );
@@ -32,9 +42,16 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
   }, [bucketId, files, folderId, onUploadError, path, sdk.buckets]);
 
   return (
-    <div className="uipath-multi-file-upload">
-      <FileUpload onFilesChange={setFiles} multiple maxSize={maxFileSize} accept={accept} />
-      <Button onClick={uploadFiles}>Upload Files</Button>
+    <div className="uipath-multi-file-upload w-[400px]">
+      <FileUpload
+        onFilesChange={setFiles}
+        multiple
+        maxSize={maxFileSize}
+        accept={accept}
+      />
+      <Button className="mt-4" onClick={uploadFiles}>
+        Upload Files
+      </Button>
     </div>
   );
 };
