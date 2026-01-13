@@ -1,4 +1,4 @@
-import './MultiFileUpload.scss';
+import './MultiFileUpload.css';
 
 import {
   FC,

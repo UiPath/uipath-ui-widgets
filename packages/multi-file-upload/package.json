@@ -7,8 +7,9 @@
   "types": "dist/index.d.ts",
   "type": "module",
   "scripts": {
-    "build": "tsc && npm run copy-styles",
-    "copy-styles": "find src -name '*.scss' -exec sh -c 'mkdir -p dist/$(dirname ${1#src/}) && cp $1 dist/${1#src/}' _ {} \\;"
+    "build": "npm run clean && tsc && npm run copy-styles",
+    "clean": "rm -rf dist",
+    "copy-styles": "npx sass --no-source-map src/MultiFileUpload.scss | npx postcss -o dist/MultiFileUpload.css"
   },
   "keywords": [
     "react",
@@ -25,11 +26,13 @@
   "devDependencies": {
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
-    "typescript": "~5.9.3"
+    "typescript": "~5.9.3",
+    "postcss": "^8.5.6",
+    "postcss-cli": "^11.0.1"
   },
   "dependencies": {
+    "@uipath/apollo-core": "^5.5.0",
     "@uipath/apollo-wind": "^0.6.3",
-    "@uipath/uipath-typescript": "^1.0.0-beta.16",
-    "postcss": "^8.5.6"
+    "@uipath/uipath-typescript": "^1.0.0-beta.16"
   }
 }

@@ -1,9 +1,10 @@
-import { useEffect, useState, useMemo } from 'react';
-import { List, ListItem, ListItemButton, ListItemText } from '@mui/material'
-import { DataTable } from '@uipath/ui-widgets-datatable'
-import { MultiFileUpload } from '@uipath/ui-widgets-multi-file-upload'
+import { List, ListItem, ListItemButton, ListItemText } from '@mui/material';
+import { DataTable } from '@uipath/ui-widgets-datatable';
+import { MultiFileUpload } from '@uipath/ui-widgets-multi-file-upload';
+import "@uipath/ui-widgets-multi-file-upload/MultiFileUpload.css";
 import type { UiPath } from '@uipath/uipath-typescript';
-import './App.css'
+import { useEffect, useMemo, useState } from 'react';
+import './App.css';
 
 interface AppProps {
   uipathSdk: UiPath;
