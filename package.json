@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "npm run build --workspaces",
+    "build": "for dir in packages/*/; do (cd \"$dir\" && npm i && npm run build); done",
     "lint": "eslint .",
     "preview": "rolldown-vite preview",
     "test": "npm test --workspaces --if-present",
@@ -22,7 +22,7 @@
     "@fontsource/roboto": "^5.2.9",
     "@mui/material": "^7.3.5",
     "@uipath/ui-widgets-datatable": "file:./packages/datatable/dist",
-    "@uipath/ui-widgets-multi-file-upload": "file:./packages/multi-file-upload/dist",
+    "@uipath/ui-widgets-multi-file-upload": "1.0.2",
     "@uipath/uipath-typescript": "^1.0.0-beta.16",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
@@ -38,7 +38,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
-    "rolldown-vite": "7.2.5",
+    "vite": "^7.3.1",
     "sass-embedded": "^1.93.3",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4"

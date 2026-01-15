@@ -1,11 +1,21 @@
 {
   "name": "@uipath/ui-widgets-multi-file-upload",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "A React multi-file upload component",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./MultiFileUpload.css": "./dist/MultiFileUpload.css"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "npm run clean && tsc && npm run copy-styles",
     "clean": "rm -rf dist",
