@@ -4,8 +4,9 @@ export interface MultiFileUploadProps {
   sdk: UiPath;
   bucketId: number;
   folderId: number;
+  accept?: string;
+  maxFileSize?: number;
   path?: string;
   onUploadError?: (error: Error) => void;
-  maxFileSize?: number;
-  accept?: string;
+  onUploadSuccess?: (uploadedFiles: File[]) => void;
 }
