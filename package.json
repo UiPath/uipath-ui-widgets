@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "for dir in packages/*/; do (cd \"$dir\" && npm i && npm run build); done",
+    "build": "for dir in packages/*/; do (cd \"$dir\" && npm i && npm run build) || exit 1; done",
     "lint": "eslint .",
     "preview": "rolldown-vite preview",
     "test": "npm test --workspaces --if-present",

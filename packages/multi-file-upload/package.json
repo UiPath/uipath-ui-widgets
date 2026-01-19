@@ -31,7 +31,8 @@
   "license": "MIT",
   "peerDependencies": {
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "@uipath/uipath-typescript": "^1.0.0-beta.16"
   },
   "devDependencies": {
     "@types/react": "^19.2.5",
@@ -42,7 +43,6 @@
   },
   "dependencies": {
     "@uipath/apollo-core": "^5.5.0",
-    "@uipath/apollo-wind": "^0.6.3",
-    "@uipath/uipath-typescript": "^1.0.0-beta.16"
+    "@uipath/apollo-wind": "^0.6.3"
   }
 }

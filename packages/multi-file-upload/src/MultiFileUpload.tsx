@@ -42,24 +42,42 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
         )
       );
 
-      const failedCount = results.filter(r => r.status === 'rejected').length;
-      const successCount = results.filter(r => r.status === 'fulfilled').length;
+      const failedUploads: Array<{ file: File; error: string }> = [];
+      const successfulFiles: File[] = [];
 
-      if (failedCount === 0) {
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value.statusCode === 201) {
+          successfulFiles.push(files[index]);
+        } else {
+          failedUploads.push({
+            file: files[index],
+            error: (result as PromiseRejectedResult).reason?.message || 'Unknown error'
+          });
+        }
+      });
+
+      if (failedUploads.length === 0) {
         // All files uploaded successfully
         setUploadStatus(UPLOAD_SUCCESS);
         onUploadSuccess?.(files);
         setFiles([]);
         setFileUploadKey(prev => prev + 1);
-      } else if (successCount === 0) {
-        // All files failed
-        const firstError = results.find(r => r.status === 'rejected') as PromiseRejectedResult;
-        const errorMessage = firstError.reason?.message || 'Failed to upload files';
-        setUploadStatus(errorMessage);
-        onUploadError?.(new Error(errorMessage));
       } else {
-        // Partial success
-        const errorMessage = `${successCount} file(s) uploaded, ${failedCount} failed`;
+        // Some or all files failed
+        const errorDetails = failedUploads.map(f => `${f.file.name}: ${f.error}`).join('; ');
+
+        let errorMessage: string;
+        if (successfulFiles.length === 0) {
+          // All files failed
+          errorMessage = `Failed to upload all files. ${errorDetails}`;
+        } else {
+          // Partial success
+          errorMessage = `${successfulFiles.length} file(s) uploaded successfully. ${failedUploads.length} failed: ${errorDetails}`;
+          // Remove successfully uploaded files, keep only failed ones
+          setFiles(failedUploads.map(f => f.file));
+          onUploadSuccess?.(successfulFiles);
+        }
+
         setUploadStatus(errorMessage);
         onUploadError?.(new Error(errorMessage));
       }
