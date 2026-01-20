@@ -30,7 +30,7 @@
   --accent-color: var(--pumpkin-500);
   --accent-light: var(--pumpkin-300);
   --accent-dark: var(--pumpkin-700);
-  
+
   /* UI colors */
   --background-gradient: linear-gradient(135deg, #f5f7fa 0%, #e8f5f3 100%);
   --surface-color: #ffffff;
@@ -44,13 +44,10 @@
   --shadow-xl: 0 12px 40px rgba(0, 0, 0, 0.15);
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
 
-html, body {
+html,
+body {
+  margin: 0;
   height: 100%;
   overflow: hidden;
 }
@@ -103,4 +100,3 @@ body {
 .MuiListItemButton-root:hover {
   background-color: var(--surface-hover) !important;
 }
-
