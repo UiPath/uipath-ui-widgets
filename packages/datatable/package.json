@@ -6,8 +6,20 @@
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./DataTable.css": "./dist/DataTable.css"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsc",
+    "build": "npm run clean && tsc && npm run copy-styles",
+    "clean": "rm -rf dist",
+    "copy-styles": "npx sass --no-source-map src/DataTable.scss | npx postcss -o dist/DataTable.css && sh -c 'for file in src/components/*.scss; do basename=$(basename \"$file\" .scss) && npx sass --no-source-map \"$file\" | npx postcss -o \"dist/components/$basename.css\"; done'",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
@@ -23,7 +35,8 @@
   "license": "MIT",
   "peerDependencies": {
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "@uipath/uipath-typescript": "npm:@uipath/uipath-typescript-dev@^1.0.0-beta.1"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.0",
@@ -42,7 +55,6 @@
     "vitest": "^2.1.8"
   },
   "dependencies": {
-    "@uipath/uipath-typescript": "^1.0.0-beta.16",
     "ag-grid-react": "^34.3.1",
     "ag-grid-community": "^34.3.1"
   }

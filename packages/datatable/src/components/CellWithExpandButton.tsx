@@ -1,4 +1,4 @@
-import './CellWithExpandButton.scss';
+import './CellWithExpandButton.css';
 
 interface CellWithExpandButtonProps {
   cellName: string;

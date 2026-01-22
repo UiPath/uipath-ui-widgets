@@ -1,4 +1,4 @@
-import './Toolbar.scss';
+import './Toolbar.css';
 
 interface ToolbarProps {
   onRefresh: () => void;

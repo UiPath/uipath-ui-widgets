@@ -1,9 +1,9 @@
-import { useEntityRecordsCache } from '@uipath/datatable/hooks/useEntityRecordsCache';
-import { GridRow } from '@uipath/datatable/types';
+import { useEntityRecordsCache } from '../hooks/useEntityRecordsCache';
+import { GridRow } from '../types';
 import { FieldMetaData, UiPath } from "@uipath/uipath-typescript";
 import { CustomCellEditorProps } from 'ag-grid-react';
 import { ChangeEvent, JSX, useEffect, useRef, useState } from "react";
-import "./RefFieldCellEditor.scss";
+import "./RefFieldCellEditor.css";
 
 export interface RefFieldCellEditorProps extends CustomCellEditorProps {
   sdk: UiPath;

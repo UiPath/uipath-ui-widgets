@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { RefFieldCellEditor } from '@uipath/datatable/components/RefFieldCellEditor';
-import { GridRow } from '@uipath/datatable/types';
+import { RefFieldCellEditor } from '../components/RefFieldCellEditor';
+import { GridRow } from '../types';
 import { EntityFieldDataType, FieldMetaData, UiPath } from '@uipath/uipath-typescript';
 import { ICellEditorParams, ValueSetterParams } from 'ag-grid-community';
 
