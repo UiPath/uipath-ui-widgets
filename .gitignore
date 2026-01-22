@@ -58,3 +58,6 @@ coverage
 
 # OS files
 Thumbs.db
+
+*storybook.log
+storybook-static

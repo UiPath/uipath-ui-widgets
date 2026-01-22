@@ -14,7 +14,9 @@
     "test": "npm test --workspaces --if-present",
     "test:watch": "npm run test:watch --workspaces --if-present",
     "test:ui": "npm run test:ui --workspaces --if-present",
-    "test:coverage": "npm run test:coverage --workspaces --if-present"
+    "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -41,6 +43,8 @@
     "vite": "^7.3.1",
     "sass-embedded": "^1.93.3",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.46.4"
+    "typescript-eslint": "^8.46.4",
+    "storybook": "^10.2.0",
+    "@storybook/react-vite": "^10.2.0"
   }
 }
