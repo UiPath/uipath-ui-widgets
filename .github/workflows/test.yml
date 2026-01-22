@@ -9,6 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      GH_NPM_REGISTRY_TOKEN: ${{ secrets.GH_NPM_REGISTRY_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
+import type { UiPath } from '@uipath/uipath-typescript';
 import "./MultiFileUpload.css";
 import { MultiFileUpload } from './MultiFileUpload';
 
@@ -13,7 +14,7 @@ const mockSdk = {
       return { statusCode: 201, data: { path } };
     }
   }
-} as any;
+} as unknown as UiPath;
 
 const meta = {
   title: 'Components/MultiFileUpload',
@@ -154,7 +155,7 @@ export const SimulatedError: Story = {
           throw new Error('Simulated upload failure');
         }
       }
-    } as any,
+    } as unknown as UiPath,
     bucketId: 1,
     folderId: 1,
     onUploadError: (error) => {

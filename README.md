@@ -1,10 +1,12 @@
 # UiPath UI Widgets
 
 [![Test](https://github.com/uipath/ui-widgets/actions/workflows/test.yml/badge.svg)](https://github.com/uipath/ui-widgets/actions/workflows/test.yml)
+[![Build & Deploy](https://github.com/uipath/ui-widgets/actions/workflows/build-and-deploy.yml/badge.svg)](https://github.com/uipath/ui-widgets/actions/workflows/build-and-deploy.yml)
 [![Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen.svg)](./coverage)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-blue.svg)](https://react.dev/)
+[![Storybook](https://img.shields.io/badge/Storybook-10.2-ff4785.svg)](https://storybook.js.org/)
 
 A collection of reusable React UI components for UiPath applications.
 
@@ -23,6 +25,18 @@ A powerful and flexible datatable component with full CRUD support, master-detai
 - 🔗 Foreign key relationship support
 - 📝 Diff viewer for change review
 - ✅ Comprehensive test coverage
+
+### [@uipath/ui-widgets-multi-file-upload](./packages/multi-file-upload)
+
+A multi-file upload component that allows users to select and upload multiple files to a UiPath bucket.
+
+**Features:**
+- 📁 Multiple file selection
+- ☁️ Upload to UiPath buckets
+- ✅ Success/error callbacks
+- 🔍 File type filtering
+- 📏 File size limits
+- 📂 Custom path support
 
 ## 🚀 Getting Started
 
@@ -43,6 +57,12 @@ npm run build
 
 # Run linter
 npm run lint
+
+# Start Storybook
+npm run storybook
+
+# Build Storybook
+npm run build-storybook
 ```
 
 ### Testing
@@ -62,6 +82,35 @@ npm run test:coverage
 ```
 
 See [TEST_GUIDE.md](./TEST_GUIDE.md) for comprehensive testing documentation.
+
+## 📚 Storybook
+
+This project uses Storybook for component documentation and development. Storybook provides an interactive UI for viewing and testing components in isolation.
+
+### Running Storybook Locally
+
+```bash
+npm run storybook
+```
+
+This will start Storybook on [http://localhost:6006](http://localhost:6006).
+
+### Building Storybook
+
+```bash
+npm run build-storybook
+```
+
+This creates a static build of Storybook in the `storybook-static` directory.
+
+### Deployment
+
+Storybook is automatically deployed to GitHub Pages when changes are pushed to the `main` or `develop` branches. The deployment workflow builds both the packages and Storybook, then publishes the static Storybook site.
+
+To enable GitHub Pages deployment:
+1. Go to your repository settings
+2. Navigate to Pages
+3. Set Source to "GitHub Actions"
 
 ## 📁 Project Structure
 
