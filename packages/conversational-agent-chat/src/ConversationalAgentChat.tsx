@@ -9,32 +9,18 @@ import { convertAttachmentToFile, createFileKey, normalizeInput } from './utils'
 export const ConversationalAgentChat = ({
   sdk,
   agentId,
-  folderId,
-  mode = AutopilotChatMode.SideBySide,
-  title = 'Welcome to UiPath Autopilot Chat!',
-  description = 'Ask me anything about your data or how to use this application.',
+  folderId
 }: ConversationalAgentChatProps) => {
   const agentService = useRef(new ConversationalAgent(sdk));
   const conversation = useRef<ConversationCreateResponse>(null);
   const isInitializing = useRef(false);
   const session = useRef<SessionEventHelper>(null);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
-
-  const [chatService] = useState(AutopilotChatService.Instantiate({
-    config: {
-      mode,
-      firstRunExperience: {
-        title,
-        description,
-        suggestions: [
-          { label: "How to get started", prompt: "How do I get started with this application?" },
-          { label: "Generate a report", prompt: "Help me generate a quarterly sales report" }
-        ]
-      }
-    }
-  }));
+  const [chatService, setChatService] = useState<AutopilotChatService>();
 
   const setupExchangeHandlers = useCallback((exchange: ExchangeEventHelper) => {
+    if (!chatService) return;
+
     exchange.onErrorStart((error: ErrorStartHandlerArgs) => {
       console.error('[Events] Exchange error:', error);
     });
@@ -169,10 +155,13 @@ export const ConversationalAgentChat = ({
   }, [getSessionHelper, setupExchangeHandlers]);
 
   const processAttachmentsInBatch = useCallback(async (attachmentBatch: AutopilotChatFileInfo[]) => {
+    if (!chatService) return;
+
     const batchPromises = attachmentBatch.map(async (attachment) => {
       try {
         const file = convertAttachmentToFile(attachment);
-        const attachmentOutput = await agentService.current.conversations.attachments.upload(conversation.current?.conversationId || '', file);
+        const conversation = await getConversation();
+        const attachmentOutput = await agentService.current.conversations.attachments.upload(conversation.conversationId, file);
         const key = createFileKey(attachment);
         uploadedAttachments.current.set(key, attachmentOutput);
         return { attachment, success: true, error: null };
@@ -186,9 +175,11 @@ export const ConversationalAgentChat = ({
     });
 
     return await Promise.all(batchPromises);
-  }, [chatService]);
+  }, [chatService, getConversation]);
 
   const onSetAttachments = useCallback(async ({ added }: { added: AutopilotChatFileInfo[] }) => {
+    if (!chatService) return;
+
     if (added.length > 0) {
       // Filter out already uploaded files
       const newAttachments = added.filter(attachment => {
@@ -210,7 +201,7 @@ export const ConversationalAgentChat = ({
         for (let i = 0; i < newAttachments.length; i += BATCH_SIZE) {
           const batch = newAttachments.slice(i, i + BATCH_SIZE);
           const batchResults = await processAttachmentsInBatch(batch);
-          results.push(...batchResults);
+          results.push(...batchResults || []);
           chatService.setAttachmentsLoading(
             batch.map(attachment => ({
               ...attachment,
@@ -233,26 +224,56 @@ export const ConversationalAgentChat = ({
   }, [chatService, processAttachmentsInBatch]);
 
   useEffect(() => {
-    const initAgentConversation = async () => {
+    const initChat = async () => {
       isInitializing.current = true;
-      chatService.on(AutopilotChatEvent.NewChat, onNewChat);
-      chatService.on(AutopilotChatEvent.Request, onSendMessage);
-      chatService.on(AutopilotChatEvent.SetAttachments, onSetAttachments);
-      chatService.open();
+
+      const agentRelease = await agentService.current.agents.getById(folderId, agentId);
+      setChatService(AutopilotChatService.Instantiate({
+        config: {
+          mode: AutopilotChatMode.Embedded,
+          firstRunExperience: {
+            title: agentRelease.appearance?.welcomeTitle || `Welcome to ${agentRelease.name}!`,
+            description: agentRelease.appearance?.welcomeDescription || '',
+            suggestions: (agentRelease.appearance?.startingPrompts || []).map(prompt => ({
+              label: prompt.displayPrompt,
+              prompt: prompt.actualPrompt
+            }))
+          },
+          overrideLabels: {
+            title: agentRelease.name,
+            footerDisclaimer: 'Agent can make mistakes. Please double check the responses.'
+          },
+          disabledFeatures: {
+            fullScreen: true,
+            history: true,
+            preview: true,
+            close: true
+          }
+        }
+      }));
+
+      if (chatService) {
+        chatService.on(AutopilotChatEvent.NewChat, onNewChat);
+        chatService.on(AutopilotChatEvent.Request, onSendMessage);
+        chatService.on(AutopilotChatEvent.SetAttachments, onSetAttachments);
+        chatService.open();
+      }
     }
 
-    if (chatService && !isInitializing.current) {
-      initAgentConversation();
+    if (!isInitializing.current) {
+      initChat();
     }
-  }, [chatService, getSessionHelper, onNewChat, onSendMessage, onSetAttachments, setupExchangeHandlers]);
+  }, [agentId, folderId, chatService, getSessionHelper, onNewChat, onSendMessage, onSetAttachments, setupExchangeHandlers]);
 
   return (
     <div className='uipath-conversational-agent-chat'>
-      <ApChat
+      {!chatService && <span>Loading...</span>}
+
+      {chatService && <ApChat
         chatServiceInstance={chatService}
         locale="en"
         theme="light"
-      />
+      />}
     </div>
   )
 };

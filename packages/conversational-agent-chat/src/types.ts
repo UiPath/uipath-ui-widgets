@@ -1,13 +1,9 @@
-import { AutopilotChatMode } from '@uipath/apollo-react/material/components';
 import { UiPath } from "@uipath/uipath-typescript/core";
 
 export interface ConversationalAgentChatProps {
   sdk: UiPath;
   agentId: number;
   folderId: number;
-  mode?: AutopilotChatMode;
-  title?: string;
-  description?: string;
 }
 
 export enum MessageWidget {
