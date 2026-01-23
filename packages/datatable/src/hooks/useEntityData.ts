@@ -1,6 +1,6 @@
-import { GridRow } from '@uipath/datatable/types';
-import { deepClone } from '@uipath/datatable/utils/dataUtils';
-import { getFieldValue, createValueSetter, createCellEditorSelector } from '@uipath/datatable/utils/fieldUtils';
+import { GridRow } from '../types';
+import { deepClone } from '../utils/dataUtils';
+import { getFieldValue, createValueSetter, createCellEditorSelector } from '../utils/fieldUtils';
 import { EntityGetResponse, UiPath } from '@uipath/uipath-typescript';
 import { ColDef } from 'ag-grid-community';
 import { useCallback, useState } from 'react';

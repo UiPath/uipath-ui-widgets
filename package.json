@@ -11,7 +11,7 @@
     "build": "for dir in packages/*/; do [ -f \"$dir/package.json\" ] && (cd \"$dir\" && npm i && npm run build) || exit 1; done",
     "lint": "eslint .",
     "preview": "rolldown-vite preview",
-    "test": "npm test --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
     "test:watch": "npm run test:watch --workspaces --if-present",
     "test:ui": "npm run test:ui --workspaces --if-present",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
@@ -24,10 +24,12 @@
     "@fontsource/roboto": "^5.2.9",
     "@mui/material": "^7.3.5",
     "@uipath/ui-widgets-datatable": "file:./packages/datatable/dist",
-    "@uipath/ui-widgets-multi-file-upload": "1.0.2",
-    "@uipath/uipath-typescript": "^1.0.0-beta.16",
+    "@uipath/ui-widgets-multi-file-upload": "1.0.3",
+    "@uipath/ui-widgets-conversational-agent-chat": "file:./packages/conversational-agent-chat/dist",
+    "@uipath/uipath-typescript": "npm:@uipath/uipath-typescript-dev@^1.0.0-beta.1",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

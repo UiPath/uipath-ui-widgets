@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { getFieldValue } from '@uipath/datatable/utils/fieldUtils';
+import { getFieldValue } from '../utils/fieldUtils';
 import { EntityGetResponse } from '@uipath/uipath-typescript';
 import { useMemo } from 'react';
-import './DiffDialog.scss';
+import './DiffDialog.css';
 
 interface DiffDialogProps {
   entity: EntityGetResponse | undefined;

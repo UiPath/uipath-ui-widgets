@@ -1,8 +1,10 @@
-import { List, ListItem, ListItemButton, ListItemText } from '@mui/material';
+import { Grid, List, ListItem, ListItemButton, ListItemText } from '@mui/material';
+import { ConversationalAgentChat } from '@uipath/ui-widgets-conversational-agent-chat';
 import { DataTable } from '@uipath/ui-widgets-datatable';
 import { MultiFileUpload } from '@uipath/ui-widgets-multi-file-upload';
 import "@uipath/ui-widgets-multi-file-upload/MultiFileUpload.css";
-import type { UiPath } from '@uipath/uipath-typescript';
+import type { UiPath } from '@uipath/uipath-typescript/core';
+import { Entities } from '@uipath/uipath-typescript/entities';
 import { useEffect, useMemo, useState } from 'react';
 import './App.css';
 
@@ -42,7 +44,8 @@ function App({ uipathSdk }: AppProps) {
     const fetchEntities = async () => {
       try {
         setLoading(true);
-        const entitiesList = await uipathSdk.entities.getAll();
+        const entities = new Entities(uipathSdk);
+        const entitiesList = await entities.getAll();
         setEntities(entitiesList);
       } catch (error) {
         console.error('Failed to fetch entities:', error);
@@ -116,16 +119,27 @@ function App({ uipathSdk }: AppProps) {
             </>
           ) : (
             <div className="empty-state">
-              <MultiFileUpload
-                sdk={uipathSdk}
-                bucketId={334332}
-                folderId={893883}
-                maxFileSize={20971520}
-                accept="image/*"
-                onUploadError={(error: Error) => {
-                  console.error('Upload error:', error);
-                }}
-              />
+              <Grid container spacing={2} height={'100%'}>
+                <Grid size={6}>
+                  <MultiFileUpload
+                    sdk={uipathSdk}
+                    bucketId={334332}
+                    folderId={893883}
+                    maxFileSize={20971520}
+                    accept="image/*"
+                    onUploadError={(error: Error) => {
+                      console.error('Upload error:', error);
+                    }}
+                  />
+                </Grid>
+                <Grid size={6} height={800}>
+                  <ConversationalAgentChat
+                    sdk={uipathSdk}
+                    agentId={parseInt(import.meta.env.VITE_CONV_AGENT_ID)}
+                    folderId={parseInt(import.meta.env.VITE_CONV_AGENT_FOLDER_ID)}
+                  />
+                </Grid>
+              </Grid>
             </div>
           )}
         </div>

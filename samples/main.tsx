@@ -1,10 +1,10 @@
 import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
+import { UiPath } from '@uipath/uipath-typescript/core';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import './index.css';
 import App from './App.tsx';
-import { UiPath } from '@uipath/uipath-typescript'
+import './index.css';
 
 const uipathSdk = new UiPath({
   baseUrl: import.meta.env.VITE_UIPATH_BASE_URL,
@@ -12,7 +12,7 @@ const uipathSdk = new UiPath({
   tenantName: import.meta.env.VITE_UIPATH_TENANT_NAME,
   clientId: import.meta.env.VITE_UIPATH_CLIENT_ID,
   redirectUri: import.meta.env.VITE_UIPATH_REDIRECT_URI,
-  scope: import.meta.env.VITE_UIPATH_SCOPE 
+  scope: import.meta.env.VITE_UIPATH_SCOPE
 });
 
 try {

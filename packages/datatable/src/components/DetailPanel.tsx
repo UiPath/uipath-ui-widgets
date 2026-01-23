@@ -1,11 +1,11 @@
-import { GridRow } from '@uipath/datatable/types';
-import { getFieldValue } from '@uipath/datatable/utils/fieldUtils';
+import { GridRow } from '../types';
+import { getFieldValue } from '../utils/fieldUtils';
 import { EntityGetResponse } from '@uipath/uipath-typescript';
 import type { ColDef } from 'ag-grid-community';
 import { themeQuartz } from 'ag-grid-community';
 import { AgGridReact } from 'ag-grid-react';
 import { useMemo } from 'react';
-import './DetailPanel.scss';
+import './DetailPanel.css';
 
 interface DetailPanelProps {
   rowData: GridRow[];

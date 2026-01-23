@@ -1,15 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { CellWithExpandButton } from '@uipath/datatable/components/CellWithExpandButton';
-import { DetailPanel } from '@uipath/datatable/components/DetailPanel';
-import { DiffDialog } from '@uipath/datatable/components/DiffDialog';
-import { Toolbar } from '@uipath/datatable/components/Toolbar';
-import { useEntityData } from '@uipath/datatable/hooks/useEntityData';
-import { useEntityRecordsCache } from '@uipath/datatable/hooks/useEntityRecordsCache';
-import { useRowEditing } from '@uipath/datatable/hooks/useRowEditing';
-import type { DataTableProps } from '@uipath/datatable/types';
-import { GridRow } from '@uipath/datatable/types';
-import { deepClone, getDiffData } from '@uipath/datatable/utils/dataUtils';
-import { getFieldValue } from '@uipath/datatable/utils/fieldUtils';
 import type {
   ColDef,
   GetRowIdParams,
@@ -24,7 +13,18 @@ import type {
 import { themeQuartz } from 'ag-grid-community';
 import { AgGridReact } from 'ag-grid-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import './DataTable.scss';
+import { CellWithExpandButton } from './components/CellWithExpandButton';
+import { DetailPanel } from './components/DetailPanel';
+import { DiffDialog } from './components/DiffDialog';
+import { Toolbar } from './components/Toolbar';
+import './DataTable.css';
+import { useEntityData } from './hooks/useEntityData';
+import { useEntityRecordsCache } from './hooks/useEntityRecordsCache';
+import { useRowEditing } from './hooks/useRowEditing';
+import type { DataTableProps } from './types';
+import { GridRow } from './types';
+import { deepClone, getDiffData } from './utils/dataUtils';
+import { getFieldValue } from './utils/fieldUtils';
 
 export const DataTable = ({
   sdk,
