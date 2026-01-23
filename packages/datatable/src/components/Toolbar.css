@@ -1,0 +1,9 @@
+/**
+ * Placeholder stylesheet for local development and tests.
+ *
+ * Production styles are authored in `Toolbar.scss` and compiled into
+ * `dist/components/Toolbar.css` by the `copy-styles` script. This file
+ * exists only so Vite/Vitest can resolve the `./Toolbar.css` import from
+ * `Toolbar.tsx` when running against `src`.
+ */
+

@@ -1,0 +1,9 @@
+/**
+ * Placeholder stylesheet for local development and tests.
+ *
+ * Production styles are authored in `DetailPanel.scss` and compiled into
+ * `dist/components/DetailPanel.css` by the `copy-styles` script. This file
+ * exists only so Vite/Vitest can resolve the `./DetailPanel.css` import from
+ * `DetailPanel.tsx` when running against `src`.
+ */
+

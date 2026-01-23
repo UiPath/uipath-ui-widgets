@@ -11,7 +11,7 @@
     "build": "for dir in packages/*/; do [ -f \"$dir/package.json\" ] && (cd \"$dir\" && npm i && npm run build) || exit 1; done",
     "lint": "eslint .",
     "preview": "rolldown-vite preview",
-    "test": "npm test --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
     "test:watch": "npm run test:watch --workspaces --if-present",
     "test:ui": "npm run test:ui --workspaces --if-present",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
