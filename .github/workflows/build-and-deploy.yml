@@ -54,4 +54,4 @@ jobs:
     steps:
       - name: Deploy to gh-pages
         run: |
-          npx gh-pages -d storybook-static -b gh-pages -t true
+          npx gh-pages -d storybook-static -b gh-pages

@@ -1,6 +1,6 @@
 # @uipath/ui-widgets-multi-file-upload
 
-A React multi-file upload component for uploading files to UiPath Data Fabric buckets.
+A React multi-file-upload widget for uploading multiple files simultaneously to UiPath Orchestrator's Storage bucket.
 
 ## Installation
 
@@ -21,6 +21,7 @@ npm install @uipath/ui-widgets-multi-file-upload
 
 ```tsx
 import { MultiFileUpload } from '@uipath/ui-widgets-multi-file-upload';
+import "@uipath/ui-widgets-multi-file-upload/MultiFileUpload.css";
 import { UiPath } from '@uipath/uipath-typescript';
 
 function App() {
@@ -32,6 +33,10 @@ function App() {
     console.error('Upload failed:', error);
   };
 
+  const handleUploadSuccess = (uploadedFiles: File[]) => {
+    console.log('Successfully uploaded:', uploadedFiles.map(f => f.name));
+  };
+
   return (
     <MultiFileUpload
       sdk={sdk}
@@ -39,6 +44,7 @@ function App() {
       folderId={456}
       path="uploads/"
       onUploadError={handleUploadError}
+      onUploadSuccess={handleUploadSuccess}
       maxFileSize={10485760} // 10MB
       accept=".pdf,.jpg,.png"
     />
@@ -53,12 +59,13 @@ function App() {
 | Prop | Type | Required | Description |
 |------|------|----------|-------------|
 | `sdk` | `UiPath` | Yes | UiPath SDK instance |
-| `bucketId` | `number` | Yes | The ID of the bucket to upload files to |
-| `folderId` | `number` | Yes | The ID of the folder within the bucket |
+| `bucketId` | `number` | Yes | The ID of the Orchestrator Storage Bucket to upload files to |
+| `folderId` | `number` | Yes | The ID of the folder containing the Storage Bucket |
 | `path` | `string` | No | Path prefix for uploaded files (e.g., "uploads/") |
 | `onUploadError` | `(error: Error) => void` | No | Callback function called when upload fails |
+| `onUploadSuccess` | `(uploadedFiles: File[]) => void` | No | Callback function called when files are successfully uploaded |
 | `maxFileSize` | `number` | No | Maximum file size in bytes |
-| `accept` | `string` | No | Accepted file types (comma-separated MIME types or extensions) |
+| `accept` | `string` | No | Accepted file types (comma-separated MIME types or extensions). See [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/accept) for details |
 
 ## Example with Options
 
@@ -69,6 +76,7 @@ function App() {
   folderId={456}
   path="documents/"
   onUploadError={(error) => console.error('Upload failed:', error)}
+  onUploadSuccess={(files) => console.log('Uploaded:', files.length, 'files')}
   maxFileSize={5242880} // 5MB
   accept=".pdf,.docx,.xlsx"
 />

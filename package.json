@@ -23,9 +23,9 @@
     "@emotion/styled": "^11.14.1",
     "@fontsource/roboto": "^5.2.9",
     "@mui/material": "^7.3.5",
+    "@uipath/ui-widgets-conversational-agent-chat": "file:./packages/conversational-agent-chat/dist",
     "@uipath/ui-widgets-datatable": "file:./packages/datatable/dist",
     "@uipath/ui-widgets-multi-file-upload": "1.0.3",
-    "@uipath/ui-widgets-conversational-agent-chat": "file:./packages/conversational-agent-chat/dist",
     "@uipath/uipath-typescript": "npm:@uipath/uipath-typescript-dev@^1.0.0-beta.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -33,6 +33,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@storybook/addon-docs": "^10.2.1",
+    "@storybook/react-vite": "^10.2.0",
+    "@tailwindcss/oxide": "^4.1.18",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
@@ -42,23 +45,21 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
-    "vite": "^7.3.1",
-    "vitest": "^2.1.8",
-    "sass": "^1.83.4",
-    "typescript": "~5.9.3",
-    "typescript-eslint": "^8.46.4",
-    "storybook": "^10.2.0",
-    "@storybook/react-vite": "^10.2.0",
     "lightningcss": "^1.30.2",
     "postcss": "^8.5.6",
     "postcss-cli": "^11.0.1",
-    "@tailwindcss/oxide": "^4.1.18",
-    "rollup": "^4.55.1"
+    "rollup": "^4.55.1",
+    "sass": "^1.83.4",
+    "storybook": "^10.2.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vite": "^7.3.1",
+    "vitest": "^2.1.8"
   },
   "optionalDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "^4.55.1",
-    "@rollup/rollup-darwin-x64": "^4.55.1",
     "@rollup/rollup-darwin-arm64": "^4.55.1",
+    "@rollup/rollup-darwin-x64": "^4.55.1",
+    "@rollup/rollup-linux-x64-gnu": "^4.55.1",
     "@rollup/rollup-win32-x64-msvc": "^4.55.1"
   }
 }
