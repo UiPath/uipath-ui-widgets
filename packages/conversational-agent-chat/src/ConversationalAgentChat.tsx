@@ -256,7 +256,6 @@ export const ConversationalAgentChat = ({
         chatService.on(AutopilotChatEvent.NewChat, onNewChat);
         chatService.on(AutopilotChatEvent.Request, onSendMessage);
         chatService.on(AutopilotChatEvent.SetAttachments, onSetAttachments);
-        chatService.open();
       }
     }
 
