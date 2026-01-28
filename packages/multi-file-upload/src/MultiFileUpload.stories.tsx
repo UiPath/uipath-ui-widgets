@@ -23,7 +23,65 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'A multi-file upload component that allows users to select and upload multiple files to a UiPath bucket.'
+        component: `
+A React multi-file-upload widget for uploading multiple files simultaneously to UiPath Orchestrator's Storage bucket.
+
+## Features
+
+- Upload multiple files simultaneously
+- Drag and drop support
+- File type validation via accept attribute
+- File size validation
+- Error handling
+- Built on Apollo Wind FileUpload component
+
+## Installation
+
+\`\`\`bash
+npm install @uipath/ui-widgets-multi-file-upload
+\`\`\`
+
+## Usage
+
+\`\`\`tsx
+import { MultiFileUpload } from '@uipath/ui-widgets-multi-file-upload';
+import "@uipath/ui-widgets-multi-file-upload/MultiFileUpload.css";
+import { UiPath } from '@uipath/uipath-typescript';
+
+function App() {
+  const sdk = new UiPath({
+    // SDK configuration
+  });
+
+  const handleUploadError = (error: Error) => {
+    console.error('Upload failed:', error);
+  };
+
+  const handleUploadSuccess = (uploadedFiles: File[]) => {
+    console.log('Successfully uploaded:', uploadedFiles.map(f => f.name));
+  };
+
+  return (
+    <MultiFileUpload
+      sdk={sdk}
+      bucketId={123}
+      folderId={456}
+      path="uploads/"
+      onUploadError={handleUploadError}
+      onUploadSuccess={handleUploadSuccess}
+      maxFileSize={10485760} // 10MB
+      accept=".pdf,.jpg,.png"
+    />
+  );
+}
+\`\`\`
+
+## Requirements
+
+- React 19.2.0+
+- React DOM 19.2.0+
+- @uipath/uipath-typescript
+- @uipath/apollo-wind`
       }
     }
   },
@@ -34,32 +92,32 @@ const meta = {
       control: false
     },
     bucketId: {
-      description: 'ID of the bucket to upload files to',
+      description: 'The ID of the Orchestrator Storage Bucket to upload files to',
       control: 'number'
     },
     folderId: {
-      description: 'ID of the folder within the bucket',
+      description: 'The ID of the folder containing the Storage Bucket',
       control: 'number'
     },
-    accept: {
-      description: 'Accepted file types (e.g., "image/*", ".pdf,.doc")',
+    path: {
+      description: 'Path prefix for uploaded files (e.g., "uploads/")',
       control: 'text'
+    },
+    onUploadError: {
+      description: 'Callback function called when upload fails',
+      action: 'uploadError'
+    },
+    onUploadSuccess: {
+      description: 'Callback function called when files are successfully uploaded',
+      action: 'uploadSuccess'
     },
     maxFileSize: {
       description: 'Maximum file size in bytes',
       control: 'number'
     },
-    path: {
-      description: 'Path prefix for uploaded files',
+    accept: {
+      description: 'Accepted file types (comma-separated MIME types or extensions). See [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/accept) for details',
       control: 'text'
-    },
-    onUploadError: {
-      description: 'Callback when upload fails',
-      action: 'uploadError'
-    },
-    onUploadSuccess: {
-      description: 'Callback when upload succeeds',
-      action: 'uploadSuccess'
     }
   }
 } satisfies Meta<typeof MultiFileUpload>;
