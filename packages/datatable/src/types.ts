@@ -1,4 +1,5 @@
-import { EntityRecord, UiPath } from "@uipath/uipath-typescript";
+import { UiPath } from "@uipath/uipath-typescript/core";
+import { EntityRecord } from "@uipath/uipath-typescript/entities";
 import { ColDef, RowClassRules } from "ag-grid-community";
 
 export interface DataTableProps {

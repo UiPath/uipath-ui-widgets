@@ -1,12 +1,12 @@
 import { GridRow } from '../types';
 import { deepClone } from '../utils/dataUtils';
 import { getFieldValue, createValueSetter, createCellEditorSelector } from '../utils/fieldUtils';
-import { EntityGetResponse, UiPath } from '@uipath/uipath-typescript';
+import { Entities, EntityGetResponse } from "@uipath/uipath-typescript/entities";
 import { ColDef } from 'ag-grid-community';
 import { useCallback, useState } from 'react';
 
 export const useEntityData = (
-  sdk: UiPath,
+  entityService: Entities,
   entityId: string,
   columnConfig?: Record<string, ColDef>
 ) => {
@@ -21,7 +21,7 @@ export const useEntityData = (
     try {
       setError(null);
 
-      const fetchedEntity = await sdk.entities.getById(entityId);
+      const fetchedEntity = await entityService.getById(entityId);
       setEntity(fetchedEntity);
 
       const records = await fetchedEntity.getRecords({
@@ -40,7 +40,7 @@ export const useEntityData = (
             valueGetter: valueGetter,
             tooltipValueGetter: valueGetter,
             valueSetter: createValueSetter(f.name),
-            cellEditorSelector: createCellEditorSelector(f, sdk),
+            cellEditorSelector: createCellEditorSelector(f, entityService),
             ...columnConfig?.[f.displayName],
           }
         });
@@ -54,7 +54,7 @@ export const useEntityData = (
       setError(err instanceof Error ? err.message : 'Failed to fetch entity records');
       // Error is caught and set in state, no need to re-throw
     }
-  }, [entityId, sdk, columnConfig]);
+  }, [entityService, entityId, columnConfig]);
 
   return {
     rowData,

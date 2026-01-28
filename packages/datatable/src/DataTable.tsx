@@ -25,6 +25,7 @@ import type { DataTableProps } from './types';
 import { GridRow } from './types';
 import { deepClone, getDiffData } from './utils/dataUtils';
 import { getFieldValue } from './utils/fieldUtils';
+import { Entities } from '@uipath/uipath-typescript/entities';
 
 export const DataTable = ({
   sdk,
@@ -45,7 +46,8 @@ export const DataTable = ({
   const expandedRowsRef = useRef<Set<string>>(new Set());
   const gridApiRef = useRef<GridApi | null>(null);
   const rowHeightCache = useRef<Map<string, number>>(new Map());
-  const { getRecords, clearCache } = useEntityRecordsCache(sdk);
+  const entityService = useRef<Entities>(new Entities(sdk));
+  const { getRecords, clearCache } = useEntityRecordsCache(entityService.current);
 
   const openDiffDialog = () => setShowDiffDialog(true);
 
@@ -62,7 +64,7 @@ export const DataTable = ({
     setError,
     entity,
     fetchEntityRecords,
-  } = useEntityData(sdk, entityId, columnConfig);
+  } = useEntityData(entityService.current, entityId, columnConfig);
 
   const groupableColumns = entity?.fields
     .filter((field) => field.isForeignKey && !field.isSystemField)
@@ -110,7 +112,7 @@ export const DataTable = ({
         try {
           const refEntityId = entity?.fields.find(f => f.displayName === selectedGroupBy)?.referenceEntity?.id;
           if (refEntityId) {
-            const refEntity = await sdk.entities.getById(refEntityId);
+            const refEntity = await entityService.current.getById(refEntityId);
             const refEntityRecords = await getRecords(refEntityId);
             setRefEntityData(refEntityRecords);
 
@@ -136,7 +138,7 @@ export const DataTable = ({
     };
 
     fetchRefEntityData();
-  }, [entity, selectedGroupBy, sdk, originalColumnDefs, setColumnDefs, expandButtonCellRenderer, getRecords]);
+  }, [entity, selectedGroupBy, originalColumnDefs, setColumnDefs, expandButtonCellRenderer, getRecords]);
 
   // Flatten row data with detail rows when expandedRows changes
   useEffect(() => {
@@ -395,11 +397,11 @@ export const DataTable = ({
   };
 
   useEffect(() => {
-    if (entityId && sdk) {
+    if (entityId && entityService) {
       refreshComponent();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entityId, sdk]);
+  }, [entityId, entityService]);
 
   if (loading) {
     return <div className="datatable-loading">Loading...</div>;

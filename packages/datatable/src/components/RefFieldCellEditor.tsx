@@ -1,23 +1,23 @@
-import { useEntityRecordsCache } from '../hooks/useEntityRecordsCache';
-import { GridRow } from '../types';
-import { FieldMetaData, UiPath } from "@uipath/uipath-typescript";
+import { Entities, FieldMetaData } from '@uipath/uipath-typescript/entities';
 import { CustomCellEditorProps } from 'ag-grid-react';
 import { ChangeEvent, JSX, useEffect, useRef, useState } from "react";
+import { useEntityRecordsCache } from '../hooks/useEntityRecordsCache';
+import { GridRow } from '../types';
 import "./RefFieldCellEditor.css";
 
 export interface RefFieldCellEditorProps extends CustomCellEditorProps {
-  sdk: UiPath;
+  entityService: Entities;
   field: FieldMetaData;
   entityRecord: GridRow;
 }
 
-export const RefFieldCellEditor = ({ sdk, field, entityRecord, onValueChange }: RefFieldCellEditorProps) => {
+export const RefFieldCellEditor = ({ entityService, field, entityRecord, onValueChange }: RefFieldCellEditorProps) => {
   const [selectedValue, setSelectedValue] = useState<string>(entityRecord[field.name]?.Id);
   const [fieldOptions, setFieldOptions] = useState<JSX.Element[]>([]);
   const selectElementRef = useRef<HTMLSelectElement>(null);
   const hasFetchedRef = useRef(false);
   const recordsMapRef = useRef<Map<string, GridRow>>(new Map());
-  const { getRecords } = useEntityRecordsCache(sdk);
+  const { getRecords } = useEntityRecordsCache(entityService);
 
   const referenceEntityId = field.referenceEntity?.id;
   const referenceFieldName = field.referenceField?.definition?.name;
@@ -41,7 +41,7 @@ export const RefFieldCellEditor = ({ sdk, field, entityRecord, onValueChange }: 
     }
 
     fetchRecords();
-  }, [referenceEntityId, referenceFieldName, sdk, getRecords]);
+  }, [referenceEntityId, referenceFieldName, entityService, getRecords]);
 
   useEffect(() => {
     if (fieldOptions.length > 0 && selectElementRef.current) {

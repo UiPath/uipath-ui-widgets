@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { RefFieldCellEditor } from '../components/RefFieldCellEditor';
 import { GridRow } from '../types';
-import { EntityFieldDataType, FieldMetaData, UiPath } from '@uipath/uipath-typescript';
+import { EntityFieldDataType, FieldMetaData } from '@uipath/uipath-typescript';
 import { ICellEditorParams, ValueSetterParams } from 'ag-grid-community';
+import { Entities } from '@uipath/uipath-typescript/entities';
 
 export const getFieldValue = (value: any, field: FieldMetaData | undefined): string => {
   if (field?.isForeignKey) {
@@ -26,13 +27,13 @@ export const createValueSetter = (fieldName: string) => {
 
 export const createCellEditorSelector = (
   field: FieldMetaData,
-  sdk: UiPath,
+  entityService: Entities,
 ) => {
   return (params: ICellEditorParams<GridRow>) => {
     if (field.isForeignKey) {
       return {
         component: RefFieldCellEditor,
-        params: { sdk, field, entityRecord: params.data }
+        params: { entityService, field, entityRecord: params.data }
       };
     } else if (isFieldTypeDate(field)) {
       return {
