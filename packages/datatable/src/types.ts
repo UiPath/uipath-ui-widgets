@@ -9,9 +9,11 @@ export interface DataTableProps {
   pageSize?: number;
   columnConfig?: Record<string, ColDef>;
   rowClassRules?: RowClassRules;
+  customPaddingForExpandedRow?: number;
 }
 
 export interface GridRow extends EntityRecord {
   _isExpandedRow?: boolean;
+  _isHidden?: boolean;
   _groupedRecords?: GridRow[]
 }

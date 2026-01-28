@@ -24,11 +24,11 @@ function App({ uipathSdk }: AppProps) {
   const [loading, setLoading] = useState(true);
 
   const columnConfig = useMemo(() => ({
-    'Edition Name': {
-      sortable: false,
-      filter: false,
-      editable: false
-    },
+    // 'Edition Name': {
+    //   sortable: false,
+    //   filter: false,
+    //   editable: false
+    // },
     // 'Inventory Left': {
     //   cellClassRules: {
     //     'datatable-cell-low-inventory': (params: any) => params.data.inventoryLeft < 3 // params.data = entity record
@@ -114,6 +114,7 @@ function App({ uipathSdk }: AppProps) {
                   pageSize={20}
                   columnConfig={columnConfig}
                   rowClassRules={rowClassRules}
+                  customPaddingForExpandedRow={80}
                 />
               </div>
             </>

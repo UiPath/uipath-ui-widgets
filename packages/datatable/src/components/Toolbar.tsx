@@ -11,7 +11,7 @@ interface ToolbarProps {
   editedRowsCount: number;
   selectedRowsCount: number;
   newRecordsCount: number;
-  groupableColumns?: string[];
+  groupableColumns?: {name: string, displayName: string}[];
   selectedGroupBy?: string;
 }
 
@@ -91,8 +91,8 @@ export const Toolbar = ({
           >
             <option value="">None</option>
             {groupableColumns.map((column) => (
-              <option key={column} value={column}>
-                {column}
+              <option key={column.name} value={column.name}>
+                {column.displayName}
               </option>
             ))}
           </select>
