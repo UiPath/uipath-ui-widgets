@@ -1,4 +1,5 @@
 import { Button, FileUpload } from '@uipath/apollo-wind';
+import { BucketService } from '@uipath/uipath-typescript/buckets';
 import { FC, useCallback, useState } from 'react';
 import './MultiFileUpload.css';
 import { MultiFileUploadProps } from './types';
@@ -31,9 +32,10 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
       const basePath = path ? (path.endsWith('/') ? path : `${path}/`) : '';
 
       // Upload all files and track results individually
+      const storageBucketService = new BucketService(sdk);
       const results = await Promise.allSettled(
         files.map((file) =>
-          sdk.buckets.uploadFile({
+          storageBucketService.uploadFile({
             bucketId,
             folderId,
             path: basePath + file.name,
@@ -87,7 +89,7 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
     } finally {
       setIsUploading(false);
     }
-  }, [bucketId, files, folderId, isUploading, onUploadError, onUploadSuccess, path, sdk.buckets]);
+  }, [bucketId, files, folderId, isUploading, onUploadError, onUploadSuccess, path, sdk]);
 
   const handleFilesChange = useCallback((newFiles: File[]) => {
     setFiles(newFiles);
