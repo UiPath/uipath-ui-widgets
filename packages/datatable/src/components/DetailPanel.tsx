@@ -33,19 +33,17 @@ export const DetailPanel = ({ rowData, groupByFieldDisplayName, entity }: Detail
 
   return (
     <div className="detail-panel">
-      <div className="detail-panel-grid">
-        <AgGridReact
-          rowData={rowData}
-          columnDefs={columnDefs}
-          domLayout="autoHeight"
-          defaultColDef={{
-            sortable: true,
-            resizable: true,
-            flex: 1
-          }}
-          theme={themeQuartz}
-        />
-      </div>
+      <AgGridReact
+        rowData={rowData}
+        columnDefs={columnDefs}
+        domLayout="autoHeight"
+        defaultColDef={{
+          sortable: true,
+          resizable: true,
+          flex: 1
+        }}
+        theme={themeQuartz}
+      />
     </div>
   );
 };

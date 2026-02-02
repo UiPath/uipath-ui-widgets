@@ -10,6 +10,7 @@ export interface DataTableProps {
   columnConfig?: Record<string, ColDef>;
   rowClassRules?: RowClassRules;
   customPaddingForExpandedRow?: number;
+  showIdColumn?: boolean;
 }
 
 export interface GridRow extends EntityRecord {

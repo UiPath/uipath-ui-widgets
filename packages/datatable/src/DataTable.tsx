@@ -34,7 +34,8 @@ export const DataTable = ({
   pageSize = 50,
   columnConfig,
   rowClassRules,
-  customPaddingForExpandedRow = 40
+  customPaddingForExpandedRow = 40,
+  showIdColumn = true,
 }: DataTableProps) => {
   const [showDiffDialog, setShowDiffDialog] = useState(false);
   const [gridApi, setGridApi] = useState<GridApi>();
@@ -62,7 +63,7 @@ export const DataTable = ({
     setError,
     entity,
     fetchEntityRecords,
-  } = useEntityData(entityService.current, entityId, columnConfig);
+  } = useEntityData(entityService.current, entityId, columnConfig, showIdColumn);
 
   const groupableColumns = useMemo(() => {
     return entity?.fields
@@ -83,6 +84,7 @@ export const DataTable = ({
   }, [setRowData]);
 
   const handleGroupByChange = useCallback(async (column: string) => {
+    column = column === 'none' ? '' : column;
     setSelectedGroupBy(column);
 
     if (column && entity) {

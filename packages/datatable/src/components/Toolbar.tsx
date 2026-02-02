@@ -1,4 +1,4 @@
-import './Toolbar.css';
+import { Button, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@uipath/apollo-wind';
 
 interface ToolbarProps {
   onRefresh: () => void;
@@ -30,72 +30,53 @@ export const Toolbar = ({
   onGroupByChange,
 }: ToolbarProps) => {
   const hasNewRecords = newRecordsCount > 0;
-  const handleGroupByChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleGroupByChange = (value: string) => {
     if (onGroupByChange) {
-      onGroupByChange(e.target.value);
+      onGroupByChange(value);
     }
   };
 
   return (
-    <div className="datatable-toolbar">
-      <button onClick={onRefresh} className="datatable-toolbar-button datatable-refresh-button">
+    <div className="flex items-center gap-2">
+      <Button variant='default' onClick={onRefresh}>
         Refresh
-      </button>
-      <button
-        onClick={onShowDiff}
-        className="datatable-toolbar-button datatable-diff-button"
-        disabled={editedRowsCount === 0}
-      >
+      </Button>
+
+      <Button variant='default' onClick={onShowDiff} disabled={editedRowsCount === 0}>
         Show Diff ({editedRowsCount})
-      </button>
-      <button
-        onClick={onAddRow}
-        className="datatable-toolbar-button datatable-add-button primary"
-        disabled={!!selectedGroupBy}
-      >
+      </Button>
+
+      <Button variant='default' onClick={onAddRow} disabled={!!selectedGroupBy}>
         Add Row
-      </button>
+      </Button>
+
       {hasNewRecords && (
         <>
-          <button
-            onClick={onInsertRecord}
-            className="datatable-toolbar-button datatable-insert-button primary"
-          >
+          <Button variant='default' onClick={onInsertRecord}>
             Insert Records ({newRecordsCount})
-          </button>
-          <button
-            onClick={onDiscardNewRecords}
-            className="datatable-toolbar-button datatable-discard-button destructive"
-          >
+          </Button>
+          <Button variant='destructive' onClick={onDiscardNewRecords}>
             Discard
-          </button>
+          </Button>
         </>
       )}
-      <button
-        onClick={onDelete}
-        className="datatable-toolbar-button datatable-delete-button destructive"
-        disabled={selectedRowsCount === 0}
-      >
+      <Button variant='destructive' onClick={onDelete} disabled={selectedRowsCount === 0}>
         Delete Records ({selectedRowsCount})
-      </button>
+      </Button>
       {groupableColumns.length > 0 && (
-        <div className="datatable-group-by-container">
-          <label htmlFor="group-by-select" className="datatable-group-by-label">
-            Group by:
-          </label>
-          <select
-            id="group-by-select"
-            className="datatable-group-by-select"
-            value={selectedGroupBy}
-            onChange={handleGroupByChange}
-          >
-            <option value="">None</option>
-            {groupableColumns.map((column) => (
-              <option key={column.name} value={column.name}>
-                {column.displayName}
-              </option>
-            ))}
-          </select>
+        <div className="ml-auto flex items-center gap-2">
+          <Label htmlFor="group-by-select" className="w-full">Group by</Label>
+          <Select value={selectedGroupBy} onValueChange={handleGroupByChange}>
+            <SelectTrigger id="group-by-select" className="w-full">
+              <SelectValue placeholder="None" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              {groupableColumns.map((column) => (
+                <SelectItem value={column.name} key={column.name}>{column.displayName}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
     </div>

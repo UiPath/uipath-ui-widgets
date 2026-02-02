@@ -8,7 +8,8 @@ import { useCallback, useState } from 'react';
 export const useEntityData = (
   entityService: Entities,
   entityId: string,
-  columnConfig?: Record<string, ColDef>
+  columnConfig?: Record<string, ColDef>,
+  showIdColumn?: boolean
 ) => {
   const [rowData, setRowData] = useState<GridRow[]>([]);
   const [originalData, setOriginalData] = useState<GridRow[]>([]);
@@ -30,7 +31,19 @@ export const useEntityData = (
       const items = records.items;
 
       if (items.length > 0) {
-        const nonSystemFields = fetchedEntity.fields.filter(f => !f.isSystemField);
+        let nonSystemFields = fetchedEntity.fields.filter(f =>
+          f.name === 'Id' ? showIdColumn : !f.isSystemField
+        );
+
+        // Move Id column to first position if showIdColumn is true
+        if (showIdColumn) {
+          const idIndex = nonSystemFields.findIndex(f => f.name === 'Id');
+          if (idIndex > 0) {
+            const idField = nonSystemFields[idIndex];
+            nonSystemFields = [idField, ...nonSystemFields.slice(0, idIndex), ...nonSystemFields.slice(idIndex + 1)];
+          }
+        }
+
         const columns: ColDef[] = nonSystemFields.map((f) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const valueGetter = (params: any) => getFieldValue(params.data?.[f.name], f)
@@ -54,7 +67,7 @@ export const useEntityData = (
       setError(err instanceof Error ? err.message : 'Failed to fetch entity records');
       // Error is caught and set in state, no need to re-throw
     }
-  }, [entityService, entityId, columnConfig]);
+  }, [entityService, entityId, showIdColumn, columnConfig]);
 
   return {
     rowData,

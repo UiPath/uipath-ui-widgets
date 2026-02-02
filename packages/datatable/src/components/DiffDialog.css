@@ -1,9 +1,0 @@
-/**
- * Placeholder stylesheet for local development and tests.
- *
- * Production styles are authored in `DiffDialog.scss` and compiled into
- * `dist/components/DiffDialog.css` by the `copy-styles` script. This file
- * exists only so Vite/Vitest can resolve the `./DiffDialog.css` import from
- * `DiffDialog.tsx` when running against `src`.
- */
-
