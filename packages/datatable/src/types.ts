@@ -1,4 +1,5 @@
-import { EntityRecord, UiPath } from "@uipath/uipath-typescript";
+import { UiPath } from "@uipath/uipath-typescript/core";
+import { EntityRecord } from "@uipath/uipath-typescript/entities";
 import { ColDef, RowClassRules } from "ag-grid-community";
 
 export interface DataTableProps {
@@ -8,9 +9,12 @@ export interface DataTableProps {
   pageSize?: number;
   columnConfig?: Record<string, ColDef>;
   rowClassRules?: RowClassRules;
+  customPaddingForExpandedRow?: number;
+  showIdColumn?: boolean;
 }
 
 export interface GridRow extends EntityRecord {
   _isExpandedRow?: boolean;
+  _isHidden?: boolean;
   _groupedRecords?: GridRow[]
 }

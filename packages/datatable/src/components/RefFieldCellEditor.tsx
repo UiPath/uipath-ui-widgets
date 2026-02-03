@@ -1,79 +1,62 @@
+import { Entities, FieldMetaData } from '@uipath/uipath-typescript/entities';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@uipath/apollo-wind';
+import { CustomCellEditorProps } from 'ag-grid-react';
+import { JSX, useCallback, useEffect, useRef, useState } from "react";
 import { useEntityRecordsCache } from '../hooks/useEntityRecordsCache';
 import { GridRow } from '../types';
-import { FieldMetaData, UiPath } from "@uipath/uipath-typescript";
-import { CustomCellEditorProps } from 'ag-grid-react';
-import { ChangeEvent, JSX, useEffect, useRef, useState } from "react";
-import "./RefFieldCellEditor.css";
 
 export interface RefFieldCellEditorProps extends CustomCellEditorProps {
-  sdk: UiPath;
+  entityService: Entities;
   field: FieldMetaData;
   entityRecord: GridRow;
 }
 
-export const RefFieldCellEditor = ({ sdk, field, entityRecord, onValueChange }: RefFieldCellEditorProps) => {
-  const [selectedValue, setSelectedValue] = useState<string>(entityRecord[field.name]?.Id);
-  const [fieldOptions, setFieldOptions] = useState<JSX.Element[]>([]);
-  const selectElementRef = useRef<HTMLSelectElement>(null);
-  const hasFetchedRef = useRef(false);
+export const RefFieldCellEditor = ({ entityService, field, entityRecord, onValueChange }: RefFieldCellEditorProps) => {
+  const [selectedValue, setSelectedValue] = useState(entityRecord[field.name]?.Id || 'none');
+  const [selectItems, setSelectItems] = useState<JSX.Element[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const recordsMapRef = useRef<Map<string, GridRow>>(new Map());
-  const { getRecords } = useEntityRecordsCache(sdk);
+  const { getRecords } = useEntityRecordsCache(entityService);
 
-  const referenceEntityId = field.referenceEntity?.id;
-  const referenceFieldName = field.referenceField?.definition?.name;
+  const referenceFieldName = field.referenceField?.definition?.name || '';
 
   useEffect(() => {
-    if (hasFetchedRef.current) return;
-
     const fetchRecords = async () => {
-      hasFetchedRef.current = true;
-      const records = await getRecords(referenceEntityId || '');
-
-      // Build Map for fast lookups
-      recordsMapRef.current = new Map(
-        records.map(r => [r.Id, r])
+      const fetchedRecords = await getRecords(field.referenceEntity?.id || '');
+      recordsMapRef.current = new Map(fetchedRecords.map(r => [r.Id, r]));
+      setSelectItems(
+        fetchedRecords.map(record => (
+          <SelectItem key={record.Id} value={record.Id}>
+            {record[referenceFieldName]}
+          </SelectItem>
+        ))
       );
-
-      setFieldOptions(records.map((r) => {
-        const displayName = r[referenceFieldName || ''];
-        return <option key={r.Id} value={r.Id}>{displayName}</option>
-      }));
-    }
-
-    fetchRecords();
-  }, [referenceEntityId, referenceFieldName, sdk, getRecords]);
-
-  useEffect(() => {
-    if (fieldOptions.length > 0 && selectElementRef.current) {
-      try {
-        selectElementRef.current.focus();
-        selectElementRef.current.showPicker();
-      } catch {
-        // Ignore error in case browser doesnt support opening the select picker
+      setIsLoading(false);
+      if (fetchedRecords.length > 0) {
+        setIsOpen(true);
       }
-    }
-  }, [fieldOptions]);
+    };
+    fetchRecords();
+  }, [field.referenceEntity?.id, getRecords, referenceFieldName]);
 
-  const handleOnChange = async (e: ChangeEvent<HTMLSelectElement>) => {
-    const newValue = e.target.value;
-    const selectedRecord = newValue ? recordsMapRef.current.get(newValue) : null;
+  const handleOnChange = useCallback((newValue: string) => {
+    const selectedRecord = newValue !== 'none' ? recordsMapRef.current.get(newValue) : null;
     setSelectedValue(newValue);
     onValueChange(selectedRecord);
-  };
+  }, [onValueChange]);
 
   return (
-    <div className="relationship-field-editor">
-      <select
-        ref={selectElementRef}
-        id="datatable-relationship-field-editor"
-        className="relationship-field-editor__select"
-        value={selectedValue}
-        onChange={handleOnChange}
-        disabled={!fieldOptions.length}
-      >
-        <option value=''>{fieldOptions.length ? 'None' : 'Loading...'}</option>
-        {fieldOptions}
-      </select>
+    <div className="h-full">
+      <Select value={selectedValue} onValueChange={handleOnChange} disabled={isLoading} open={isOpen} onOpenChange={setIsOpen}>
+        <SelectTrigger className="h-full w-full">
+          <SelectValue>{isLoading ? 'Loading...' : undefined}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">None</SelectItem>
+          {selectItems}
+        </SelectContent>
+      </Select>
     </div>
-  )
+  );
 };

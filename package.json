@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "for dir in packages/*/; do [ -f \"$dir/package.json\" ] && (cd \"$dir\" && npm i && npm run build) || exit 1; done",
+    "build": "for dir in packages/*/; do [ -f \"$dir/package.json\" ] && (cd \"$dir\" && npm run build) || exit 1; done",
     "lint": "eslint .",
     "preview": "rolldown-vite preview",
     "test": "npm run test --workspaces --if-present",
@@ -57,9 +57,8 @@
     "vitest": "^2.1.8"
   },
   "optionalDependencies": {
-    "@rollup/rollup-darwin-arm64": "^4.55.1",
-    "@rollup/rollup-darwin-x64": "^4.55.1",
     "@rollup/rollup-linux-x64-gnu": "^4.55.1",
-    "@rollup/rollup-win32-x64-msvc": "^4.55.1"
+    "lightningcss-linux-x64-gnu": "^1.30.2",
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.1.18"
   }
 }

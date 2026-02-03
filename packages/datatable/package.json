@@ -1,6 +1,6 @@
 {
   "name": "@uipath/ui-widgets-datatable",
-  "version": "1.0.0",
+  "version": "1.0.1-dev.0",
   "description": "A simple React datatable component",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -34,9 +34,9 @@
   "author": "",
   "license": "MIT",
   "peerDependencies": {
+    "@uipath/uipath-typescript": "npm:@uipath/uipath-typescript-dev@^1.0.0-beta.1",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "@uipath/uipath-typescript": "npm:@uipath/uipath-typescript-dev@^1.0.0-beta.1"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.0",
@@ -49,13 +49,20 @@
     "@vitest/coverage-v8": "^2.1.8",
     "@vitest/ui": "^2.1.8",
     "jsdom": "^25.0.1",
-    "sass": "^1.83.4",
     "typescript": "~5.9.3",
     "vite": "^6.0.3",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "postcss": "^8.5.6",
+    "postcss-cli": "^11.0.1",
+    "sass": "^1.83.4",
+    "lightningcss": "^1.30.2",
+    "@tailwindcss/oxide": "^4.1.18",
+    "rollup": "^4.55.1"
   },
   "dependencies": {
-    "ag-grid-react": "^34.3.1",
-    "ag-grid-community": "^34.3.1"
+    "@uipath/apollo-core": "^5.5.0",
+    "@uipath/apollo-wind": "^0.6.6",
+    "ag-grid-community": "^34.3.1",
+    "ag-grid-react": "^34.3.1"
   }
 }

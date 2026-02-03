@@ -91,17 +91,14 @@ describe('DiffDialog', () => {
     expect(ageCells.length).toBeLessThanOrEqual(1)
   })
 
-  it('should call onClose when close button is clicked', async () => {
+  it('should call onClose when Escape key is pressed', async () => {
     const onClose = vi.fn()
     const user = userEvent.setup()
 
     render(<DiffDialog {...defaultProps} onClose={onClose} />)
 
-    const closeButton = screen.getByRole('button', { name: '' }).parentElement?.querySelector('.datatable-dialog-close')
-    if (closeButton) {
-      await user.click(closeButton)
-      expect(onClose).toHaveBeenCalledTimes(1)
-    }
+    await user.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('should call onCommit when Commit Changes button is clicked', async () => {
@@ -158,14 +155,12 @@ describe('DiffDialog', () => {
     expect(screen.getAllByText('New').length).toBeGreaterThan(0)
   })
 
-  it('should have correct CSS classes', () => {
-    const { container } = render(<DiffDialog {...defaultProps} />)
+  it('should render with Dialog component', () => {
+    render(<DiffDialog {...defaultProps} />)
 
-    expect(container.querySelector('.datatable-dialog-overlay')).toBeInTheDocument()
-    expect(container.querySelector('.datatable-dialog')).toBeInTheDocument()
-    expect(container.querySelector('.datatable-dialog-header')).toBeInTheDocument()
-    expect(container.querySelector('.datatable-dialog-content')).toBeInTheDocument()
-    expect(container.querySelector('.datatable-dialog-footer')).toBeInTheDocument()
+    // Check that the dialog renders with proper role
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('Review Changes')
   })
 
   it('should render multiple revert buttons for multiple changed fields', () => {
@@ -204,11 +199,17 @@ describe('DiffDialog', () => {
     expect(screen.getByText('Row ID: row1')).toBeInTheDocument()
   })
 
-  it('should apply CSS class to changed rows', () => {
-    const { container } = render(<DiffDialog {...defaultProps} />)
+  it('should render changed rows in tables', () => {
+    render(<DiffDialog {...defaultProps} />)
 
-    const changedRows = container.querySelectorAll('.datatable-diff-changed')
-    expect(changedRows.length).toBeGreaterThan(0)
+    // Verify that both row sections are rendered
+    expect(screen.getByText('Row ID: row1')).toBeInTheDocument()
+    expect(screen.getByText('Row ID: row2')).toBeInTheDocument()
+
+    // Verify that table rows for changed fields are rendered
+    // Row1 has 2 changed fields (name and age), Row2 has 1 (name)
+    const revertButtons = screen.getAllByTitle('Revert this field')
+    expect(revertButtons.length).toBeGreaterThanOrEqual(2)
   })
 })
 

@@ -1,8 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getFieldValue } from '../utils/fieldUtils';
 import { EntityGetResponse } from '@uipath/uipath-typescript';
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@uipath/apollo-wind';
 import { useMemo } from 'react';
-import './DiffDialog.css';
 
 interface DiffDialogProps {
   entity: EntityGetResponse | undefined;
@@ -42,65 +55,64 @@ export const DiffDialog = ({
     return new Map(entity?.fields.map(f => [f.name, f]) || []);
   }, [entity]);
 
-  if (!isOpen) return null;
-
   return (
-    <div className="datatable-dialog-overlay">
-      <div className="datatable-dialog">
-        <div className="datatable-dialog-header">
-          <h2>Review Changes</h2>
-          <button onClick={onClose} className="datatable-dialog-close">
-            <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#1f1f1f"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-          </button>
-        </div>
-        <div className="datatable-dialog-content">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Review Changes</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
           {diffData.map(({ rowId, original, edited }) => (
-            <div key={rowId} className="datatable-diff-row">
-              <h3>Row ID: {rowId}</h3>
-              <table className="datatable-diff-table">
-                <thead>
-                  <tr>
-                    <th>Field</th>
-                    <th>Original</th>
-                    <th>New</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.keys(edited).map((key) => {
-                    const originalValue = original?.[key];
-                    const editedValue = edited[key];
-                    const hasChanged = JSON.stringify(originalValue) !== JSON.stringify(editedValue);
-                    const field = fieldsMap.get(key);
+            <div key={rowId} className="space-y-2">
+              <h3 className="text-sm font-medium">Row ID: {rowId}</h3>
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="h-8">Field</TableHead>
+                      <TableHead className="h-8">Original</TableHead>
+                      <TableHead className="h-8">New</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Object.keys(edited).map((key) => {
+                      const originalValue = original?.[key];
+                      const editedValue = edited[key];
+                      const hasChanged = JSON.stringify(originalValue) !== JSON.stringify(editedValue);
+                      const field = fieldsMap.get(key);
 
-                    return hasChanged ? (
-                      <tr key={key} className="datatable-diff-changed">
-                        <td>{key}</td>
-                        <td className="datatable-diff-old">{field ? getFieldValue(originalValue, field) : valueToString(originalValue)}</td>
-                        <td className="datatable-diff-new">
-                          <div className="datatable-diff-new-content">
-                            <span>{field ? getFieldValue(editedValue, field) : valueToString(editedValue)}</span>
-                            <button
-                              onClick={() => onRevertField(rowId, key, originalValue)}
-                              className="datatable-button-revert-field"
-                              title="Revert this field"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#1f1f1f"><path d="M280-200v-80h284q63 0 109.5-40T720-420q0-60-46.5-100T564-560H312l104 104-56 56-200-200 200-200 56 56-104 104h252q97 0 166.5 63T800-420q0 94-69.5 157T564-200H280Z"/></svg>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : null;
-                  })}
-                </tbody>
-              </table>
+                      return hasChanged ? (
+                        <TableRow key={key} className="hover:bg-muted/50">
+                          <TableCell className="py-2 font-medium">{key}</TableCell>
+                          <TableCell className="py-2 text-muted-foreground">{field ? getFieldValue(originalValue, field) : valueToString(originalValue)}</TableCell>
+                          <TableCell className="py-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-medium">{field ? getFieldValue(editedValue, field) : valueToString(editedValue)}</span>
+                              <Button
+                                onClick={() => onRevertField(rowId, key, originalValue)}
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                title="Revert this field"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M280-200v-80h284q63 0 109.5-40T720-420q0-60-46.5-100T564-560H312l104 104-56 56-200-200 200-200 56 56-104 104h252q97 0 166.5 63T800-420q0 94-69.5 157T564-200H280Z"/></svg>
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : null;
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           ))}
         </div>
-        <div className="datatable-dialog-footer">
-          <button onClick={onRevertAll} className="datatable-button-revert-all">Revert</button>
-          <button onClick={onCommit} className="datatable-button-commit">Commit Changes</button>
-        </div>
-      </div>
-    </div>
+        <DialogFooter>
+          <Button onClick={onRevertAll} variant="outline">Revert</Button>
+          <Button onClick={onCommit}>Commit Changes</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import type { UiPath } from '@uipath/uipath-typescript';
+import type { UiPath } from '@uipath/uipath-typescript/core';
 import "./MultiFileUpload.css";
 import { MultiFileUpload } from './MultiFileUpload';
 

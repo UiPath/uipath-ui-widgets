@@ -1,5 +1,6 @@
 import { Button, FileUpload } from '@uipath/apollo-wind';
-import { FC, useCallback, useState } from 'react';
+import { BucketService } from '@uipath/uipath-typescript/buckets';
+import { FC, useCallback, useRef, useState } from 'react';
 import './MultiFileUpload.css';
 import { MultiFileUploadProps } from './types';
 
@@ -19,6 +20,7 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [fileUploadKey, setFileUploadKey] = useState(0); // A key to reset the state of FileUpload component. Modify (or simply increment) it on upload/clear to reset the list of files to []. If we wont increment it, then even after uploading files, file list wont clear. And if we re-upload a different set of files, it will append to the old list instead of overriding it.
   const [isUploading, setIsUploading] = useState(false);
+  const storageBucketService = useRef(new BucketService(sdk));
 
   const uploadFiles = useCallback(async () => {
     if (isUploading) return; // Prevent multiple simultaneous uploads
@@ -33,7 +35,7 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
       // Upload all files and track results individually
       const results = await Promise.allSettled(
         files.map((file) =>
-          sdk.buckets.uploadFile({
+          storageBucketService.current.uploadFile({
             bucketId,
             folderId,
             path: basePath + file.name,
@@ -87,7 +89,7 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
     } finally {
       setIsUploading(false);
     }
-  }, [bucketId, files, folderId, isUploading, onUploadError, onUploadSuccess, path, sdk.buckets]);
+  }, [bucketId, files, folderId, isUploading, onUploadError, onUploadSuccess, path, sdk]);
 
   const handleFilesChange = useCallback((newFiles: File[]) => {
     setFiles(newFiles);

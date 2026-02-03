@@ -1,4 +1,4 @@
-import { UiPath } from '@uipath/uipath-typescript';
+import { UiPath } from '@uipath/uipath-typescript/core';
 
 export interface MultiFileUploadProps {
   sdk: UiPath;

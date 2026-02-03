@@ -143,8 +143,8 @@ describe('fieldUtils', () => {
         isForeignKey: true,
         name: 'category',
       }
-      const sdk = {} as any
-      const cellEditorSelector = createCellEditorSelector(field as FieldMetaData, sdk)
+      const entityService = {} as any
+      const cellEditorSelector = createCellEditorSelector(field as FieldMetaData, entityService)
       const params = {
         data: { Id: 'row1' },
       } as any
@@ -154,7 +154,7 @@ describe('fieldUtils', () => {
       expect(result).toBeDefined()
       expect(result?.component).toBeDefined()
       expect(result?.params).toEqual({
-        sdk,
+        entityService,
         field,
         entityRecord: params.data,
       })

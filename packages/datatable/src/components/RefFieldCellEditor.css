@@ -1,9 +1,0 @@
-/**
- * Placeholder stylesheet for local development and tests.
- *
- * Production styles are authored in `RefFieldCellEditor.scss` and compiled
- * into `dist/components/RefFieldCellEditor.css` by the `copy-styles` script.
- * This file exists only so Vite/Vitest can resolve the `./RefFieldCellEditor.css`
- * import from `RefFieldCellEditor.tsx` when running against `src`.
- */
-

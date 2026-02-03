@@ -5,6 +5,16 @@ import userEvent from '@testing-library/user-event'
 import { MultiFileUpload } from '../MultiFileUpload'
 import { UiPath } from '@uipath/uipath-typescript'
 
+// Create mock uploadFile function
+const mockUploadFile = vi.fn()
+
+// Mock BucketService to avoid SDK validation issues
+vi.mock('@uipath/uipath-typescript/buckets', () => ({
+  BucketService: vi.fn().mockImplementation(() => ({
+    uploadFile: mockUploadFile,
+  })),
+}))
+
 // Mock @uipath/apollo-wind components
 vi.mock('@uipath/apollo-wind', () => ({
   Button: ({ onClick, children, disabled }: any) => (
@@ -31,15 +41,10 @@ vi.mock('@uipath/apollo-wind', () => ({
 
 describe('MultiFileUpload', () => {
   let mockSdk: UiPath
-  let uploadFileMock: any
 
   beforeEach(() => {
-    uploadFileMock = vi.fn()
-    mockSdk = {
-      buckets: {
-        uploadFile: uploadFileMock,
-      },
-    } as UiPath
+    vi.clearAllMocks()
+    mockSdk = {} as UiPath
   })
 
   const getDefaultProps = () => ({
@@ -98,7 +103,7 @@ describe('MultiFileUpload', () => {
   it('should upload files successfully', async () => {
     const user = userEvent.setup()
     const onUploadSuccess = vi.fn()
-    uploadFileMock.mockResolvedValue({ statusCode: 201 })
+    mockUploadFile.mockResolvedValue({ statusCode: 201 })
 
     render(
       <MultiFileUpload
@@ -117,7 +122,7 @@ describe('MultiFileUpload', () => {
     await user.click(uploadButton)
 
     await waitFor(() => {
-      expect(uploadFileMock).toHaveBeenCalledTimes(2)
+      expect(mockUploadFile).toHaveBeenCalledTimes(2)
       expect(onUploadSuccess).toHaveBeenCalledWith([file1, file2])
       expect(screen.getByText('Files uploaded successfully!')).toBeInTheDocument()
     })
@@ -125,7 +130,7 @@ describe('MultiFileUpload', () => {
 
   it('should upload files with custom path', async () => {
     const user = userEvent.setup()
-    uploadFileMock.mockResolvedValue({ statusCode: 201 })
+    mockUploadFile.mockResolvedValue({ statusCode: 201 })
 
     render(
       <MultiFileUpload
@@ -143,7 +148,7 @@ describe('MultiFileUpload', () => {
     await user.click(uploadButton)
 
     await waitFor(() => {
-      expect(uploadFileMock).toHaveBeenCalledWith({
+      expect(mockUploadFile).toHaveBeenCalledWith({
         bucketId: 1,
         folderId: 100,
         path: 'custom/folder/test.txt',
@@ -154,7 +159,7 @@ describe('MultiFileUpload', () => {
 
   it('should ensure path ends with slash', async () => {
     const user = userEvent.setup()
-    uploadFileMock.mockResolvedValue({ statusCode: 201 })
+    mockUploadFile.mockResolvedValue({ statusCode: 201 })
 
     render(
       <MultiFileUpload
@@ -172,7 +177,7 @@ describe('MultiFileUpload', () => {
     await user.click(uploadButton)
 
     await waitFor(() => {
-      expect(uploadFileMock).toHaveBeenCalledWith({
+      expect(mockUploadFile).toHaveBeenCalledWith({
         bucketId: 1,
         folderId: 100,
         path: 'custom/folder/test.txt',
@@ -184,7 +189,7 @@ describe('MultiFileUpload', () => {
   it('should handle upload errors for all files', async () => {
     const user = userEvent.setup()
     const onUploadError = vi.fn()
-    uploadFileMock.mockRejectedValue(new Error('Upload failed'))
+    mockUploadFile.mockRejectedValue(new Error('Upload failed'))
 
     render(
       <MultiFileUpload
@@ -213,7 +218,7 @@ describe('MultiFileUpload', () => {
     const onUploadError = vi.fn()
 
     // First file succeeds, second fails
-    uploadFileMock
+    mockUploadFile
       .mockResolvedValueOnce({ statusCode: 201 })
       .mockRejectedValueOnce(new Error('Upload failed'))
 
@@ -267,7 +272,7 @@ describe('MultiFileUpload', () => {
 
   it('should clear status message when new files are selected', async () => {
     const user = userEvent.setup()
-    uploadFileMock.mockRejectedValue(new Error('Upload failed'))
+    mockUploadFile.mockRejectedValue(new Error('Upload failed'))
 
     render(<MultiFileUpload {...getDefaultProps()} />)
 
@@ -295,7 +300,7 @@ describe('MultiFileUpload', () => {
   it('should disable buttons while uploading', async () => {
     const user = userEvent.setup()
     let resolveUpload: any
-    uploadFileMock.mockImplementation(() => new Promise((resolve) => {
+    mockUploadFile.mockImplementation(() => new Promise((resolve) => {
       resolveUpload = () => resolve({ statusCode: 201 })
     }))
 
@@ -329,7 +334,7 @@ describe('MultiFileUpload', () => {
   it('should prevent multiple simultaneous uploads', async () => {
     const user = userEvent.setup()
     let resolveUpload: any
-    uploadFileMock.mockImplementation(() => new Promise((resolve) => {
+    mockUploadFile.mockImplementation(() => new Promise((resolve) => {
       resolveUpload = () => resolve({ statusCode: 201 })
     }))
 
@@ -346,14 +351,14 @@ describe('MultiFileUpload', () => {
     await user.click(uploadButton)
 
     // Should only upload once
-    expect(uploadFileMock).toHaveBeenCalledTimes(1)
+    expect(mockUploadFile).toHaveBeenCalledTimes(1)
 
     resolveUpload()
   })
 
   it('should display correct color for success message', async () => {
     const user = userEvent.setup()
-    uploadFileMock.mockResolvedValue({ statusCode: 201 })
+    mockUploadFile.mockResolvedValue({ statusCode: 201 })
 
     render(<MultiFileUpload {...getDefaultProps()} />)
 
@@ -372,7 +377,7 @@ describe('MultiFileUpload', () => {
 
   it('should display correct color for error message', async () => {
     const user = userEvent.setup()
-    uploadFileMock.mockRejectedValue(new Error('Upload failed'))
+    mockUploadFile.mockRejectedValue(new Error('Upload failed'))
 
     render(<MultiFileUpload {...getDefaultProps()} />)
 
@@ -391,7 +396,7 @@ describe('MultiFileUpload', () => {
 
   it('should display correct color for partial success message', async () => {
     const user = userEvent.setup()
-    uploadFileMock
+    mockUploadFile
       .mockResolvedValueOnce({ statusCode: 201 })
       .mockRejectedValueOnce(new Error('Upload failed'))
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Grid, List, ListItem, ListItemButton, ListItemText } from '@mui/material';
 import { ConversationalAgentChat } from '@uipath/ui-widgets-conversational-agent-chat';
 import { DataTable } from '@uipath/ui-widgets-datatable';
@@ -27,17 +28,16 @@ function App({ uipathSdk }: AppProps) {
     'Edition Name': {
       sortable: false,
       filter: false,
-      editable: false
     },
-    // 'Inventory Left': {
-    //   cellClassRules: {
-    //     'datatable-cell-low-inventory': (params: any) => params.data.inventoryLeft < 3 // params.data = entity record
-    //   }
-    // }
+    'Inventory Left': {
+      cellClassRules: {
+        'datatable-cell-low-inventory': (params: any) => params.data.inventoryLeft < 3 // params.data = entity record
+      }
+    }
   }), []);
 
   const rowClassRules = useMemo(() => ({
-    // 'datatable-row-low-inventory': (params: any) => params.data.inventoryLeft < 5
+    'datatable-row-low-inventory': (params: any) => params.data.inventoryLeft < 5
   }), [])
 
   useEffect(() => {
@@ -114,6 +114,7 @@ function App({ uipathSdk }: AppProps) {
                   pageSize={20}
                   columnConfig={columnConfig}
                   rowClassRules={rowClassRules}
+                  customPaddingForExpandedRow={80}
                 />
               </div>
             </>
@@ -123,10 +124,13 @@ function App({ uipathSdk }: AppProps) {
                 <Grid size={6}>
                   <MultiFileUpload
                     sdk={uipathSdk}
-                    bucketId={334332}
-                    folderId={893883}
+                    bucketId={parseInt(import.meta.env.VITE_MFU_BUCKET_ID)}
+                    folderId={parseInt(import.meta.env.VITE_MFU_BUCKET_FOLDER_ID)}
                     maxFileSize={20971520}
                     accept="image/*"
+                    onUploadSuccess={(files: File[]) => {
+                      console.log('Files uploaded:', files);
+                    }}
                     onUploadError={(error: Error) => {
                       console.error('Upload error:', error);
                     }}
