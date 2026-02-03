@@ -28,11 +28,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20.x'
+          cache: 'npm'
 
       - name: Install dependencies
         run: |
-          rm -rf node_modules package-lock.json
-          npm install --include=optional
+          # Use npm install to ensure optional dependencies (like lightningcss native binaries) are installed
+          npm install --include=optional --legacy-peer-deps
+          # Rebuild native modules to ensure platform-specific binaries are available
+          npm rebuild lightningcss --include=optional || true
 
       - name: Build packages
         run: npm run build

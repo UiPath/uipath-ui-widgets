@@ -33,7 +33,9 @@ export const RefFieldCellEditor = ({ entityService, field, entityRecord, onValue
         ))
       );
       setIsLoading(false);
-      if (fetchedRecords.length > 0) setIsOpen(true);
+      if (fetchedRecords.length > 0) {
+        setIsOpen(true);
+      }
     };
     fetchRecords();
   }, [field.referenceEntity?.id, getRecords, referenceFieldName]);
