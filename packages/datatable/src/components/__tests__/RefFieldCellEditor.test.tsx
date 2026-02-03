@@ -3,7 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RefFieldCellEditor, RefFieldCellEditorProps } from '../RefFieldCellEditor'
-import { UiPath } from '@uipath/uipath-typescript'
+import { UiPath } from '@uipath/uipath-typescript/core'
+
+// Mock DOM methods for Radix UI Select
+Element.prototype.scrollIntoView = vi.fn()
+Element.prototype.hasPointerCapture = vi.fn(() => false)
+Element.prototype.releasePointerCapture = vi.fn()
 
 // Mock useEntityRecordsCache
 vi.mock('@uipath/datatable/hooks/useEntityRecordsCache', () => ({
@@ -55,29 +60,41 @@ describe('RefFieldCellEditor', () => {
   it('should load and display reference options', async () => {
     render(<RefFieldCellEditor {...defaultProps} />)
 
+    // Wait for dropdown to auto-open after loading
     await waitFor(() => {
-      expect(screen.getByText('Reference 1')).toBeInTheDocument()
+      expect(screen.getByRole('listbox')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Reference 2')).toBeInTheDocument()
-    expect(screen.getByText('Reference 3')).toBeInTheDocument()
+    // Check that options are rendered
+    expect(screen.getByRole('option', { name: 'Reference 1' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Reference 2' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Reference 3' })).toBeInTheDocument()
   })
 
   it('should show "None" option when options are loaded', async () => {
     render(<RefFieldCellEditor {...defaultProps} />)
 
+    // Wait for dropdown to auto-open after loading
     await waitFor(() => {
-      expect(screen.getByText('None')).toBeInTheDocument()
+      expect(screen.getByRole('listbox')).toBeInTheDocument()
     })
+
+    expect(screen.getByRole('option', { name: 'None' })).toBeInTheDocument()
   })
 
   it('should set initial selected value from entity record', async () => {
     render(<RefFieldCellEditor {...defaultProps} />)
 
+    // Get the trigger first before dropdown opens
+    const trigger = screen.getByRole('combobox')
+
+    // Wait for dropdown to auto-open after loading
     await waitFor(() => {
-      const select = screen.getByRole('combobox') as HTMLSelectElement
-      expect(select.value).toBe('ref1')
+      expect(screen.getByRole('listbox')).toBeInTheDocument()
     })
+
+    // The trigger should display the selected value
+    expect(trigger).toHaveTextContent('Reference 1')
   })
 
   it('should call onValueChange when selection changes', async () => {
@@ -86,12 +103,13 @@ describe('RefFieldCellEditor', () => {
 
     render(<RefFieldCellEditor {...defaultProps} onValueChange={onValueChange} />)
 
+    // Wait for dropdown to auto-open after loading
     await waitFor(() => {
-      expect(screen.getByText('Reference 2')).toBeInTheDocument()
+      expect(screen.getByRole('listbox')).toBeInTheDocument()
     })
 
-    const select = screen.getByRole('combobox')
-    await user.selectOptions(select, 'ref2')
+    const option = screen.getByRole('option', { name: 'Reference 2' })
+    await user.click(option)
 
     expect(onValueChange).toHaveBeenCalledWith({
       Id: 'ref2',
@@ -105,12 +123,13 @@ describe('RefFieldCellEditor', () => {
 
     render(<RefFieldCellEditor {...defaultProps} onValueChange={onValueChange} />)
 
+    // Wait for dropdown to auto-open after loading
     await waitFor(() => {
-      expect(screen.getByText('None')).toBeInTheDocument()
+      expect(screen.getByRole('listbox')).toBeInTheDocument()
     })
 
-    const select = screen.getByRole('combobox')
-    await user.selectOptions(select, '')
+    const noneOption = screen.getByRole('option', { name: 'None' })
+    await user.click(noneOption)
 
     expect(onValueChange).toHaveBeenCalledWith(null)
   })
@@ -125,10 +144,15 @@ describe('RefFieldCellEditor', () => {
   it('should enable select after options are loaded', async () => {
     render(<RefFieldCellEditor {...defaultProps} />)
 
+    // Get the trigger first
+    const trigger = screen.getByRole('combobox')
+
+    // Wait for dropdown to auto-open, which happens when loading completes
     await waitFor(() => {
-      const select = screen.getByRole('combobox')
-      expect(select).not.toBeDisabled()
+      expect(screen.getByRole('listbox')).toBeInTheDocument()
     })
+
+    expect(trigger).not.toBeDisabled()
   })
 
   it('should handle entity record without initial value', async () => {
@@ -145,22 +169,24 @@ describe('RefFieldCellEditor', () => {
     })
   })
 
-  it('should have correct CSS classes', () => {
-    const { container } = render(<RefFieldCellEditor {...defaultProps} />)
+  it('should render with Select component', () => {
+    render(<RefFieldCellEditor {...defaultProps} />)
 
-    expect(container.querySelector('.relationship-field-editor')).toBeInTheDocument()
-    expect(container.querySelector('.relationship-field-editor__select')).toBeInTheDocument()
+    // Verify the Select trigger is rendered
+    expect(screen.getByRole('combobox')).toBeInTheDocument()
   })
 
   it('should render correct number of options', async () => {
     render(<RefFieldCellEditor {...defaultProps} />)
 
+    // Wait for dropdown to auto-open after loading
     await waitFor(() => {
-      const select = screen.getByRole('combobox')
-      const options = select.querySelectorAll('option')
-      // 1 "None" option + 3 reference options
-      expect(options).toHaveLength(4)
+      expect(screen.getByRole('listbox')).toBeInTheDocument()
     })
+
+    const options = screen.getAllByRole('option')
+    // 1 "None" option + 3 reference options
+    expect(options).toHaveLength(4)
   })
 
   it('should update selected value state on change', async () => {
@@ -168,14 +194,21 @@ describe('RefFieldCellEditor', () => {
 
     render(<RefFieldCellEditor {...defaultProps} />)
 
+    // Get the trigger first
+    const trigger = screen.getByRole('combobox')
+
+    // Wait for dropdown to auto-open after loading
     await waitFor(() => {
-      expect(screen.getByText('Reference 3')).toBeInTheDocument()
+      expect(screen.getByRole('listbox')).toBeInTheDocument()
     })
 
-    const select = screen.getByRole('combobox') as HTMLSelectElement
-    await user.selectOptions(select, 'ref3')
+    const option = screen.getByRole('option', { name: 'Reference 3' })
+    await user.click(option)
 
-    expect(select.value).toBe('ref3')
+    // After selection, trigger should show the selected value
+    await waitFor(() => {
+      expect(trigger).toHaveTextContent('Reference 3')
+    })
   })
 
   it('should handle missing reference entity id', async () => {

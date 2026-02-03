@@ -2,21 +2,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useEntityRecordsCache } from '../useEntityRecordsCache'
-import { UiPath } from '@uipath/uipath-typescript'
+import { Entities } from '@uipath/uipath-typescript/entities'
 
 describe('useEntityRecordsCache', () => {
-  let mockSdk: Partial<UiPath>
+  let mockEntityService: Partial<Entities>
   let mockGetRecordsById: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     mockGetRecordsById = vi.fn()
-    mockSdk = {
-      entities: {
-        getRecordsById: mockGetRecordsById,
-      } as any,
-    }
+    mockEntityService = {
+      getRecordsById: mockGetRecordsById,
+    } as any
     // Clear the static cache before each test
-    const { result } = renderHook(() => useEntityRecordsCache(mockSdk as UiPath))
+    const { result } = renderHook(() => useEntityRecordsCache(mockEntityService as Entities))
     result.current.clearCache()
   })
 
@@ -31,7 +29,7 @@ describe('useEntityRecordsCache', () => {
     ]
     mockGetRecordsById.mockResolvedValue({ items: mockRecords })
 
-    const { result } = renderHook(() => useEntityRecordsCache(mockSdk as UiPath))
+    const { result } = renderHook(() => useEntityRecordsCache(mockEntityService as Entities))
 
     const records = await result.current.getRecords('entity1')
 
@@ -44,7 +42,7 @@ describe('useEntityRecordsCache', () => {
     const mockRecords = [{ Id: '1', name: 'Record 1' }]
     mockGetRecordsById.mockResolvedValue({ items: mockRecords })
 
-    const { result } = renderHook(() => useEntityRecordsCache(mockSdk as UiPath))
+    const { result } = renderHook(() => useEntityRecordsCache(mockEntityService as Entities))
 
     // First call - should fetch from API
     const records1 = await result.current.getRecords('entity1')
@@ -63,7 +61,7 @@ describe('useEntityRecordsCache', () => {
       .mockResolvedValueOnce({ items: mockRecords1 })
       .mockResolvedValueOnce({ items: mockRecords2 })
 
-    const { result } = renderHook(() => useEntityRecordsCache(mockSdk as UiPath))
+    const { result } = renderHook(() => useEntityRecordsCache(mockEntityService as Entities))
 
     const records1 = await result.current.getRecords('entity1')
     const records2 = await result.current.getRecords('entity2')
@@ -77,7 +75,7 @@ describe('useEntityRecordsCache', () => {
     const mockRecords = [{ Id: '1', name: 'Record 1' }]
     mockGetRecordsById.mockResolvedValue({ items: mockRecords })
 
-    const { result } = renderHook(() => useEntityRecordsCache(mockSdk as UiPath))
+    const { result } = renderHook(() => useEntityRecordsCache(mockEntityService as Entities))
 
     // Fetch and cache
     await result.current.getRecords('entity1')
@@ -98,7 +96,7 @@ describe('useEntityRecordsCache', () => {
       .mockResolvedValueOnce({ items: mockRecords1 })
       .mockResolvedValueOnce({ items: mockRecords2 })
 
-    const { result } = renderHook(() => useEntityRecordsCache(mockSdk as UiPath))
+    const { result } = renderHook(() => useEntityRecordsCache(mockEntityService as Entities))
 
     // Cache two entities
     await result.current.getRecords('entity1')
@@ -122,33 +120,33 @@ describe('useEntityRecordsCache', () => {
     const error = new Error('API Error')
     mockGetRecordsById.mockRejectedValue(error)
 
-    const { result } = renderHook(() => useEntityRecordsCache(mockSdk as UiPath))
+    const { result } = renderHook(() => useEntityRecordsCache(mockEntityService as Entities))
 
     await expect(result.current.getRecords('entity1')).rejects.toThrow('API Error')
   })
 
-  it('should use updated SDK reference', async () => {
+  it('should use updated entity service reference', async () => {
     const mockRecords = [{ Id: '1', name: 'Record 1' }]
     const initialMockGetRecordsById = vi.fn().mockResolvedValue({ items: mockRecords })
-    const initialSdk = {
-      entities: { getRecordsById: initialMockGetRecordsById } as any,
-    } as UiPath
+    const initialEntityService = {
+      getRecordsById: initialMockGetRecordsById,
+    } as Entities
 
     const { result, rerender } = renderHook(
-      ({ sdk }) => useEntityRecordsCache(sdk),
-      { initialProps: { sdk: initialSdk } }
+      ({ entityService }) => useEntityRecordsCache(entityService),
+      { initialProps: { entityService: initialEntityService } }
     )
 
-    // Create new SDK instance
+    // Create new entity service instance
     const newMockGetRecordsById = vi.fn().mockResolvedValue({ items: mockRecords })
-    const newSdk = {
-      entities: { getRecordsById: newMockGetRecordsById } as any,
-    } as UiPath
+    const newEntityService = {
+      getRecordsById: newMockGetRecordsById,
+    } as Entities
 
-    // Update SDK
-    rerender({ sdk: newSdk })
+    // Update entity service
+    rerender({ entityService: newEntityService })
 
-    // Fetch records - should use new SDK
+    // Fetch records - should use new entity service
     await result.current.getRecords('entity1')
 
     expect(newMockGetRecordsById).toHaveBeenCalledWith('entity1')

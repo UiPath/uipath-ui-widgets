@@ -8,7 +8,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { DataTable } from '../DataTable'
-import { UiPath } from '@uipath/uipath-typescript'
+import { UiPath } from '@uipath/uipath-typescript/core'
+
+// Create mock Entities instance
+const mockGetById = vi.fn()
+const mockGetRecordsById = vi.fn()
+
+// Mock Entities to avoid SDK validation issues
+vi.mock('@uipath/uipath-typescript/entities', () => ({
+  Entities: vi.fn().mockImplementation(() => ({
+    getById: mockGetById,
+    getRecordsById: mockGetRecordsById,
+  })),
+}))
 
 // Mock ag-grid-react
 vi.mock('ag-grid-react', () => ({
@@ -43,6 +55,8 @@ describe('DataTable Integration Tests', () => {
   let mockEntity: any
 
   beforeEach(() => {
+    vi.clearAllMocks()
+
     mockEntity = {
       id: 'entity-1',
       name: 'TestEntity',
@@ -79,17 +93,16 @@ describe('DataTable Integration Tests', () => {
       delete: vi.fn().mockResolvedValue(undefined),
     }
 
-    mockSdk = {
-      entities: {
-        getById: vi.fn().mockResolvedValue(mockEntity),
-        getRecordsById: vi.fn().mockResolvedValue({
-          items: [
-            { Id: 'row1', name: 'Item 1', status: 'Active' },
-            { Id: 'row2', name: 'Item 2', status: 'Inactive' },
-          ],
-        }),
-      } as any,
-    }
+    // Setup mock implementations
+    mockGetById.mockResolvedValue(mockEntity)
+    mockGetRecordsById.mockResolvedValue({
+      items: [
+        { Id: 'row1', name: 'Item 1', status: 'Active' },
+        { Id: 'row2', name: 'Item 2', status: 'Inactive' },
+      ],
+    })
+
+    mockSdk = {} as any
   })
 
   it('should render DataTable with toolbar and grid', async () => {
@@ -112,7 +125,7 @@ describe('DataTable Integration Tests', () => {
       expect(screen.getByTestId('row-count')).toHaveTextContent('2')
     })
 
-    expect(mockSdk.entities?.getById).toHaveBeenCalledWith('entity-1')
+    expect(mockGetById).toHaveBeenCalledWith('entity-1')
   })
 
   it('should handle refresh action', async () => {
@@ -128,7 +141,7 @@ describe('DataTable Integration Tests', () => {
 
     // Should call getById again after refresh
     await waitFor(() => {
-      expect(mockSdk.entities?.getById).toHaveBeenCalledTimes(2)
+      expect(mockGetById).toHaveBeenCalledTimes(2)
     })
   })
 
@@ -139,13 +152,9 @@ describe('DataTable Integration Tests', () => {
   })
 
   it('should handle errors gracefully', async () => {
-    const errorSdk = {
-      entities: {
-        getById: vi.fn().mockRejectedValue(new Error('Failed to fetch entity')),
-      } as any,
-    }
+    mockGetById.mockRejectedValueOnce(new Error('Failed to fetch entity'))
 
-    render(<DataTable sdk={errorSdk as UiPath} entityId="entity-1" />)
+    render(<DataTable sdk={mockSdk as UiPath} entityId="entity-1" />)
 
     await waitFor(() => {
       expect(screen.getByText(/Error:/)).toBeInTheDocument()
@@ -179,14 +188,14 @@ describe('DataTable Integration Tests', () => {
     const { rerender } = render(<DataTable sdk={mockSdk as UiPath} entityId="entity-1" />)
 
     await waitFor(() => {
-      expect(mockSdk.entities?.getById).toHaveBeenCalledWith('entity-1')
+      expect(mockGetById).toHaveBeenCalledWith('entity-1')
     })
 
     // Change entity ID
     rerender(<DataTable sdk={mockSdk as UiPath} entityId="entity-2" />)
 
     await waitFor(() => {
-      expect(mockSdk.entities?.getById).toHaveBeenCalledWith('entity-2')
+      expect(mockGetById).toHaveBeenCalledWith('entity-2')
     })
   })
 })

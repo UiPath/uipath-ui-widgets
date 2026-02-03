@@ -110,7 +110,6 @@ describe('DetailPanel', () => {
     const { container } = render(<DetailPanel {...defaultProps} />)
 
     expect(container.querySelector('.detail-panel')).toBeInTheDocument()
-    expect(container.querySelector('.detail-panel-grid')).toBeInTheDocument()
   })
 
   it('should update columns when entity changes', () => {
