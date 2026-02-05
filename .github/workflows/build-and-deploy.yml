@@ -19,6 +19,7 @@ jobs:
     env:
       GH_NPM_REGISTRY_TOKEN: ${{ secrets.GH_NPM_REGISTRY_TOKEN }}
       NODE_AUTH_TOKEN: ${{ secrets.GH_NPM_REGISTRY_TOKEN }}
+      PACKAGES: datatable multi-file-upload conversational-agent-chat
 
     steps:
       - name: Checkout
@@ -29,7 +30,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
+          node-version: '24.x'
           cache: 'npm'
           registry-url: 'https://npm.pkg.github.com'
           scope: '@uipath'
@@ -50,7 +51,7 @@ jobs:
         run: |
           CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} 2>/dev/null || git diff --name-only HEAD~1 HEAD)
           CHANGED_PACKAGES=""
-          for pkg in datatable multi-file-upload conversational-agent-chat; do
+          for pkg in $PACKAGES; do
             echo "$CHANGED_FILES" | grep -q "^packages/$pkg/" && CHANGED_PACKAGES="$CHANGED_PACKAGES $pkg"
           done
           echo "packages=$CHANGED_PACKAGES" >> $GITHUB_OUTPUT

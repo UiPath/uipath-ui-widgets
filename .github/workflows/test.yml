@@ -6,19 +6,26 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
     env:
       GH_NPM_REGISTRY_TOKEN: ${{ secrets.GH_NPM_REGISTRY_TOKEN }}
+      PACKAGES: datatable multi-file-upload conversational-agent-chat
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for comparing with base branch
 
-      - name: Setup Node.js 20.x
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
+          node-version: '24.x'
           cache: 'npm'
 
       - name: Install dependencies
@@ -27,17 +34,119 @@ jobs:
       - name: Run linter
         run: npm run lint
 
-      - name: Run tests
-        run: npm run test
-
-      - name: Generate coverage report
+      - name: Run tests with coverage
         run: npm run test:coverage
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage/lcov.info
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
+      - name: Post Coverage Report to PR
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMENT="## 📊 Coverage Report\n\n"
+          COMMENT+="| Package | Line Coverage |\n"
+          COMMENT+="|---------|---------------|\n"
 
+          for PKG in $PACKAGES; do
+            SUMMARY="packages/$PKG/coverage/coverage-summary.json"
+            if [ -f "$SUMMARY" ]; then
+              LINES=$(node -e "const s=require('./$SUMMARY').total; console.log(s.lines.pct.toFixed(2))")
+              COMMENT+="| $PKG | ${LINES}% |\n"
+            else
+              COMMENT+="| $PKG | ⚠️ No data |\n"
+            fi
+          done
+
+          # Post or update comment
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          EXISTING=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/comments --jq '.[] | select(.body | startswith("## 📊 Coverage Report")) | .id' | head -1)
+
+          if [ -n "$EXISTING" ]; then
+            gh api repos/${{ github.repository }}/issues/comments/$EXISTING -X PATCH -f body="$(echo -e "$COMMENT")"
+          else
+            gh pr comment $PR_NUMBER --body "$(echo -e "$COMMENT")"
+          fi
+
+      - name: Check coverage threshold (80% for new lines)
+        run: |
+          FAILED=0
+
+          # Get list of changed files in PR
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+          fi
+
+          CHANGED_FILES=$(git diff --name-only $BASE_SHA $HEAD_SHA | grep -E '\.(ts|tsx)$' | grep -v '\.test\.' | grep -v '\.spec\.' || true)
+
+          for PKG in $PACKAGES; do
+            COVERAGE_FILE="packages/$PKG/coverage/coverage-final.json"
+            SUMMARY_FILE="packages/$PKG/coverage/coverage-summary.json"
+
+            if [ ! -f "$COVERAGE_FILE" ] || [ ! -f "$SUMMARY_FILE" ]; then
+              echo "::warning::No coverage found for $PKG"
+              continue
+            fi
+
+            # Check overall coverage
+            OVERALL=$(node -e "console.log(Math.round(require('./$SUMMARY_FILE').total.lines.pct))")
+            echo "$PKG overall coverage: $OVERALL%"
+
+            # Check coverage for changed files in this package
+            PKG_CHANGED=$(echo "$CHANGED_FILES" | grep "^packages/$PKG/src/" || true)
+
+            if [ -n "$PKG_CHANGED" ]; then
+              echo "Checking coverage for changed files in $PKG:"
+
+              TOTAL_LINES=0
+              COVERED_LINES=0
+
+              while IFS= read -r FILE; do
+                [ -z "$FILE" ] && continue
+                ABS_PATH="$(pwd)/$FILE"
+
+                FILE_COVERAGE=$(node -e "
+                  const cov = require('./$COVERAGE_FILE');
+                  const data = cov['$ABS_PATH'];
+                  if (data && data.s) {
+                    const total = Object.keys(data.s).length;
+                    const covered = Object.values(data.s).filter(v => v > 0).length;
+                    console.log(total + ':' + covered);
+                  } else {
+                    console.log('0:0');
+                  }
+                " 2>/dev/null || echo "0:0")
+
+                FILE_TOTAL=$(echo "$FILE_COVERAGE" | cut -d: -f1)
+                FILE_COVERED=$(echo "$FILE_COVERAGE" | cut -d: -f2)
+
+                TOTAL_LINES=$((TOTAL_LINES + FILE_TOTAL))
+                COVERED_LINES=$((COVERED_LINES + FILE_COVERED))
+
+                if [ "$FILE_TOTAL" -gt 0 ]; then
+                  FILE_PCT=$((FILE_COVERED * 100 / FILE_TOTAL))
+                  echo "  $FILE: $FILE_PCT% ($FILE_COVERED/$FILE_TOTAL)"
+                fi
+              done <<< "$PKG_CHANGED"
+
+              if [ "$TOTAL_LINES" -gt 0 ]; then
+                NEW_COVERAGE=$((COVERED_LINES * 100 / TOTAL_LINES))
+                echo "$PKG new lines coverage: $NEW_COVERAGE% ($COVERED_LINES/$TOTAL_LINES)"
+
+                if [ "$NEW_COVERAGE" -lt 80 ]; then
+                  echo "::error::$PKG new lines coverage ($NEW_COVERAGE%) is below 80%"
+                  FAILED=1
+                fi
+              fi
+            else
+              echo "No source changes in $PKG"
+            fi
+          done
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo "::error::Coverage for new lines is below 80% threshold"
+            exit 1
+          fi
+          echo "✅ All changed files meet 80% coverage threshold"
