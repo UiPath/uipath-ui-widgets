@@ -1,4 +1,4 @@
-name: Build and Deploy Storybook
+name: Build and Deploy
 
 on:
   push:
@@ -10,32 +10,33 @@ permissions:
   contents: write
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: "ci-${{ github.ref }}"
+  cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     env:
       GH_NPM_REGISTRY_TOKEN: ${{ secrets.GH_NPM_REGISTRY_TOKEN }}
-      GITHUB_TOKEN: ${{ secrets.GH_NPM_REGISTRY_TOKEN }}
+      NODE_AUTH_TOKEN: ${{ secrets.GH_NPM_REGISTRY_TOKEN }}
+      PACKAGES: datatable multi-file-upload conversational-agent-chat
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Setup Node.js 20.x
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
+          node-version: '24.x'
           cache: 'npm'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@uipath'
 
       - name: Install dependencies
-        run: |
-          # Use npm install to ensure optional dependencies (like lightningcss native binaries) are installed
-          npm install --include=optional --legacy-peer-deps
-          # Rebuild native modules to ensure platform-specific binaries are available
-          npm rebuild lightningcss --include=optional || true
+        run: npm install --include=optional --legacy-peer-deps
 
       - name: Build packages
         run: npm run build
@@ -43,9 +44,44 @@ jobs:
       - name: Build Storybook
         run: npm run build-storybook
 
-      - name: Deploy to gh-pages
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+      # ===== Publish (only on push to main/develop) =====
+      - name: Detect changed packages
+        if: github.event_name == 'push'
+        id: changed
         run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+          CHANGED_PACKAGES=""
+          for pkg in $PACKAGES; do
+            echo "$CHANGED_FILES" | grep -q "^packages/$pkg/" && CHANGED_PACKAGES="$CHANGED_PACKAGES $pkg"
+          done
+          echo "packages=$CHANGED_PACKAGES" >> $GITHUB_OUTPUT
+
+      - name: Version and Publish
+        if: github.event_name == 'push' && steps.changed.outputs.packages != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GH_NPM_REGISTRY_TOKEN }}@github.com/${{ github.repository }}.git
+
+          for PACKAGE in ${{ steps.changed.outputs.packages }}; do
+            cd packages/$PACKAGE
+            if [ "${{ github.ref_name }}" = "develop" ]; then
+              npm version prerelease --preid=dev --no-git-tag-version
+              npm publish --tag dev || true
+            else
+              npm version patch --no-git-tag-version
+              npm publish --tag latest || true
+            fi
+            cd ../..
+          done
+
+          git add -A
+          git diff --staged --quiet || git commit -m "chore: bump versions [skip ci]" && git push
+
+      # ===== Deploy Storybook (only on push to main/develop) =====
+      - name: Deploy to gh-pages
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           npx gh-pages -d storybook-static -b gh-pages
