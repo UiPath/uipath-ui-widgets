@@ -3,17 +3,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MultiFileUpload } from '../MultiFileUpload'
-import { UiPath } from '@uipath/uipath-typescript'
+import { UiPath } from '@uipath/uipath-typescript/core'
 
 // Create mock uploadFile function
 const mockUploadFile = vi.fn()
 
 // Mock BucketService to avoid SDK validation issues
-vi.mock('@uipath/uipath-typescript/buckets', () => ({
-  BucketService: vi.fn().mockImplementation(() => ({
-    uploadFile: mockUploadFile,
-  })),
-}))
+vi.mock('@uipath/uipath-typescript/buckets', () => {
+  return {
+    BucketService: class {
+      uploadFile = mockUploadFile
+    }
+  }
+})
 
 // Mock @uipath/apollo-wind components
 vi.mock('@uipath/apollo-wind', () => ({

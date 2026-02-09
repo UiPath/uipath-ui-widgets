@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest'
-import { createFileKey, normalizeInput, convertAttachmentToFile } from '../utils'
-import { AutopilotChatFileInfo } from '@uipath/apollo-react/ap-chat'
+import { createFileKey, normalizeInput, convertAttachmentToFile, getConversationHistoryDisplayItems, mapExchangesToChatMessages } from '../utils'
+import { AutopilotChatFileInfo, AutopilotChatRole } from '@uipath/apollo-react/ap-chat'
+import { MessageWidget } from '../types'
 
 describe('utils', () => {
   describe('createFileKey', () => {
@@ -276,6 +277,364 @@ describe('utils', () => {
         const file = convertAttachmentToFile(attachment)
         expect(file.type).toBe(type)
       })
+    })
+  })
+
+  describe('getConversationHistoryDisplayItems', () => {
+    it('should map conversations to display items', () => {
+      const conversations = [
+        { conversationId: 'conv-1', label: 'First Chat', lastActivityAt: '2024-01-01T10:00:00Z' },
+        { conversationId: 'conv-2', label: 'Second Chat', lastActivityAt: '2024-01-02T10:00:00Z' },
+      ] as any
+
+      const result = getConversationHistoryDisplayItems(conversations)
+
+      expect(result).toEqual([
+        { id: 'conv-1', name: 'First Chat', timestamp: '2024-01-01T10:00:00.000Z' },
+        { id: 'conv-2', name: 'Second Chat', timestamp: '2024-01-02T10:00:00.000Z' },
+      ])
+    })
+
+    it('should use default name when label is missing', () => {
+      const conversations = [
+        { conversationId: 'conv-1', label: null, lastActivityAt: '2024-01-01T10:00:00Z' },
+        { conversationId: 'conv-2', label: '', lastActivityAt: '2024-01-02T10:00:00Z' },
+      ] as any
+
+      const result = getConversationHistoryDisplayItems(conversations)
+
+      expect(result[0].name).toBe('New chat')
+      expect(result[1].name).toBe('New chat')
+    })
+
+    it('should handle empty conversations array', () => {
+      const result = getConversationHistoryDisplayItems([])
+      expect(result).toEqual([])
+    })
+
+    it('should preserve conversation ID as string', () => {
+      const conversations = [
+        { conversationId: 'abc-123', label: 'Test', lastActivityAt: '2024-01-01T10:00:00Z' },
+      ] as any
+
+      const result = getConversationHistoryDisplayItems(conversations)
+      expect(result[0].id).toBe('abc-123')
+    })
+  })
+
+  describe('mapExchangesToChatMessages', () => {
+    it('should map exchanges to chat messages', () => {
+      const exchanges = [{
+        exchangeId: 'exc-1',
+        messages: [{
+          messageId: 'msg-1',
+          role: 'user',
+          createdAt: '2024-01-01T10:00:00Z',
+          contentParts: [{
+            contentPartId: 'cp-1',
+            mimeType: 'text/plain',
+            data: { inline: 'Hello' },
+            citations: []
+          }]
+        }]
+      }] as any
+
+      const result = mapExchangesToChatMessages(exchanges)
+
+      expect(result).toHaveLength(1)
+      expect(result[0].id).toBe('msg-1')
+      expect(result[0].role).toBe(AutopilotChatRole.User)
+      expect(result[0].widget).toBe(MessageWidget.Human)
+      expect(result[0].groupId).toBe('exc-1-user')
+    })
+
+    it('should map assistant messages correctly', () => {
+      const exchanges = [{
+        exchangeId: 'exc-1',
+        messages: [{
+          messageId: 'msg-1',
+          role: 'assistant',
+          createdAt: '2024-01-01T10:00:00Z',
+          contentParts: [{
+            contentPartId: 'cp-1',
+            mimeType: 'text/plain',
+            data: { inline: 'Hi there!' },
+            citations: []
+          }]
+        }]
+      }] as any
+
+      const result = mapExchangesToChatMessages(exchanges)
+
+      expect(result[0].role).toBe(AutopilotChatRole.Assistant)
+      expect(result[0].widget).toBe(MessageWidget.AI)
+      expect(result[0].groupId).toBe('exc-1-assistant')
+    })
+
+    it('should include tool calls as separate messages', () => {
+      const exchanges = [{
+        exchangeId: 'exc-1',
+        messages: [{
+          messageId: 'msg-1',
+          role: 'assistant',
+          createdAt: '2024-01-01T10:00:00Z',
+          contentParts: [],
+          toolCalls: [{
+            toolCallId: 'tc-1',
+            name: 'search',
+            input: { query: 'test' },
+            createdAt: '2024-01-01T10:00:01Z',
+            result: {
+              output: 'Found results',
+              timestamp: '2024-01-01T10:00:02Z',
+              isError: false
+            }
+          }]
+        }]
+      }] as any
+
+      const result = mapExchangesToChatMessages(exchanges)
+
+      expect(result).toHaveLength(2)
+      expect(result[1].id).toBe('tc-1')
+      expect(result[1].content).toBe('Performing search')
+      expect(result[1].widget).toBe(MessageWidget.ApolloAgentsToolCall)
+      expect(result[1].meta).toEqual({
+        toolName: 'search',
+        input: { query: 'test' },
+        startTime: '2024-01-01T10:00:01Z',
+        output: 'Found results',
+        endTime: '2024-01-01T10:00:02Z',
+        isError: false,
+        exchangeId: 'exc-1'
+      })
+    })
+
+    it('should handle multiple exchanges', () => {
+      const exchanges = [
+        {
+          exchangeId: 'exc-1',
+          messages: [
+            { messageId: 'msg-1', role: 'user', createdAt: '2024-01-01T10:00:00Z', contentParts: [] },
+            { messageId: 'msg-2', role: 'assistant', createdAt: '2024-01-01T10:00:01Z', contentParts: [] }
+          ]
+        },
+        {
+          exchangeId: 'exc-2',
+          messages: [
+            { messageId: 'msg-3', role: 'user', createdAt: '2024-01-01T10:00:02Z', contentParts: [] }
+          ]
+        }
+      ] as any
+
+      const result = mapExchangesToChatMessages(exchanges)
+
+      expect(result).toHaveLength(3)
+      expect(result[0].id).toBe('msg-1')
+      expect(result[1].id).toBe('msg-2')
+      expect(result[2].id).toBe('msg-3')
+    })
+
+    it('should include feedback when present', () => {
+      const exchanges = [{
+        exchangeId: 'exc-1',
+        feedbackRating: 'positive',
+        messages: [{
+          messageId: 'msg-1',
+          role: 'assistant',
+          createdAt: '2024-01-01T10:00:00Z',
+          contentParts: []
+        }]
+      }] as any
+
+      const result = mapExchangesToChatMessages(exchanges)
+
+      expect(result[0].feedback).toEqual({ isPositive: true })
+    })
+
+    it('should handle negative feedback', () => {
+      const exchanges = [{
+        exchangeId: 'exc-1',
+        feedbackRating: 'negative',
+        messages: [{
+          messageId: 'msg-1',
+          role: 'assistant',
+          createdAt: '2024-01-01T10:00:00Z',
+          contentParts: []
+        }]
+      }] as any
+
+      const result = mapExchangesToChatMessages(exchanges)
+
+      expect(result[0].feedback).toEqual({ isPositive: false })
+    })
+
+    it('should not include feedback when not present', () => {
+      const exchanges = [{
+        exchangeId: 'exc-1',
+        messages: [{
+          messageId: 'msg-1',
+          role: 'assistant',
+          createdAt: '2024-01-01T10:00:00Z',
+          contentParts: []
+        }]
+      }] as any
+
+      const result = mapExchangesToChatMessages(exchanges)
+
+      expect(result[0].feedback).toBeUndefined()
+    })
+
+    it('should handle empty exchanges array', () => {
+      const result = mapExchangesToChatMessages([])
+      expect(result).toEqual([])
+    })
+
+    it('should set toCopy from content parts', () => {
+      const exchanges = [{
+        exchangeId: 'exc-1',
+        messages: [{
+          messageId: 'msg-1',
+          role: 'assistant',
+          createdAt: '2024-01-01T10:00:00Z',
+          contentParts: [
+            { contentPartId: 'cp-1', mimeType: 'text/plain', data: { inline: 'Hello ' }, citations: [], createdAt: '2024-01-01T10:00:00Z' },
+            { contentPartId: 'cp-2', mimeType: 'text/plain', data: { inline: 'World' }, citations: [], createdAt: '2024-01-01T10:00:00Z' }
+          ]
+        }]
+      }] as any
+
+      const result = mapExchangesToChatMessages(exchanges)
+
+      expect(result[0].toCopy).toBe('Hello World')
+    })
+
+    it('should handle content parts with citations', () => {
+      const exchanges = [{
+        exchangeId: 'exc-1',
+        messages: [{
+          messageId: 'msg-1',
+          role: 'assistant',
+          createdAt: '2024-01-01T10:00:00Z',
+          contentParts: [{
+            contentPartId: 'cp-1',
+            mimeType: 'text/plain',
+            data: { inline: 'Check this source for more info.' },
+            citations: [{
+              offset: 11,
+              length: 6,
+              sources: [{
+                number: 1,
+                title: 'Wikipedia',
+                url: 'https://wikipedia.org'
+              }]
+            }],
+            createdAt: '2024-01-01T10:00:00Z'
+          }]
+        }]
+      }] as any
+
+      const result = mapExchangesToChatMessages(exchanges)
+
+      expect(result[0].contentParts).toHaveLength(3)
+      expect(result[0].contentParts![0].text).toBe('Check this ')
+      expect(result[0].contentParts![1].text).toBe('source')
+      expect(result[0].contentParts![1].citations).toEqual([{
+        id: 1,
+        title: 'Wikipedia',
+        url: 'https://wikipedia.org',
+        download_url: '',
+        page_number: 0
+      }])
+      expect(result[0].contentParts![2].text).toBe(' for more info.')
+    })
+
+    it('should handle attachments (external values)', () => {
+      const exchanges = [{
+        exchangeId: 'exc-1',
+        messages: [{
+          messageId: 'msg-1',
+          role: 'user',
+          createdAt: '2024-01-01T10:00:00Z',
+          contentParts: [{
+            contentPartId: 'cp-1',
+            mimeType: 'application/pdf',
+            name: 'document.pdf',
+            data: { uri: 'https://example.com/doc.pdf', byteCount: 1024 },
+            citations: [],
+            createdAt: '2024-01-01T10:00:00Z'
+          }]
+        }]
+      }] as any
+
+      const result = mapExchangesToChatMessages(exchanges)
+
+      expect(result[0].attachments).toHaveLength(1)
+      expect(result[0].attachments![0]).toEqual({
+        name: 'document.pdf',
+        type: 'application/pdf',
+        size: 1024,
+        lastModified: 0,
+        content: { text: null, binary: null, base64: null }
+      })
+    })
+
+    it('should handle completed content parts', () => {
+      const exchanges = [{
+        exchangeId: 'exc-1',
+        messages: [{
+          messageId: 'msg-1',
+          role: 'assistant',
+          createdAt: '2024-01-01T10:00:00Z',
+          contentParts: [{
+            contentPartId: 'cp-1',
+            mimeType: 'text/plain',
+            data: 'Completed response',
+            citations: []
+          }]
+        }]
+      }] as any
+
+      const result = mapExchangesToChatMessages(exchanges)
+
+      expect(result[0].contentParts![0].text).toBe('Completed response')
+    })
+
+    it('should ignore non-text content parts for inline content', () => {
+      const exchanges = [{
+        exchangeId: 'exc-1',
+        messages: [{
+          messageId: 'msg-1',
+          role: 'assistant',
+          createdAt: '2024-01-01T10:00:00Z',
+          contentParts: [{
+            contentPartId: 'cp-1',
+            mimeType: 'image/png',
+            data: { inline: 'binary-data' },
+            citations: []
+          }]
+        }]
+      }] as any
+
+      const result = mapExchangesToChatMessages(exchanges)
+
+      expect(result[0].contentParts).toHaveLength(0)
+    })
+
+    it('should include exchangeId in meta', () => {
+      const exchanges = [{
+        exchangeId: 'exc-123',
+        messages: [{
+          messageId: 'msg-1',
+          role: 'user',
+          createdAt: '2024-01-01T10:00:00Z',
+          contentParts: []
+        }]
+      }] as any
+
+      const result = mapExchangesToChatMessages(exchanges)
+
+      expect(result[0].meta).toEqual({ exchangeId: 'exc-123' })
     })
   })
 })
