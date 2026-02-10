@@ -15,12 +15,14 @@ const mockGetById = vi.fn()
 const mockGetRecordsById = vi.fn()
 
 // Mock Entities to avoid SDK validation issues
-vi.mock('@uipath/uipath-typescript/entities', () => ({
-  Entities: vi.fn().mockImplementation(() => ({
-    getById: mockGetById,
-    getRecordsById: mockGetRecordsById,
-  })),
-}))
+vi.mock('@uipath/uipath-typescript/entities', () => {
+  return {
+    Entities: class {
+      getById = mockGetById
+      getRecordsById = mockGetRecordsById
+    }
+  }
+})
 
 // Mock ag-grid-react
 vi.mock('ag-grid-react', () => ({

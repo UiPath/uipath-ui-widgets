@@ -1,10 +1,10 @@
-import '@uipath/apollo-react/core/fonts/font.css';
 import { ApChat, AutopilotChatEvent, AutopilotChatFileInfo, AutopilotChatMessage, AutopilotChatMode, AutopilotChatService } from '@uipath/apollo-react/material/components';
-import { ContentPartChunkEvent, ContentPartEventHelper, ConversationalAgent, ConversationCreateResponse, ErrorStartHandlerArgs, ExchangeEventHelper, MessageEventHelper, SessionEventHelper, ToolCallEndEvent, ToolCallEventHelper } from '@uipath/uipath-typescript/conversational-agent';
+import { Alert, AlertDescription, Button } from '@uipath/apollo-wind';
+import { ContentPartChunkEvent, ContentPartEventHelper, Conversation, ConversationalAgent, ConversationCreateResponse, ErrorStartHandlerArgs, ExchangeEventHelper, ExchangeWithHelpers, MessageEventHelper, SessionEventHelper, ToolCallEndEvent, ToolCallEventHelper } from '@uipath/uipath-typescript/conversational-agent';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import './ConversationalAgentChat.css';
 import { AttachFileOutput, ConversationalAgentChatProps, MessageWidget } from './types';
-import { convertAttachmentToFile, createFileKey, normalizeInput } from './utils';
+import { convertAttachmentToFile, createFileKey, getConversationHistoryDisplayItems, mapExchangesToChatMessages, normalizeInput } from './utils';
 
 export const ConversationalAgentChat = ({
   sdk,
@@ -12,11 +12,13 @@ export const ConversationalAgentChat = ({
   folderId
 }: ConversationalAgentChatProps) => {
   const agentService = useRef(new ConversationalAgent(sdk));
-  const conversation = useRef<ConversationCreateResponse>(null);
-  const isInitializing = useRef(false);
-  const session = useRef<SessionEventHelper>(null);
+  const currentConversation = useRef<ConversationCreateResponse | null>(null);
+  const initializedFor = useRef<string | null>(null);
+  const session = useRef<SessionEventHelper | null>(null);
+  const pastConversations = useRef<Conversation[]>([]);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
   const [chatService, setChatService] = useState<AutopilotChatService>();
+  const [error, setError] = useState<string | null>(null);
 
   const setupExchangeHandlers = useCallback((exchange: ExchangeEventHelper) => {
     if (!chatService) return;
@@ -60,7 +62,6 @@ export const ConversationalAgentChat = ({
           const startEvent = toolCall.startEvent;
           const startTimeIso = new Date().toISOString();
           const toolInput = startEvent.input ? normalizeInput(startEvent.input) : {};
-    
           chatService.sendResponse({
             id: toolCall.toolCallId,
             content: `Performing ${startEvent.toolName}`,
@@ -96,14 +97,14 @@ export const ConversationalAgentChat = ({
   }, [chatService]);
 
   const getConversation = useCallback(async (): Promise<ConversationCreateResponse> => {
-    if (conversation.current) {
-      return conversation.current;
+    if (currentConversation.current) {
+      return currentConversation.current;
     }
     const newConversation = await agentService.current.conversations.create({
       agentReleaseId: agentId,
       folderId
     });
-    conversation.current = newConversation;
+    currentConversation.current = newConversation;
     return newConversation;
   }, [agentId, folderId])
 
@@ -125,7 +126,7 @@ export const ConversationalAgentChat = ({
   }, [getConversation])
 
   const onNewChat = useCallback(() => {
-    conversation.current = null;
+    currentConversation.current = null;
     session.current = null;
   }, []);
 
@@ -223,12 +224,34 @@ export const ConversationalAgentChat = ({
     }
   }, [chatService, processAttachmentsInBatch]);
 
-  useEffect(() => {
-    const initChat = async () => {
-      isInitializing.current = true;
+  const fetchExchanges = useCallback(async (conversationId: string): Promise<ExchangeWithHelpers[]> => {
+    const allExchanges = (await agentService.current.conversations.exchanges.getAll(conversationId)).items;
+    allExchanges.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return allExchanges;
+  }, []);
+
+  const onClickOpenConversation = useCallback(async (id: string) => {
+    if (!chatService) return;
+
+    chatService.stopResponse();
+    chatService.clearError();
+    const selectedConversation = pastConversations.current.find((c) => c.conversationId === id);
+    if (!selectedConversation) return;
+
+    currentConversation.current = selectedConversation;
+    session.current = null;
+
+    const allExchanges = await fetchExchanges(selectedConversation.conversationId);
+    chatService.setConversation(mapExchangesToChatMessages(allExchanges));
+  }, [chatService, fetchExchanges]);
+
+  const initChat = useCallback(async () => {
+    const initKey = `${agentId}-${folderId}`;
+    try {
+      initializedFor.current = initKey;
 
       const agentRelease = await agentService.current.agents.getById(folderId, agentId);
-      setChatService(AutopilotChatService.Instantiate({
+      const chatServiceInstance = AutopilotChatService.Instantiate({
         config: {
           mode: AutopilotChatMode.Embedded,
           firstRunExperience: {
@@ -245,30 +268,75 @@ export const ConversationalAgentChat = ({
           },
           disabledFeatures: {
             fullScreen: true,
-            history: true,
             preview: true,
             close: true
           }
         }
-      }));
+      })
+      setChatService(chatServiceInstance);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to initialize chat';
+      setError(message);
+      initializedFor.current = null;
+    }
+  }, [agentId, folderId]);
 
-      if (chatService) {
+  const handleReload = useCallback(() => {
+    initializedFor.current = null;
+    setError(null);
+    setChatService(undefined);
+    initChat();
+  }, [initChat]);
+
+  // Initialize chat service on mount and when agentId/folderId changes
+  useEffect(() => {
+    const initKey = `${agentId}-${folderId}`;
+    if (initializedFor.current !== initKey) {
+      initChat();
+    }
+  }, [agentId, folderId, initChat]);
+
+  // Register event handlers after chatService is available
+  useEffect(() => {
+    if (!chatService) return;
+
+    const registerEvents = async () => {
+      try {
+        pastConversations.current = (await agentService.current.conversations.getAll()).items;
+        chatService.setHistory(getConversationHistoryDisplayItems(pastConversations.current));
         chatService.on(AutopilotChatEvent.NewChat, onNewChat);
         chatService.on(AutopilotChatEvent.Request, onSendMessage);
         chatService.on(AutopilotChatEvent.SetAttachments, onSetAttachments);
+        chatService.on(AutopilotChatEvent.OpenConversation, onClickOpenConversation);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load conversation history';
+        setError(message);
       }
-    }
+    };
 
-    if (!isInitializing.current) {
-      initChat();
-    }
-  }, [agentId, folderId, chatService, getSessionHelper, onNewChat, onSendMessage, onSetAttachments, setupExchangeHandlers]);
+    registerEvents();
+  }, [chatService, onClickOpenConversation, onNewChat, onSendMessage, onSetAttachments]);
 
   return (
     <div className='uipath-conversational-agent-chat'>
-      {!chatService && <span>Loading...</span>}
+      {error && (
+        <div className='info-container'>
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+          <Button variant={'outline'} onClick={handleReload}>Reload</Button>
+        </div>
+      )}
 
-      {chatService && <ApChat
+      {!error && !chatService && (
+        <div className='info-container'>
+          <Alert>
+            <AlertDescription>Loading...</AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      {!error && chatService && <ApChat
         chatServiceInstance={chatService}
         locale="en"
         theme="light"

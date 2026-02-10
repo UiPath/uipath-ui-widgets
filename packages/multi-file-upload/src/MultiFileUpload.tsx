@@ -89,7 +89,7 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
     } finally {
       setIsUploading(false);
     }
-  }, [bucketId, files, folderId, isUploading, onUploadError, onUploadSuccess, path, sdk]);
+  }, [bucketId, files, folderId, isUploading, onUploadError, onUploadSuccess, path]);
 
   const handleFilesChange = useCallback((newFiles: File[]) => {
     setFiles(newFiles);
