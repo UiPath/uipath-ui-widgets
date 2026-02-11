@@ -1,6 +1,6 @@
 {
   "name": "@uipath/ui-widgets-datatable",
-  "version": "1.0.1-dev.0",
+  "version": "1.0.0",
   "description": "A simple React datatable component",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -33,6 +33,14 @@
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/UiPath/uipath-ui-widgets.git",
+    "directory": "packages/datatable"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "peerDependencies": {
     "@uipath/uipath-typescript": "npm:@uipath/uipath-typescript-dev@^1.0.0-beta.1",
     "react": "^19.2.0",

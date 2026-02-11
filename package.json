@@ -25,7 +25,7 @@
     "@mui/material": "^7.3.5",
     "@uipath/ui-widgets-conversational-agent-chat": "file:./packages/conversational-agent-chat/dist",
     "@uipath/ui-widgets-datatable": "file:./packages/datatable/dist",
-    "@uipath/ui-widgets-multi-file-upload": "1.0.3",
+    "@uipath/ui-widgets-multi-file-upload": "file:./packages/multi-file-upload/dist",
     "@uipath/uipath-typescript": "npm:@uipath/uipath-typescript-dev@^1.0.0-beta.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
