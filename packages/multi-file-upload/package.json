@@ -33,6 +33,14 @@
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/UiPath/uipath-ui-widgets.git",
+    "directory": "packages/multi-file-upload"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "peerDependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
