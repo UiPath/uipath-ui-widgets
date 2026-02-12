@@ -1,20 +1,14 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import type { UiPath } from '@uipath/uipath-typescript/core';
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { UiPath } from '@uipath/uipath-typescript/core';
 import "./MultiFileUpload.css";
 import { MultiFileUpload } from './MultiFileUpload';
 
-// Mock SDK for Storybook
-const mockSdk = {
-  buckets: {
-    uploadFile: async ({ path, content }: { bucketId: number; folderId: number; path: string; content: File }) => {
-      console.log(`Mock upload: ${path}`, content);
-      // Simulate upload delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      // Simulate success
-      return { statusCode: 201, data: { path } };
-    }
-  }
-} as unknown as UiPath;
+const mockSdk = new UiPath({
+  baseUrl: 'https://mock.uipath.com',
+  orgName: 'storybook-org',
+  tenantName: 'storybook-tenant',
+  secret: 'dummy-secret'
+});
 
 const meta = {
   title: 'Components/MultiFileUpload',
@@ -206,14 +200,7 @@ export const WithCallbacks: Story = {
 
 export const SimulatedError: Story = {
   args: {
-    sdk: {
-      buckets: {
-        uploadFile: async () => {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          throw new Error('Simulated upload failure');
-        }
-      }
-    } as unknown as UiPath,
+    sdk: mockSdk,
     bucketId: 1,
     folderId: 1,
     onUploadError: (error) => {
@@ -223,7 +210,7 @@ export const SimulatedError: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Simulates an upload error to demonstrate error handling.'
+        story: 'Demonstrates error handling when upload fails (will fail with network error in Storybook since the mock server does not exist).'
       }
     }
   }
