@@ -17,6 +17,7 @@
     "isolatedModules": true,
     "noEmit": false,
     "baseUrl": "./src",
+    "sourceMap": true,
     "paths": {
       "@uipath/datatable/*": ["./*"]
     }

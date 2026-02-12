@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { UiPath } from '@uipath/uipath-typescript/core';
 import { ConversationalAgentChat } from './ConversationalAgentChat';
 import './ConversationalAgentChat.css';
@@ -13,11 +13,67 @@ const mockSdk = new UiPath({
 const meta = {
   title: 'Components/ConversationalAgentChat',
   component: ConversationalAgentChat,
+  decorators: [
+    (Story) => (
+      <div style={{ height: '600px' }}>
+        <Story />
+      </div>
+    )
+  ],
   parameters: {
     layout: 'padded',
     docs: {
       description: {
-        component: 'A conversational agent chat component that integrates with UiPath Conversational AI agents. This component provides a chat interface for interacting with AI agents, supporting file attachments, streaming responses, and tool calls.'
+        component: `
+A React chat widget for interacting with UiPath Conversational AI agents.
+
+## Features
+
+- Real-time streaming responses
+- File attachment support with drag and drop
+- Tool call visualization
+- Conversation history management
+- Start new conversations or continue existing ones
+- Built on Apollo React chat components
+
+## Installation
+
+\`\`\`bash
+npm install @uipath/ui-widgets-conversational-agent-chat
+\`\`\`
+
+## Usage
+
+\`\`\`tsx
+import { ConversationalAgentChat } from '@uipath/ui-widgets-conversational-agent-chat';
+import "@uipath/ui-widgets-conversational-agent-chat/ConversationalAgentChat.css";
+import { UiPath } from '@uipath/uipath-typescript/core';
+
+function App() {
+  const sdk = new UiPath({
+    baseUrl: 'https://cloud.uipath.com',
+    orgName: 'your-org',
+    tenantName: 'your-tenant',
+    secret: 'your-secret'
+  });
+
+  return (
+    <ConversationalAgentChat
+      sdk={sdk}
+      agentId={123}
+      folderId={456}
+    />
+  );
+}
+\`\`\`
+
+## Requirements
+
+- React 19.2.0+
+- React DOM 19.2.0+
+- @uipath/uipath-typescript
+- @uipath/apollo-react
+- @uipath/apollo-wind`
       }
     }
   },

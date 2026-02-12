@@ -24,6 +24,7 @@ export default defineConfig({
         '**/*.config.{js,ts}',
         '**/index.ts',
         '**/*.scss',
+        '**/*.stories.tsx',
       ],
       include: ['src/**/*.{ts,tsx}'],
     },
