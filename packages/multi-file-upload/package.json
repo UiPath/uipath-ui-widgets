@@ -68,7 +68,7 @@
     "rollup": "^4.55.1"
   },
   "dependencies": {
-    "@uipath/apollo-core": "^5.6.0",
-    "@uipath/apollo-wind": "^0.6.5"
+    "@uipath/apollo-core": "^5.7.0",
+    "@uipath/apollo-wind": "^0.8.0"
   }
 }

@@ -61,13 +61,12 @@ jobs:
       - name: Version and Publish
         if: github.event_name == 'push' && steps.changed.outputs.packages != ''
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
 
           for PACKAGE in ${{ steps.changed.outputs.packages }}; do
             cd packages/$PACKAGE
             if [ "${{ github.ref_name }}" = "develop" ]; then
-              npm version prerelease --no-git-tag-version
+              npm version prerelease --preid=dev.${SHORT_SHA} --no-git-tag-version
               npm publish --tag dev || true
             else
               npm version patch --no-git-tag-version
@@ -76,10 +75,10 @@ jobs:
             cd ../..
           done
 
-          git add -A
-          git diff --staged --quiet || git commit -m "chore: bump versions [skip ci]" && git push
-
       # ===== Deploy Storybook (only on push to main/develop) =====
       - name: Deploy to gh-pages
         if: github.event_name == 'push'
-        run: npx gh-pages -d storybook-static -b gh-pages
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          npx gh-pages -d storybook-static -b gh-pages

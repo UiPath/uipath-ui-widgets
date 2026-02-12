@@ -63,8 +63,8 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "@uipath/apollo-react": "^2.10.0",
-    "@uipath/apollo-core": "^5.5.0",
-    "@uipath/apollo-wind": "^0.6.6"
+    "@uipath/apollo-react": "^3.30.2",
+    "@uipath/apollo-core": "^5.7.0",
+    "@uipath/apollo-wind": "^0.8.0"
   }
 }
