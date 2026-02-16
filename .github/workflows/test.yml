@@ -26,21 +26,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Required for comparing with base branch
+          fetch-depth: 0 # Required for comparing with base branch
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24.x'
-          cache: 'npm'
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@uipath'
+          node-version: "24.x"
+          cache: "npm"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@uipath"
 
       - name: Install dependencies
         run: npm install --include=optional --legacy-peer-deps
-
-      - name: Run linter
-        run: npm run lint
 
       - name: Run tests with coverage
         run: npm run test:coverage

@@ -7,10 +7,10 @@ export interface ConversationalAgentChatProps {
 }
 
 export enum MessageWidget {
-  AI = 'ai',
-  Human = 'human',
-  ApolloAgentsToolCall = 'apollo-agents-tool-call',
-  ToolConfirmation = 'apollo-cas-tool-confirmation'
+  AI = "ai",
+  Human = "human",
+  ApolloAgentsToolCall = "apollo-agents-tool-call",
+  ToolConfirmation = "apollo-cas-tool-confirmation",
 }
 
 export interface AttachFileOutput {

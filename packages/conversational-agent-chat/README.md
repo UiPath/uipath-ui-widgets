@@ -31,31 +31,25 @@ npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript
 ### Basic Example
 
 ```tsx
-import { ConversationalAgentChat } from '@uipath/ui-widgets-conversational-agent-chat';
-import '@uipath/ui-widgets-conversational-agent-chat/ConversationalAgentChat.css';
-import { UiPath } from '@uipath/uipath-typescript/core';
+import { ConversationalAgentChat } from "@uipath/ui-widgets-conversational-agent-chat";
+import "@uipath/ui-widgets-conversational-agent-chat/ConversationalAgentChat.css";
+import { UiPath } from "@uipath/uipath-typescript/core";
 
 function App() {
   const sdk = new UiPath({
     // Your UiPath SDK configuration
   });
 
-  return (
-    <ConversationalAgentChat
-      sdk={sdk}
-      agentId={123}
-      folderId={456}
-    />
-  );
+  return <ConversationalAgentChat sdk={sdk} agentId={123} folderId={456} />;
 }
 ```
 
 ### Customized Example
 
 ```tsx
-import { ConversationalAgentChat } from '@uipath/ui-widgets-conversational-agent-chat';
-import '@uipath/ui-widgets-conversational-agent-chat/ConversationalAgentChat.css';
-import { AutopilotChatMode } from '@uipath/apollo-react/material/components';
+import { ConversationalAgentChat } from "@uipath/ui-widgets-conversational-agent-chat";
+import "@uipath/ui-widgets-conversational-agent-chat/ConversationalAgentChat.css";
+import { AutopilotChatMode } from "@uipath/apollo-react/material/components";
 
 function App() {
   const sdk = new UiPath({
@@ -79,14 +73,14 @@ function App() {
 
 ### Props
 
-| Prop | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `sdk` | `UiPath` | Yes | - | UiPath SDK instance for API communication |
-| `agentId` | `number` | Yes | - | The ID of the conversational agent release to use |
-| `folderId` | `number` | Yes | - | The folder ID where conversations will be stored |
-| `mode` | `AutopilotChatMode` | No | `AutopilotChatMode.SideBySide` | Chat display mode (SideBySide or Embedded) |
-| `title` | `string` | No | `'Welcome to UiPath Autopilot Chat!'` | Title displayed in the first-run experience |
-| `description` | `string` | No | `'Ask me anything about your data or how to use this application.'` | Description shown in the first-run experience |
+| Prop          | Type                | Required | Default                                                             | Description                                       |
+| ------------- | ------------------- | -------- | ------------------------------------------------------------------- | ------------------------------------------------- |
+| `sdk`         | `UiPath`            | Yes      | -                                                                   | UiPath SDK instance for API communication         |
+| `agentId`     | `number`            | Yes      | -                                                                   | The ID of the conversational agent release to use |
+| `folderId`    | `number`            | Yes      | -                                                                   | The folder ID where conversations will be stored  |
+| `mode`        | `AutopilotChatMode` | No       | `AutopilotChatMode.SideBySide`                                      | Chat display mode (SideBySide or Embedded)        |
+| `title`       | `string`            | No       | `'Welcome to UiPath Autopilot Chat!'`                               | Title displayed in the first-run experience       |
+| `description` | `string`            | No       | `'Ask me anything about your data or how to use this application.'` | Description shown in the first-run experience     |
 
 ### Chat Modes
 
@@ -104,6 +98,7 @@ The component supports real-time streaming of AI responses, providing a smooth c
 ### Tool Call Tracking
 
 When the conversational agent uses tools, the component automatically displays:
+
 - Tool name and input parameters
 - Execution status
 - Output results
@@ -112,6 +107,7 @@ When the conversational agent uses tools, the component automatically displays:
 ### Session Management
 
 The widget automatically handles:
+
 - Conversation creation and persistence
 - Session initialization and maintenance
 - Multiple conversation support via "New Chat"
@@ -121,7 +117,7 @@ The widget automatically handles:
 The component comes with default styles. Import the CSS file in your application:
 
 ```tsx
-import '@uipath/ui-widgets-conversational-agent-chat/ConversationalAgentChat.css';
+import "@uipath/ui-widgets-conversational-agent-chat/ConversationalAgentChat.css";
 ```
 
 The chat interface supports both light and dark themes through the UiPath Apollo design system.
@@ -161,7 +157,7 @@ npm run test:coverage
 This package is written in TypeScript and includes type definitions. Import types as needed:
 
 ```tsx
-import type { ConversationalAgentChatProps } from '@uipath/ui-widgets-conversational-agent-chat';
+import type { ConversationalAgentChatProps } from "@uipath/ui-widgets-conversational-agent-chat";
 ```
 
 ## License

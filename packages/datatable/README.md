@@ -23,53 +23,53 @@ npm install @uipath/ui-widgets-datatable
 ## Usage
 
 ```tsx
-import { DataTable } from '@uipath/ui-widgets-datatable'
-import { UiPath } from '@uipath/uipath-typescript'
+import { DataTable } from "@uipath/ui-widgets-datatable";
+import { UiPath } from "@uipath/uipath-typescript";
 
 function App() {
-  const sdk = new UiPath({ /* config */ })
+  const sdk = new UiPath({
+    /* config */
+  });
 
-  return (
-    <DataTable
-      sdk={sdk}
-      entityId="your-entity-id"
-      pageSize={50}
-    />
-  )
+  return <DataTable sdk={sdk} entityId="your-entity-id" pageSize={50} />;
 }
 ```
 
 ## Props
 
-| Prop | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `sdk` | `UiPath` | Yes | - | UiPath SDK instance |
-| `entityId` | `string` | Yes | - | ID of the entity to display |
-| `className` | `string` | No | `''` | Additional CSS class name |
-| `pageSize` | `number` | No | `50` | Number of rows per page |
-| `columnConfig` | `Record<string, ColDef>` | No | - | Custom column configuration |
-| `rowClassRules` | `RowClassRules` | No | - | Custom row styling rules |
+| Prop            | Type                     | Required | Default | Description                 |
+| --------------- | ------------------------ | -------- | ------- | --------------------------- |
+| `sdk`           | `UiPath`                 | Yes      | -       | UiPath SDK instance         |
+| `entityId`      | `string`                 | Yes      | -       | ID of the entity to display |
+| `className`     | `string`                 | No       | `''`    | Additional CSS class name   |
+| `pageSize`      | `number`                 | No       | `50`    | Number of rows per page     |
+| `columnConfig`  | `Record<string, ColDef>` | No       | -       | Custom column configuration |
+| `rowClassRules` | `RowClassRules`          | No       | -       | Custom row styling rules    |
 
 ## Features in Detail
 
 ### CRUD Operations
 
 #### Create
+
 - Click "Add Row" to add a new row
 - Fill in the data
 - Click "Insert Records" to save
 
 #### Read
+
 - Data is automatically loaded on mount
 - Click "Refresh" to reload data
 
 #### Update
+
 - Click any cell to edit (when not in master-detail mode)
 - Changes are tracked automatically
 - Click "Show Diff" to review changes
 - Click "Commit Changes" to save
 
 #### Delete
+
 - Select rows using checkboxes
 - Click "Delete Records"
 - Confirm deletion
@@ -98,10 +98,10 @@ The datatable automatically handles different field types:
   sdk={sdk}
   entityId="entity-id"
   columnConfig={{
-    'Column Name': {
+    "Column Name": {
       width: 200,
       editable: false,
-      cellStyle: { color: 'blue' },
+      cellStyle: { color: "blue" },
     },
   }}
 />
@@ -114,8 +114,8 @@ The datatable automatically handles different field types:
   sdk={sdk}
   entityId="entity-id"
   rowClassRules={{
-    'row-highlight': (params) => params.data.status === 'Active',
-    'row-disabled': (params) => params.data.status === 'Inactive',
+    "row-highlight": (params) => params.data.status === "Active",
+    "row-disabled": (params) => params.data.status === "Inactive",
   }}
 />
 ```

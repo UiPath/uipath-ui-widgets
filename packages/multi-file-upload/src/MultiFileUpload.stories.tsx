@@ -1,20 +1,20 @@
-import type { Meta, StoryObj } from '@storybook/react-vite';
-import { UiPath } from '@uipath/uipath-typescript/core';
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { UiPath } from "@uipath/uipath-typescript/core";
 import "./MultiFileUpload.css";
-import { MultiFileUpload } from './MultiFileUpload';
+import { MultiFileUpload } from "./MultiFileUpload";
 
 const mockSdk = new UiPath({
-  baseUrl: 'https://mock.uipath.com',
-  orgName: 'storybook-org',
-  tenantName: 'storybook-tenant',
-  secret: 'dummy-secret'
+  baseUrl: "https://mock.uipath.com",
+  orgName: "storybook-org",
+  tenantName: "storybook-tenant",
+  secret: "dummy-secret",
 });
 
 const meta = {
-  title: 'Components/MultiFileUpload',
+  title: "Components/MultiFileUpload",
   component: MultiFileUpload,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
     docs: {
       description: {
         component: `
@@ -75,45 +75,48 @@ function App() {
 - React 19.2.0+
 - React DOM 19.2.0+
 - @uipath/uipath-typescript
-- @uipath/apollo-wind`
-      }
-    }
+- @uipath/apollo-wind`,
+      },
+    },
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   argTypes: {
     sdk: {
-      description: 'UiPath SDK instance',
-      control: false
+      description: "UiPath SDK instance",
+      control: false,
     },
     bucketId: {
-      description: 'The ID of the Orchestrator Storage Bucket to upload files to',
-      control: 'number'
+      description:
+        "The ID of the Orchestrator Storage Bucket to upload files to",
+      control: "number",
     },
     folderId: {
-      description: 'The ID of the folder containing the Storage Bucket',
-      control: 'number'
+      description: "The ID of the folder containing the Storage Bucket",
+      control: "number",
     },
     path: {
       description: 'Path prefix for uploaded files (e.g., "uploads/")',
-      control: 'text'
+      control: "text",
     },
     onUploadError: {
-      description: 'Callback function called when upload fails',
-      action: 'uploadError'
+      description: "Callback function called when upload fails",
+      action: "uploadError",
     },
     onUploadSuccess: {
-      description: 'Callback function called when files are successfully uploaded',
-      action: 'uploadSuccess'
+      description:
+        "Callback function called when files are successfully uploaded",
+      action: "uploadSuccess",
     },
     maxFileSize: {
-      description: 'Maximum file size in bytes',
-      control: 'number'
+      description: "Maximum file size in bytes",
+      control: "number",
     },
     accept: {
-      description: 'Accepted file types (comma-separated MIME types or extensions). See [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/accept) for details',
-      control: 'text'
-    }
-  }
+      description:
+        "Accepted file types (comma-separated MIME types or extensions). See [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/accept) for details",
+      control: "text",
+    },
+  },
 } satisfies Meta<typeof MultiFileUpload>;
 
 export default meta;
@@ -123,8 +126,8 @@ export const Default: Story = {
   args: {
     sdk: mockSdk,
     bucketId: 1,
-    folderId: 1
-  }
+    folderId: 1,
+  },
 };
 
 export const WithAcceptFilter: Story = {
@@ -132,15 +135,15 @@ export const WithAcceptFilter: Story = {
     sdk: mockSdk,
     bucketId: 1,
     folderId: 1,
-    accept: 'image/*'
+    accept: "image/*",
   },
   parameters: {
     docs: {
       description: {
-        story: 'Only accepts image files.'
-      }
-    }
-  }
+        story: "Only accepts image files.",
+      },
+    },
+  },
 };
 
 export const WithMaxFileSize: Story = {
@@ -148,15 +151,15 @@ export const WithMaxFileSize: Story = {
     sdk: mockSdk,
     bucketId: 1,
     folderId: 1,
-    maxFileSize: 5 * 1024 * 1024 // 5MB
+    maxFileSize: 5 * 1024 * 1024, // 5MB
   },
   parameters: {
     docs: {
       description: {
-        story: 'Limits file size to 5MB.'
-      }
-    }
-  }
+        story: "Limits file size to 5MB.",
+      },
+    },
+  },
 };
 
 export const WithPath: Story = {
@@ -164,15 +167,15 @@ export const WithPath: Story = {
     sdk: mockSdk,
     bucketId: 1,
     folderId: 1,
-    path: 'uploads/documents'
+    path: "uploads/documents",
   },
   parameters: {
     docs: {
       description: {
-        story: 'Uploads files to a specific path within the bucket.'
-      }
-    }
-  }
+        story: "Uploads files to a specific path within the bucket.",
+      },
+    },
+  },
 };
 
 export const WithCallbacks: Story = {
@@ -181,21 +184,21 @@ export const WithCallbacks: Story = {
     bucketId: 1,
     folderId: 1,
     onUploadError: (error) => {
-      console.error('Upload failed:', error);
+      console.error("Upload failed:", error);
       alert(`Upload failed: ${error.message}`);
     },
     onUploadSuccess: (files) => {
-      console.log('Upload successful:', files);
+      console.log("Upload successful:", files);
       alert(`Successfully uploaded ${files.length} file(s)`);
-    }
+    },
   },
   parameters: {
     docs: {
       description: {
-        story: 'Demonstrates error and success callbacks with alerts.'
-      }
-    }
-  }
+        story: "Demonstrates error and success callbacks with alerts.",
+      },
+    },
+  },
 };
 
 export const SimulatedError: Story = {
@@ -204,14 +207,15 @@ export const SimulatedError: Story = {
     bucketId: 1,
     folderId: 1,
     onUploadError: (error) => {
-      console.error('Expected error:', error);
-    }
+      console.error("Expected error:", error);
+    },
   },
   parameters: {
     docs: {
       description: {
-        story: 'Demonstrates error handling when upload fails (will fail with network error in Storybook since the mock server does not exist).'
-      }
-    }
-  }
+        story:
+          "Demonstrates error handling when upload fails (will fail with network error in Storybook since the mock server does not exist).",
+      },
+    },
+  },
 };

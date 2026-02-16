@@ -16,5 +16,5 @@ export interface DataTableProps {
 export interface GridRow extends EntityRecord {
   _isExpandedRow?: boolean;
   _isHidden?: boolean;
-  _groupedRecords?: GridRow[]
+  _groupedRecords?: GridRow[];
 }

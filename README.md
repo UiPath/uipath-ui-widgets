@@ -17,6 +17,7 @@ A collection of reusable React UI components for UiPath applications.
 A powerful and flexible datatable component with full CRUD support, master-detail views, inline editing, and more.
 
 **Features:**
+
 - ✅ Full CRUD operations (Create, Read, Update, Delete)
 - 📊 Master-detail view with grouping
 - ✏️ Inline editing with multiple field types
@@ -31,6 +32,7 @@ A powerful and flexible datatable component with full CRUD support, master-detai
 A multi-file upload component that allows users to select and upload multiple files to a UiPath bucket.
 
 **Features:**
+
 - 📁 Multiple file selection
 - ☁️ Upload to UiPath buckets
 - ✅ Success/error callbacks
@@ -108,6 +110,7 @@ This creates a static build of Storybook in the `storybook-static` directory.
 Storybook is automatically deployed to GitHub Pages when changes are pushed to the `main` or `develop` branches. The deployment workflow builds both the packages and Storybook, then publishes the static Storybook site.
 
 To enable GitHub Pages deployment:
+
 1. Go to your repository settings
 2. Navigate to Pages
 3. Set Source to "GitHub Actions"
@@ -141,6 +144,7 @@ This project follows testing best practices with comprehensive unit test coverag
 - **Coverage Target**: 80%+ for statements, branches, functions, and lines
 
 Key testing principles:
+
 - ✅ Test behavior, not implementation
 - ✅ Use accessible queries
 - ✅ Follow AAA pattern (Arrange-Act-Assert)
@@ -169,9 +173,9 @@ If you are developing a production application, we recommend updating the config
 
 ```js
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(["dist"]),
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ["**/*.{ts,tsx}"],
     extends: [
       // Other configs...
 
@@ -186,40 +190,40 @@ export default defineConfig([
     ],
     languageOptions: {
       parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        project: ["./tsconfig.node.json", "./tsconfig.app.json"],
         tsconfigRootDir: import.meta.dirname,
       },
       // other options...
     },
   },
-])
+]);
 ```
 
 You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
 ```js
 // eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+import reactX from "eslint-plugin-react-x";
+import reactDom from "eslint-plugin-react-dom";
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(["dist"]),
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ["**/*.{ts,tsx}"],
     extends: [
       // Other configs...
       // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
+      reactX.configs["recommended-typescript"],
       // Enable lint rules for React DOM
       reactDom.configs.recommended,
     ],
     languageOptions: {
       parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        project: ["./tsconfig.node.json", "./tsconfig.app.json"],
         tsconfigRootDir: import.meta.dirname,
       },
       // other options...
     },
   },
-])
+]);
 ```

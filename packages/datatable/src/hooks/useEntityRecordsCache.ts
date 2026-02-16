@@ -1,10 +1,13 @@
 import { Entities, EntityRecord } from "@uipath/uipath-typescript/entities";
-import { useCallback } from 'react';
+import { useCallback } from "react";
 
 class EntityRecordsCache {
   private static cache = new Map<string, EntityRecord[]>();
 
-  static async getRecords(entityService: Entities, entityId: string): Promise<EntityRecord[]> {
+  static async getRecords(
+    entityService: Entities,
+    entityId: string,
+  ): Promise<EntityRecord[]> {
     const cached = this.cache.get(entityId);
     if (cached) {
       return cached;
@@ -24,9 +27,12 @@ class EntityRecordsCache {
 }
 
 export const useEntityRecordsCache = (entityService: Entities) => {
-  const getRecords = useCallback(async (entityId: string) => {
-    return EntityRecordsCache.getRecords(entityService, entityId);
-  }, [entityService]);
+  const getRecords = useCallback(
+    async (entityId: string) => {
+      return EntityRecordsCache.getRecords(entityService, entityId);
+    },
+    [entityService],
+  );
 
   const clearCache = useCallback((entityId?: string) => {
     EntityRecordsCache.clearCache(entityId);

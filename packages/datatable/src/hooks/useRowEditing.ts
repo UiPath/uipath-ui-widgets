@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { GridRow } from '../types';
-import { deepClone, hasRowChanges } from '../utils/dataUtils';
-import { EntityGetResponse } from '@uipath/uipath-typescript';
-import { CellValueChangedEvent } from 'ag-grid-community';
-import { useState } from 'react';
+import { GridRow } from "../types";
+import { deepClone, hasRowChanges } from "../utils/dataUtils";
+import { EntityGetResponse } from "@uipath/uipath-typescript";
+import { CellValueChangedEvent } from "ag-grid-community";
+import { useState } from "react";
 
 export const useRowEditing = (
   originalData: GridRow[],
@@ -28,7 +28,9 @@ export const useRowEditing = (
       const rowsToUpdate = Array.from(editedRows.values());
       await entity?.update(rowsToUpdate);
     } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Failed to commit changes');
+      throw new Error(
+        err instanceof Error ? err.message : "Failed to commit changes",
+      );
     }
   };
 
@@ -37,7 +39,11 @@ export const useRowEditing = (
     setEditedRows(new Map());
   };
 
-  const revertSingleCellUpdate = (rowId: string, fieldKey: string, originalValue: any) => {
+  const revertSingleCellUpdate = (
+    rowId: string,
+    fieldKey: string,
+    originalValue: any,
+  ) => {
     // Restore original field value in the row data
     setRowData((prev) => {
       return prev.map((row: any) => {
@@ -57,7 +63,9 @@ export const useRowEditing = (
         const newEditedRow = { ...editedRow, [fieldKey]: originalValue };
 
         // Check if this row still has any changes
-        const originalRow = originalData.find((row: any) => row.Id === rowId) as any;
+        const originalRow = originalData.find(
+          (row: any) => row.Id === rowId,
+        ) as any;
         const hasChanges = hasRowChanges(newEditedRow, originalRow);
 
         if (hasChanges) {

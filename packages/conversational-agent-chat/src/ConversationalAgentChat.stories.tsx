@@ -1,27 +1,27 @@
-import type { Meta, StoryObj } from '@storybook/react-vite';
-import { UiPath } from '@uipath/uipath-typescript/core';
-import { ConversationalAgentChat } from './ConversationalAgentChat';
-import './ConversationalAgentChat.css';
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { UiPath } from "@uipath/uipath-typescript/core";
+import { ConversationalAgentChat } from "./ConversationalAgentChat";
+import "./ConversationalAgentChat.css";
 
 const mockSdk = new UiPath({
-  baseUrl: 'https://mock.uipath.com',
-  orgName: 'storybook-org',
-  tenantName: 'storybook-tenant',
-  secret: 'dummy-secret'
+  baseUrl: "https://mock.uipath.com",
+  orgName: "storybook-org",
+  tenantName: "storybook-tenant",
+  secret: "dummy-secret",
 });
 
 const meta = {
-  title: 'Components/ConversationalAgentChat',
+  title: "Components/ConversationalAgentChat",
   component: ConversationalAgentChat,
   decorators: [
     (Story) => (
-      <div style={{ height: '600px' }}>
+      <div style={{ height: "600px" }}>
         <Story />
       </div>
-    )
+    ),
   ],
   parameters: {
-    layout: 'padded',
+    layout: "padded",
     docs: {
       description: {
         component: `
@@ -73,34 +73,34 @@ function App() {
 - React DOM 19.2.0+
 - @uipath/uipath-typescript
 - @uipath/apollo-react
-- @uipath/apollo-wind`
-      }
-    }
+- @uipath/apollo-wind`,
+      },
+    },
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   argTypes: {
     sdk: {
-      description: 'UiPath SDK instance',
+      description: "UiPath SDK instance",
       control: false,
       table: {
-        type: { summary: 'UiPath' }
-      }
+        type: { summary: "UiPath" },
+      },
     },
     agentId: {
-      description: 'ID of the conversational agent to use',
-      control: 'number',
+      description: "ID of the conversational agent to use",
+      control: "number",
       table: {
-        type: { summary: 'number' }
-      }
+        type: { summary: "number" },
+      },
     },
     folderId: {
-      description: 'ID of the folder containing the agent',
-      control: 'number',
+      description: "ID of the folder containing the agent",
+      control: "number",
       table: {
-        type: { summary: 'number' }
-      }
-    }
-  }
+        type: { summary: "number" },
+      },
+    },
+  },
 } satisfies Meta<typeof ConversationalAgentChat>;
 
 export default meta;
@@ -110,13 +110,14 @@ export const Default: Story = {
   args: {
     sdk: mockSdk,
     agentId: 1,
-    folderId: 100
+    folderId: 100,
   },
   parameters: {
     docs: {
       description: {
-        story: 'Default conversational agent chat with standard welcome message and starting prompts.'
-      }
-    }
-  }
+        story:
+          "Default conversational agent chat with standard welcome message and starting prompts.",
+      },
+    },
+  },
 };

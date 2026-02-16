@@ -1,2 +1,2 @@
-export { ConversationalAgentChat } from './ConversationalAgentChat';
-export type { ConversationalAgentChatProps } from './types';
+export { ConversationalAgentChat } from "./ConversationalAgentChat";
+export type { ConversationalAgentChatProps } from "./types";

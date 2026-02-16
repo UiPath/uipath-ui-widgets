@@ -22,7 +22,7 @@
 }
 
 .app-header::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   right: 0;
@@ -109,7 +109,7 @@
 }
 
 .entity-list-button::after {
-  content: '';
+  content: "";
   position: absolute;
   right: 16px;
   top: 50%;
@@ -162,7 +162,11 @@
 .content-header-icon {
   width: 40px;
   height: 40px;
-  background: linear-gradient(135deg, var(--pumpkin-400) 0%, var(--pumpkin-600) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--pumpkin-400) 0%,
+    var(--pumpkin-600) 100%
+  );
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -234,7 +238,11 @@
 
 /* Inventory Alert Styles */
 .datatable-row-low-inventory {
-  background: linear-gradient(90deg, var(--pumpkin-50) 0%, var(--pumpkin-100) 100%) !important;
+  background: linear-gradient(
+    90deg,
+    var(--pumpkin-50) 0%,
+    var(--pumpkin-100) 100%
+  ) !important;
   border-left: 4px solid var(--pumpkin-600) !important;
   font-weight: 500;
 }
@@ -381,7 +389,11 @@
 }
 
 .datatable-wrapper .ag-header {
-  background: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-700) 100%) !important;
+  background: linear-gradient(
+    135deg,
+    var(--teal-600) 0%,
+    var(--teal-700) 100%
+  ) !important;
   border-radius: 8px 8px 0 0;
 }
 
@@ -906,7 +918,7 @@
 }
 
 .datatable-wrapper .datatable-toolbar-button::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 50%;
   left: 50%;
@@ -915,7 +927,9 @@
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.3);
   transform: translate(-50%, -50%);
-  transition: width 0.6s, height 0.6s;
+  transition:
+    width 0.6s,
+    height 0.6s;
 }
 
 .datatable-wrapper .datatable-toolbar-button:hover::before {
@@ -934,11 +948,19 @@
 }
 
 .datatable-wrapper .datatable-toolbar-button.destructive {
-  background: linear-gradient(135deg, var(--pumpkin-500) 0%, var(--pumpkin-700) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--pumpkin-500) 0%,
+    var(--pumpkin-700) 100%
+  );
 }
 
 .datatable-wrapper .datatable-toolbar-button.destructive:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--pumpkin-700) 0%, var(--pumpkin-800) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--pumpkin-700) 0%,
+    var(--pumpkin-800) 100%
+  );
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
 }
@@ -1032,7 +1054,11 @@
 
 .datatable-dialog-header {
   padding: 24px 32px !important;
-  background: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-700) 100%) !important;
+  background: linear-gradient(
+    135deg,
+    var(--teal-600) 0%,
+    var(--teal-700) 100%
+  ) !important;
   color: white !important;
   border-radius: 14px 14px 0 0 !important;
 }
@@ -1081,7 +1107,11 @@
 }
 
 .datatable-diff-table th {
-  background: linear-gradient(135deg, var(--teal-50) 0%, var(--teal-100) 100%) !important;
+  background: linear-gradient(
+    135deg,
+    var(--teal-50) 0%,
+    var(--teal-100) 100%
+  ) !important;
   color: var(--teal-800) !important;
   font-weight: 500 !important;
   text-transform: uppercase !important;
@@ -1100,7 +1130,7 @@
 }
 
 .datatable-diff-old::before {
-  content: '❌ ';
+  content: "❌ ";
   margin-right: 4px;
 }
 
@@ -1111,7 +1141,7 @@
 }
 
 .datatable-diff-new::before {
-  content: '✓ ';
+  content: "✓ ";
   margin-right: 4px;
   color: #4caf50;
 }
@@ -1160,13 +1190,21 @@
   padding: 12px 32px !important;
   border-radius: 10px !important;
   font-weight: 500 !important;
-  background: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-700) 100%) !important;
+  background: linear-gradient(
+    135deg,
+    var(--teal-600) 0%,
+    var(--teal-700) 100%
+  ) !important;
   color: white !important;
   box-shadow: var(--shadow-sm) !important;
 }
 
 .datatable-button-commit:hover {
-  background: linear-gradient(135deg, var(--teal-700) 0%, var(--teal-800) 100%) !important;
+  background: linear-gradient(
+    135deg,
+    var(--teal-700) 0%,
+    var(--teal-800) 100%
+  ) !important;
   transform: translateY(-2px);
   box-shadow: 0 4px 16px rgba(0, 137, 123, 0.4) !important;
 }
@@ -1177,7 +1215,11 @@
 
 .detail-panel {
   padding: 24px !important;
-  background: linear-gradient(135deg, var(--teal-50) 0%, #f5f7fa 100%) !important;
+  background: linear-gradient(
+    135deg,
+    var(--teal-50) 0%,
+    #f5f7fa 100%
+  ) !important;
   border-radius: 12px !important;
   margin: 8px !important;
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.08) !important;
@@ -1209,7 +1251,7 @@
 }
 
 .detail-panel::before {
-  content: '↳ Details';
+  content: "↳ Details";
   display: block;
   font-size: 11px;
   font-weight: 500;
@@ -1232,7 +1274,11 @@
 }
 
 .expand-button {
-  background: linear-gradient(135deg, var(--teal-50) 0%, var(--teal-100) 100%) !important;
+  background: linear-gradient(
+    135deg,
+    var(--teal-50) 0%,
+    var(--teal-100) 100%
+  ) !important;
   border: 2px solid var(--teal-300) !important;
   padding: 6px !important;
   color: var(--teal-700) !important;
@@ -1248,7 +1294,11 @@
 }
 
 .expand-button:hover {
-  background: linear-gradient(135deg, var(--teal-100) 0%, var(--teal-200) 100%) !important;
+  background: linear-gradient(
+    135deg,
+    var(--teal-100) 0%,
+    var(--teal-200) 100%
+  ) !important;
   color: var(--teal-900) !important;
   transform: scale(1.1) !important;
   border-color: var(--teal-400) !important;
@@ -1256,13 +1306,21 @@
 }
 
 .expand-button.expanded {
-  background: linear-gradient(135deg, var(--pumpkin-500) 0%, var(--pumpkin-700) 100%) !important;
+  background: linear-gradient(
+    135deg,
+    var(--pumpkin-500) 0%,
+    var(--pumpkin-700) 100%
+  ) !important;
   border-color: var(--pumpkin-600) !important;
   color: white !important;
 }
 
 .expand-button.expanded:hover {
-  background: linear-gradient(135deg, var(--pumpkin-600) 0%, var(--pumpkin-800) 100%) !important;
+  background: linear-gradient(
+    135deg,
+    var(--pumpkin-600) 0%,
+    var(--pumpkin-800) 100%
+  ) !important;
   border-color: var(--pumpkin-700) !important;
 }
 
@@ -1287,13 +1345,21 @@
 
 /* Master row (grouped row) styling */
 .datatable-wrapper .ag-row-group {
-  background: linear-gradient(90deg, var(--teal-50) 0%, #ffffff 100%) !important;
+  background: linear-gradient(
+    90deg,
+    var(--teal-50) 0%,
+    #ffffff 100%
+  ) !important;
   font-weight: 500 !important;
   border-left: 4px solid var(--teal-500) !important;
 }
 
 .datatable-wrapper .ag-row-group:hover {
-  background: linear-gradient(90deg, var(--teal-100) 0%, var(--teal-50) 100%) !important;
+  background: linear-gradient(
+    90deg,
+    var(--teal-100) 0%,
+    var(--teal-50) 100%
+  ) !important;
 }
 
 /* Ensure expand button in grouped rows is centered */
@@ -1339,7 +1405,7 @@
 }
 
 .datatable-loading::before {
-  content: '' !important;
+  content: "" !important;
   width: 40px !important;
   height: 40px !important;
   border: 3px solid var(--teal-100) !important;
@@ -1358,7 +1424,7 @@
 }
 
 .datatable-error::before {
-  content: '⚠️ ' !important;
+  content: "⚠️ " !important;
   font-size: 1.5rem !important;
   display: block !important;
   margin-bottom: 8px !important;
@@ -1374,7 +1440,7 @@
 }
 
 .datatable-empty::before {
-  content: '📭 ' !important;
+  content: "📭 " !important;
   font-size: 2rem !important;
   display: block !important;
   margin-bottom: 8px !important;

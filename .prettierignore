@@ -1,0 +1,36 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs
+dist
+**/dist
+build
+**/build
+storybook-static
+*.tgz
+
+# Test coverage
+coverage
+**/coverage
+
+# Cache
+.cache
+.parcel-cache
+.eslintcache
+.stylelintcache
+.vitest
+**/.vitest
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Logs
+*.log
+
+# Generated files
+*.min.js
+*.min.css
+*.tsbuildinfo
