@@ -1,10 +1,10 @@
-import { Button, FileUpload } from '@uipath/apollo-wind';
-import { BucketService } from '@uipath/uipath-typescript/buckets';
-import { FC, useCallback, useRef, useState } from 'react';
-import './MultiFileUpload.css';
-import { MultiFileUploadProps } from './types';
+import { Button, FileUpload } from "@uipath/apollo-wind";
+import { BucketService } from "@uipath/uipath-typescript/buckets";
+import { FC, useCallback, useRef, useState } from "react";
+import "./MultiFileUpload.css";
+import { MultiFileUploadProps } from "./types";
 
-const UPLOAD_SUCCESS = 'success';
+const UPLOAD_SUCCESS = "success";
 
 export const MultiFileUpload: FC<MultiFileUploadProps> = ({
   sdk,
@@ -14,7 +14,7 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
   maxFileSize,
   path,
   onUploadError,
-  onUploadSuccess
+  onUploadSuccess,
 }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
@@ -30,7 +30,7 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
 
     try {
       // Ensure path ends with '/' if provided
-      const basePath = path ? (path.endsWith('/') ? path : `${path}/`) : '';
+      const basePath = path ? (path.endsWith("/") ? path : `${path}/`) : "";
 
       // Upload all files and track results individually
       const results = await Promise.allSettled(
@@ -40,20 +40,22 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
             folderId,
             path: basePath + file.name,
             content: file,
-          })
-        )
+          }),
+        ),
       );
 
       const failedUploads: Array<{ file: File; error: string }> = [];
       const successfulFiles: File[] = [];
 
       results.forEach((result, index) => {
-        if (result.status === 'fulfilled' && result.value.statusCode === 201) {
+        if (result.status === "fulfilled" && result.value.statusCode === 201) {
           successfulFiles.push(files[index]);
         } else {
           failedUploads.push({
             file: files[index],
-            error: (result as PromiseRejectedResult).reason?.message || 'Unknown error'
+            error:
+              (result as PromiseRejectedResult).reason?.message ||
+              "Unknown error",
           });
         }
       });
@@ -63,10 +65,12 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
         setUploadStatus(UPLOAD_SUCCESS);
         onUploadSuccess?.(files);
         setFiles([]);
-        setFileUploadKey(prev => prev + 1);
+        setFileUploadKey((prev) => prev + 1);
       } else {
         // Some or all files failed
-        const errorDetails = failedUploads.map(f => `${f.file.name}: ${f.error}`).join('; ');
+        const errorDetails = failedUploads
+          .map((f) => `${f.file.name}: ${f.error}`)
+          .join("; ");
 
         let errorMessage: string;
         if (successfulFiles.length === 0) {
@@ -76,7 +80,7 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
           // Partial success
           errorMessage = `${successfulFiles.length} file(s) uploaded successfully. ${failedUploads.length} failed: ${errorDetails}`;
           // Remove successfully uploaded files, keep only failed ones
-          setFiles(failedUploads.map(f => f.file));
+          setFiles(failedUploads.map((f) => f.file));
           onUploadSuccess?.(successfulFiles);
         }
 
@@ -84,12 +88,20 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
         onUploadError?.(new Error(errorMessage));
       }
     } catch (error) {
-      setUploadStatus((error as Error).message || 'Failed to upload files');
+      setUploadStatus((error as Error).message || "Failed to upload files");
       onUploadError?.(error as Error);
     } finally {
       setIsUploading(false);
     }
-  }, [bucketId, files, folderId, isUploading, onUploadError, onUploadSuccess, path]);
+  }, [
+    bucketId,
+    files,
+    folderId,
+    isUploading,
+    onUploadError,
+    onUploadSuccess,
+    path,
+  ]);
 
   const handleFilesChange = useCallback((newFiles: File[]) => {
     setFiles(newFiles);
@@ -99,7 +111,7 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
   const handleClear = useCallback(() => {
     setFiles([]);
     setUploadStatus(null);
-    setFileUploadKey(prev => prev + 1);
+    setFileUploadKey((prev) => prev + 1);
   }, []);
 
   return (
@@ -112,21 +124,32 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
         accept={accept}
       />
       {uploadStatus && (
-        <div className={`mt-2 text-sm ${
-          uploadStatus === UPLOAD_SUCCESS
-            ? 'text-green-600'
-            : uploadStatus.includes('uploaded')
-              ? 'text-yellow-600'
-              : 'text-red-600'
-        }`}>
-          {uploadStatus === UPLOAD_SUCCESS ? 'Files uploaded successfully!' : uploadStatus}
+        <div
+          className={`mt-2 text-sm ${
+            uploadStatus === UPLOAD_SUCCESS
+              ? "text-green-600"
+              : uploadStatus.includes("uploaded")
+                ? "text-yellow-600"
+                : "text-red-600"
+          }`}
+        >
+          {uploadStatus === UPLOAD_SUCCESS
+            ? "Files uploaded successfully!"
+            : uploadStatus}
         </div>
       )}
       <div className="flex gap-2 mt-4 justify-center">
-        <Button onClick={uploadFiles} disabled={files.length === 0 || isUploading}>
-          {isUploading ? 'Uploading...' : 'Upload Files'}
+        <Button
+          onClick={uploadFiles}
+          disabled={files.length === 0 || isUploading}
+        >
+          {isUploading ? "Uploading..." : "Upload Files"}
         </Button>
-        <Button variant="outline" onClick={handleClear} disabled={files.length === 0 || isUploading}>
+        <Button
+          variant="outline"
+          onClick={handleClear}
+          disabled={files.length === 0 || isUploading}
+        >
           Clear
         </Button>
       </div>

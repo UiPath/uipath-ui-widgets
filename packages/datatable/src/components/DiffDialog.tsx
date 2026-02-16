@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { getFieldValue } from '../utils/fieldUtils';
-import { EntityGetResponse } from '@uipath/uipath-typescript';
+import { getFieldValue } from "../utils/fieldUtils";
+import { EntityGetResponse } from "@uipath/uipath-typescript";
 import {
   Button,
   Dialog,
@@ -13,9 +13,9 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow
-} from '@uipath/apollo-wind';
-import { useMemo } from 'react';
+  TableRow,
+} from "@uipath/apollo-wind";
+import { useMemo } from "react";
 
 interface DiffDialogProps {
   entity: EntityGetResponse | undefined;
@@ -36,11 +36,11 @@ const valueToString = (value: any): string => {
   if (value === null || value === undefined) {
     return String(value);
   }
-  if (typeof value === 'object') {
+  if (typeof value === "object") {
     return JSON.stringify(value);
   }
   return String(value);
-}
+};
 
 export const DiffDialog = ({
   entity,
@@ -52,7 +52,7 @@ export const DiffDialog = ({
   diffData,
 }: DiffDialogProps) => {
   const fieldsMap = useMemo(() => {
-    return new Map(entity?.fields.map(f => [f.name, f]) || []);
+    return new Map(entity?.fields.map((f) => [f.name, f]) || []);
   }, [entity]);
 
   return (
@@ -78,24 +78,46 @@ export const DiffDialog = ({
                     {Object.keys(edited).map((key) => {
                       const originalValue = original?.[key];
                       const editedValue = edited[key];
-                      const hasChanged = JSON.stringify(originalValue) !== JSON.stringify(editedValue);
+                      const hasChanged =
+                        JSON.stringify(originalValue) !==
+                        JSON.stringify(editedValue);
                       const field = fieldsMap.get(key);
 
                       return hasChanged ? (
                         <TableRow key={key} className="hover:bg-muted/50">
-                          <TableCell className="py-2 font-medium">{key}</TableCell>
-                          <TableCell className="py-2 text-muted-foreground">{field ? getFieldValue(originalValue, field) : valueToString(originalValue)}</TableCell>
+                          <TableCell className="py-2 font-medium">
+                            {key}
+                          </TableCell>
+                          <TableCell className="py-2 text-muted-foreground">
+                            {field
+                              ? getFieldValue(originalValue, field)
+                              : valueToString(originalValue)}
+                          </TableCell>
                           <TableCell className="py-2">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="font-medium">{field ? getFieldValue(editedValue, field) : valueToString(editedValue)}</span>
+                              <span className="font-medium">
+                                {field
+                                  ? getFieldValue(editedValue, field)
+                                  : valueToString(editedValue)}
+                              </span>
                               <Button
-                                onClick={() => onRevertField(rowId, key, originalValue)}
+                                onClick={() =>
+                                  onRevertField(rowId, key, originalValue)
+                                }
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7"
                                 title="Revert this field"
                               >
-                                <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M280-200v-80h284q63 0 109.5-40T720-420q0-60-46.5-100T564-560H312l104 104-56 56-200-200 200-200 56 56-104 104h252q97 0 166.5 63T800-420q0 94-69.5 157T564-200H280Z"/></svg>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  height="16px"
+                                  viewBox="0 -960 960 960"
+                                  width="16px"
+                                  fill="currentColor"
+                                >
+                                  <path d="M280-200v-80h284q63 0 109.5-40T720-420q0-60-46.5-100T564-560H312l104 104-56 56-200-200 200-200 56 56-104 104h252q97 0 166.5 63T800-420q0 94-69.5 157T564-200H280Z" />
+                                </svg>
                               </Button>
                             </div>
                           </TableCell>
@@ -109,7 +131,9 @@ export const DiffDialog = ({
           ))}
         </div>
         <DialogFooter>
-          <Button onClick={onRevertAll} variant="outline">Revert</Button>
+          <Button onClick={onRevertAll} variant="outline">
+            Revert
+          </Button>
           <Button onClick={onCommit}>Commit Changes</Button>
         </DialogFooter>
       </DialogContent>

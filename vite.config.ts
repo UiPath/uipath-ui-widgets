@@ -1,5 +1,5 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 // https://vite.dev/config/
 // This config is used for both rolldown-vite (dev/build) and standard vite (tests)
@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [
     react({
       babel: {
-        plugins: [['babel-plugin-react-compiler']],
+        plugins: [["babel-plugin-react-compiler"]],
       },
     }),
   ],
@@ -15,6 +15,6 @@ export default defineConfig({
     dedupe: ["react", "react-dom"],
   },
   build: {
-    sourcemap: true
-  }
-})
+    sourcemap: true,
+  },
+});

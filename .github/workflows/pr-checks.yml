@@ -1,4 +1,4 @@
-name: Commitlint
+name: PR Checks
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ permissions:
   packages: read
 
 jobs:
-  commitlint:
+  pr-checks:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -22,13 +22,19 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24.x'
-          cache: 'npm'
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@uipath'
+          node-version: "24.x"
+          cache: "npm"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@uipath"
 
-      - name: Install commitlint
-        run: npm install @commitlint/cli @commitlint/config-conventional
+      - name: Install dependencies
+        run: npm install --include=optional --legacy-peer-deps
 
       - name: Validate commits
         run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+
+      - name: Check formatting
+        run: npx prettier --check .
+
+      - name: Run linter
+        run: npm run lint

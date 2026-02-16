@@ -1,11 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { RefFieldCellEditor } from '../components/RefFieldCellEditor';
-import { GridRow } from '../types';
-import { EntityFieldDataType, FieldMetaData } from '@uipath/uipath-typescript';
-import { ICellEditorParams, ValueSetterParams } from 'ag-grid-community';
-import { Entities } from '@uipath/uipath-typescript/entities';
+import { RefFieldCellEditor } from "../components/RefFieldCellEditor";
+import { GridRow } from "../types";
+import { EntityFieldDataType, FieldMetaData } from "@uipath/uipath-typescript";
+import { ICellEditorParams, ValueSetterParams } from "ag-grid-community";
+import { Entities } from "@uipath/uipath-typescript/entities";
 
-export const getFieldValue = (value: any, field: FieldMetaData | undefined): string => {
+export const getFieldValue = (
+  value: any,
+  field: FieldMetaData | undefined,
+): string => {
   if (field?.isForeignKey) {
     const referenceFieldName = field.referenceField?.definition?.name;
     return referenceFieldName ? value?.[referenceFieldName] : value;
@@ -33,17 +36,17 @@ export const createCellEditorSelector = (
     if (field.isForeignKey) {
       return {
         component: RefFieldCellEditor,
-        params: { entityService, field, entityRecord: params.data }
+        params: { entityService, field, entityRecord: params.data },
       };
     } else if (isFieldTypeDate(field)) {
       return {
-        component: 'agDateStringCellEditor',
-      }
+        component: "agDateStringCellEditor",
+      };
     }
     return undefined;
   };
 };
 
 export const isFieldTypeDate = (field: FieldMetaData): boolean => {
-  return field.fieldDataType?.name === EntityFieldDataType.DATE
-}
+  return field.fieldDataType?.name === EntityFieldDataType.DATE;
+};

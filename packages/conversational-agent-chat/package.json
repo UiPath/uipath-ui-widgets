@@ -18,8 +18,8 @@
   ],
   "scripts": {
     "build": "npm run clean && tsc && npm run copy-styles",
-    "clean": "rm -rf dist",
-    "copy-styles": "npx sass --no-source-map src/ConversationalAgentChat.scss | npx postcss -o dist/ConversationalAgentChat.css",
+    "clean": "rimraf dist",
+    "copy-styles": "sass --no-source-map src/ConversationalAgentChat.scss | postcss -o dist/ConversationalAgentChat.css",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
@@ -47,6 +47,7 @@
     "@uipath/uipath-typescript": "npm:@uipath/uipath-typescript-dev@^1.0.0-beta.1"
   },
   "devDependencies": {
+    "rimraf": "^6.0.1",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",

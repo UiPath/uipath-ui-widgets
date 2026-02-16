@@ -20,9 +20,9 @@ npm install @uipath/ui-widgets-multi-file-upload
 ## Usage
 
 ```tsx
-import { MultiFileUpload } from '@uipath/ui-widgets-multi-file-upload';
+import { MultiFileUpload } from "@uipath/ui-widgets-multi-file-upload";
 import "@uipath/ui-widgets-multi-file-upload/MultiFileUpload.css";
-import { UiPath } from '@uipath/uipath-typescript';
+import { UiPath } from "@uipath/uipath-typescript";
 
 function App() {
   const sdk = new UiPath({
@@ -30,11 +30,14 @@ function App() {
   });
 
   const handleUploadError = (error: Error) => {
-    console.error('Upload failed:', error);
+    console.error("Upload failed:", error);
   };
 
   const handleUploadSuccess = (uploadedFiles: File[]) => {
-    console.log('Successfully uploaded:', uploadedFiles.map(f => f.name));
+    console.log(
+      "Successfully uploaded:",
+      uploadedFiles.map((f) => f.name),
+    );
   };
 
   return (
@@ -56,16 +59,16 @@ function App() {
 
 ### MultiFileUpload
 
-| Prop | Type | Required | Description |
-|------|------|----------|-------------|
-| `sdk` | `UiPath` | Yes | UiPath SDK instance |
-| `bucketId` | `number` | Yes | The ID of the Orchestrator Storage Bucket to upload files to |
-| `folderId` | `number` | Yes | The ID of the folder containing the Storage Bucket |
-| `path` | `string` | No | Path prefix for uploaded files (e.g., "uploads/") |
-| `onUploadError` | `(error: Error) => void` | No | Callback function called when upload fails |
-| `onUploadSuccess` | `(uploadedFiles: File[]) => void` | No | Callback function called when files are successfully uploaded |
-| `maxFileSize` | `number` | No | Maximum file size in bytes |
-| `accept` | `string` | No | Accepted file types (comma-separated MIME types or extensions). See [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/accept) for details |
+| Prop              | Type                              | Required | Description                                                                                                                                                                        |
+| ----------------- | --------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sdk`             | `UiPath`                          | Yes      | UiPath SDK instance                                                                                                                                                                |
+| `bucketId`        | `number`                          | Yes      | The ID of the Orchestrator Storage Bucket to upload files to                                                                                                                       |
+| `folderId`        | `number`                          | Yes      | The ID of the folder containing the Storage Bucket                                                                                                                                 |
+| `path`            | `string`                          | No       | Path prefix for uploaded files (e.g., "uploads/")                                                                                                                                  |
+| `onUploadError`   | `(error: Error) => void`          | No       | Callback function called when upload fails                                                                                                                                         |
+| `onUploadSuccess` | `(uploadedFiles: File[]) => void` | No       | Callback function called when files are successfully uploaded                                                                                                                      |
+| `maxFileSize`     | `number`                          | No       | Maximum file size in bytes                                                                                                                                                         |
+| `accept`          | `string`                          | No       | Accepted file types (comma-separated MIME types or extensions). See [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/accept) for details |
 
 ## Example with Options
 
@@ -75,8 +78,8 @@ function App() {
   bucketId={123}
   folderId={456}
   path="documents/"
-  onUploadError={(error) => console.error('Upload failed:', error)}
-  onUploadSuccess={(files) => console.log('Uploaded:', files.length, 'files')}
+  onUploadError={(error) => console.error("Upload failed:", error)}
+  onUploadSuccess={(files) => console.log("Uploaded:", files.length, "files")}
   maxFileSize={5242880} // 5MB
   accept=".pdf,.docx,.xlsx"
 />

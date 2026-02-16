@@ -6,4 +6,3 @@
  * exists only so Vite/Vitest can resolve the `./DetailPanel.css` import from
  * `DetailPanel.tsx` when running against `src`.
  */
-
