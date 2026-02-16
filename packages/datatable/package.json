@@ -68,8 +68,8 @@
     "rollup": "^4.55.1"
   },
   "dependencies": {
-    "@uipath/apollo-core": "^5.5.0",
-    "@uipath/apollo-wind": "^0.6.6",
+    "@uipath/apollo-core": "^5.7.0",
+    "@uipath/apollo-wind": "^0.8.0",
     "ag-grid-community": "^34.3.1",
     "ag-grid-react": "^34.3.1"
   }
