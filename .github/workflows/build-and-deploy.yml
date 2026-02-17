@@ -2,9 +2,9 @@ name: Build and Deploy
 
 on:
   push:
-    branches: [main, develop]
+    branches: [release/*, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [release/*, develop]
 
 permissions:
   contents: write
@@ -24,12 +24,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24.x"
           cache: "npm"
@@ -45,40 +46,16 @@ jobs:
       - name: Build Storybook
         run: npm run build-storybook
 
-      # ===== Publish (only on push to main/develop) =====
-      - name: Detect changed packages
-        if: github.event_name == 'push'
-        id: changed
+      # ===== Release: Version, Publish, and Deploy (only on push to release/*) =====
+      - name: Release and deploy
+        if: github.event_name == 'push' && startsWith(github.ref_name, 'release/')
         run: |
-          CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} 2>/dev/null || git diff --name-only HEAD~1 HEAD)
-          CHANGED_PACKAGES=""
-          for pkg in $PACKAGES; do
-            echo "$CHANGED_FILES" | grep -q "^packages/$pkg/" && CHANGED_PACKAGES="$CHANGED_PACKAGES $pkg"
-          done
-          echo "packages=$CHANGED_PACKAGES"
-          echo "packages=$CHANGED_PACKAGES" >> $GITHUB_OUTPUT
-
-      - name: Version and Publish
-        if: github.event_name == 'push' && steps.changed.outputs.packages != ''
-        run: |
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-
-          for PACKAGE in ${{ steps.changed.outputs.packages }}; do
-            cd packages/$PACKAGE
-            if [ "${{ github.ref_name }}" = "develop" ]; then
-              npm version prerelease --preid=dev.${SHORT_SHA} --no-git-tag-version
-              npm publish --tag dev || true
-            else
-              npm version patch --no-git-tag-version
-              npm publish --tag latest || true
-            fi
-            cd ../..
-          done
-
-      # ===== Deploy Storybook (only on push to main/develop) =====
-      - name: Deploy to gh-pages
-        if: github.event_name == 'push'
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          npx gh-pages -d storybook-static -b gh-pages
+          npx changeset version
+          npx changeset publish
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git add .changeset packages/*/CHANGELOG.md packages/*/package.json
+          git diff --staged --quiet || git commit -m "chore: version packages [skip ci]"
+          git push
+          npx gh-pages -d storybook-static -b gh-pages -u "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"

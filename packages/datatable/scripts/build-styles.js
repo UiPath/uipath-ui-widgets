@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { mkdirSync, readdirSync } from "fs";
 import { basename, join } from "path";
 
@@ -8,8 +8,12 @@ const componentsDir = join(srcDir, "components");
 const distComponentsDir = join(distDir, "components");
 
 function compileScss(inputPath, outputPath) {
-  execSync(`sass --no-source-map ${inputPath} | postcss -o ${outputPath}`, {
-    shell: true,
+  // Run sass to compile SCSS to CSS (outputs to file directly)
+  execFileSync("sass", ["--no-source-map", inputPath, outputPath], {
+    stdio: "inherit",
+  });
+  // Run postcss on the output file
+  execFileSync("postcss", [outputPath, "-o", outputPath], {
     stdio: "inherit",
   });
 }

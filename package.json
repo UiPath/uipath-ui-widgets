@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/multi-file-upload"
   ],
   "scripts": {
     "dev": "vite",
@@ -17,7 +17,10 @@
     "test:coverage": "npm run test:coverage --workspaces --if-present",
     "storybook": "npx storybook dev -p 6006 --config-dir .storybook",
     "build-storybook": "npx storybook build --config-dir .storybook",
-    "prepare": "husky"
+    "prepare": "husky",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "changeset publish"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -27,7 +30,7 @@
     "@uipath/ui-widgets-conversational-agent-chat": "file:./packages/conversational-agent-chat/dist",
     "@uipath/ui-widgets-datatable": "file:./packages/datatable/dist",
     "@uipath/ui-widgets-multi-file-upload": "file:./packages/multi-file-upload/dist",
-    "@uipath/uipath-typescript": "npm:@uipath/uipath-typescript-dev@^1.0.0-beta.1",
+    "@uipath/uipath-typescript": "1.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "socket.io-client": "^4.8.3"
@@ -36,6 +39,8 @@
     "**/*": "prettier --write --ignore-unknown"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^0.5.2",
+    "@changesets/cli": "^2.29.8",
     "@commitlint/cli": "^19.6.1",
     "@commitlint/config-conventional": "^19.6.0",
     "@eslint/js": "^9.39.1",
