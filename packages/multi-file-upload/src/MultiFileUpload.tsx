@@ -4,8 +4,6 @@ import { FC, useCallback, useRef, useState } from "react";
 import "./MultiFileUpload.css";
 import { MultiFileUploadProps } from "./types";
 
-const UPLOAD_SUCCESS = "success";
-
 export const MultiFileUpload: FC<MultiFileUploadProps> = ({
   sdk,
   bucketId,
@@ -17,7 +15,8 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
   onUploadSuccess,
 }) => {
   const [files, setFiles] = useState<File[]>([]);
-  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [fileErrors, setFileErrors] = useState<Record<string, string>>({});
   const [fileUploadKey, setFileUploadKey] = useState(0); // A key to reset the state of FileUpload component. Modify (or simply increment) it on upload/clear to reset the list of files to []. If we wont increment it, then even after uploading files, file list wont clear. And if we re-upload a different set of files, it will append to the old list instead of overriding it.
   const [isUploading, setIsUploading] = useState(false);
   const storageBucketService = useRef(new BucketService(sdk));
@@ -26,7 +25,8 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
     if (isUploading) return; // Prevent multiple simultaneous uploads
 
     setIsUploading(true);
-    setUploadStatus(null);
+    setUploadSuccess(false);
+    setFileErrors({});
 
     try {
       // Ensure path ends with '/' if provided
@@ -44,51 +44,48 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
         ),
       );
 
-      const failedUploads: Array<{ file: File; error: string }> = [];
+      const errors: Record<string, string> = {};
       const successfulFiles: File[] = [];
 
       results.forEach((result, index) => {
+        const file = files[index];
         if (result.status === "fulfilled" && result.value.statusCode === 201) {
-          successfulFiles.push(files[index]);
+          successfulFiles.push(file);
         } else {
-          failedUploads.push({
-            file: files[index],
-            error:
-              (result as PromiseRejectedResult).reason?.message ||
-              "Unknown error",
-          });
+          errors[file.name] =
+            (result as PromiseRejectedResult).reason?.message ||
+            "Upload failed";
         }
       });
 
-      if (failedUploads.length === 0) {
+      if (Object.keys(errors).length === 0) {
         // All files uploaded successfully
-        setUploadStatus(UPLOAD_SUCCESS);
+        setUploadSuccess(true);
         onUploadSuccess?.(files);
         setFiles([]);
         setFileUploadKey((prev) => prev + 1);
       } else {
         // Some or all files failed
-        const errorDetails = failedUploads
-          .map((f) => `${f.file.name}: ${f.error}`)
-          .join("; ");
+        setFileErrors(errors);
 
-        let errorMessage: string;
-        if (successfulFiles.length === 0) {
-          // All files failed
-          errorMessage = `Failed to upload all files. ${errorDetails}`;
-        } else {
-          // Partial success
-          errorMessage = `${successfulFiles.length} file(s) uploaded successfully. ${failedUploads.length} failed: ${errorDetails}`;
-          // Remove successfully uploaded files, keep only failed ones
-          setFiles(failedUploads.map((f) => f.file));
+        if (successfulFiles.length > 0) {
+          // Partial success - keep only failed files
+          setFiles(files.filter((f) => errors[f.name]));
           onUploadSuccess?.(successfulFiles);
         }
 
-        setUploadStatus(errorMessage);
-        onUploadError?.(new Error(errorMessage));
+        onUploadError?.(
+          new Error(`${Object.keys(errors).length} file(s) failed to upload`),
+        );
       }
     } catch (error) {
-      setUploadStatus((error as Error).message || "Failed to upload files");
+      // Unexpected error - mark all files as failed
+      const errors: Record<string, string> = {};
+      const errorMessage = (error as Error).message || "Upload failed";
+      files.forEach((file) => {
+        errors[file.name] = errorMessage;
+      });
+      setFileErrors(errors);
       onUploadError?.(error as Error);
     } finally {
       setIsUploading(false);
@@ -105,12 +102,14 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
 
   const handleFilesChange = useCallback((newFiles: File[]) => {
     setFiles(newFiles);
-    setUploadStatus(null);
+    setUploadSuccess(false);
+    setFileErrors({});
   }, []);
 
   const handleClear = useCallback(() => {
     setFiles([]);
-    setUploadStatus(null);
+    setUploadSuccess(false);
+    setFileErrors({});
     setFileUploadKey((prev) => prev + 1);
   }, []);
 
@@ -122,20 +121,11 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
         multiple
         maxSize={maxFileSize}
         accept={accept}
+        errors={fileErrors}
       />
-      {uploadStatus && (
-        <div
-          className={`mt-2 text-sm ${
-            uploadStatus === UPLOAD_SUCCESS
-              ? "text-green-600"
-              : uploadStatus.includes("uploaded")
-                ? "text-yellow-600"
-                : "text-red-600"
-          }`}
-        >
-          {uploadStatus === UPLOAD_SUCCESS
-            ? "Files uploaded successfully!"
-            : uploadStatus}
+      {uploadSuccess && (
+        <div className="mt-2 text-sm text-green-600">
+          Files uploaded successfully!
         </div>
       )}
       <div className="flex gap-2 mt-4 justify-center">

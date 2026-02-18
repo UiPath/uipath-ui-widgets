@@ -66,6 +66,6 @@
   "dependencies": {
     "@uipath/apollo-react": "^3.30.2",
     "@uipath/apollo-core": "^5.7.0",
-    "@uipath/apollo-wind": "^0.8.0"
+    "@uipath/apollo-wind": "^0.10.0"
   }
 }
