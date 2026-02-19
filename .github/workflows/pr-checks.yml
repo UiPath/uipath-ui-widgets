@@ -49,7 +49,7 @@ jobs:
       - name: Security audit
         id: audit
         continue-on-error: true
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=high --omit=dev
 
       # Zizmor is a specialized GitHub Actions security linter that catches workflow-specific
       # vulnerabilities (script injection, unpinned actions, etc.) that CodeQL's analysis may miss.

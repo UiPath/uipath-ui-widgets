@@ -70,7 +70,7 @@
   },
   "dependencies": {
     "@uipath/apollo-core": "^5.7.0",
-    "@uipath/apollo-wind": "^0.8.0",
+    "@uipath/apollo-wind": "^0.10.0",
     "ag-grid-community": "^34.3.1",
     "ag-grid-react": "^34.3.1"
   }

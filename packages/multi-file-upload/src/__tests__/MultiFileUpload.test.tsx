@@ -24,7 +24,7 @@ vi.mock("@uipath/apollo-wind", () => ({
       {children}
     </button>
   ),
-  FileUpload: ({ onFilesChange, multiple, maxSize, accept }: any) => (
+  FileUpload: ({ onFilesChange, multiple, maxSize, accept, errors }: any) => (
     <div data-testid="file-upload">
       <input
         type="file"
@@ -37,6 +37,15 @@ vi.mock("@uipath/apollo-wind", () => ({
         }}
       />
       <div data-testid="max-size">{maxSize}</div>
+      {errors && Object.keys(errors).length > 0 && (
+        <div data-testid="file-errors">
+          {Object.entries(errors).map(([fileName, error]) => (
+            <div key={fileName} data-testid={`error-${fileName}`}>
+              {fileName}: {error as string}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   ),
 }));
@@ -199,9 +208,8 @@ describe("MultiFileUpload", () => {
 
     await waitFor(() => {
       expect(onUploadError).toHaveBeenCalled();
-      expect(
-        screen.getByText(/Failed to upload all files/),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("file-errors")).toBeInTheDocument();
+      expect(screen.getByTestId("error-test.txt")).toBeInTheDocument();
     });
   });
 
@@ -235,9 +243,9 @@ describe("MultiFileUpload", () => {
     await waitFor(() => {
       expect(onUploadSuccess).toHaveBeenCalledWith([file1]);
       expect(onUploadError).toHaveBeenCalled();
-      expect(
-        screen.getByText(/1 file\(s\) uploaded successfully. 1 failed/),
-      ).toBeInTheDocument();
+      // Only the failed file should have an error
+      expect(screen.getByTestId("error-test2.txt")).toBeInTheDocument();
+      expect(screen.queryByTestId("error-test1.txt")).not.toBeInTheDocument();
     });
   });
 
@@ -265,7 +273,7 @@ describe("MultiFileUpload", () => {
     });
   });
 
-  it("should clear status message when new files are selected", async () => {
+  it("should clear errors when new files are selected", async () => {
     const user = userEvent.setup();
     mockUploadFile.mockRejectedValue(new Error("Upload failed"));
 
@@ -280,19 +288,15 @@ describe("MultiFileUpload", () => {
     await user.click(uploadButton);
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/Failed to upload all files/),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("file-errors")).toBeInTheDocument();
     });
 
-    // Select new file - status message should clear
+    // Select new file - errors should clear
     const file2 = new File(["content2"], "test2.txt", { type: "text/plain" });
     await user.upload(fileInput, file2);
 
     await waitFor(() => {
-      expect(
-        screen.queryByText(/Failed to upload all files/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("file-errors")).not.toBeInTheDocument();
     });
   });
 
@@ -380,7 +384,7 @@ describe("MultiFileUpload", () => {
     });
   });
 
-  it("should display correct color for error message", async () => {
+  it("should pass errors to FileUpload component", async () => {
     const user = userEvent.setup();
     mockUploadFile.mockRejectedValue(new Error("Upload failed"));
 
@@ -394,30 +398,30 @@ describe("MultiFileUpload", () => {
     await user.click(uploadButton);
 
     await waitFor(() => {
-      const message = screen.getByText(/Failed to upload all files/);
-      expect(message).toHaveClass("text-red-600");
+      expect(screen.getByTestId("file-errors")).toBeInTheDocument();
+      expect(screen.getByText(/test.txt: Upload failed/)).toBeInTheDocument();
     });
   });
 
-  it("should display correct color for partial success message", async () => {
+  it("should show error message from API response", async () => {
     const user = userEvent.setup();
-    mockUploadFile
-      .mockResolvedValueOnce({ statusCode: 201 })
-      .mockRejectedValueOnce(new Error("Upload failed"));
+    mockUploadFile.mockRejectedValue(new Error("File too large"));
 
     render(<MultiFileUpload {...getDefaultProps()} />);
 
     const fileInput = screen.getByTestId("file-input");
-    const file1 = new File(["content1"], "test1.txt", { type: "text/plain" });
-    const file2 = new File(["content2"], "test2.txt", { type: "text/plain" });
-    await user.upload(fileInput, [file1, file2]);
+    const file = new File(["content"], "large-file.txt", {
+      type: "text/plain",
+    });
+    await user.upload(fileInput, file);
 
     const uploadButton = screen.getAllByTestId("button")[0];
     await user.click(uploadButton);
 
     await waitFor(() => {
-      const message = screen.getByText(/1 file\(s\) uploaded successfully/);
-      expect(message).toHaveClass("text-yellow-600");
+      expect(
+        screen.getByText(/large-file.txt: File too large/),
+      ).toBeInTheDocument();
     });
   });
 });
