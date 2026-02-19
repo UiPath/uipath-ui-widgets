@@ -78,10 +78,11 @@ describe("MultiFileUpload", () => {
     expect(fileInput).toHaveAttribute("accept", ".pdf,.doc");
   });
 
-  it("should render with custom maxFileSize prop", () => {
-    render(<MultiFileUpload {...getDefaultProps()} maxFileSize={5000000} />);
+  it("should render with custom maxFileSizeInMb prop", () => {
+    render(<MultiFileUpload {...getDefaultProps()} maxFileSizeInMb={5} />);
 
-    expect(screen.getByTestId("max-size")).toHaveTextContent("5000000");
+    // 5 MB = 5 * 1024 * 1024 = 5242880 bytes
+    expect(screen.getByTestId("max-size")).toHaveTextContent("5242880");
   });
 
   it("should have upload and clear buttons disabled when no files selected", () => {

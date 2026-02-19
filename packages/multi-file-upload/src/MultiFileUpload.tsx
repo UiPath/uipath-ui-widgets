@@ -9,7 +9,7 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
   bucketId,
   folderId,
   accept,
-  maxFileSize,
+  maxFileSizeInMb,
   path,
   onUploadError,
   onUploadSuccess,
@@ -119,7 +119,7 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
         key={fileUploadKey}
         onFilesChange={handleFilesChange}
         multiple
-        maxSize={maxFileSize}
+        maxSize={maxFileSizeInMb ? maxFileSizeInMb * 1024 * 1024 : undefined}
         accept={accept}
         errors={fileErrors}
       />

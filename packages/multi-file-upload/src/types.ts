@@ -5,7 +5,7 @@ export interface MultiFileUploadProps {
   bucketId: number;
   folderId: number;
   accept?: string;
-  maxFileSize?: number;
+  maxFileSizeInMb?: number;
   path?: string;
   onUploadError?: (error: Error) => void;
   onUploadSuccess?: (uploadedFiles: File[]) => void;
