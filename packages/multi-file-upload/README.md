@@ -48,7 +48,7 @@ function App() {
       path="uploads/"
       onUploadError={handleUploadError}
       onUploadSuccess={handleUploadSuccess}
-      maxFileSize={10485760} // 10MB
+      maxFileSizeInMb={10}
       accept=".pdf,.jpg,.png"
     />
   );
@@ -67,7 +67,7 @@ function App() {
 | `path`            | `string`                          | No       | Path prefix for uploaded files (e.g., "uploads/")                                                                                                                                  |
 | `onUploadError`   | `(error: Error) => void`          | No       | Callback function called when upload fails                                                                                                                                         |
 | `onUploadSuccess` | `(uploadedFiles: File[]) => void` | No       | Callback function called when files are successfully uploaded                                                                                                                      |
-| `maxFileSize`     | `number`                          | No       | Maximum file size in bytes                                                                                                                                                         |
+| `maxFileSizeInMb` | `number`                          | No       | Maximum file size in megabytes                                                                                                                                                     |
 | `accept`          | `string`                          | No       | Accepted file types (comma-separated MIME types or extensions). See [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/accept) for details |
 
 ## Example with Options
@@ -80,7 +80,7 @@ function App() {
   path="documents/"
   onUploadError={(error) => console.error("Upload failed:", error)}
   onUploadSuccess={(files) => console.log("Uploaded:", files.length, "files")}
-  maxFileSize={5242880} // 5MB
+  maxFileSizeInMb={5}
   accept=".pdf,.docx,.xlsx"
 />
 ```

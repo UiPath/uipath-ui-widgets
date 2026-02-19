@@ -63,7 +63,7 @@ function App() {
       path="uploads/"
       onUploadError={handleUploadError}
       onUploadSuccess={handleUploadSuccess}
-      maxFileSize={10485760} // 10MB
+      maxFileSizeInMb={10}
       accept=".pdf,.jpg,.png"
     />
   );
@@ -107,8 +107,8 @@ function App() {
         "Callback function called when files are successfully uploaded",
       action: "uploadSuccess",
     },
-    maxFileSize: {
-      description: "Maximum file size in bytes",
+    maxFileSizeInMb: {
+      description: "Maximum file size in megabytes",
       control: "number",
     },
     accept: {
@@ -151,7 +151,7 @@ export const WithMaxFileSize: Story = {
     sdk: mockSdk,
     bucketId: 1,
     folderId: 1,
-    maxFileSize: 5 * 1024 * 1024, // 5MB
+    maxFileSizeInMb: 5,
   },
   parameters: {
     docs: {
