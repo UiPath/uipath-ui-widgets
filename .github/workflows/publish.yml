@@ -1,0 +1,48 @@
+name: Publish SDK package
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Package to publish"
+        required: true
+        type: choice
+        options:
+          - multi-file-upload
+          - datatable
+          - conversational-agent-chat
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  publish-sdk:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install Dependencies
+        run: npm install --include=optional --legacy-peer-deps
+
+      - name: Build
+        working-directory: packages/${{ inputs.package }}
+        run: npm run build
+
+      - name: Publish to npm
+        env:
+          GITHUB_TOKEN: ${{ secrets.NPM_TOKEN }}
+        working-directory: packages/${{ inputs.package }}
+        run: npm publish --provenance --access public
