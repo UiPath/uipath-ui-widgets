@@ -17,6 +17,13 @@ vi.mock("@uipath/uipath-typescript/buckets", () => {
   };
 });
 
+// Mock telemetryClient
+vi.mock("@uipath/uipath-typescript", () => ({
+  telemetryClient: {
+    track: vi.fn(),
+  },
+}));
+
 // Mock @uipath/apollo-wind components
 vi.mock("@uipath/apollo-wind", () => ({
   Button: ({ onClick, children, disabled }: any) => (
