@@ -57,7 +57,7 @@ jobs:
 
       - name: Publish to npm
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: packages/${{ inputs.package }}
         run: |
           if [ "${{ inputs.beta }}" = "true" ]; then
