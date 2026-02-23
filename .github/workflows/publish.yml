@@ -11,6 +11,11 @@ on:
           - multi-file-upload
           - datatable
           - conversational-agent-chat
+      beta:
+        description: "Check for prerelease/beta versions"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -54,4 +59,9 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: packages/${{ inputs.package }}
-        run: npm publish --provenance --access public
+        run: |
+          if [ "${{ inputs.beta }}" = "true" ]; then
+            npm publish --provenance --access public --tag beta
+          else
+            npm publish --provenance --access public
+          fi
