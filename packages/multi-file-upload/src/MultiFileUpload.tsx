@@ -1,8 +1,9 @@
 import { Button, FileUpload } from "@uipath/apollo-wind";
+import { telemetryClient } from "@uipath/uipath-typescript/core";
 import { BucketService } from "@uipath/uipath-typescript/buckets";
 import { FC, useCallback, useRef, useState } from "react";
 import "./MultiFileUpload.css";
-import { MultiFileUploadProps } from "./types";
+import { MultiFileUploadProps, TelemetryConstants } from "./types";
 
 export const MultiFileUpload: FC<MultiFileUploadProps> = ({
   sdk,
@@ -52,11 +53,40 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
         if (result.status === "fulfilled" && result.value.statusCode === 201) {
           successfulFiles.push(file);
         } else {
-          errors[file.name] =
+          const errorMessage =
             (result as PromiseRejectedResult).reason?.message ||
             "Upload failed";
+          errors[file.name] = errorMessage;
+
+          // Telemetry: Log individual file upload error
+          telemetryClient.track(
+            TelemetryConstants.Service.UploadFile,
+            TelemetryConstants.Telemetry.Error,
+            {
+              ApplicationName: TelemetryConstants.ApplicationName,
+              WidgetVersion: TelemetryConstants.Version,
+              Error: errorMessage,
+            },
+          );
         }
       });
+
+      // Telemetry: Log upload results summary
+      telemetryClient.track(
+        TelemetryConstants.Service.UploadFile,
+        TelemetryConstants.Telemetry.Usage,
+        {
+          ApplicationName: TelemetryConstants.ApplicationName,
+          WidgetVersion: TelemetryConstants.Version,
+          TotalFiles: files.length,
+          SuccessCount: successfulFiles.length,
+          FailureCount: Object.keys(errors).length,
+          HasAccept: !!accept,
+          HasMaxFileSizeInMb: !!maxFileSizeInMb,
+          HasOnUploadError: !!onUploadError,
+          HasOnUploadSuccess: !!onUploadSuccess,
+        },
+      );
 
       if (Object.keys(errors).length === 0) {
         // All files uploaded successfully
@@ -87,14 +117,29 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
       });
       setFileErrors(errors);
       onUploadError?.(error as Error);
+
+      // Telemetry: Log uncaught error
+      telemetryClient.track(
+        TelemetryConstants.Service.UploadFile,
+        TelemetryConstants.Telemetry.Error,
+        {
+          ApplicationName: TelemetryConstants.ApplicationName,
+          WidgetVersion: TelemetryConstants.Version,
+          Error: errorMessage,
+          ErrorType: "uncaught",
+          TotalFiles: files.length,
+        },
+      );
     } finally {
       setIsUploading(false);
     }
   }, [
+    accept,
     bucketId,
     files,
     folderId,
     isUploading,
+    maxFileSizeInMb,
     onUploadError,
     onUploadSuccess,
     path,

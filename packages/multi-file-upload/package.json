@@ -1,6 +1,6 @@
 {
   "name": "@uipath/ui-widgets-multi-file-upload",
-  "version": "1.0.2",
+  "version": "1.0.0",
   "description": "A React component for uploading multiple files simultaneously to UiPath Orchestrator Storage Bucket",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -41,7 +41,8 @@
     "directory": "packages/multi-file-upload"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   },
   "bugs": {
     "url": "https://github.com/UiPath/uipath-ui-widgets/issues"
@@ -50,7 +51,7 @@
   "peerDependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "@uipath/uipath-typescript": "1.0.0"
+    "@uipath/uipath-typescript": "1.1.1"
   },
   "devDependencies": {
     "rimraf": "^6.0.1",
