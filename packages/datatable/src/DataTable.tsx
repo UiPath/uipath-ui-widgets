@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { ChoiceSets, Entities } from "@uipath/uipath-typescript/entities";
 import type {
   ColDef,
   GetRowIdParams,
@@ -18,6 +19,7 @@ import { DetailPanel } from "./components/DetailPanel";
 import { DiffDialog } from "./components/DiffDialog";
 import { Toolbar } from "./components/Toolbar";
 import "./DataTable.css";
+import { useChoiceSetCache } from "./hooks/useChoiceSetCache";
 import { useEntityData } from "./hooks/useEntityData";
 import { useEntityRecordsCache } from "./hooks/useEntityRecordsCache";
 import { useRowEditing } from "./hooks/useRowEditing";
@@ -25,12 +27,10 @@ import type { DataTableProps } from "./types";
 import { GridRow } from "./types";
 import { deepClone, getDiffData } from "./utils/dataUtils";
 import { getFieldValue } from "./utils/fieldUtils";
-import { Entities } from "@uipath/uipath-typescript/entities";
 
 export const DataTable = ({
   sdk,
   entityId,
-  className = "",
   pageSize = 50,
   columnConfig,
   rowClassRules,
@@ -44,10 +44,14 @@ export const DataTable = ({
   const [selectedGroupBy, setSelectedGroupBy] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const entityService = useRef<Entities>(new Entities(sdk));
+  const choiceSetService = useRef<ChoiceSets>(new ChoiceSets(sdk));
   const hasInitialized = useRef<string | null>(null);
   const rowsMapInGroupByMode = useRef<Record<string, GridRow>>({});
   const { getRecords, clearCache } = useEntityRecordsCache(
     entityService.current,
+  );
+  const { clearCache: clearChoiceSetCache } = useChoiceSetCache(
+    choiceSetService.current,
   );
 
   const openDiffDialog = useCallback(() => setShowDiffDialog(true), []);
@@ -64,9 +68,11 @@ export const DataTable = ({
     error,
     setError,
     entity,
+    choiceSetValuesMap,
     fetchEntityRecords,
   } = useEntityData(
     entityService.current,
+    choiceSetService.current,
     entityId,
     columnConfig,
     showIdColumn,
@@ -246,11 +252,12 @@ export const DataTable = ({
       setNewRecords(new Map());
       revertAllUpdates();
       clearCache();
+      clearChoiceSetCache();
       await fetchEntityRecords();
     } finally {
       setLoading(false);
     }
-  }, [clearCache, fetchEntityRecords, revertAllUpdates]);
+  }, [clearCache, clearChoiceSetCache, fetchEntityRecords, revertAllUpdates]);
 
   const isFullWidthRow = useCallback(
     (params: IsFullWidthRowParams<GridRow>) => {
@@ -445,7 +452,7 @@ export const DataTable = ({
 
   return (
     <div
-      className={`datatable-container ${isMasterDetailMode ? "datatable-master-detail" : ""} ${className}`}
+      className={`uipath-datatable-container ${isMasterDetailMode ? "datatable-master-detail" : ""}`}
     >
       <Toolbar
         onRefresh={refreshComponent}
@@ -475,7 +482,6 @@ export const DataTable = ({
             filter: true,
             resizable: true,
             editable: !isMasterDetailMode,
-            flex: 1,
             minWidth: 100,
           }}
           theme={themeQuartz}
@@ -506,6 +512,7 @@ export const DataTable = ({
         onRevertAll={handleRevertAll}
         onRevertField={revertSingleCellUpdate}
         diffData={getDiffData(editedRows, originalData)}
+        choiceSetValuesMap={choiceSetValuesMap}
       />
     </div>
   );

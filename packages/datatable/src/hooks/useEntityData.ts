@@ -4,16 +4,22 @@ import {
   getFieldValue,
   createValueSetter,
   createCellEditorSelector,
+  isChoiceSetSingle,
+  isChoiceSetMultiple,
+  ChoiceSetValuesMap,
 } from "../utils/fieldUtils";
 import {
+  ChoiceSets,
   Entities,
   EntityGetResponse,
 } from "@uipath/uipath-typescript/entities";
 import { ColDef } from "ag-grid-community";
 import { useCallback, useState } from "react";
+import { useChoiceSetCache } from "./useChoiceSetCache";
 
 export const useEntityData = (
   entityService: Entities,
+  choiceSetService: ChoiceSets,
   entityId: string,
   columnConfig?: Record<string, ColDef>,
   showIdColumn?: boolean,
@@ -24,6 +30,9 @@ export const useEntityData = (
   const [originalColumnDefs, setOriginalColumnDefs] = useState<ColDef[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [entity, setEntity] = useState<EntityGetResponse>();
+  const [choiceSetValuesMap, setChoiceSetValuesMap] =
+    useState<ChoiceSetValuesMap>(new Map());
+  const { getValues: getChoiceSetValues } = useChoiceSetCache(choiceSetService);
 
   const fetchEntityRecords = useCallback(async () => {
     try {
@@ -55,17 +64,44 @@ export const useEntityData = (
           }
         }
 
+        // Pre-fetch choice set values for all choice set fields
+        const choiceSetIds = [
+          ...new Set(
+            nonSystemFields
+              .filter((f) => isChoiceSetSingle(f) || isChoiceSetMultiple(f))
+              .map((f) => f.choiceSetId)
+              .filter(Boolean),
+          ),
+        ] as string[];
+
+        const csValuesMap: ChoiceSetValuesMap = new Map();
+        await Promise.all(
+          choiceSetIds.map(async (csId) => {
+            const values = await getChoiceSetValues(csId);
+            const numberIdMap = new Map<number, string>();
+            for (const item of values) {
+              numberIdMap.set(item.numberId, item.displayName);
+            }
+            csValuesMap.set(csId, numberIdMap);
+          }),
+        );
+        setChoiceSetValuesMap(csValuesMap);
+
         const columns: ColDef[] = nonSystemFields.map((f) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const valueGetter = (params: any) =>
-            getFieldValue(params.data?.[f.name], f);
+            getFieldValue(params.data?.[f.name], f, csValuesMap);
           return {
             field: f.name,
             headerName: f.displayName,
             valueGetter: valueGetter,
             tooltipValueGetter: valueGetter,
             valueSetter: createValueSetter(f.name),
-            cellEditorSelector: createCellEditorSelector(f, entityService),
+            cellEditorSelector: createCellEditorSelector(
+              f,
+              entityService,
+              choiceSetService,
+            ),
             ...columnConfig?.[f.displayName],
           };
         });
@@ -81,7 +117,14 @@ export const useEntityData = (
       );
       // Error is caught and set in state, no need to re-throw
     }
-  }, [entityService, entityId, showIdColumn, columnConfig]);
+  }, [
+    entityService,
+    choiceSetService,
+    entityId,
+    showIdColumn,
+    columnConfig,
+    getChoiceSetValues,
+  ]);
 
   return {
     rowData,
@@ -93,6 +136,7 @@ export const useEntityData = (
     error,
     setError,
     entity,
+    choiceSetValuesMap,
     fetchEntityRecords,
   };
 };

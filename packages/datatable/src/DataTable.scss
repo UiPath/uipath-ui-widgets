@@ -3,7 +3,7 @@
 @source "../../../node_modules/@uipath/apollo-wind/dist/**/*.js";
 @source "../dist/components/**/*.{js,css}";
 
-.datatable-container {
+.uipath-datatable-container {
   height: 100%;
   width: 100%;
   display: flex;
@@ -13,6 +13,10 @@
 
   .datatable-grid-wrapper {
     flex: 1;
+
+    .ag-cell-inline-editing {
+      overflow: visible;
+    }
   }
 }
 
