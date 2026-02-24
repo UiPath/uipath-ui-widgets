@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { UiPath } from "@uipath/uipath-typescript/core";
-import "./MultiFileUpload.css";
+import "./MultiFileUpload.scss";
 import { MultiFileUpload } from "./MultiFileUpload";
 
 const mockSdk = new UiPath({
