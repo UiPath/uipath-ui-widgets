@@ -1,4 +1,6 @@
 import type { StorybookConfig } from "@storybook/react-vite";
+import tailwindcssPlugin from "@tailwindcss/postcss";
+import autoprefixer from "autoprefixer";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -11,8 +13,17 @@ function getAbsolutePath(value: string) {
 }
 
 const config: StorybookConfig = {
-  stories: ["../packages/multi-file-upload/dist/*.stories.js"],
+  stories: ["../packages/multi-file-upload/src/*.stories.tsx"],
   addons: [getAbsolutePath("@storybook/addon-docs")],
   framework: getAbsolutePath("@storybook/react-vite"),
+  viteFinal(config) {
+    config.css = {
+      ...config.css,
+      postcss: {
+        plugins: [tailwindcssPlugin, autoprefixer],
+      },
+    };
+    return config;
+  },
 };
 export default config;
