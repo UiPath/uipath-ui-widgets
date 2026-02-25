@@ -2,6 +2,7 @@ import {
   ChoiceSets,
   ChoiceSetGetResponse,
 } from "@uipath/uipath-typescript/entities";
+import { toast } from "@uipath/apollo-wind";
 import { useCallback } from "react";
 
 class ChoiceSetCache {
@@ -15,10 +16,16 @@ class ChoiceSetCache {
     if (cached) {
       return cached;
     }
-    const response = await choiceSetService.getById(choiceSetId);
-    const values = response.items;
-    this.cache.set(choiceSetId, values);
-    return values;
+    try {
+      const response = await choiceSetService.getById(choiceSetId);
+      const values = response.items;
+      this.cache.set(choiceSetId, values);
+      return values;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to load choice set values: ${message}`);
+      return [];
+    }
   }
 
   static clearCache(choiceSetId?: string): void {

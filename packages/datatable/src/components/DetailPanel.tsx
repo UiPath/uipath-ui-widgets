@@ -1,5 +1,5 @@
 import { GridRow } from "../types";
-import { getFieldValue } from "../utils/fieldUtils";
+import { getFieldValue, ChoiceSetValuesMap } from "../utils/fieldUtils";
 import { EntityGetResponse } from "@uipath/uipath-typescript";
 import type { ColDef } from "ag-grid-community";
 import { themeQuartz } from "ag-grid-community";
@@ -12,12 +12,14 @@ interface DetailPanelProps {
   groupByFieldDisplayName: string;
   groupByFieldId: string | undefined;
   entity: EntityGetResponse | undefined;
+  choiceSetValuesMap?: ChoiceSetValuesMap;
 }
 
 export const DetailPanel = ({
   rowData,
   groupByFieldDisplayName,
   entity,
+  choiceSetValuesMap,
 }: DetailPanelProps) => {
   const columnDefs = useMemo<ColDef<GridRow>[]>(() => {
     if (!entity) return [];
@@ -32,7 +34,11 @@ export const DetailPanel = ({
       .map((f) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const valueGetter = (params: any) =>
-          getFieldValue(params.data?.[f.name], entityFieldsMap.get(f.name));
+          getFieldValue(
+            params.data?.[f.name],
+            entityFieldsMap.get(f.name),
+            choiceSetValuesMap,
+          );
         return {
           field: f.name,
           headerName: f.displayName,
@@ -40,7 +46,7 @@ export const DetailPanel = ({
           tooltipValueGetter: valueGetter,
         };
       });
-  }, [entity, groupByFieldDisplayName]);
+  }, [entity, groupByFieldDisplayName, choiceSetValuesMap]);
 
   return (
     <div className="detail-panel">

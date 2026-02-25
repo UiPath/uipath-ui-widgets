@@ -28,7 +28,9 @@ export const ChoiceSetMultipleCellEditor = ({
     return [];
   };
 
-  const [selected, setSelected] = useState<string[]>(parseInitialSelected());
+  const [selectedChoices, setSelectedChoices] = useState<string[]>(
+    parseInitialSelected(),
+  );
   const [options, setOptions] = useState<{ label: string; value: string }[]>(
     [],
   );
@@ -50,7 +52,7 @@ export const ChoiceSetMultipleCellEditor = ({
 
   const handleChange = useCallback(
     (newSelected: string[]) => {
-      setSelected(newSelected);
+      setSelectedChoices(newSelected);
       onValueChange(newSelected.map(Number));
     },
     [onValueChange],
@@ -60,7 +62,7 @@ export const ChoiceSetMultipleCellEditor = ({
     <div className="ag-allow-overflow">
       <MultiSelect
         options={options}
-        selected={selected}
+        selected={selectedChoices}
         onChange={handleChange}
         placeholder="Select values..."
       />

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { Toaster } from "@uipath/apollo-wind";
 import { ChoiceSets, Entities } from "@uipath/uipath-typescript/entities";
 import type {
   ColDef,
@@ -275,11 +276,12 @@ export const DataTable = ({
             groupByFieldDisplayName={selectedGroupBy}
             groupByFieldId={props.data?.Id}
             entity={entity}
+            choiceSetValuesMap={choiceSetValuesMap}
           />
         </div>
       );
     },
-    [entity, selectedGroupBy],
+    [entity, selectedGroupBy, choiceSetValuesMap],
   );
 
   const getRowHeight = useCallback(
@@ -514,6 +516,7 @@ export const DataTable = ({
         diffData={getDiffData(editedRows, originalData)}
         choiceSetValuesMap={choiceSetValuesMap}
       />
+      <Toaster position="top-right" />
     </div>
   );
 };

@@ -31,6 +31,15 @@ vi.mock("@uipath/uipath-typescript/entities", async (importOriginal) => {
   };
 });
 
+// Mock apollo-wind Toaster to avoid sonner issues in jsdom
+vi.mock("@uipath/apollo-wind", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    Toaster: () => null,
+  };
+});
+
 // Store callbacks for testing
 let storedOnCellValueChanged: any;
 let storedOnSelectionChanged: any;
