@@ -19,6 +19,8 @@ npm install @uipath/ui-widgets-multi-file-upload
 
 ## Usage
 
+> **Note:** Add either `light` or `dark` class to your HTML `<body>` element to enable proper theming.
+
 ```tsx
 import { MultiFileUpload } from "@uipath/ui-widgets-multi-file-upload";
 import "@uipath/ui-widgets-multi-file-upload/MultiFileUpload.css";

@@ -145,7 +145,7 @@ function App({ uipathSdk }: AppProps) {
                     folderId={parseInt(
                       import.meta.env.VITE_MFU_BUCKET_FOLDER_ID,
                     )}
-                    maxFileSize={20971520}
+                    maxFileSizeInMb={2}
                     accept="image/*"
                     onUploadSuccess={(files: File[]) => {
                       console.log("Files uploaded:", files);

@@ -1,6 +1,6 @@
 {
   "name": "@uipath/ui-widgets-multi-file-upload",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0",
   "description": "A React component for uploading multiple files simultaneously to UiPath Orchestrator Storage Bucket",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
