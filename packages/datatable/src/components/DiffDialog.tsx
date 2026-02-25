@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { getFieldValue } from "../utils/fieldUtils";
+import { getFieldValue, ChoiceSetValuesMap } from "../utils/fieldUtils";
 import { EntityGetResponse } from "@uipath/uipath-typescript";
 import {
   Button,
@@ -29,6 +29,7 @@ interface DiffDialogProps {
     original: any;
     edited: any;
   }>;
+  choiceSetValuesMap?: ChoiceSetValuesMap;
 }
 
 // Helper function to safely convert any value to a displayable string
@@ -50,6 +51,7 @@ export const DiffDialog = ({
   onRevertAll,
   onRevertField,
   diffData,
+  choiceSetValuesMap,
 }: DiffDialogProps) => {
   const fieldsMap = useMemo(() => {
     return new Map(entity?.fields.map((f) => [f.name, f]) || []);
@@ -69,9 +71,9 @@ export const DiffDialog = ({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="h-8">Field</TableHead>
-                      <TableHead className="h-8">Original</TableHead>
-                      <TableHead className="h-8">New</TableHead>
+                      <TableHead className="h-8 w-[20%]">Field</TableHead>
+                      <TableHead className="h-8 w-[40%]">Original</TableHead>
+                      <TableHead className="h-8 w-[40%]">New</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -90,14 +92,22 @@ export const DiffDialog = ({
                           </TableCell>
                           <TableCell className="py-2 text-muted-foreground">
                             {field
-                              ? getFieldValue(originalValue, field)
+                              ? getFieldValue(
+                                  originalValue,
+                                  field,
+                                  choiceSetValuesMap,
+                                )
                               : valueToString(originalValue)}
                           </TableCell>
                           <TableCell className="py-2">
                             <div className="flex items-center justify-between gap-2">
                               <span className="font-medium">
                                 {field
-                                  ? getFieldValue(editedValue, field)
+                                  ? getFieldValue(
+                                      editedValue,
+                                      field,
+                                      choiceSetValuesMap,
+                                    )
                                   : valueToString(editedValue)}
                               </span>
                               <Button

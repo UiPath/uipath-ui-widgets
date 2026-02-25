@@ -5,8 +5,15 @@ import {
   createValueSetter,
   createCellEditorSelector,
   isFieldTypeDate,
+  isChoiceSetSingle,
+  isChoiceSetMultiple,
+  ChoiceSetValuesMap,
 } from "../fieldUtils";
-import { EntityFieldDataType, FieldMetaData } from "@uipath/uipath-typescript";
+import {
+  EntityFieldDataType,
+  FieldDisplayType,
+  FieldMetaData,
+} from "@uipath/uipath-typescript";
 import { GridRow } from "@uipath/datatable/types";
 
 describe("fieldUtils", () => {
@@ -90,6 +97,100 @@ describe("fieldUtils", () => {
 
       expect(result).toBe(null);
     });
+
+    it("should resolve ChoiceSetSingle integer value to displayName", () => {
+      const field: Partial<FieldMetaData> = {
+        isForeignKey: false,
+        fieldDisplayType: FieldDisplayType.ChoiceSetSingle,
+        choiceSetId: "cs-1",
+      };
+      const choiceSetValuesMap: ChoiceSetValuesMap = new Map([
+        [
+          "cs-1",
+          new Map([
+            [1, "High"],
+            [2, "Medium"],
+            [3, "Low"],
+          ]),
+        ],
+      ]);
+
+      const result = getFieldValue(
+        2,
+        field as FieldMetaData,
+        choiceSetValuesMap,
+      );
+
+      expect(result).toBe("Medium");
+    });
+
+    it("should return stringified value for ChoiceSetSingle when numberId not found", () => {
+      const field: Partial<FieldMetaData> = {
+        isForeignKey: false,
+        fieldDisplayType: FieldDisplayType.ChoiceSetSingle,
+        choiceSetId: "cs-1",
+      };
+      const choiceSetValuesMap: ChoiceSetValuesMap = new Map([
+        ["cs-1", new Map([[1, "High"]])],
+      ]);
+
+      const result = getFieldValue(
+        99,
+        field as FieldMetaData,
+        choiceSetValuesMap,
+      );
+
+      expect(result).toBe("99");
+    });
+
+    it("should return value as-is for ChoiceSetSingle without map", () => {
+      const field: Partial<FieldMetaData> = {
+        isForeignKey: false,
+        fieldDisplayType: FieldDisplayType.ChoiceSetSingle,
+        choiceSetId: "cs-1",
+      };
+
+      const result = getFieldValue(2, field as FieldMetaData);
+
+      expect(result).toBe(2);
+    });
+
+    it("should resolve ChoiceSetMultiple integer array to displayNames", () => {
+      const field: Partial<FieldMetaData> = {
+        isForeignKey: false,
+        fieldDisplayType: FieldDisplayType.ChoiceSetMultiple,
+        choiceSetId: "cs-2",
+      };
+      const choiceSetValuesMap: ChoiceSetValuesMap = new Map([
+        [
+          "cs-2",
+          new Map([
+            [1, "Red"],
+            [2, "Green"],
+            [3, "Blue"],
+          ]),
+        ],
+      ]);
+
+      const result = getFieldValue(
+        [1, 3],
+        field as FieldMetaData,
+        choiceSetValuesMap,
+      );
+
+      expect(result).toBe("Red, Blue");
+    });
+
+    it("should return value as-is for ChoiceSetMultiple with non-array value", () => {
+      const field: Partial<FieldMetaData> = {
+        isForeignKey: false,
+        fieldDisplayType: FieldDisplayType.ChoiceSetMultiple,
+      };
+
+      const result = getFieldValue("single value", field as FieldMetaData);
+
+      expect(result).toBe("single value");
+    });
   });
 
   describe("createValueSetter", () => {
@@ -144,9 +245,11 @@ describe("fieldUtils", () => {
         name: "category",
       };
       const entityService = {} as any;
+      const choiceSetService = {} as any;
       const cellEditorSelector = createCellEditorSelector(
         field as FieldMetaData,
         entityService,
+        choiceSetService,
       );
       const params = {
         data: { Id: "row1" },
@@ -163,15 +266,69 @@ describe("fieldUtils", () => {
       });
     });
 
+    it("should return ChoiceSetSingleCellEditor for ChoiceSetSingle fields", () => {
+      const field: Partial<FieldMetaData> = {
+        isForeignKey: false,
+        fieldDisplayType: FieldDisplayType.ChoiceSetSingle,
+        choiceSetId: "cs-1",
+      };
+      const entityService = {} as any;
+      const choiceSetService = {} as any;
+      const cellEditorSelector = createCellEditorSelector(
+        field as FieldMetaData,
+        entityService,
+        choiceSetService,
+      );
+      const params = { data: { Id: "row1" } } as any;
+
+      const result = cellEditorSelector(params);
+
+      expect(result).toBeDefined();
+      expect(result?.component).toBeDefined();
+      expect(result?.params).toEqual({
+        choiceSetService,
+        field,
+        entityRecord: params.data,
+      });
+    });
+
+    it("should return ChoiceSetMultipleCellEditor for ChoiceSetMultiple fields", () => {
+      const field: Partial<FieldMetaData> = {
+        isForeignKey: false,
+        fieldDisplayType: FieldDisplayType.ChoiceSetMultiple,
+        choiceSetId: "cs-2",
+      };
+      const entityService = {} as any;
+      const choiceSetService = {} as any;
+      const cellEditorSelector = createCellEditorSelector(
+        field as FieldMetaData,
+        entityService,
+        choiceSetService,
+      );
+      const params = { data: { Id: "row1" } } as any;
+
+      const result = cellEditorSelector(params);
+
+      expect(result).toBeDefined();
+      expect(result?.component).toBeDefined();
+      expect(result?.params).toEqual({
+        choiceSetService,
+        field,
+        entityRecord: params.data,
+      });
+    });
+
     it("should return agDateStringCellEditor for date fields", () => {
       const field: Partial<FieldMetaData> = {
         isForeignKey: false,
         fieldDataType: { name: EntityFieldDataType.DATE } as any,
       };
-      const sdk = {} as any;
+      const entityService = {} as any;
+      const choiceSetService = {} as any;
       const cellEditorSelector = createCellEditorSelector(
         field as FieldMetaData,
-        sdk,
+        entityService,
+        choiceSetService,
       );
       const params = { data: { Id: "row1" } } as any;
 
@@ -187,10 +344,12 @@ describe("fieldUtils", () => {
         isForeignKey: false,
         fieldDataType: { name: EntityFieldDataType.STRING } as any,
       };
-      const sdk = {} as any;
+      const entityService = {} as any;
+      const choiceSetService = {} as any;
       const cellEditorSelector = createCellEditorSelector(
         field as FieldMetaData,
-        sdk,
+        entityService,
+        choiceSetService,
       );
       const params = { data: { Id: "row1" } } as any;
 
@@ -229,6 +388,42 @@ describe("fieldUtils", () => {
       const result = isFieldTypeDate(field as FieldMetaData);
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe("isChoiceSetSingle", () => {
+    it("should return true for ChoiceSetSingle display type", () => {
+      const field: Partial<FieldMetaData> = {
+        fieldDisplayType: FieldDisplayType.ChoiceSetSingle,
+      };
+
+      expect(isChoiceSetSingle(field as FieldMetaData)).toBe(true);
+    });
+
+    it("should return false for non-ChoiceSetSingle display type", () => {
+      const field: Partial<FieldMetaData> = {
+        fieldDisplayType: FieldDisplayType.Basic,
+      };
+
+      expect(isChoiceSetSingle(field as FieldMetaData)).toBe(false);
+    });
+  });
+
+  describe("isChoiceSetMultiple", () => {
+    it("should return true for ChoiceSetMultiple display type", () => {
+      const field: Partial<FieldMetaData> = {
+        fieldDisplayType: FieldDisplayType.ChoiceSetMultiple,
+      };
+
+      expect(isChoiceSetMultiple(field as FieldMetaData)).toBe(true);
+    });
+
+    it("should return false for non-ChoiceSetMultiple display type", () => {
+      const field: Partial<FieldMetaData> = {
+        fieldDisplayType: FieldDisplayType.Basic,
+      };
+
+      expect(isChoiceSetMultiple(field as FieldMetaData)).toBe(false);
     });
   });
 });

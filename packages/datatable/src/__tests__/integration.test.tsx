@@ -15,12 +15,28 @@ const mockGetById = vi.fn();
 const mockGetRecordsById = vi.fn();
 
 // Mock Entities to avoid SDK validation issues
-vi.mock("@uipath/uipath-typescript/entities", () => {
+vi.mock("@uipath/uipath-typescript/entities", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@uipath/uipath-typescript/entities")>();
   return {
+    ...actual,
     Entities: class {
       getById = mockGetById;
       getRecordsById = mockGetRecordsById;
     },
+    ChoiceSets: class {
+      getById = vi.fn().mockResolvedValue({ items: [] });
+      getAll = vi.fn().mockResolvedValue([]);
+    },
+  };
+});
+
+// Mock apollo-wind Toaster to avoid sonner issues in jsdom
+vi.mock("@uipath/apollo-wind", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    Toaster: () => null,
   };
 });
 
@@ -248,19 +264,14 @@ describe("DataTable Integration Tests", () => {
 
   it("should have correct CSS classes", async () => {
     const { container } = render(
-      <DataTable
-        sdk={mockSdk as UiPath}
-        entityId="entity-1"
-        className="custom-class"
-      />,
+      <DataTable sdk={mockSdk as UiPath} entityId="entity-1" />,
     );
 
     await waitFor(() => {
       const datatableContainer = container.querySelector(
-        ".datatable-container",
+        ".uipath-datatable-container",
       );
       expect(datatableContainer).toBeInTheDocument();
-      expect(datatableContainer).toHaveClass("custom-class");
     });
   });
 
