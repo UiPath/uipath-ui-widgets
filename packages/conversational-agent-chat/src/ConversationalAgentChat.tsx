@@ -9,17 +9,17 @@ import {
 import { Alert, AlertDescription, Button } from "@uipath/apollo-wind";
 import {
   ContentPartChunkEvent,
-  ContentPartEventHelper,
-  Conversation,
+  ContentPartStream,
   ConversationalAgent,
   ConversationCreateResponse,
   ErrorStartHandlerArgs,
-  ExchangeEventHelper,
-  ExchangeWithHelpers,
-  MessageEventHelper,
-  SessionEventHelper,
+  ExchangeGetResponse,
+  ExchangeStream,
+  MessageStream,
+  SessionStream,
+  SortOrder,
   ToolCallEndEvent,
-  ToolCallEventHelper,
+  ToolCallStream,
 } from "@uipath/uipath-typescript/conversational-agent";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./ConversationalAgentChat.css";
@@ -44,32 +44,36 @@ export const ConversationalAgentChat = ({
   const agentService = useRef(new ConversationalAgent(sdk));
   const currentConversation = useRef<ConversationCreateResponse | null>(null);
   const initializedFor = useRef<string | null>(null);
-  const session = useRef<SessionEventHelper | null>(null);
-  const pastConversations = useRef<Conversation[]>([]);
+  const session = useRef<SessionStream | null>(null);
+  const pastConversations = useRef<ConversationCreateResponse[]>([]);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
+  const conversationsCursor = useRef<{ value: string } | undefined>(undefined);
   const [chatService, setChatService] = useState<AutopilotChatService>();
   const [error, setError] = useState<string | null>(null);
 
   const setupExchangeHandlers = useCallback(
-    (exchange: ExchangeEventHelper) => {
+    (exchange: ExchangeStream) => {
       if (!chatService) return;
 
       exchange.onErrorStart((error: ErrorStartHandlerArgs) => {
         console.error("[Events] Exchange error:", error);
       });
 
-      exchange.onMessageStart((message: MessageEventHelper) => {
+      exchange.onMessageStart((message: MessageStream) => {
         if (message.startEvent.role === "assistant") {
-          message.onContentPartStart((contentPart: ContentPartEventHelper) => {
+          const messageId = message.messageId;
+          const messageTimestamp = message.startEvent.timestamp;
+
+          message.onContentPartStart((contentPart: ContentPartStream) => {
             if (contentPart.startEvent.mimeType.startsWith("text/")) {
               let fullResponse = "";
 
               contentPart.onChunk((chunk: ContentPartChunkEvent) => {
                 fullResponse += chunk.data;
                 chatService.sendResponse({
-                  id: contentPart.message.messageId,
+                  id: messageId,
                   content: chunk.data,
-                  created_at: contentPart.message.startEvent.timestamp,
+                  created_at: messageTimestamp,
                   widget: MessageWidget.AI,
                   stream: true,
                   done: false,
@@ -78,9 +82,9 @@ export const ConversationalAgentChat = ({
 
               contentPart.onContentPartEnd(() => {
                 chatService.sendResponse({
-                  id: contentPart.message.messageId,
+                  id: messageId,
                   content: fullResponse,
-                  created_at: contentPart.message.startEvent.timestamp,
+                  created_at: messageTimestamp,
                   widget: MessageWidget.AI,
                   stream: false,
                   done: true,
@@ -89,7 +93,7 @@ export const ConversationalAgentChat = ({
             }
           });
 
-          message.onToolCallStart((toolCall: ToolCallEventHelper) => {
+          message.onToolCallStart((toolCall: ToolCallStream) => {
             const startEvent = toolCall.startEvent;
             const startTimeIso = new Date().toISOString();
             const toolInput = startEvent.input
@@ -136,61 +140,97 @@ export const ConversationalAgentChat = ({
       if (currentConversation.current) {
         return currentConversation.current;
       }
-      const newConversation = await agentService.current.conversations.create({
-        agentReleaseId: agentId,
+      const newConversation = await agentService.current.conversations.create(
+        agentId,
         folderId,
-      });
+      );
       currentConversation.current = newConversation;
       return newConversation;
     }, [agentId, folderId]);
 
-  const getSessionHelper =
-    useCallback(async (): Promise<SessionEventHelper> => {
-      if (session.current) {
-        return session.current;
-      }
-      const conversation = await getConversation();
-      const sessionHelper = agentService.current.events.startSession({
-        conversationId: conversation.conversationId,
-        echo: false,
+  const getSessionHelper = useCallback(async (): Promise<SessionStream> => {
+    if (session.current) {
+      return session.current;
+    }
+    const conversation = await getConversation();
+    const sessionHelper = agentService.current.conversations.startSession(
+      conversation.id,
+      { echo: false },
+    );
+    return new Promise((resolve) => {
+      sessionHelper.onSessionStarted(() => {
+        session.current = sessionHelper;
+        resolve(sessionHelper);
       });
-      return new Promise((resolve) => {
-        sessionHelper.onSessionStarted(() => {
-          session.current = sessionHelper;
-          resolve(sessionHelper);
-        });
-      });
-    }, [getConversation]);
+    });
+  }, [getConversation]);
 
   const onNewChat = useCallback(() => {
     currentConversation.current = null;
     session.current = null;
   }, []);
 
+  const onHistoryLoadMore = useCallback(async () => {
+    if (!chatService) return;
+    if (!conversationsCursor.current) {
+      chatService.appendOlderHistoryItems([], true);
+      return;
+    }
+    const result = await agentService.current.conversations.getAll({
+      sort: SortOrder.Descending,
+      pageSize: 20,
+      cursor: conversationsCursor.current,
+    });
+    conversationsCursor.current = result.nextCursor;
+    pastConversations.current = [...pastConversations.current, ...result.items];
+    chatService.appendOlderHistoryItems(
+      getConversationHistoryDisplayItems(result.items),
+      !result.hasNextPage,
+    );
+  }, [chatService]);
+
+  const onClickDeleteConversation = useCallback(
+    async (id: string) => {
+      if (!chatService) return;
+      await agentService.current.conversations.deleteById(id);
+      pastConversations.current = pastConversations.current.filter(
+        (c) => c.id !== id,
+      );
+      chatService.setHistory(
+        getConversationHistoryDisplayItems(pastConversations.current),
+      );
+      if (currentConversation.current?.id === id) {
+        onNewChat();
+      }
+    },
+    [chatService, onNewChat],
+  );
+
   const onSendMessage = useCallback(
     async (data: AutopilotChatMessage) => {
       const sessionHelper = await getSessionHelper();
       const exchange = sessionHelper.startExchange();
       setupExchangeHandlers(exchange);
-      exchange.startMessage({}, async (message) => {
-        await message.sendContentPart({
-          mimeType: "text/plain",
-          data: data.content,
-        });
-        for (const attachment of data.attachments || []) {
-          const key = createFileKey(attachment);
-          const attachmentOutput = uploadedAttachments.current.get(key);
-          if (attachmentOutput) {
-            await message.sendContentPart({
-              name: attachmentOutput.name,
-              mimeType: attachmentOutput.mimeType,
-              externalValue: {
-                uri: attachmentOutput.uri,
-              },
-            });
-          }
-        }
+      const message = exchange.startMessage({});
+      await message.sendContentPart({
+        mimeType: "text/plain",
+        data: data.content,
       });
+      for (const attachment of data.attachments || []) {
+        const key = createFileKey(attachment);
+        const attachmentOutput = uploadedAttachments.current.get(key);
+        if (attachmentOutput) {
+          const part = message.startContentPart({
+            name: attachmentOutput.name,
+            mimeType: attachmentOutput.mimeType,
+            externalValue: {
+              uri: attachmentOutput.uri,
+            },
+          });
+          part.sendContentPartEnd();
+        }
+      }
+      message.sendMessageEnd();
     },
     [getSessionHelper, setupExchangeHandlers],
   );
@@ -204,8 +244,8 @@ export const ConversationalAgentChat = ({
           const file = convertAttachmentToFile(attachment);
           const conversation = await getConversation();
           const attachmentOutput =
-            await agentService.current.conversations.attachments.upload(
-              conversation.conversationId,
+            await agentService.current.conversations.uploadAttachment(
+              conversation.id,
               file,
             );
           const key = createFileKey(attachment);
@@ -277,15 +317,13 @@ export const ConversationalAgentChat = ({
   );
 
   const fetchExchanges = useCallback(
-    async (conversationId: string): Promise<ExchangeWithHelpers[]> => {
-      const allExchanges = (
-        await agentService.current.conversations.exchanges.getAll(
-          conversationId,
-        )
-      ).items;
+    async (conversationId: string): Promise<ExchangeGetResponse[]> => {
+      const conversation =
+        await agentService.current.conversations.getById(conversationId);
+      const allExchanges = (await conversation.exchanges.getAll()).items;
       allExchanges.sort(
-        (a, b) =>
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+        (a: ExchangeGetResponse, b: ExchangeGetResponse) =>
+          new Date(a.createdTime).getTime() - new Date(b.createdTime).getTime(),
       );
       return allExchanges;
     },
@@ -299,16 +337,14 @@ export const ConversationalAgentChat = ({
       chatService.stopResponse();
       chatService.clearError();
       const selectedConversation = pastConversations.current.find(
-        (c) => c.conversationId === id,
+        (c) => c.id === id,
       );
       if (!selectedConversation) return;
 
       currentConversation.current = selectedConversation;
       session.current = null;
 
-      const allExchanges = await fetchExchanges(
-        selectedConversation.conversationId,
-      );
+      const allExchanges = await fetchExchanges(selectedConversation.id);
       chatService.setConversation(mapExchangesToChatMessages(allExchanges));
     },
     [chatService, fetchExchanges],
@@ -319,9 +355,9 @@ export const ConversationalAgentChat = ({
     try {
       initializedFor.current = initKey;
 
-      const agentRelease = await agentService.current.agents.getById(
-        folderId,
+      const agentRelease = await agentService.current.getById(
         agentId,
+        folderId,
       );
       const chatServiceInstance = AutopilotChatService.Instantiate({
         config: {
@@ -343,6 +379,7 @@ export const ConversationalAgentChat = ({
             footerDisclaimer:
               "Agent can make mistakes. Please double check the responses.",
           },
+          paginatedHistory: true,
           disabledFeatures: {
             fullScreen: true,
             preview: true,
@@ -380,11 +417,15 @@ export const ConversationalAgentChat = ({
 
     const registerEvents = async () => {
       try {
-        pastConversations.current = (
-          await agentService.current.conversations.getAll()
-        ).items;
+        const result = await agentService.current.conversations.getAll({
+          sort: SortOrder.Descending,
+          pageSize: 20,
+        });
+        conversationsCursor.current = result.nextCursor;
+        pastConversations.current = result.items;
         chatService.setHistory(
           getConversationHistoryDisplayItems(pastConversations.current),
+          !result.hasNextPage,
         );
         chatService.on(AutopilotChatEvent.NewChat, onNewChat);
         chatService.on(AutopilotChatEvent.Request, onSendMessage);
@@ -393,6 +434,11 @@ export const ConversationalAgentChat = ({
           AutopilotChatEvent.OpenConversation,
           onClickOpenConversation,
         );
+        chatService.on(
+          AutopilotChatEvent.DeleteConversation,
+          onClickDeleteConversation,
+        );
+        chatService.on(AutopilotChatEvent.HistoryLoadMore, onHistoryLoadMore);
       } catch (err) {
         const message =
           err instanceof Error
@@ -405,7 +451,9 @@ export const ConversationalAgentChat = ({
     registerEvents();
   }, [
     chatService,
+    onClickDeleteConversation,
     onClickOpenConversation,
+    onHistoryLoadMore,
     onNewChat,
     onSendMessage,
     onSetAttachments,

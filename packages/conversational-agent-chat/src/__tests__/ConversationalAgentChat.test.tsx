@@ -17,6 +17,7 @@ const createMockChatService = () => ({
   setConversation: vi.fn(),
   stopResponse: vi.fn(),
   clearError: vi.fn(),
+  appendOlderHistoryItems: vi.fn(),
 });
 
 let mockChatService = createMockChatService();
@@ -35,6 +36,8 @@ vi.mock("@uipath/apollo-react/material/components", () => ({
     Request: "request",
     SetAttachments: "setAttachments",
     OpenConversation: "openConversation",
+    DeleteConversation: "deleteConversation",
+    HistoryLoadMore: "historyLoadMore",
   },
   AutopilotChatService: {
     Instantiate: vi.fn(() => mockChatService),
@@ -49,40 +52,48 @@ let toolCallStartHandler: any = null;
 let chunkHandler: any = null;
 let contentPartEndHandler: any = null;
 let toolCallEndHandler: any = null;
-let startMessageCallback: any = null;
 
 // Prevent lint errors for handler variables that are assigned inside mocks
 void contentPartStartHandler;
 void toolCallStartHandler;
 
+// Imperative message builder mock
+let mockMessageBuilder: any = {
+  sendContentPart: vi.fn().mockResolvedValue(undefined),
+  startContentPart: vi.fn().mockReturnValue({
+    sendContentPartEnd: vi.fn(),
+  }),
+  sendMessageEnd: vi.fn(),
+};
+
 vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
   const mockConversations = [
     {
-      conversationId: "conv-1",
+      id: "conv-1",
       label: "First Chat",
-      lastActivityAt: "2024-01-01T10:00:00Z",
+      lastActivityTime: "2024-01-01T10:00:00Z",
     },
     {
-      conversationId: "conv-2",
+      id: "conv-2",
       label: "Second Chat",
-      lastActivityAt: "2024-01-02T10:00:00Z",
+      lastActivityTime: "2024-01-02T10:00:00Z",
     },
   ];
   const mockExch = [
     {
       exchangeId: "exc-1",
-      createdAt: "2024-01-01T10:00:00Z",
+      createdTime: "2024-01-01T10:00:00Z",
       messages: [
         {
           messageId: "msg-1",
           role: "user",
-          createdAt: "2024-01-01T10:00:00Z",
+          createdTime: "2024-01-01T10:00:00Z",
           contentParts: [],
         },
         {
           messageId: "msg-2",
           role: "assistant",
-          createdAt: "2024-01-01T10:00:01Z",
+          createdTime: "2024-01-01T10:00:01Z",
           contentParts: [],
         },
       ],
@@ -91,33 +102,35 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
 
   return {
     ConversationalAgent: class {
+      getById = vi.fn().mockResolvedValue({
+        name: "Test Agent",
+        appearance: {
+          welcomeTitle: "Welcome to Test Agent",
+          welcomeDescription: "This is a test agent",
+          startingPrompts: [
+            { displayPrompt: "Test Prompt", actualPrompt: "test" },
+          ],
+        },
+      });
+
       conversations = {
-        create: vi.fn().mockResolvedValue({ conversationId: "conv-123" }),
-        getAll: vi.fn().mockResolvedValue({ items: mockConversations }),
-        attachments: {
-          upload: vi.fn().mockResolvedValue({
-            uri: "file://test.txt",
-            name: "test.txt",
-            mimeType: "text/plain",
-          }),
-        },
-        exchanges: {
-          getAll: vi.fn().mockResolvedValue({ items: mockExch }),
-        },
-      };
-      agents = {
+        create: vi.fn().mockResolvedValue({ id: "conv-123" }),
+        getAll: vi.fn().mockResolvedValue({
+          items: mockConversations,
+          nextCursor: { value: "cursor-1" },
+          hasNextPage: true,
+        }),
         getById: vi.fn().mockResolvedValue({
-          name: "Test Agent",
-          appearance: {
-            welcomeTitle: "Welcome to Test Agent",
-            welcomeDescription: "This is a test agent",
-            startingPrompts: [
-              { displayPrompt: "Test Prompt", actualPrompt: "test" },
-            ],
+          exchanges: {
+            getAll: vi.fn().mockResolvedValue({ items: mockExch }),
           },
         }),
-      };
-      events = {
+        uploadAttachment: vi.fn().mockResolvedValue({
+          uri: "file://test.txt",
+          name: "test.txt",
+          mimeType: "text/plain",
+        }),
+        deleteById: vi.fn().mockResolvedValue(undefined),
         startSession: vi.fn().mockImplementation(() => {
           const sessionHelper = {
             onSessionStarted: vi.fn((callback: any) => {
@@ -131,20 +144,14 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
               onMessageStart: vi.fn((handler: any) => {
                 messageStartHandler = handler;
               }),
-              startMessage: vi.fn((opts: any, callback: any) => {
-                startMessageCallback = callback;
-              }),
+              startMessage: vi.fn(() => mockMessageBuilder),
             })),
           };
           return sessionHelper;
         }),
       };
     },
-    ContentPartEventHelper: vi.fn(),
-    ExchangeEventHelper: vi.fn(),
-    MessageEventHelper: vi.fn(),
-    SessionEventHelper: vi.fn(),
-    ToolCallEventHelper: vi.fn(),
+    SortOrder: { Descending: "descending", Ascending: "ascending" },
   };
 });
 
@@ -155,6 +162,20 @@ describe("ConversationalAgentChat", () => {
     vi.clearAllMocks();
     mockSdk = {} as any;
     mockChatService = createMockChatService();
+    mockMessageBuilder = {
+      sendContentPart: vi.fn().mockResolvedValue(undefined),
+      startContentPart: vi.fn().mockReturnValue({
+        sendContentPartEnd: vi.fn(),
+      }),
+      sendMessageEnd: vi.fn(),
+    };
+    exchangeErrorHandler = null;
+    messageStartHandler = null;
+    contentPartStartHandler = null;
+    toolCallStartHandler = null;
+    chunkHandler = null;
+    contentPartEndHandler = null;
+    toolCallEndHandler = null;
   });
 
   const defaultProps = {
@@ -184,7 +205,6 @@ describe("ConversationalAgentChat", () => {
   it("should fetch agent details on mount", async () => {
     render(<ConversationalAgentChat {...defaultProps} />);
 
-    // Verify that the component renders successfully after fetching agent details
     await waitFor(
       () => {
         expect(screen.getByTestId("ap-chat")).toBeInTheDocument();
@@ -206,6 +226,7 @@ describe("ConversationalAgentChat", () => {
           expect.objectContaining({
             config: expect.objectContaining({
               mode: "embedded",
+              paginatedHistory: true,
               firstRunExperience: expect.objectContaining({
                 title: "Welcome to Test Agent",
                 description: "This is a test agent",
@@ -221,7 +242,6 @@ describe("ConversationalAgentChat", () => {
   it("should handle agent without custom appearance", async () => {
     render(<ConversationalAgentChat {...defaultProps} />);
 
-    // Should still initialize and render successfully
     await waitFor(
       () => {
         expect(screen.getByTestId("ap-chat")).toBeInTheDocument();
@@ -234,7 +254,6 @@ describe("ConversationalAgentChat", () => {
   it("should register event handlers on chat service", async () => {
     render(<ConversationalAgentChat {...defaultProps} />);
 
-    // Verify chat service is initialized and opened
     await waitFor(
       () => {
         expect(screen.getByTestId("ap-chat")).toBeInTheDocument();
@@ -332,9 +351,6 @@ describe("ConversationalAgentChat", () => {
       },
       { timeout: 3000 },
     );
-
-    // ApChat is mocked to render when chatServiceInstance is truthy
-    // The actual props (locale="en", theme="light") are passed in the real implementation
   });
 
   it("should only initialize once", async () => {
@@ -347,7 +363,6 @@ describe("ConversationalAgentChat", () => {
       { timeout: 3000 },
     );
 
-    // Chat should be initialized and ready
     expect(screen.getByTestId("ap-chat")).toBeInTheDocument();
   });
 
@@ -363,18 +378,35 @@ describe("ConversationalAgentChat", () => {
 
     rerender(<ConversationalAgentChat {...defaultProps} agentId={2} />);
 
-    // Note: In the current implementation, changing props doesn't reinitialize
-    // This test documents current behavior
     expect(screen.getByTestId("ap-chat")).toBeInTheDocument();
   });
 
   it("should create ConversationalAgent with provided SDK", async () => {
     render(<ConversationalAgentChat {...defaultProps} />);
 
-    // Should initialize successfully with the provided SDK
     await waitFor(
       () => {
         expect(screen.getByTestId("ap-chat")).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it("should enable paginatedHistory in config", async () => {
+    const { AutopilotChatService } =
+      await import("@uipath/apollo-react/material/components");
+
+    render(<ConversationalAgentChat {...defaultProps} />);
+
+    await waitFor(
+      () => {
+        expect(AutopilotChatService.Instantiate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            config: expect.objectContaining({
+              paginatedHistory: true,
+            }),
+          }),
+        );
       },
       { timeout: 3000 },
     );
@@ -408,16 +440,13 @@ describe("ConversationalAgentChat", () => {
         { timeout: 3000 },
       );
 
-      // Get the onClickOpenConversation handler
       const openConversationCall = mockChatService.on.mock.calls.find(
         (call: any) => call[0] === "openConversation",
       );
       const onClickOpenConversation = openConversationCall?.[1];
 
-      // Simulate clicking on a conversation
       await onClickOpenConversation?.("conv-1");
 
-      // Verify setConversation was called (which means exchanges were fetched)
       expect(mockChatService.setConversation).toHaveBeenCalled();
     });
 
@@ -486,13 +515,10 @@ describe("ConversationalAgentChat", () => {
       );
       const onClickOpenConversation = openConversationCall?.[1];
 
-      // Clear previous calls
       mockChatService.setConversation.mockClear();
 
-      // Try to open a non-existent conversation
       await onClickOpenConversation?.("non-existent-conv");
 
-      // setConversation should not be called for non-existent conversation
       expect(mockChatService.setConversation).not.toHaveBeenCalled();
     });
 
@@ -502,6 +528,20 @@ describe("ConversationalAgentChat", () => {
       await waitFor(
         () => {
           expect(mockChatService.setHistory).toHaveBeenCalled();
+        },
+        { timeout: 3000 },
+      );
+    });
+
+    it("should pass done flag to setHistory based on hasNextPage", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.setHistory).toHaveBeenCalledWith(
+            expect.any(Array),
+            false,
+          );
         },
         { timeout: 3000 },
       );
@@ -579,8 +619,40 @@ describe("ConversationalAgentChat", () => {
       );
       const onSendMessage = requestCall?.[1];
 
-      // Trigger send message
       await onSendMessage?.({ content: "Hello", attachments: [] });
+
+      // Verify sendContentPart was called with the text content
+      await waitFor(() => {
+        expect(mockMessageBuilder.sendContentPart).toHaveBeenCalledWith({
+          mimeType: "text/plain",
+          data: "Hello",
+        });
+      });
+    });
+
+    it("should call sendMessageEnd after sending content", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const requestCall = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      );
+      const onSendMessage = requestCall?.[1];
+
+      await onSendMessage?.({ content: "Hello", attachments: [] });
+
+      await waitFor(() => {
+        expect(mockMessageBuilder.sendMessageEnd).toHaveBeenCalled();
+      });
     });
 
     it("should send message with attachments", async () => {
@@ -607,7 +679,6 @@ describe("ConversationalAgentChat", () => {
         content: { text: "test content", binary: null, base64: null },
       };
 
-      // Trigger send message with attachment
       await onSendMessage?.({
         content: "Hello with attachment",
         attachments: [mockAttachment],
@@ -648,10 +719,8 @@ describe("ConversationalAgentChat", () => {
       );
       const onSetAttachments = setAttachmentsCall?.[1];
 
-      // Trigger with empty attachments
       await onSetAttachments?.({ added: [] });
 
-      // setAttachmentsLoading should not be called for empty attachments
       expect(mockChatService.setAttachmentsLoading).not.toHaveBeenCalled();
     });
 
@@ -679,10 +748,8 @@ describe("ConversationalAgentChat", () => {
         content: { text: null, binary: [116, 101, 115, 116], base64: null },
       };
 
-      // Trigger with new attachment
       await onSetAttachments?.({ added: [mockAttachment] });
 
-      // setAttachmentsLoading should be called
       expect(mockChatService.setAttachmentsLoading).toHaveBeenCalled();
     });
 
@@ -865,10 +932,6 @@ describe("ConversationalAgentChat", () => {
       if (messageStartHandler) {
         const mockContentPart = {
           startEvent: { mimeType: "text/plain" },
-          message: {
-            messageId: "msg-1",
-            startEvent: { timestamp: "2024-01-01T10:00:00Z" },
-          },
           onChunk: vi.fn((handler: any) => {
             chunkHandler = handler;
           }),
@@ -877,7 +940,11 @@ describe("ConversationalAgentChat", () => {
           }),
         };
         const mockMessage = {
-          startEvent: { role: "assistant" },
+          messageId: "msg-1",
+          startEvent: {
+            role: "assistant",
+            timestamp: "2024-01-01T10:00:00Z",
+          },
           onContentPartStart: vi.fn((handler: any) => {
             contentPartStartHandler = handler;
             handler(mockContentPart);
@@ -932,7 +999,11 @@ describe("ConversationalAgentChat", () => {
           }),
         };
         const mockMessage = {
-          startEvent: { role: "assistant" },
+          messageId: "msg-1",
+          startEvent: {
+            role: "assistant",
+            timestamp: "2024-01-01T10:00:00Z",
+          },
           onContentPartStart: vi.fn(),
           onToolCallStart: vi.fn((handler: any) => {
             toolCallStartHandler = handler;
@@ -977,7 +1048,11 @@ describe("ConversationalAgentChat", () => {
           onToolCallEnd: vi.fn(),
         };
         const mockMessage = {
-          startEvent: { role: "assistant" },
+          messageId: "msg-1",
+          startEvent: {
+            role: "assistant",
+            timestamp: "2024-01-01T10:00:00Z",
+          },
           onContentPartStart: vi.fn(),
           onToolCallStart: vi.fn((handler: any) => handler(mockToolCall)),
         };
@@ -1009,7 +1084,8 @@ describe("ConversationalAgentChat", () => {
 
       if (messageStartHandler) {
         const mockMessage = {
-          startEvent: { role: "user" },
+          messageId: "msg-1",
+          startEvent: { role: "user", timestamp: "2024-01-01T10:00:00Z" },
           onContentPartStart: vi.fn(),
           onToolCallStart: vi.fn(),
         };
@@ -1049,7 +1125,11 @@ describe("ConversationalAgentChat", () => {
           onContentPartEnd: vi.fn(),
         };
         const mockMessage = {
-          startEvent: { role: "assistant" },
+          messageId: "msg-1",
+          startEvent: {
+            role: "assistant",
+            timestamp: "2024-01-01T10:00:00Z",
+          },
           onContentPartStart: vi.fn((handler: any) => handler(mockContentPart)),
           onToolCallStart: vi.fn(),
         };
@@ -1104,19 +1184,25 @@ describe("ConversationalAgentChat", () => {
         attachments: [mockAttachment],
       });
 
-      // startMessage callback should have been set
-      expect(startMessageCallback).toBeDefined();
+      // Verify sendContentPart was called with text content
+      await waitFor(() => {
+        expect(mockMessageBuilder.sendContentPart).toHaveBeenCalledWith({
+          mimeType: "text/plain",
+          data: "Check this file",
+        });
+      });
 
-      // Execute the startMessage callback to cover attachment sending
-      if (startMessageCallback) {
-        const mockMessageBuilder = {
-          sendContentPart: vi.fn().mockResolvedValue(undefined),
-        };
-        await startMessageCallback(mockMessageBuilder);
+      // Verify startContentPart was called for the attachment
+      expect(mockMessageBuilder.startContentPart).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "test.txt",
+          mimeType: "text/plain",
+          externalValue: { uri: "file://test.txt" },
+        }),
+      );
 
-        // Should have sent text content and attachment
-        expect(mockMessageBuilder.sendContentPart).toHaveBeenCalledTimes(2);
-      }
+      // Verify sendMessageEnd was called
+      expect(mockMessageBuilder.sendMessageEnd).toHaveBeenCalled();
     });
 
     it("should skip attachments that were not uploaded", async () => {
@@ -1149,15 +1235,18 @@ describe("ConversationalAgentChat", () => {
         attachments: [unknownAttachment],
       });
 
-      if (startMessageCallback) {
-        const mockMessageBuilder = {
-          sendContentPart: vi.fn().mockResolvedValue(undefined),
-        };
-        await startMessageCallback(mockMessageBuilder);
+      await waitFor(() => {
+        expect(mockMessageBuilder.sendContentPart).toHaveBeenCalledWith({
+          mimeType: "text/plain",
+          data: "With unknown attachment",
+        });
+      });
 
-        // Should only send text content (attachment not in uploadedAttachments)
-        expect(mockMessageBuilder.sendContentPart).toHaveBeenCalledTimes(1);
-      }
+      // startContentPart should not be called for unknown attachment
+      expect(mockMessageBuilder.startContentPart).not.toHaveBeenCalled();
+
+      // sendMessageEnd should still be called
+      expect(mockMessageBuilder.sendMessageEnd).toHaveBeenCalled();
     });
   });
 
@@ -1190,41 +1279,127 @@ describe("ConversationalAgentChat", () => {
     });
   });
 
-  describe("agent without appearance", () => {
-    it("should use default welcome title when appearance is missing", async () => {
-      // Import to get reference to mock
-      const { ConversationalAgent } =
-        await import("@uipath/uipath-typescript/conversational-agent");
-
-      // Create a new instance and override getById
-      const mockInstance = new ConversationalAgent({} as any);
-      mockInstance.agents.getById = vi.fn().mockResolvedValue({
-        name: "Test Agent",
-        appearance: null,
-      });
-
+  describe("onClickDeleteConversation", () => {
+    it("should register DeleteConversation event handler", async () => {
       render(<ConversationalAgentChat {...defaultProps} />);
 
       await waitFor(
         () => {
-          expect(screen.getByTestId("ap-chat")).toBeInTheDocument();
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "deleteConversation",
+            expect.any(Function),
+          );
         },
         { timeout: 3000 },
       );
     });
 
-    it("should use default values when startingPrompts is empty", async () => {
-      const { AutopilotChatService } =
-        await import("@uipath/apollo-react/material/components");
-
+    it("should delete conversation and update history", async () => {
       render(<ConversationalAgentChat {...defaultProps} />);
 
       await waitFor(
         () => {
-          expect(AutopilotChatService.Instantiate).toHaveBeenCalled();
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "deleteConversation",
+            expect.any(Function),
+          );
         },
         { timeout: 3000 },
       );
+
+      const deleteConversationCall = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "deleteConversation",
+      );
+      const onClickDeleteConversation = deleteConversationCall?.[1];
+
+      mockChatService.setHistory.mockClear();
+
+      await onClickDeleteConversation?.("conv-1");
+
+      // setHistory should be called to update the list
+      expect(mockChatService.setHistory).toHaveBeenCalled();
+    });
+
+    it("should reset current conversation if deleted conversation is active", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "openConversation",
+            expect.any(Function),
+          );
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "deleteConversation",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      // First open a conversation to set it as current
+      const openConversationCall = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "openConversation",
+      );
+      const onClickOpenConversation = openConversationCall?.[1];
+      await onClickOpenConversation?.("conv-1");
+
+      // Now delete that active conversation
+      const deleteConversationCall = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "deleteConversation",
+      );
+      const onClickDeleteConversation = deleteConversationCall?.[1];
+      await onClickDeleteConversation?.("conv-1");
+
+      // After deleting active conversation, sending a new message should
+      // create a new conversation (no error thrown)
+      const requestCall = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      );
+      const onSendMessage = requestCall?.[1];
+      await onSendMessage?.({
+        content: "New message after delete",
+        attachments: [],
+      });
+    });
+  });
+
+  describe("onHistoryLoadMore", () => {
+    it("should register HistoryLoadMore event handler", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "historyLoadMore",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+    });
+
+    it("should load more conversations when triggered", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "historyLoadMore",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const historyLoadMoreCall = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "historyLoadMore",
+      );
+      const onHistoryLoadMore = historyLoadMoreCall?.[1];
+
+      await onHistoryLoadMore?.();
+
+      expect(mockChatService.appendOlderHistoryItems).toHaveBeenCalled();
     });
   });
 
@@ -1233,12 +1408,11 @@ describe("ConversationalAgentChat", () => {
       const { ConversationalAgent } =
         await import("@uipath/uipath-typescript/conversational-agent");
       const mockInstance = new ConversationalAgent({} as any);
-      mockInstance.agents.getById = vi
+      mockInstance.getById = vi
         .fn()
         .mockRejectedValue(new Error("Network error"));
 
-      // Need to re-mock to use the failing instance
-      vi.spyOn(mockInstance.agents, "getById").mockRejectedValue(
+      vi.spyOn(mockInstance, "getById").mockRejectedValue(
         new Error("Network error"),
       );
 

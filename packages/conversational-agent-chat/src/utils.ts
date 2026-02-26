@@ -8,8 +8,8 @@ import {
 import {
   CompletedContentPart,
   ContentPartHelper,
-  Conversation,
-  ExchangeWithHelpers,
+  ExchangeGetResponse,
+  RawConversationGetResponse,
 } from "@uipath/uipath-typescript/conversational-agent";
 import { MessageWidget } from "./types";
 
@@ -61,20 +61,20 @@ export const convertAttachmentToFile = (
 };
 
 export const getConversationHistoryDisplayItems = (
-  conversations: Conversation[],
+  conversations: RawConversationGetResponse[],
 ) => {
   return conversations.map((conversation) => {
     return {
-      id: conversation.conversationId,
+      id: conversation.id,
       name: conversation.label || `New chat`,
-      timestamp: new Date(conversation.lastActivityAt).toISOString(),
+      timestamp: new Date(conversation.lastActivityTime).toISOString(),
     };
   });
 };
 
 const isCompletedContentPart = (
   cp: ContentPartHelper | CompletedContentPart,
-): cp is CompletedContentPart => !("createdAt" in cp);
+): cp is CompletedContentPart => !("createdTime" in cp);
 
 const isExternalValue = (
   data: any,
@@ -184,7 +184,7 @@ const mapContentPartsToChatContentPartsAndAttachments = (
 };
 
 export const mapExchangesToChatMessages = (
-  exchanges: ExchangeWithHelpers[],
+  exchanges: ExchangeGetResponse[],
 ): AutopilotChatMessage[] =>
   exchanges.flatMap((exchange) =>
     exchange.messages.flatMap((message) => {
@@ -203,7 +203,7 @@ export const mapExchangesToChatMessages = (
         content: "",
         contentParts: chatContentParts,
         attachments: chatAttachments,
-        created_at: message.createdAt,
+        created_at: message.createdTime,
         role,
         widget:
           message.role === "user" ? MessageWidget.Human : MessageWidget.AI,
@@ -218,13 +218,13 @@ export const mapExchangesToChatMessages = (
         id: toolCall.toolCallId,
         groupId: `${exchange.exchangeId}-${AutopilotChatRole.Assistant}`,
         content: `Performing ${toolCall.name}`,
-        created_at: toolCall.createdAt,
+        created_at: toolCall.createdTime,
         role: AutopilotChatRole.Assistant,
         widget: MessageWidget.ApolloAgentsToolCall,
         meta: {
           toolName: toolCall.name,
           input: toolCall.input,
-          startTime: toolCall.createdAt,
+          startTime: toolCall.createdTime,
           output: toolCall.result?.output,
           endTime: toolCall.result?.timestamp,
           isError: toolCall.result?.isError,
