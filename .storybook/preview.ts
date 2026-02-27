@@ -79,8 +79,8 @@ window.fetch = async (
     );
   }
 
-  // Mock all other UiPath API calls to prevent errors
-  if (url.includes("mock.uipath.com") || url.includes("uipath.com")) {
+  // Mock all other mock.uipath.com API calls to prevent errors
+  if (url.includes("mock.uipath.com")) {
     return new Response(JSON.stringify({}), {
       status: 200,
       headers: { "Content-Type": "application/json" },
