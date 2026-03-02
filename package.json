@@ -5,7 +5,8 @@
   "type": "module",
   "workspaces": [
     "packages/multi-file-upload",
-    "packages/datatable"
+    "packages/datatable",
+    "packages/conversational-agent-chat"
   ],
   "scripts": {
     "dev": "vite",

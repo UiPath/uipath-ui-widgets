@@ -13,7 +13,10 @@ function getAbsolutePath(value: string) {
 }
 
 const config: StorybookConfig = {
-  stories: ["../packages/multi-file-upload/src/*.stories.tsx"],
+  stories: [
+    "../packages/multi-file-upload/src/*.stories.tsx",
+    "../packages/conversational-agent-chat/src/*.stories.tsx",
+  ],
   addons: [getAbsolutePath("@storybook/addon-docs")],
   framework: getAbsolutePath("@storybook/react-vite"),
   viteFinal(config) {

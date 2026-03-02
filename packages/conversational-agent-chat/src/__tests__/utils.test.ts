@@ -295,14 +295,14 @@ describe("utils", () => {
     it("should map conversations to display items", () => {
       const conversations = [
         {
-          conversationId: "conv-1",
+          id: "conv-1",
           label: "First Chat",
-          lastActivityAt: "2024-01-01T10:00:00Z",
+          lastActivityTime: "2024-01-01T10:00:00Z",
         },
         {
-          conversationId: "conv-2",
+          id: "conv-2",
           label: "Second Chat",
-          lastActivityAt: "2024-01-02T10:00:00Z",
+          lastActivityTime: "2024-01-02T10:00:00Z",
         },
       ] as any;
 
@@ -325,14 +325,14 @@ describe("utils", () => {
     it("should use default name when label is missing", () => {
       const conversations = [
         {
-          conversationId: "conv-1",
+          id: "conv-1",
           label: null,
-          lastActivityAt: "2024-01-01T10:00:00Z",
+          lastActivityTime: "2024-01-01T10:00:00Z",
         },
         {
-          conversationId: "conv-2",
+          id: "conv-2",
           label: "",
-          lastActivityAt: "2024-01-02T10:00:00Z",
+          lastActivityTime: "2024-01-02T10:00:00Z",
         },
       ] as any;
 
@@ -350,9 +350,9 @@ describe("utils", () => {
     it("should preserve conversation ID as string", () => {
       const conversations = [
         {
-          conversationId: "abc-123",
+          id: "abc-123",
           label: "Test",
-          lastActivityAt: "2024-01-01T10:00:00Z",
+          lastActivityTime: "2024-01-01T10:00:00Z",
         },
       ] as any;
 
@@ -430,14 +430,14 @@ describe("utils", () => {
             {
               messageId: "msg-1",
               role: "assistant",
-              createdAt: "2024-01-01T10:00:00Z",
+              createdTime: "2024-01-01T10:00:00Z",
               contentParts: [],
               toolCalls: [
                 {
                   toolCallId: "tc-1",
                   name: "search",
                   input: { query: "test" },
-                  createdAt: "2024-01-01T10:00:01Z",
+                  createdTime: "2024-01-01T10:00:01Z",
                   result: {
                     output: "Found results",
                     timestamp: "2024-01-01T10:00:02Z",
@@ -465,6 +465,7 @@ describe("utils", () => {
         isError: false,
         exchangeId: "exc-1",
       });
+      expect(result[1].created_at).toBe("2024-01-01T10:00:01Z");
     });
 
     it("should handle multiple exchanges", () => {
@@ -582,21 +583,21 @@ describe("utils", () => {
             {
               messageId: "msg-1",
               role: "assistant",
-              createdAt: "2024-01-01T10:00:00Z",
+              createdTime: "2024-01-01T10:00:00Z",
               contentParts: [
                 {
                   contentPartId: "cp-1",
                   mimeType: "text/plain",
                   data: { inline: "Hello " },
                   citations: [],
-                  createdAt: "2024-01-01T10:00:00Z",
+                  createdTime: "2024-01-01T10:00:00Z",
                 },
                 {
                   contentPartId: "cp-2",
                   mimeType: "text/plain",
                   data: { inline: "World" },
                   citations: [],
-                  createdAt: "2024-01-01T10:00:00Z",
+                  createdTime: "2024-01-01T10:00:00Z",
                 },
               ],
             },
@@ -617,7 +618,7 @@ describe("utils", () => {
             {
               messageId: "msg-1",
               role: "assistant",
-              createdAt: "2024-01-01T10:00:00Z",
+              createdTime: "2024-01-01T10:00:00Z",
               contentParts: [
                 {
                   contentPartId: "cp-1",
@@ -636,7 +637,7 @@ describe("utils", () => {
                       ],
                     },
                   ],
-                  createdAt: "2024-01-01T10:00:00Z",
+                  createdTime: "2024-01-01T10:00:00Z",
                 },
               ],
             },
@@ -669,7 +670,7 @@ describe("utils", () => {
             {
               messageId: "msg-1",
               role: "user",
-              createdAt: "2024-01-01T10:00:00Z",
+              createdTime: "2024-01-01T10:00:00Z",
               contentParts: [
                 {
                   contentPartId: "cp-1",
@@ -677,7 +678,7 @@ describe("utils", () => {
                   name: "document.pdf",
                   data: { uri: "https://example.com/doc.pdf", byteCount: 1024 },
                   citations: [],
-                  createdAt: "2024-01-01T10:00:00Z",
+                  createdTime: "2024-01-01T10:00:00Z",
                 },
               ],
             },
