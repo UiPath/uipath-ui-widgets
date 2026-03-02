@@ -12,7 +12,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: "ci-${{ github.ref }}"
+  group: "ci-test-${{ github.ref }}"
   cancel-in-progress: true
 
 jobs:
