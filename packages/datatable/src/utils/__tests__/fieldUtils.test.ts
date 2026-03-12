@@ -8,13 +8,14 @@ import {
   isChoiceSetSingle,
   isChoiceSetMultiple,
   ChoiceSetValuesMap,
+  getMimeType,
 } from "../fieldUtils";
 import {
   EntityFieldDataType,
   FieldDisplayType,
   FieldMetaData,
 } from "@uipath/uipath-typescript";
-import { GridRow } from "@uipath/datatable/types";
+import { GridRow } from "../../types";
 
 describe("fieldUtils", () => {
   describe("getFieldValue", () => {
@@ -197,7 +198,7 @@ describe("fieldUtils", () => {
     it("should create a value setter that updates field value", () => {
       const fieldName = "name";
       const valueSetter = createValueSetter(fieldName);
-      const data: GridRow = { Id: "row1", name: "Old Name" };
+      const data: GridRow = { Id: "row1", name: "Old Name", id: "row1" };
       const params = {
         data,
         newValue: "New Name",
@@ -382,7 +383,7 @@ describe("fieldUtils", () => {
 
     it("should return false for NUMBER field type", () => {
       const field: Partial<FieldMetaData> = {
-        fieldDataType: { name: EntityFieldDataType.NUMBER } as any,
+        fieldDataType: { name: EntityFieldDataType.INTEGER } as any,
       };
 
       const result = isFieldTypeDate(field as FieldMetaData);
@@ -424,6 +425,64 @@ describe("fieldUtils", () => {
       };
 
       expect(isChoiceSetMultiple(field as FieldMetaData)).toBe(false);
+    });
+  });
+
+  describe("getMimeType", () => {
+    it("should return correct mime type for pdf", () => {
+      expect(getMimeType("report.pdf")).toBe("application/pdf");
+    });
+
+    it("should return correct mime type for png", () => {
+      expect(getMimeType("image.png")).toBe("image/png");
+    });
+
+    it("should return correct mime type for jpg", () => {
+      expect(getMimeType("photo.jpg")).toBe("image/jpeg");
+    });
+
+    it("should return correct mime type for jpeg", () => {
+      expect(getMimeType("photo.jpeg")).toBe("image/jpeg");
+    });
+
+    it("should return correct mime type for csv", () => {
+      expect(getMimeType("data.csv")).toBe("text/csv");
+    });
+
+    it("should return correct mime type for json", () => {
+      expect(getMimeType("config.json")).toBe("application/json");
+    });
+
+    it("should return correct mime type for mp4", () => {
+      expect(getMimeType("video.mp4")).toBe("video/mp4");
+    });
+
+    it("should return correct mime type for mp3", () => {
+      expect(getMimeType("audio.mp3")).toBe("audio/mpeg");
+    });
+
+    it("should return octet-stream for unknown extensions", () => {
+      expect(getMimeType("file.xyz")).toBe("application/octet-stream");
+    });
+
+    it("should return octet-stream for files with no extension", () => {
+      expect(getMimeType("README")).toBe("application/octet-stream");
+    });
+
+    it("should handle uppercase extensions", () => {
+      expect(getMimeType("FILE.PDF")).toBe("application/pdf");
+    });
+
+    it("should handle mixed case extensions", () => {
+      expect(getMimeType("image.Png")).toBe("image/png");
+    });
+
+    it("should handle files with multiple dots", () => {
+      expect(getMimeType("my.report.final.pdf")).toBe("application/pdf");
+    });
+
+    it("should return octet-stream for empty string", () => {
+      expect(getMimeType("")).toBe("application/octet-stream");
     });
   });
 });

@@ -96,3 +96,34 @@ export const isChoiceSetSingle = (field: FieldMetaData): boolean => {
 export const isChoiceSetMultiple = (field: FieldMetaData): boolean => {
   return field.fieldDisplayType === FieldDisplayType.ChoiceSetMultiple;
 };
+
+export const isFileField = (field: FieldMetaData): boolean => {
+  return field.fieldDisplayType === FieldDisplayType.File;
+};
+
+const mimeTypes: Record<string, string> = {
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+  bmp: "image/bmp",
+  ico: "image/x-icon",
+  txt: "text/plain",
+  html: "text/html",
+  css: "text/css",
+  js: "text/javascript",
+  json: "application/json",
+  xml: "application/xml",
+  csv: "text/csv",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  mp3: "audio/mpeg",
+};
+
+export const getMimeType = (filename: string): string => {
+  const ext = filename.split(".").pop()?.toLowerCase() || "";
+  return mimeTypes[ext] || "application/octet-stream";
+};

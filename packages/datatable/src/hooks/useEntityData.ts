@@ -6,8 +6,10 @@ import {
   createCellEditorSelector,
   isChoiceSetSingle,
   isChoiceSetMultiple,
+  isFileField,
   ChoiceSetValuesMap,
 } from "../utils/fieldUtils";
+import { FileCellRenderer } from "../components/FileCellRenderer";
 import {
   ChoiceSets,
   Entities,
@@ -91,7 +93,8 @@ export const useEntityData = (
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const valueGetter = (params: any) =>
             getFieldValue(params.data?.[f.name], f, csValuesMap);
-          return {
+
+          const colDef: ColDef = {
             field: f.name,
             headerName: f.displayName,
             valueGetter: valueGetter,
@@ -104,6 +107,18 @@ export const useEntityData = (
             ),
             ...columnConfig?.[f.displayName],
           };
+
+          if (isFileField(f)) {
+            colDef.cellRenderer = FileCellRenderer;
+            colDef.cellRendererParams = {
+              entityService,
+              entityId,
+              fieldName: f.name,
+            };
+            colDef.editable = false;
+          }
+
+          return colDef;
         });
         setColumnDefs(columns);
         setOriginalColumnDefs(columns);
