@@ -18,7 +18,7 @@ vi.mock("@uipath/uipath-typescript/buckets", () => {
 });
 
 // Mock telemetryClient
-vi.mock("@uipath/uipath-typescript", () => ({
+vi.mock("@uipath/uipath-typescript/entities", () => ({
   telemetryClient: {
     track: vi.fn(),
   },

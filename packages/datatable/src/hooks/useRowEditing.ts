@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { GridRow } from "../types";
 import { deepClone, hasRowChanges } from "../utils/dataUtils";
-import { EntityGetResponse } from "@uipath/uipath-typescript";
+import { EntityGetResponse } from "@uipath/uipath-typescript/entities";
 import { CellValueChangedEvent } from "ag-grid-community";
 import { useState } from "react";
 

@@ -24,7 +24,7 @@ npm install @uipath/ui-widgets-multi-file-upload
 ```tsx
 import { MultiFileUpload } from "@uipath/ui-widgets-multi-file-upload";
 import "@uipath/ui-widgets-multi-file-upload/MultiFileUpload.css";
-import { UiPath } from "@uipath/uipath-typescript";
+import { UiPath } from "@uipath/uipath-typescript/entities";
 
 function App() {
   const sdk = new UiPath({

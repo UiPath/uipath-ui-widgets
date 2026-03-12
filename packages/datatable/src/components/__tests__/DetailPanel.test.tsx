@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { DetailPanel } from "../DetailPanel";
-import { EntityGetResponse } from "@uipath/uipath-typescript";
+import { EntityGetResponse } from "@uipath/uipath-typescript/entities";
 
 // Mock AgGridReact
 vi.mock("ag-grid-react", () => ({

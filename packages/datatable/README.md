@@ -24,7 +24,7 @@ npm install @uipath/ui-widgets-datatable
 
 ```tsx
 import { DataTable } from "@uipath/ui-widgets-datatable";
-import { UiPath } from "@uipath/uipath-typescript";
+import { UiPath } from "@uipath/uipath-typescript/entities";
 
 function App() {
   const sdk = new UiPath({

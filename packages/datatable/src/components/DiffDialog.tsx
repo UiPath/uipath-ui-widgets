@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getFieldValue, ChoiceSetValuesMap } from "../utils/fieldUtils";
-import { EntityGetResponse } from "@uipath/uipath-typescript";
+import { EntityGetResponse } from "@uipath/uipath-typescript/entities";
 import {
   Button,
   Dialog,
