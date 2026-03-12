@@ -131,6 +131,13 @@ export const ConversationalAgentChat = ({
           });
         }
       });
+
+      exchange.onExchangeEnd(() => {
+        chatService.sendOutputStreamEvent({ turnComplete: true });
+        chatService.stopResponse();
+        chatService.setShowLoading(false);
+        chatService.setWaiting(false);
+      });
     },
     [chatService],
   );
