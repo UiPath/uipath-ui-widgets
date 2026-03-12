@@ -31,6 +31,17 @@ vi.mock("@uipath/uipath-typescript/entities", async (importOriginal) => {
   };
 });
 
+// Mock telemetryClient
+vi.mock("@uipath/uipath-typescript/core", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    telemetryClient: {
+      track: vi.fn(),
+    },
+  };
+});
+
 // Mock apollo-wind Toaster to avoid sonner issues in jsdom
 vi.mock("@uipath/apollo-wind", async (importOriginal) => {
   const actual = await importOriginal<any>();
@@ -189,9 +200,9 @@ describe("DataTable Integration Tests", () => {
           { Id: "row2", name: "Item 2", status: "Inactive" },
         ],
       }),
-      update: vi.fn().mockResolvedValue(undefined),
-      insert: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockResolvedValue(undefined),
+      updateRecords: vi.fn().mockResolvedValue(undefined),
+      insertRecords: vi.fn().mockResolvedValue(undefined),
+      deleteRecords: vi.fn().mockResolvedValue(undefined),
     };
 
     // Setup mock implementations
@@ -532,7 +543,7 @@ describe("DataTable Integration Tests", () => {
     await user.click(insertButton);
 
     await waitFor(() => {
-      expect(mockEntity.insert).toHaveBeenCalled();
+      expect(mockEntity.insertRecords).toHaveBeenCalled();
     });
   });
 
@@ -601,7 +612,7 @@ describe("DataTable Integration Tests", () => {
     await user.click(commitButton);
 
     await waitFor(() => {
-      expect(mockEntity.update).toHaveBeenCalled();
+      expect(mockEntity.updateRecords).toHaveBeenCalled();
     });
   });
 
@@ -735,9 +746,9 @@ describe("DataTable Group By Tests", () => {
           },
         ],
       }),
-      update: vi.fn().mockResolvedValue(undefined),
-      insert: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn().mockResolvedValue(undefined),
+      updateRecords: vi.fn().mockResolvedValue(undefined),
+      insertRecords: vi.fn().mockResolvedValue(undefined),
+      deleteRecords: vi.fn().mockResolvedValue(undefined),
     };
 
     mockGetById.mockImplementation((id: string) => {

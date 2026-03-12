@@ -1,6 +1,6 @@
 import { GridRow } from "../types";
 import { getFieldValue, ChoiceSetValuesMap } from "../utils/fieldUtils";
-import { EntityGetResponse } from "@uipath/uipath-typescript";
+import { EntityGetResponse } from "@uipath/uipath-typescript/entities";
 import type { ColDef } from "ag-grid-community";
 import { themeQuartz } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";

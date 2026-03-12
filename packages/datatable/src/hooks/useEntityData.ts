@@ -1,15 +1,3 @@
-import { GridRow } from "../types";
-import { deepClone } from "../utils/dataUtils";
-import {
-  getFieldValue,
-  createValueSetter,
-  createCellEditorSelector,
-  isChoiceSetSingle,
-  isChoiceSetMultiple,
-  isFileField,
-  ChoiceSetValuesMap,
-} from "../utils/fieldUtils";
-import { FileCellRenderer } from "../components/FileCellRenderer";
 import {
   ChoiceSets,
   Entities,
@@ -17,6 +5,19 @@ import {
 } from "@uipath/uipath-typescript/entities";
 import { ColDef } from "ag-grid-community";
 import { useCallback, useState } from "react";
+import { FileCellRenderer } from "../components/FileCellRenderer";
+import { GridRow, TelemetryService, TelemetryStatus } from "../types";
+import { deepClone } from "../utils/dataUtils";
+import {
+  ChoiceSetValuesMap,
+  createCellEditorSelector,
+  createValueSetter,
+  getFieldValue,
+  isChoiceSetMultiple,
+  isChoiceSetSingle,
+  isFileField,
+} from "../utils/fieldUtils";
+import { trackTelemetry } from "../utils/telemetryUtils";
 import { useChoiceSetCache } from "./useChoiceSetCache";
 
 export const useEntityData = (
@@ -127,10 +128,14 @@ export const useEntityData = (
       setRowData(items);
       setOriginalData(deepClone(items));
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch entity records",
-      );
-      // Error is caught and set in state, no need to re-throw
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch entity records";
+      setError(errorMessage);
+
+      trackTelemetry(TelemetryService.EntityDataLoad, TelemetryStatus.Error, {
+        EntityId: entityId,
+        Error: errorMessage,
+      });
     }
   }, [
     entityService,

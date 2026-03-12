@@ -27,7 +27,9 @@ interface Entity {
 
 function App({ uipathSdk }: AppProps) {
   const [entities, setEntities] = useState<Entity[]>([]);
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(
+    import.meta.env.VITE_SELECTED_ENTITY_ID,
+  );
   const [loading, setLoading] = useState(true);
 
   const columnConfig = useMemo(

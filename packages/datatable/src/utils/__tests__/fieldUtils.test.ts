@@ -14,7 +14,7 @@ import {
   EntityFieldDataType,
   FieldDisplayType,
   FieldMetaData,
-} from "@uipath/uipath-typescript";
+} from "@uipath/uipath-typescript/entities";
 import { GridRow } from "../../types";
 
 describe("fieldUtils", () => {

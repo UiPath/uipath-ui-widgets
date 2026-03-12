@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Toaster } from "@uipath/apollo-wind";
+import { toast, Toaster } from "@uipath/apollo-wind";
+import { trackTelemetry } from "./utils/telemetryUtils";
 import { ChoiceSets, Entities } from "@uipath/uipath-typescript/entities";
 import type {
   ColDef,
@@ -25,9 +26,11 @@ import { useEntityData } from "./hooks/useEntityData";
 import { useEntityRecordsCache } from "./hooks/useEntityRecordsCache";
 import { useRowEditing } from "./hooks/useRowEditing";
 import type { DataTableProps } from "./types";
-import { GridRow } from "./types";
+import { GridRow, TelemetryService, TelemetryStatus } from "./types";
 import { deepClone, getDiffData } from "./utils/dataUtils";
 import { getFieldValue } from "./utils/fieldUtils";
+
+const DEFAULT_PADDING_FOR_EXPANDED_ROW = 40;
 
 export const DataTable = ({
   sdk,
@@ -35,7 +38,7 @@ export const DataTable = ({
   pageSize = 50,
   columnConfig,
   rowClassRules,
-  customPaddingForExpandedRow = 40,
+  customPaddingForExpandedRow = DEFAULT_PADDING_FOR_EXPANDED_ROW,
   showIdColumn = true,
 }: DataTableProps) => {
   const [showDiffDialog, setShowDiffDialog] = useState(false);
@@ -54,8 +57,6 @@ export const DataTable = ({
   const { clearCache: clearChoiceSetCache } = useChoiceSetCache(
     choiceSetService.current,
   );
-
-  const openDiffDialog = useCallback(() => setShowDiffDialog(true), []);
 
   const closeDiffDialog = useCallback(() => setShowDiffDialog(false), []);
 
@@ -112,6 +113,10 @@ export const DataTable = ({
     async (column: string) => {
       column = column === "none" ? "" : column;
       setSelectedGroupBy(column);
+
+      trackTelemetry(TelemetryService.GroupBy, TelemetryStatus.Success, {
+        GroupByColumn: column || "none",
+      });
 
       if (column && entity) {
         setLoading(true);
@@ -182,6 +187,11 @@ export const DataTable = ({
             };
             setColumnDefs(columns);
           }
+        } catch (err) {
+          trackTelemetry(TelemetryService.GroupBy, TelemetryStatus.Error, {
+            Error: err instanceof Error ? err.message : "Group by failed",
+            GroupByColumn: column,
+          });
         } finally {
           setLoading(false);
         }
@@ -209,6 +219,14 @@ export const DataTable = ({
     revertSingleCellUpdate,
   } = useRowEditing(originalData, setRowData);
 
+  const openDiffDialog = useCallback(() => {
+    setShowDiffDialog(true);
+
+    trackTelemetry(TelemetryService.ShowDiff, TelemetryStatus.Success, {
+      EditedRowsCount: editedRows.size,
+    });
+  }, [editedRows.size]);
+
   const handleCellValueChanged = useCallback(
     (event: any) => {
       const rowId = event.data.Id;
@@ -232,8 +250,14 @@ export const DataTable = ({
     try {
       closeDiffDialog();
       await commitUpdates(entity);
+
+      trackTelemetry(TelemetryService.CommitChanges, TelemetryStatus.Success);
     } catch (err) {
-      console.error(err);
+      const errorMessage = err instanceof Error ? err.message : "Commit failed";
+      toast.error(errorMessage);
+      trackTelemetry(TelemetryService.CommitChanges, TelemetryStatus.Error, {
+        Error: errorMessage,
+      });
     }
   }, [closeDiffDialog, commitUpdates, entity]);
 
@@ -241,10 +265,25 @@ export const DataTable = ({
     try {
       closeDiffDialog();
       revertAllUpdates();
+
+      trackTelemetry(TelemetryService.RevertAll, TelemetryStatus.Success);
     } catch (err) {
-      console.error(err);
+      const errorMessage = err instanceof Error ? err.message : "Revert failed";
+      toast.error(errorMessage);
+      trackTelemetry(TelemetryService.RevertAll, TelemetryStatus.Error, {
+        Error: errorMessage,
+      });
     }
   }, [closeDiffDialog, revertAllUpdates]);
+
+  const handleRevertField = useCallback(
+    (rowId: string, fieldKey: string, originalValue: any) => {
+      revertSingleCellUpdate(rowId, fieldKey, originalValue);
+
+      trackTelemetry(TelemetryService.RevertField, TelemetryStatus.Success);
+    },
+    [revertSingleCellUpdate],
+  );
 
   const refreshComponent = useCallback(async () => {
     setLoading(true);
@@ -255,10 +294,33 @@ export const DataTable = ({
       clearCache();
       clearChoiceSetCache();
       await fetchEntityRecords();
+
+      trackTelemetry(TelemetryService.Refresh, TelemetryStatus.Success, {
+        HasColumnConfig: !!columnConfig,
+        HasRowClassRules: !!rowClassRules,
+        HasCustomPaddingForExpandedRow:
+          customPaddingForExpandedRow !== DEFAULT_PADDING_FOR_EXPANDED_ROW,
+        HasShowIdColumn: showIdColumn,
+        PageSize: pageSize,
+      });
+    } catch (err) {
+      trackTelemetry(TelemetryService.Refresh, TelemetryStatus.Error, {
+        Error: err instanceof Error ? err.message : "Refresh failed",
+      });
     } finally {
       setLoading(false);
     }
-  }, [clearCache, clearChoiceSetCache, fetchEntityRecords, revertAllUpdates]);
+  }, [
+    clearCache,
+    clearChoiceSetCache,
+    columnConfig,
+    customPaddingForExpandedRow,
+    fetchEntityRecords,
+    pageSize,
+    revertAllUpdates,
+    rowClassRules,
+    showIdColumn,
+  ]);
 
   const isFullWidthRow = useCallback(
     (params: IsFullWidthRowParams<GridRow>) => {
@@ -354,11 +416,16 @@ export const DataTable = ({
     // Add the new record to the top of the data
     const updatedRowData = [newRecord, ...rowData];
     setRowData(updatedRowData);
-  }, [columnDefs, gridApi, rowData, setRowData]);
+
+    trackTelemetry(TelemetryService.AddRow, TelemetryStatus.Success, {
+      TotalNewRecords: newRecords.size + 1,
+    });
+  }, [columnDefs, gridApi, newRecords.size, rowData, setRowData]);
 
   const handleInsertRecord = useCallback(async () => {
     if (!entity || newRecords.size === 0) return;
 
+    const insertCount = newRecords.size;
     try {
       // Get all new records and prepare them for insertion (remove temp IDs)
       const recordsToInsert = Array.from(newRecords.values()).map((record) => {
@@ -368,15 +435,26 @@ export const DataTable = ({
       });
 
       // Insert via SDK
-      await entity.insert(recordsToInsert);
+      await entity.insertRecords(recordsToInsert);
 
       // Clear new records tracking
       setNewRecords(new Map());
 
       // Refresh the data to show the newly inserted records with real IDs
       await fetchEntityRecords();
+
+      trackTelemetry(TelemetryService.InsertRecords, TelemetryStatus.Success, {
+        NewRecordsCount: insertCount,
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to insert records");
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to insert records";
+      setError(errorMessage);
+
+      trackTelemetry(TelemetryService.InsertRecords, TelemetryStatus.Error, {
+        Error: errorMessage,
+        NewRecordsCount: insertCount,
+      });
     }
   }, [entity, fetchEntityRecords, newRecords, setError]);
 
@@ -391,6 +469,8 @@ export const DataTable = ({
 
     if (!confirmed) return;
 
+    const discardedCount = newRecords.size;
+
     // Remove all new records from the row data
     const newRecordIds = Array.from(newRecords.keys());
     const updatedRowData = rowData.filter(
@@ -400,6 +480,14 @@ export const DataTable = ({
 
     // Clear new records tracking
     setNewRecords(new Map());
+
+    trackTelemetry(
+      TelemetryService.DiscardNewRecords,
+      TelemetryStatus.Success,
+      {
+        DiscardedRecordsCount: discardedCount,
+      },
+    );
   }, [newRecords, rowData, setRowData]);
 
   const handleDeleteRecords = useCallback(async () => {
@@ -427,11 +515,20 @@ export const DataTable = ({
     setSelectedRowsCount(0);
 
     try {
-      await entity?.delete(selectedDataIds);
+      await entity?.deleteRecords(selectedDataIds);
+
+      trackTelemetry(TelemetryService.DeleteRow, TelemetryStatus.Success, {
+        DeletedCount: selectedDataIds.length,
+      });
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to delete entity records",
-      );
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to delete entity records";
+      setError(errorMessage);
+
+      trackTelemetry(TelemetryService.DeleteRow, TelemetryStatus.Error, {
+        Error: errorMessage,
+        DeletedCount: selectedDataIds.length,
+      });
     }
   }, [entity, gridApi, rowData, setError, setRowData]);
 
@@ -512,7 +609,7 @@ export const DataTable = ({
         onClose={closeDiffDialog}
         onCommit={handleCommit}
         onRevertAll={handleRevertAll}
-        onRevertField={revertSingleCellUpdate}
+        onRevertField={handleRevertField}
         diffData={getDiffData(editedRows, originalData)}
         choiceSetValuesMap={choiceSetValuesMap}
       />

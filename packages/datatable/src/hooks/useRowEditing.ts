@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { GridRow } from "../types";
 import { deepClone, hasRowChanges } from "../utils/dataUtils";
-import { EntityGetResponse } from "@uipath/uipath-typescript";
+import { EntityGetResponse } from "@uipath/uipath-typescript/entities";
 import { CellValueChangedEvent } from "ag-grid-community";
 import { useState } from "react";
 
@@ -26,7 +26,7 @@ export const useRowEditing = (
     try {
       setEditedRows(new Map());
       const rowsToUpdate = Array.from(editedRows.values());
-      await entity?.update(rowsToUpdate);
+      await entity?.updateRecords(rowsToUpdate);
     } catch (err) {
       throw new Error(
         err instanceof Error ? err.message : "Failed to commit changes",

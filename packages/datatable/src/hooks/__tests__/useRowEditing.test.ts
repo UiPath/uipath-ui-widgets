@@ -103,7 +103,7 @@ describe("useRowEditing", () => {
 
   it("should commit updates and clear edited rows", async () => {
     const mockEntity = {
-      update: vi.fn().mockResolvedValue(undefined),
+      updateRecords: vi.fn().mockResolvedValue(undefined),
     } as any;
 
     const { result } = renderHook(() =>
@@ -122,7 +122,7 @@ describe("useRowEditing", () => {
       await result.current.commitUpdates(mockEntity);
     });
 
-    expect(mockEntity.update).toHaveBeenCalledWith([
+    expect(mockEntity.updateRecords).toHaveBeenCalledWith([
       { Id: "row1", name: "John Updated", age: 30 },
     ]);
     expect(result.current.editedRows.size).toBe(0);
@@ -130,7 +130,7 @@ describe("useRowEditing", () => {
 
   it("should handle commit errors", async () => {
     const mockEntity = {
-      update: vi.fn().mockRejectedValue(new Error("Update failed")),
+      updateRecords: vi.fn().mockRejectedValue(new Error("Update failed")),
     } as any;
 
     const { result } = renderHook(() =>

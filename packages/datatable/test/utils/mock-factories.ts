@@ -3,9 +3,9 @@ import {
   EntityGetResponse,
   FieldMetaData,
   EntityFieldDataType,
-} from "@uipath/uipath-typescript";
-import { GridRow } from "@uipath/datatable/types";
+} from "@uipath/uipath-typescript/entities";
 import { vi } from "vitest";
+import { GridRow } from "../../src/types";
 
 /**
  * Factory functions for creating mock data in tests
@@ -43,7 +43,7 @@ export const createMockEntity = (
   }) as any;
 
 export const createMockGridRow = (overrides?: Partial<GridRow>): GridRow => ({
-  Id: `row-${Math.random().toString(36).substr(2, 9)}`,
+  id: `row-${Math.random().toString(36).substr(2, 9)}`,
   name: "Test Row",
   status: "Active",
   ...overrides,
