@@ -6,9 +6,11 @@ import {
   DropdownMenuTrigger,
   toast,
 } from "@uipath/apollo-wind";
+import { trackTelemetry } from "../utils/telemetryUtils";
 import { Entities } from "@uipath/uipath-typescript/entities";
 import { ICellRendererParams } from "ag-grid-community";
 import { useCallback, useRef, useState } from "react";
+import { TelemetryService, TelemetryStatus } from "../types";
 import { getMimeType } from "../utils/fieldUtils";
 import { MoreVerticalIcon } from "./icons/MoreVerticalIcon";
 import { UploadIcon } from "./icons/UploadIcon";
@@ -39,9 +41,14 @@ export const FileCellRenderer = (props: FileCellRendererProps) => {
           const url = URL.createObjectURL(typedBlob);
           window.open(url, "_blank");
           setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+          trackTelemetry(TelemetryService.FileOpen, TelemetryStatus.Success);
         })
         .catch((error) => {
-          console.error("Failed to open file:", error);
+          trackTelemetry(TelemetryService.FileOpen, TelemetryStatus.Error, {
+            Error:
+              error instanceof Error ? error.message : "Failed to open file",
+          });
           throw error;
         }),
       {
@@ -64,9 +71,19 @@ export const FileCellRenderer = (props: FileCellRendererProps) => {
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
+
+          trackTelemetry(
+            TelemetryService.FileDownload,
+            TelemetryStatus.Success,
+          );
         })
         .catch((error) => {
-          console.error("Failed to download file:", error);
+          trackTelemetry(TelemetryService.FileDownload, TelemetryStatus.Error, {
+            Error:
+              error instanceof Error
+                ? error.message
+                : "Failed to download file",
+          });
           throw error;
         }),
       {
@@ -85,9 +102,16 @@ export const FileCellRenderer = (props: FileCellRendererProps) => {
     toast.promise(
       entityService
         .deleteAttachment(entityId, data.Id, fieldName)
-        .then(() => setFileName(null))
+        .then(() => {
+          setFileName(null);
+
+          trackTelemetry(TelemetryService.FileRemove, TelemetryStatus.Success);
+        })
         .catch((error) => {
-          console.error("Failed to remove file:", error);
+          trackTelemetry(TelemetryService.FileRemove, TelemetryStatus.Error, {
+            Error:
+              error instanceof Error ? error.message : "Failed to remove file",
+          });
           throw error;
         }),
       {
@@ -107,9 +131,21 @@ export const FileCellRenderer = (props: FileCellRendererProps) => {
       toast.promise(
         entityService
           .uploadAttachment(entityId, data.Id, fieldName, file)
-          .then(() => setFileName(file.name))
+          .then(() => {
+            setFileName(file.name);
+
+            trackTelemetry(
+              TelemetryService.FileUpload,
+              TelemetryStatus.Success,
+            );
+          })
           .catch((error) => {
-            console.error("Failed to upload file:", error);
+            trackTelemetry(TelemetryService.FileUpload, TelemetryStatus.Error, {
+              Error:
+                error instanceof Error
+                  ? error.message
+                  : "Failed to upload file",
+            });
             throw error;
           })
           .finally(() => {

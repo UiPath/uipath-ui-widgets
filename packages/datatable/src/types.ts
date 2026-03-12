@@ -17,3 +17,26 @@ export interface GridRow extends EntityRecord {
   _isHidden?: boolean;
   _groupedRecords?: GridRow[];
 }
+
+export enum TelemetryService {
+  Refresh = "DT.Refresh",
+  AddRow = "DT.AddRow",
+  DeleteRow = "DT.DeleteRow",
+  ShowDiff = "DT.ShowDiff",
+  GroupBy = "DT.GroupBy",
+  InsertRecords = "DT.InsertRecords",
+  DiscardNewRecords = "DT.DiscardNewRecords",
+  CommitChanges = "DT.CommitChanges",
+  RevertAll = "DT.RevertAll",
+  RevertField = "DT.RevertField",
+  EntityDataLoad = "DT.EntityDataLoad",
+  FileOpen = "DT.FileOpen",
+  FileDownload = "DT.FileDownload",
+  FileRemove = "DT.FileRemove",
+  FileUpload = "DT.FileUpload",
+}
+
+export enum TelemetryStatus {
+  Success = "DT.Success",
+  Error = "DT.Error",
+}
