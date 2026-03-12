@@ -1,5 +1,6 @@
 import {
   ApChat,
+  AutopilotChatActionPayload,
   AutopilotChatEvent,
   AutopilotChatFileInfo,
   AutopilotChatMessage,
@@ -15,6 +16,7 @@ import {
   ErrorStartHandlerArgs,
   ExchangeGetResponse,
   ExchangeStream,
+  FeedbackRating,
   MessageStream,
   SessionStream,
   SortOrder,
@@ -28,6 +30,7 @@ import {
   ConversationalAgentChatProps,
   MessageWidget,
 } from "./types";
+import { FeedbackDialog } from "./components/FeedbackDialog";
 import {
   convertAttachmentToFile,
   createFileKey,
@@ -50,6 +53,8 @@ export const ConversationalAgentChat = ({
   const conversationsCursor = useRef<{ value: string } | undefined>(undefined);
   const [chatService, setChatService] = useState<AutopilotChatService>();
   const [error, setError] = useState<string | null>(null);
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
 
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
@@ -410,6 +415,33 @@ export const ConversationalAgentChat = ({
     initChat();
   }, [initChat]);
 
+  const onFeedback = useCallback((data: AutopilotChatActionPayload) => {
+    pendingFeedback.current = data;
+    setFeedbackDialogOpen(true);
+  }, []);
+
+  const onFeedbackSubmit = useCallback((comment: string) => {
+    const data = pendingFeedback.current;
+    if (data) {
+      currentConversation.current?.exchanges?.createFeedback(
+        data.message.meta.exchangeId,
+        {
+          rating: data.action.details?.isPositive
+            ? FeedbackRating.Positive
+            : FeedbackRating.Negative,
+          comment,
+        },
+      );
+    }
+    pendingFeedback.current = null;
+    setFeedbackDialogOpen(false);
+  }, []);
+
+  const onFeedbackCancel = useCallback(() => {
+    pendingFeedback.current = null;
+    setFeedbackDialogOpen(false);
+  }, []);
+
   // Initialize chat service on mount and when agentId/folderId changes
   useEffect(() => {
     const initKey = `${agentId}-${folderId}`;
@@ -446,6 +478,7 @@ export const ConversationalAgentChat = ({
           onClickDeleteConversation,
         );
         chatService.on(AutopilotChatEvent.HistoryLoadMore, onHistoryLoadMore);
+        chatService.on(AutopilotChatEvent.Feedback, onFeedback);
       } catch (err) {
         const message =
           err instanceof Error
@@ -460,6 +493,7 @@ export const ConversationalAgentChat = ({
     chatService,
     onClickDeleteConversation,
     onClickOpenConversation,
+    onFeedback,
     onHistoryLoadMore,
     onNewChat,
     onSendMessage,
@@ -490,6 +524,13 @@ export const ConversationalAgentChat = ({
       {!error && chatService && (
         <ApChat chatServiceInstance={chatService} locale="en" theme="light" />
       )}
+
+      <FeedbackDialog
+        open={feedbackDialogOpen}
+        onOpenChange={setFeedbackDialogOpen}
+        onSubmit={onFeedbackSubmit}
+        onCancel={onFeedbackCancel}
+      />
     </div>
   );
 };
