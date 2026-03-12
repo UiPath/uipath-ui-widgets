@@ -38,10 +38,16 @@ vi.mock("@uipath/apollo-react/material/components", () => ({
     OpenConversation: "openConversation",
     DeleteConversation: "deleteConversation",
     HistoryLoadMore: "historyLoadMore",
+    Feedback: "feedback",
   },
   AutopilotChatService: {
     Instantiate: vi.fn(() => mockChatService),
   },
+}));
+
+const mockTrackTelemetry = vi.fn();
+vi.mock("../utils/telemetryUtils", () => ({
+  trackTelemetry: (...args: any[]) => mockTrackTelemetry(...args),
 }));
 
 // Store handlers for testing
@@ -872,11 +878,7 @@ describe("ConversationalAgentChat", () => {
   });
 
   describe("setupExchangeHandlers", () => {
-    it("should handle exchange errors", async () => {
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
-
+    it("should handle exchange errors with telemetry and show error", async () => {
       render(<ConversationalAgentChat {...defaultProps} />);
 
       await waitFor(
@@ -899,13 +901,14 @@ describe("ConversationalAgentChat", () => {
 
       // Trigger error handler
       if (exchangeErrorHandler) {
-        exchangeErrorHandler({ message: "Test error" });
-        expect(consoleSpy).toHaveBeenCalledWith("[Events] Exchange error:", {
-          message: "Test error",
-        });
+        exchangeErrorHandler({ errorId: "err-1", message: "Test error" });
+        expect(mockTrackTelemetry).toHaveBeenCalledWith(
+          "CAC.SendMessage",
+          "CAC.Error",
+          { error: "Test error" },
+        );
+        expect(mockChatService.setError).toHaveBeenCalledWith("Test error");
       }
-
-      consoleSpy.mockRestore();
     });
 
     it("should handle assistant messages with text content", async () => {
@@ -1401,6 +1404,230 @@ describe("ConversationalAgentChat", () => {
       await onHistoryLoadMore?.();
 
       expect(mockChatService.appendOlderHistoryItems).toHaveBeenCalled();
+    });
+  });
+
+  describe("telemetry", () => {
+    it("should track NewChat telemetry when new chat is triggered", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "newChat",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const newChatCall = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "newChat",
+      );
+      const onNewChat = newChatCall?.[1];
+
+      mockTrackTelemetry.mockClear();
+      onNewChat?.();
+
+      expect(mockTrackTelemetry).toHaveBeenCalledWith(
+        "CAC.NewChat",
+        "CAC.Success",
+      );
+    });
+
+    it("should track SendMessage success telemetry", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const requestCall = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      );
+      const onSendMessage = requestCall?.[1];
+
+      mockTrackTelemetry.mockClear();
+      await onSendMessage?.({ content: "Hello", attachments: [] });
+
+      expect(mockTrackTelemetry).toHaveBeenCalledWith(
+        "CAC.SendMessage",
+        "CAC.Success",
+      );
+    });
+
+    it("should track SendMessage error telemetry on failure", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const requestCall = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      );
+      const onSendMessage = requestCall?.[1];
+
+      // Make sendContentPart fail
+      mockMessageBuilder.sendContentPart.mockRejectedValueOnce(
+        new Error("Send failed"),
+      );
+
+      mockTrackTelemetry.mockClear();
+      await onSendMessage?.({ content: "Hello", attachments: [] });
+
+      expect(mockTrackTelemetry).toHaveBeenCalledWith(
+        "CAC.SendMessage",
+        "CAC.Error",
+        { error: "Send failed" },
+      );
+      expect(mockChatService.setError).toHaveBeenCalledWith(
+        "Failed to send message: Send failed",
+      );
+    });
+
+    it("should track OpenConversation success telemetry", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "openConversation",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const openConversationCall = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "openConversation",
+      );
+      const onClickOpenConversation = openConversationCall?.[1];
+
+      mockTrackTelemetry.mockClear();
+      await onClickOpenConversation?.("conv-1");
+
+      expect(mockTrackTelemetry).toHaveBeenCalledWith(
+        "CAC.OpenConversation",
+        "CAC.Success",
+        { conversationId: "conv-1" },
+      );
+    });
+
+    it("should track FileAttached success telemetry", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "setAttachments",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const setAttachmentsCall = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "setAttachments",
+      );
+      const onSetAttachments = setAttachmentsCall?.[1];
+
+      const mockAttachment = {
+        name: "test.txt",
+        type: "text/plain",
+        content: { text: null, binary: [116, 101, 115, 116], base64: null },
+      };
+
+      mockTrackTelemetry.mockClear();
+      await onSetAttachments?.({ added: [mockAttachment] });
+
+      expect(mockTrackTelemetry).toHaveBeenCalledWith(
+        "CAC.FileAttached",
+        "CAC.Success",
+        { fileCount: 1 },
+      );
+    });
+
+    it("should track FileAttached error telemetry on upload failure", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "setAttachments",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const setAttachmentsCall = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "setAttachments",
+      );
+      const onSetAttachments = setAttachmentsCall?.[1];
+
+      // Attachment with no content will fail to convert
+      const invalidAttachment = {
+        name: "invalid.txt",
+        type: "text/plain",
+        content: { text: null, binary: null, base64: null },
+      };
+
+      mockTrackTelemetry.mockClear();
+      await onSetAttachments?.({ added: [invalidAttachment] });
+
+      expect(mockTrackTelemetry).toHaveBeenCalledWith(
+        "CAC.FileAttached",
+        "CAC.Error",
+        { failedCount: 1 },
+      );
+    });
+
+    it("should track SendMessage error telemetry on exchange error", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const requestCall = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      );
+      const onSendMessage = requestCall?.[1];
+
+      await onSendMessage?.({ content: "Test", attachments: [] });
+
+      mockTrackTelemetry.mockClear();
+      if (exchangeErrorHandler) {
+        exchangeErrorHandler({
+          errorId: "err-1",
+          message: "Exchange failed",
+        });
+
+        expect(mockTrackTelemetry).toHaveBeenCalledWith(
+          "CAC.SendMessage",
+          "CAC.Error",
+          { error: "Exchange failed" },
+        );
+      }
     });
   });
 
