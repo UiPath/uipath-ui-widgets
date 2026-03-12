@@ -144,6 +144,7 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
               onMessageStart: vi.fn((handler: any) => {
                 messageStartHandler = handler;
               }),
+              onExchangeEnd: vi.fn(),
               startMessage: vi.fn(() => mockMessageBuilder),
             })),
           };
