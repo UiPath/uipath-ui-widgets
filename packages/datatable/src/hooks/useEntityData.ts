@@ -44,8 +44,9 @@ export const useEntityData = (
       const fetchedEntity = await entityService.getById(entityId);
       setEntity(fetchedEntity);
 
-      const records = await fetchedEntity.getRecords({
+      const records = await fetchedEntity.getAllRecords({
         expansionLevel: 2,
+        pageSize: 10000,
       });
       const items = records.items;
 
