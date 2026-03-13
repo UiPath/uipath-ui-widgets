@@ -431,17 +431,22 @@ export const DataTable = ({
       const recordsToInsert = Array.from(newRecords.values()).map((record) => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { Id, ...recordWithoutId } = record;
-        return recordWithoutId;
+        // Remove keys with empty string values
+        return Object.fromEntries(
+          Object.entries(recordWithoutId).filter(([, v]) => v !== ""),
+        );
       });
 
-      // Insert via SDK
-      await entity.insertRecords(recordsToInsert);
+      // Insert via SDK and get back records with real IDs
+      const insertedRecords = await entity.insertRecords(recordsToInsert);
 
-      // Clear new records tracking
+      // Clear new records tracking (removes pinned top rows)
       setNewRecords(new Map());
 
-      // Refresh the data to show the newly inserted records with real IDs
-      await fetchEntityRecords();
+      // Add newly inserted records to the grid
+      if (Array.isArray(insertedRecords)) {
+        setRowData((prev: any[]) => [...insertedRecords, ...prev]);
+      }
 
       trackTelemetry(TelemetryService.InsertRecords, TelemetryStatus.Success, {
         NewRecordsCount: insertCount,
@@ -456,7 +461,7 @@ export const DataTable = ({
         NewRecordsCount: insertCount,
       });
     }
-  }, [entity, fetchEntityRecords, newRecords, setError]);
+  }, [entity, newRecords, setError, setRowData]);
 
   const handleDiscardNewRecords = useCallback(() => {
     if (newRecords.size === 0) return;
