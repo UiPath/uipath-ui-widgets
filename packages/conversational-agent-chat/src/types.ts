@@ -18,3 +18,16 @@ export interface AttachFileOutput {
   name: string;
   mimeType: string;
 }
+
+export enum TelemetryEvent {
+  NewChat = "CAC.NewChat",
+  SendMessage = "CAC.SendMessage",
+  OpenConversation = "CAC.OpenConversation",
+  FileAttached = "CAC.FileAttached",
+  Feedback = "CAC.Feedback",
+}
+
+export enum TelemetryStatus {
+  Success = "CAC.Success",
+  Error = "CAC.Error",
+}

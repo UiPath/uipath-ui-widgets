@@ -1,5 +1,6 @@
 import {
   ApChat,
+  AutopilotChatActionPayload,
   AutopilotChatEvent,
   AutopilotChatFileInfo,
   AutopilotChatMessage,
@@ -15,6 +16,7 @@ import {
   ErrorStartHandlerArgs,
   ExchangeGetResponse,
   ExchangeStream,
+  FeedbackRating,
   MessageStream,
   SessionStream,
   SortOrder,
@@ -22,11 +24,14 @@ import {
   ToolCallStream,
 } from "@uipath/uipath-typescript/conversational-agent";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FeedbackDialog } from "./components/FeedbackDialog";
 import "./ConversationalAgentChat.css";
 import {
   AttachFileOutput,
   ConversationalAgentChatProps,
+  TelemetryEvent,
   MessageWidget,
+  TelemetryStatus,
 } from "./types";
 import {
   convertAttachmentToFile,
@@ -35,6 +40,7 @@ import {
   mapExchangesToChatMessages,
   normalizeInput,
 } from "./utils";
+import { trackTelemetry } from "./utils/telemetryUtils";
 
 export const ConversationalAgentChat = ({
   sdk,
@@ -50,13 +56,20 @@ export const ConversationalAgentChat = ({
   const conversationsCursor = useRef<{ value: string } | undefined>(undefined);
   const [chatService, setChatService] = useState<AutopilotChatService>();
   const [error, setError] = useState<string | null>(null);
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
 
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
       if (!chatService) return;
 
       exchange.onErrorStart((error: ErrorStartHandlerArgs) => {
-        console.error("[Events] Exchange error:", error);
+        trackTelemetry(TelemetryEvent.SendMessage, TelemetryStatus.Error, {
+          error: error.message,
+        });
+        chatService.setError(
+          error.message || "Something went wrong. Please try again.",
+        );
       });
 
       exchange.onMessageStart((message: MessageStream) => {
@@ -175,6 +188,7 @@ export const ConversationalAgentChat = ({
   const onNewChat = useCallback(() => {
     currentConversation.current = null;
     session.current = null;
+    trackTelemetry(TelemetryEvent.NewChat, TelemetryStatus.Success);
   }, []);
 
   const onHistoryLoadMore = useCallback(async () => {
@@ -215,31 +229,40 @@ export const ConversationalAgentChat = ({
 
   const onSendMessage = useCallback(
     async (data: AutopilotChatMessage) => {
-      const sessionHelper = await getSessionHelper();
-      const exchange = sessionHelper.startExchange();
-      setupExchangeHandlers(exchange);
-      const message = exchange.startMessage({});
-      await message.sendContentPart({
-        mimeType: "text/plain",
-        data: data.content,
-      });
-      for (const attachment of data.attachments || []) {
-        const key = createFileKey(attachment);
-        const attachmentOutput = uploadedAttachments.current.get(key);
-        if (attachmentOutput) {
-          const part = message.startContentPart({
-            name: attachmentOutput.name,
-            mimeType: attachmentOutput.mimeType,
-            externalValue: {
-              uri: attachmentOutput.uri,
-            },
-          });
-          part.sendContentPartEnd();
+      try {
+        const sessionHelper = await getSessionHelper();
+        const exchange = sessionHelper.startExchange();
+        setupExchangeHandlers(exchange);
+        const message = exchange.startMessage({});
+        await message.sendContentPart({
+          mimeType: "text/plain",
+          data: data.content,
+        });
+        for (const attachment of data.attachments || []) {
+          const key = createFileKey(attachment);
+          const attachmentOutput = uploadedAttachments.current.get(key);
+          if (attachmentOutput) {
+            const part = message.startContentPart({
+              name: attachmentOutput.name,
+              mimeType: attachmentOutput.mimeType,
+              externalValue: {
+                uri: attachmentOutput.uri,
+              },
+            });
+            part.sendContentPartEnd();
+          }
         }
+        message.sendMessageEnd();
+        trackTelemetry(TelemetryEvent.SendMessage, TelemetryStatus.Success);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        trackTelemetry(TelemetryEvent.SendMessage, TelemetryStatus.Error, {
+          error: errorMessage,
+        });
+        chatService?.setError(`Failed to send message: ${errorMessage}`);
       }
-      message.sendMessageEnd();
     },
-    [getSessionHelper, setupExchangeHandlers],
+    [chatService, getSessionHelper, setupExchangeHandlers],
   );
 
   const processAttachmentsInBatch = useCallback(
@@ -316,6 +339,17 @@ export const ConversationalAgentChat = ({
               const key = createFileKey(failedUpload.attachment);
               uploadedAttachments.current.delete(key);
             }
+            trackTelemetry(TelemetryEvent.FileAttached, TelemetryStatus.Error, {
+              failedCount: failedUploads.length,
+            });
+          } else {
+            trackTelemetry(
+              TelemetryEvent.FileAttached,
+              TelemetryStatus.Success,
+              {
+                fileCount: newAttachments.length,
+              },
+            );
           }
         }
       }
@@ -341,18 +375,34 @@ export const ConversationalAgentChat = ({
     async (id: string) => {
       if (!chatService) return;
 
-      chatService.stopResponse();
-      chatService.clearError();
-      const selectedConversation = pastConversations.current.find(
-        (c) => c.id === id,
-      );
-      if (!selectedConversation) return;
+      try {
+        chatService.stopResponse();
+        chatService.clearError();
+        const selectedConversation = pastConversations.current.find(
+          (c) => c.id === id,
+        );
+        if (!selectedConversation) return;
 
-      currentConversation.current = selectedConversation;
-      session.current = null;
+        currentConversation.current = selectedConversation;
+        session.current = null;
 
-      const allExchanges = await fetchExchanges(selectedConversation.id);
-      chatService.setConversation(mapExchangesToChatMessages(allExchanges));
+        const allExchanges = await fetchExchanges(selectedConversation.id);
+        chatService.setConversation(mapExchangesToChatMessages(allExchanges));
+        trackTelemetry(
+          TelemetryEvent.OpenConversation,
+          TelemetryStatus.Success,
+          {
+            conversationId: id,
+          },
+        );
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        trackTelemetry(TelemetryEvent.OpenConversation, TelemetryStatus.Error, {
+          conversationId: id,
+          error: errorMessage,
+        });
+        chatService.setError(`Failed to open conversation: ${errorMessage}`);
+      }
     },
     [chatService, fetchExchanges],
   );
@@ -410,6 +460,37 @@ export const ConversationalAgentChat = ({
     initChat();
   }, [initChat]);
 
+  const onFeedback = useCallback((data: AutopilotChatActionPayload) => {
+    pendingFeedback.current = data;
+    setFeedbackDialogOpen(true);
+  }, []);
+
+  const onFeedbackSubmit = useCallback((comment: string) => {
+    const data = pendingFeedback.current;
+    if (data) {
+      const rating = data.action.details?.isPositive
+        ? FeedbackRating.Positive
+        : FeedbackRating.Negative;
+      currentConversation.current?.exchanges?.createFeedback(
+        data.message.meta.exchangeId,
+        {
+          rating,
+          comment,
+        },
+      );
+      trackTelemetry(TelemetryEvent.Feedback, TelemetryStatus.Success, {
+        rating,
+      });
+    }
+    pendingFeedback.current = null;
+    setFeedbackDialogOpen(false);
+  }, []);
+
+  const onFeedbackCancel = useCallback(() => {
+    pendingFeedback.current = null;
+    setFeedbackDialogOpen(false);
+  }, []);
+
   // Initialize chat service on mount and when agentId/folderId changes
   useEffect(() => {
     const initKey = `${agentId}-${folderId}`;
@@ -446,6 +527,7 @@ export const ConversationalAgentChat = ({
           onClickDeleteConversation,
         );
         chatService.on(AutopilotChatEvent.HistoryLoadMore, onHistoryLoadMore);
+        chatService.on(AutopilotChatEvent.Feedback, onFeedback);
       } catch (err) {
         const message =
           err instanceof Error
@@ -460,6 +542,7 @@ export const ConversationalAgentChat = ({
     chatService,
     onClickDeleteConversation,
     onClickOpenConversation,
+    onFeedback,
     onHistoryLoadMore,
     onNewChat,
     onSendMessage,
@@ -490,6 +573,13 @@ export const ConversationalAgentChat = ({
       {!error && chatService && (
         <ApChat chatServiceInstance={chatService} locale="en" theme="light" />
       )}
+
+      <FeedbackDialog
+        open={feedbackDialogOpen}
+        onOpenChange={setFeedbackDialogOpen}
+        onSubmit={onFeedbackSubmit}
+        onCancel={onFeedbackCancel}
+      />
     </div>
   );
 };
