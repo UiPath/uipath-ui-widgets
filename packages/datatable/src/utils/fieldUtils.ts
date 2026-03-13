@@ -80,6 +80,10 @@ export const createCellEditorSelector = (
       return {
         component: "agDateStringCellEditor",
       };
+    } else if (isFieldTypeNumeric(field)) {
+      return {
+        component: "agNumberCellEditor",
+      };
     }
     return undefined;
   };
@@ -95,6 +99,17 @@ export const isChoiceSetSingle = (field: FieldMetaData): boolean => {
 
 export const isChoiceSetMultiple = (field: FieldMetaData): boolean => {
   return field.fieldDisplayType === FieldDisplayType.ChoiceSetMultiple;
+};
+
+export const isFieldTypeNumeric = (field: FieldMetaData): boolean => {
+  const type = field.fieldDataType?.name;
+  return (
+    type === EntityFieldDataType.INTEGER ||
+    type === EntityFieldDataType.BIG_INTEGER ||
+    type === EntityFieldDataType.DECIMAL ||
+    type === EntityFieldDataType.FLOAT ||
+    type === EntityFieldDataType.DOUBLE
+  );
 };
 
 export const isFileField = (field: FieldMetaData): boolean => {
