@@ -66,7 +66,6 @@
     "postcss-cli": "^11.0.1",
     "prettier": "3.8.1",
     "rimraf": "^6.0.1",
-    "rollup": "^4.55.1",
     "sass": "^1.83.4",
     "storybook": "^10.2.8",
     "typescript": "~5.9.3",
@@ -75,11 +74,6 @@
     "vitest": "^4.0.18"
   },
   "optionalDependencies": {
-    "@rollup/rollup-darwin-arm64": "^4.55.1",
-    "@rollup/rollup-darwin-x64": "^4.55.1",
-    "@rollup/rollup-linux-arm64-gnu": "^4.55.1",
-    "@rollup/rollup-linux-x64-gnu": "^4.55.1",
-    "@rollup/rollup-win32-x64-msvc": "^4.55.1",
     "@tailwindcss/oxide-darwin-arm64": "^4.1.18",
     "@tailwindcss/oxide-darwin-x64": "^4.1.18",
     "@tailwindcss/oxide-linux-arm64-gnu": "^4.1.18",
