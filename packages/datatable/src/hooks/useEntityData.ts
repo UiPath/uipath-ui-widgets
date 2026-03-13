@@ -5,6 +5,7 @@ import {
 } from "@uipath/uipath-typescript/entities";
 import { ColDef } from "ag-grid-community";
 import { useCallback, useState } from "react";
+import { DateTimeCellRenderer } from "../components/DateTimeCellRenderer";
 import { FileCellRenderer } from "../components/FileCellRenderer";
 import { GridRow, TelemetryService, TelemetryStatus } from "../types";
 import { deepClone } from "../utils/dataUtils";
@@ -15,6 +16,7 @@ import {
   getFieldValue,
   isChoiceSetMultiple,
   isChoiceSetSingle,
+  isFieldTypeDateTime,
   isFileField,
 } from "../utils/fieldUtils";
 import { trackTelemetry } from "../utils/telemetryUtils";
@@ -117,6 +119,11 @@ export const useEntityData = (
               entityId,
               fieldName: f.name,
             };
+            colDef.editable = false;
+          } else if (isFieldTypeDateTime(f)) {
+            colDef.cellRenderer = DateTimeCellRenderer;
+            colDef.cellRendererParams = { fieldName: f.name };
+            colDef.minWidth = 300; // This is the default width of datetime picker
             colDef.editable = false;
           }
 

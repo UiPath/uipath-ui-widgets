@@ -41,6 +41,8 @@ export const getFieldValue = (
     return value;
   } else if (field && isFieldTypeDate(field) && value instanceof Date) {
     return value.toLocaleDateString();
+  } else if (field && isFieldTypeDateTime(field) && value instanceof Date) {
+    return value.toLocaleString();
   }
   return value;
 };
@@ -91,6 +93,14 @@ export const createCellEditorSelector = (
 
 export const isFieldTypeDate = (field: FieldMetaData): boolean => {
   return field.fieldDataType?.name === EntityFieldDataType.DATE;
+};
+
+export const isFieldTypeDateTime = (field: FieldMetaData): boolean => {
+  const type = field.fieldDataType?.name;
+  return (
+    type === EntityFieldDataType.DATETIME ||
+    type === EntityFieldDataType.DATETIME_WITH_TZ
+  );
 };
 
 export const isChoiceSetSingle = (field: FieldMetaData): boolean => {
