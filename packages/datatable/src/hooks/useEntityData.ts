@@ -16,6 +16,7 @@ import {
   getFieldValue,
   isChoiceSetMultiple,
   isChoiceSetSingle,
+  isFieldTypeBoolean,
   isFieldTypeDateTime,
   isFileField,
 } from "../utils/fieldUtils";
@@ -125,6 +126,16 @@ export const useEntityData = (
             colDef.cellRendererParams = { fieldName: f.name };
             colDef.minWidth = 300; // This is the default width of datetime picker
             colDef.editable = false;
+          } else if (isFieldTypeBoolean(f)) {
+            colDef.valueSetter = (params) => {
+              const map: Record<string, boolean | null> = {
+                Yes: true,
+                No: false,
+                None: null,
+              };
+              params.data[f.name] = map[params.newValue] ?? null;
+              return true;
+            };
           }
 
           return colDef;

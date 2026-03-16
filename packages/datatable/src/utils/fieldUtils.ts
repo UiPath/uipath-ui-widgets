@@ -43,6 +43,10 @@ export const getFieldValue = (
     return value.toLocaleDateString();
   } else if (field && isFieldTypeDateTime(field) && value instanceof Date) {
     return value.toLocaleString();
+  } else if (field && isFieldTypeBoolean(field)) {
+    if (value === true) return "Yes";
+    if (value === false) return "No";
+    return "";
   }
   return value;
 };
@@ -86,6 +90,13 @@ export const createCellEditorSelector = (
       return {
         component: "agNumberCellEditor",
       };
+    } else if (isFieldTypeBoolean(field)) {
+      return {
+        component: "agSelectCellEditor",
+        params: {
+          values: ["None", "Yes", "No"],
+        },
+      };
     }
     return undefined;
   };
@@ -120,6 +131,10 @@ export const isFieldTypeNumeric = (field: FieldMetaData): boolean => {
     type === EntityFieldDataType.FLOAT ||
     type === EntityFieldDataType.DOUBLE
   );
+};
+
+export const isFieldTypeBoolean = (field: FieldMetaData): boolean => {
+  return field.fieldDataType?.name === EntityFieldDataType.BOOLEAN;
 };
 
 export const isFileField = (field: FieldMetaData): boolean => {
