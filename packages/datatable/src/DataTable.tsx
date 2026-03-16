@@ -391,12 +391,17 @@ export const DataTable = ({
     setSelectedRowsCount(selectedRows.length);
   }, [gridApi]);
 
+  const pinnedTopRowData = useMemo(
+    () => Array.from(newRecords.values()),
+    [newRecords],
+  );
+
   const handleAddRow = useCallback(() => {
     if (!gridApi) return;
 
     // Create a new empty record with all column fields
     const newRecord: any = {};
-    columnDefs.forEach((colDef: any) => {
+    columnDefs.forEach((colDef) => {
       if (colDef.field && colDef.field !== "Id") {
         newRecord[colDef.field] = "";
       }
@@ -406,21 +411,17 @@ export const DataTable = ({
     const tempId = `temp-${Date.now()}`;
     newRecord.Id = tempId;
 
-    // Track this as a new record
+    // Track this as a new record (pinned top rows are driven by newRecords)
     setNewRecords((prev) => {
       const updated = new Map(prev);
       updated.set(tempId, newRecord);
       return updated;
     });
 
-    // Add the new record to the top of the data
-    const updatedRowData = [newRecord, ...rowData];
-    setRowData(updatedRowData);
-
     trackTelemetry(TelemetryService.AddRow, TelemetryStatus.Success, {
       TotalNewRecords: newRecords.size + 1,
     });
-  }, [columnDefs, gridApi, newRecords.size, rowData, setRowData]);
+  }, [columnDefs, gridApi, newRecords.size]);
 
   const handleInsertRecord = useCallback(async () => {
     if (!entity || newRecords.size === 0) return;
@@ -476,14 +477,7 @@ export const DataTable = ({
 
     const discardedCount = newRecords.size;
 
-    // Remove all new records from the row data
-    const newRecordIds = Array.from(newRecords.keys());
-    const updatedRowData = rowData.filter(
-      (row: any) => !newRecordIds.includes(row.Id),
-    );
-    setRowData(updatedRowData);
-
-    // Clear new records tracking
+    // Clear new records tracking (pinned rows will update automatically)
     setNewRecords(new Map());
 
     trackTelemetry(
@@ -493,7 +487,7 @@ export const DataTable = ({
         DiscardedRecordsCount: discardedCount,
       },
     );
-  }, [newRecords, rowData, setRowData]);
+  }, [newRecords]);
 
   const handleDeleteRecords = useCallback(async () => {
     if (!gridApi) return;
@@ -588,6 +582,7 @@ export const DataTable = ({
             editable: !isMasterDetailMode,
             minWidth: 100,
           }}
+          pinnedTopRowData={pinnedTopRowData}
           theme={themeQuartz}
           onCellValueChanged={handleCellValueChanged}
           rowSelection={!isMasterDetailMode ? rowSelection : undefined}
