@@ -278,11 +278,19 @@ export const DataTable = ({
 
   const handleRevertField = useCallback(
     (rowId: string, fieldKey: string, originalValue: any) => {
-      revertSingleCellUpdate(rowId, fieldKey, originalValue);
+      const noRemainingEdits = revertSingleCellUpdate(
+        rowId,
+        fieldKey,
+        originalValue,
+      );
+
+      if (noRemainingEdits) {
+        closeDiffDialog();
+      }
 
       trackTelemetry(TelemetryService.RevertField, TelemetryStatus.Success);
     },
-    [revertSingleCellUpdate],
+    [revertSingleCellUpdate, closeDiffDialog],
   );
 
   const refreshComponent = useCallback(async () => {
