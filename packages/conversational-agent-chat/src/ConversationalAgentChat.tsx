@@ -56,6 +56,7 @@ export const ConversationalAgentChat = ({
   const conversationsCursor = useRef<{ value: string } | undefined>(undefined);
   const [chatService, setChatService] = useState<AutopilotChatService>();
   const [error, setError] = useState<string | null>(null);
+  const activeExchange = useRef<ExchangeStream | null>(null);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
 
@@ -146,6 +147,7 @@ export const ConversationalAgentChat = ({
       });
 
       exchange.onExchangeEnd(() => {
+        activeExchange.current = null;
         chatService.sendOutputStreamEvent({ turnComplete: true });
         chatService.stopResponse();
         chatService.setShowLoading(false);
@@ -188,6 +190,7 @@ export const ConversationalAgentChat = ({
   const onNewChat = useCallback(() => {
     currentConversation.current = null;
     session.current = null;
+    activeExchange.current = null;
     trackTelemetry(TelemetryEvent.NewChat, TelemetryStatus.Success);
   }, []);
 
@@ -232,6 +235,7 @@ export const ConversationalAgentChat = ({
       try {
         const sessionHelper = await getSessionHelper();
         const exchange = sessionHelper.startExchange();
+        activeExchange.current = exchange;
         setupExchangeHandlers(exchange);
         const message = exchange.startMessage({});
         await message.sendContentPart({
@@ -460,6 +464,18 @@ export const ConversationalAgentChat = ({
     initChat();
   }, [initChat]);
 
+  const onStopResponse = useCallback(() => {
+    if (!chatService) return;
+    if (activeExchange.current) {
+      activeExchange.current.sendExchangeEnd();
+      activeExchange.current = null;
+    }
+    chatService.sendOutputStreamEvent({ turnComplete: true });
+    chatService.stopResponse();
+    chatService.setShowLoading(false);
+    chatService.setWaiting(false);
+  }, [chatService]);
+
   const onFeedback = useCallback((data: AutopilotChatActionPayload) => {
     pendingFeedback.current = data;
     setFeedbackDialogOpen(true);
@@ -528,6 +544,7 @@ export const ConversationalAgentChat = ({
         );
         chatService.on(AutopilotChatEvent.HistoryLoadMore, onHistoryLoadMore);
         chatService.on(AutopilotChatEvent.Feedback, onFeedback);
+        chatService.on(AutopilotChatEvent.StopResponse, onStopResponse);
       } catch (err) {
         const message =
           err instanceof Error
@@ -547,6 +564,7 @@ export const ConversationalAgentChat = ({
     onNewChat,
     onSendMessage,
     onSetAttachments,
+    onStopResponse,
   ]);
 
   return (
