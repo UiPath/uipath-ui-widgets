@@ -17,6 +17,7 @@ import {
   isChoiceSetMultiple,
   isChoiceSetSingle,
   isFieldTypeBoolean,
+  isFieldTypeDate,
   isFieldTypeDateTime,
   isFileField,
 } from "../utils/fieldUtils";
@@ -112,6 +113,10 @@ export const useEntityData = (
             ),
             ...columnConfig?.[f.displayName],
           };
+
+          if (isFieldTypeDate(f)) {
+            colDef.minWidth = 130;
+          }
 
           if (isFileField(f)) {
             colDef.cellRenderer = FileCellRenderer;
