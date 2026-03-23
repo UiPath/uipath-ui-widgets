@@ -447,19 +447,31 @@ export const DataTable = ({
       });
 
       // Insert via SDK and get back records with real IDs
-      const insertedRecords = await entity.insertRecords(recordsToInsert);
+      const { successRecords, failureRecords } =
+        await entity.insertRecords(recordsToInsert);
 
       // Clear new records tracking (removes pinned top rows)
       setNewRecords(new Map());
 
-      // Add newly inserted records to the grid
-      if (Array.isArray(insertedRecords)) {
-        setRowData((prev: any[]) => [...insertedRecords, ...prev]);
+      // Add successfully inserted records to the grid
+      if (Array.isArray(successRecords) && successRecords.length > 0) {
+        setRowData((prev: any[]) => [...successRecords, ...prev]);
+        trackTelemetry(
+          TelemetryService.InsertRecords,
+          TelemetryStatus.Success,
+          {
+            NewRecordsCount: successRecords.length,
+          },
+        );
       }
 
-      trackTelemetry(TelemetryService.InsertRecords, TelemetryStatus.Success, {
-        NewRecordsCount: insertCount,
-      });
+      if (Array.isArray(failureRecords) && failureRecords.length > 0) {
+        toast.error(`${failureRecords.length} record(s) failed to insert`);
+        trackTelemetry(TelemetryService.InsertRecords, TelemetryStatus.Error, {
+          Error: JSON.stringify(failureRecords),
+          FailureRecordsCount: failureRecords.length,
+        });
+      }
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to insert records";
