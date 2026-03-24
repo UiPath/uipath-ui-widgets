@@ -41,6 +41,12 @@ export const getFieldValue = (
     return value;
   } else if (field && isFieldTypeDate(field) && value instanceof Date) {
     return value.toLocaleDateString();
+  } else if (field && isFieldTypeDateTime(field) && value instanceof Date) {
+    return value.toLocaleString();
+  } else if (field && isFieldTypeBoolean(field)) {
+    if (value === true) return "Yes";
+    if (value === false) return "No";
+    return "";
   }
   return value;
 };
@@ -80,6 +86,17 @@ export const createCellEditorSelector = (
       return {
         component: "agDateStringCellEditor",
       };
+    } else if (isFieldTypeNumeric(field)) {
+      return {
+        component: "agNumberCellEditor",
+      };
+    } else if (isFieldTypeBoolean(field)) {
+      return {
+        component: "agSelectCellEditor",
+        params: {
+          values: ["None", "Yes", "No"],
+        },
+      };
     }
     return undefined;
   };
@@ -89,12 +106,35 @@ export const isFieldTypeDate = (field: FieldMetaData): boolean => {
   return field.fieldDataType?.name === EntityFieldDataType.DATE;
 };
 
+export const isFieldTypeDateTime = (field: FieldMetaData): boolean => {
+  const type = field.fieldDataType?.name;
+  return (
+    type === EntityFieldDataType.DATETIME ||
+    type === EntityFieldDataType.DATETIME_WITH_TZ
+  );
+};
+
 export const isChoiceSetSingle = (field: FieldMetaData): boolean => {
   return field.fieldDisplayType === FieldDisplayType.ChoiceSetSingle;
 };
 
 export const isChoiceSetMultiple = (field: FieldMetaData): boolean => {
   return field.fieldDisplayType === FieldDisplayType.ChoiceSetMultiple;
+};
+
+export const isFieldTypeNumeric = (field: FieldMetaData): boolean => {
+  const type = field.fieldDataType?.name;
+  return (
+    type === EntityFieldDataType.INTEGER ||
+    type === EntityFieldDataType.BIG_INTEGER ||
+    type === EntityFieldDataType.DECIMAL ||
+    type === EntityFieldDataType.FLOAT ||
+    type === EntityFieldDataType.DOUBLE
+  );
+};
+
+export const isFieldTypeBoolean = (field: FieldMetaData): boolean => {
+  return field.fieldDataType?.name === EntityFieldDataType.BOOLEAN;
 };
 
 export const isFileField = (field: FieldMetaData): boolean => {

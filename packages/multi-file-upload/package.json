@@ -72,8 +72,7 @@
     "postcss-cli": "^11.0.1",
     "sass": "^1.83.4",
     "lightningcss": "^1.30.2",
-    "@tailwindcss/oxide": "^4.1.18",
-    "rollup": "^4.55.1"
+    "@tailwindcss/oxide": "^4.1.18"
   },
   "dependencies": {
     "@uipath/apollo-core": "^5.7.0",

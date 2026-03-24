@@ -5,6 +5,7 @@ import {
 } from "@uipath/uipath-typescript/entities";
 import { ColDef } from "ag-grid-community";
 import { useCallback, useState } from "react";
+import { DateTimeCellRenderer } from "../components/DateTimeCellRenderer";
 import { FileCellRenderer } from "../components/FileCellRenderer";
 import { GridRow, TelemetryService, TelemetryStatus } from "../types";
 import { deepClone } from "../utils/dataUtils";
@@ -15,6 +16,9 @@ import {
   getFieldValue,
   isChoiceSetMultiple,
   isChoiceSetSingle,
+  isFieldTypeBoolean,
+  isFieldTypeDate,
+  isFieldTypeDateTime,
   isFileField,
 } from "../utils/fieldUtils";
 import { trackTelemetry } from "../utils/telemetryUtils";
@@ -44,8 +48,9 @@ export const useEntityData = (
       const fetchedEntity = await entityService.getById(entityId);
       setEntity(fetchedEntity);
 
-      const records = await fetchedEntity.getRecords({
+      const records = await fetchedEntity.getAllRecords({
         expansionLevel: 2,
+        pageSize: 10000,
       });
       const items = records.items;
 
@@ -109,6 +114,10 @@ export const useEntityData = (
             ...columnConfig?.[f.displayName],
           };
 
+          if (isFieldTypeDate(f)) {
+            colDef.minWidth = 130;
+          }
+
           if (isFileField(f)) {
             colDef.cellRenderer = FileCellRenderer;
             colDef.cellRendererParams = {
@@ -117,6 +126,21 @@ export const useEntityData = (
               fieldName: f.name,
             };
             colDef.editable = false;
+          } else if (isFieldTypeDateTime(f)) {
+            colDef.cellRenderer = DateTimeCellRenderer;
+            colDef.cellRendererParams = { fieldName: f.name };
+            colDef.minWidth = 300; // This is the default width of datetime picker
+            colDef.editable = false;
+          } else if (isFieldTypeBoolean(f)) {
+            colDef.valueSetter = (params) => {
+              const map: Record<string, boolean | null> = {
+                Yes: true,
+                No: false,
+                None: null,
+              };
+              params.data[f.name] = map[params.newValue] ?? null;
+              return true;
+            };
           }
 
           return colDef;

@@ -43,7 +43,7 @@ export const useRowEditing = (
     rowId: string,
     fieldKey: string,
     originalValue: any,
-  ) => {
+  ): boolean => {
     // Restore original field value in the row data
     setRowData((prev) => {
       return prev.map((row: any) => {
@@ -54,29 +54,29 @@ export const useRowEditing = (
       });
     });
 
-    // Update edited rows map
-    setEditedRows((prev) => {
-      const updated = new Map(prev);
-      const editedRow = updated.get(rowId);
+    // Compute whether any edits will remain after this revert
+    const editedRow = editedRows.get(rowId);
+    const remainingEdits = new Map(editedRows);
 
-      if (editedRow) {
-        const newEditedRow = { ...editedRow, [fieldKey]: originalValue };
+    if (editedRow) {
+      const newEditedRow = { ...editedRow, [fieldKey]: originalValue };
+      const originalRow = originalData.find(
+        (row: any) => row.Id === rowId,
+      ) as any;
 
-        // Check if this row still has any changes
-        const originalRow = originalData.find(
-          (row: any) => row.Id === rowId,
-        ) as any;
-        const hasChanges = hasRowChanges(newEditedRow, originalRow);
-
-        if (hasChanges) {
-          updated.set(rowId, newEditedRow);
-        } else {
-          updated.delete(rowId);
-        }
+      if (hasRowChanges(newEditedRow, originalRow)) {
+        remainingEdits.set(rowId, newEditedRow);
+      } else {
+        remainingEdits.delete(rowId);
       }
+    }
 
-      return updated;
-    });
+    const noRemainingEdits = remainingEdits.size === 0;
+
+    // Update edited rows map
+    setEditedRows(remainingEdits);
+
+    return noRemainingEdits;
   };
 
   return {
