@@ -18,7 +18,7 @@ on:
         default: false
 
 permissions:
-  contents: read
+  contents: write
   packages: write
   id-token: write
 
@@ -49,6 +49,12 @@ jobs:
       - name: Build
         working-directory: packages/${{ inputs.package }}
         run: npm run build
+
+      - name: Build Storybook
+        run: npm run build-storybook
+
+      - name: Deploy Storybook to GitHub Pages
+        run: npx gh-pages -d storybook-static -b gh-pages -u "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
 
       - name: Publish to GitHub Packages
         working-directory: packages/${{ inputs.package }}
