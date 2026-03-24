@@ -8,7 +8,7 @@ export interface DateTimeCellRendererProps extends ICellRendererParams<GridRow> 
 }
 
 export const DateTimeCellRenderer = (props: DateTimeCellRendererProps) => {
-  const { fieldName, data, node, api } = props;
+  const { fieldName, data, node } = props;
   const currentValue = data?.[fieldName];
   const [value, setValue] = useState<Date | undefined>(
     currentValue ? new Date(currentValue) : undefined,
@@ -19,9 +19,8 @@ export const DateTimeCellRenderer = (props: DateTimeCellRendererProps) => {
       setValue(date);
       const newValue = date ? date.toISOString() : null;
       node.setDataValue(fieldName, newValue, "dateTimePicker");
-      api.refreshCells({ rowNodes: [node], columns: [fieldName] });
     },
-    [api, fieldName, node],
+    [fieldName, node],
   );
 
   return (
