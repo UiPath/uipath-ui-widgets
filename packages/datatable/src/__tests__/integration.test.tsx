@@ -122,6 +122,7 @@ vi.mock("ag-grid-react", () => ({
     getRowClass,
     isFullWidthRow,
     fullWidthCellRenderer,
+    pinnedTopRowData,
   }: any) => {
     // Store callbacks for testing
     storedOnCellValueChanged = onCellValueChanged;
@@ -151,11 +152,12 @@ vi.mock("ag-grid-react", () => ({
       }, 0);
     }
 
+    const allRows = [...(rowData || []), ...(pinnedTopRowData || [])];
     return (
       <div data-testid="ag-grid-integration">
-        <div data-testid="row-count">{rowData?.length || 0}</div>
+        <div data-testid="row-count">{allRows.length}</div>
         <div data-testid="column-count">{columnDefs?.length || 0}</div>
-        <div data-testid="row-data">{JSON.stringify(rowData)}</div>
+        <div data-testid="row-data">{JSON.stringify(allRows)}</div>
       </div>
     );
   },
@@ -194,7 +196,7 @@ describe("DataTable Integration Tests", () => {
           fieldDataType: { name: "STRING" },
         },
       ],
-      getRecords: vi.fn().mockResolvedValue({
+      getAllRecords: vi.fn().mockResolvedValue({
         items: [
           { Id: "row1", name: "Item 1", status: "Active" },
           { Id: "row2", name: "Item 2", status: "Inactive" },
@@ -727,7 +729,7 @@ describe("DataTable Group By Tests", () => {
           referenceField: { definition: { name: "categoryName" } },
         },
       ],
-      getRecords: vi.fn().mockResolvedValue({
+      getAllRecords: vi.fn().mockResolvedValue({
         items: [
           {
             Id: "row1",
