@@ -54,7 +54,11 @@ jobs:
         run: npm run build-storybook
 
       - name: Deploy Storybook to GitHub Pages
-        run: npx gh-pages -d storybook-static -b gh-pages -u "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          npx gh-pages -d storybook-static -b gh-pages
 
       - name: Publish to GitHub Packages
         working-directory: packages/${{ inputs.package }}
