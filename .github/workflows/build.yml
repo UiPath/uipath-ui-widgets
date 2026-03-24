@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -45,17 +45,3 @@ jobs:
 
       - name: Build Storybook
         run: npm run build-storybook
-
-      # ===== Release: Version, Publish, and Deploy (only on push to release/*) =====
-      - name: Release and deploy
-        if: github.event_name == 'push' && startsWith(github.ref_name, 'release/')
-        run: |
-          npx changeset version
-          npx changeset publish
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-          git add .changeset packages/*/CHANGELOG.md packages/*/package.json
-          git diff --staged --quiet || git commit -m "chore: version packages [skip ci]"
-          git push
-          npx gh-pages -d storybook-static -b gh-pages -u "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
