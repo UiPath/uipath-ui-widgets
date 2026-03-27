@@ -26,7 +26,7 @@ import { useEntityData } from "./hooks/useEntityData";
 import { useEntityRecordsCache } from "./hooks/useEntityRecordsCache";
 import { useRowEditing } from "./hooks/useRowEditing";
 import type { DataTableProps } from "./types";
-import { GridRow, TelemetryService, TelemetryStatus } from "./types";
+import { GridRow, IdColumn, TelemetryService, TelemetryStatus } from "./types";
 import { deepClone, getDiffData } from "./utils/dataUtils";
 import { getFieldValue } from "./utils/fieldUtils";
 
@@ -410,7 +410,7 @@ export const DataTable = ({
     // Create a new empty record with all column fields
     const newRecord: any = {};
     columnDefs.forEach((colDef) => {
-      if (colDef.field && colDef.field !== "Id") {
+      if (colDef.field && colDef.field !== IdColumn) {
         newRecord[colDef.field] = "";
       }
     });

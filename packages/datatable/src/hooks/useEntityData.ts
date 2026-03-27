@@ -8,7 +8,7 @@ import { useCallback, useState } from "react";
 import { DateTimeCellRenderer } from "../components/DateTimeCellRenderer";
 import { FileCellRenderer } from "../components/FileCellRenderer";
 import { MultilineTextCellRenderer } from "../components/MultilineTextCellRenderer";
-import { GridRow, TelemetryService, TelemetryStatus } from "../types";
+import { GridRow, IdColumn, TelemetryService, TelemetryStatus } from "../types";
 import { deepClone } from "../utils/dataUtils";
 import {
   ChoiceSetValuesMap,
@@ -58,12 +58,12 @@ export const useEntityData = (
 
       if (items.length > 0) {
         let nonSystemFields = fetchedEntity.fields.filter((f) =>
-          f.name === "Id" ? showIdColumn : !f.isSystemField,
+          f.name === IdColumn ? showIdColumn : !f.isSystemField,
         );
 
         // Move Id column to first position if showIdColumn is true
         if (showIdColumn) {
-          const idIndex = nonSystemFields.findIndex((f) => f.name === "Id");
+          const idIndex = nonSystemFields.findIndex((f) => f.name === IdColumn);
           if (idIndex > 0) {
             const idField = nonSystemFields[idIndex];
             nonSystemFields = [
@@ -116,7 +116,7 @@ export const useEntityData = (
             ...columnConfig?.[f.displayName],
           };
 
-          if (f.name === "Id") {
+          if (f.name === IdColumn) {
             colDef.editable = false;
           }
 

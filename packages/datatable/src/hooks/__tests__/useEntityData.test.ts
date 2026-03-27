@@ -8,6 +8,7 @@ import {
   EntityFieldDataType,
   FieldDisplayType,
 } from "@uipath/uipath-typescript/entities";
+import { IdColumn } from "../../types";
 
 // Mock telemetry
 vi.mock("@uipath/uipath-typescript/core", async (importOriginal) => {
@@ -39,8 +40,8 @@ describe("useEntityData", () => {
   };
 
   const idField = {
-    name: "Id",
-    displayName: "ID",
+    name: IdColumn,
+    displayName: IdColumn,
     isSystemField: true,
     isForeignKey: false,
     fieldDataType: { name: "STRING" },
@@ -147,7 +148,7 @@ describe("useEntityData", () => {
 
     expect(result.current.columnDefs).toHaveLength(3);
     // Id should be moved to first position
-    expect(result.current.columnDefs[0].field).toBe("Id");
+    expect(result.current.columnDefs[0].field).toBe(IdColumn);
     expect(result.current.columnDefs[1].field).toBe("name");
     expect(result.current.columnDefs[2].field).toBe("status");
   });
