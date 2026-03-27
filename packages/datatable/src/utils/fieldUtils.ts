@@ -10,6 +10,7 @@ import { ICellEditorParams, ValueSetterParams } from "ag-grid-community";
 import { ChoiceSetMultipleCellEditor } from "../components/ChoiceSetMultipleCellEditor";
 import { ChoiceSetSingleCellEditor } from "../components/ChoiceSetSingleCellEditor";
 import { RefFieldCellEditor } from "../components/RefFieldCellEditor";
+import { MultilineTextCellEditor } from "../components/MultilineTextCellEditor";
 import { GridRow } from "../types";
 
 // Maps choiceSetId → (numberId → displayName)
@@ -97,6 +98,10 @@ export const createCellEditorSelector = (
           values: ["None", "Yes", "No"],
         },
       };
+    } else if (isFieldTypeMultilineText(field)) {
+      return {
+        component: MultilineTextCellEditor,
+      };
     }
     return undefined;
   };
@@ -135,6 +140,10 @@ export const isFieldTypeNumeric = (field: FieldMetaData): boolean => {
 
 export const isFieldTypeBoolean = (field: FieldMetaData): boolean => {
   return field.fieldDataType?.name === EntityFieldDataType.BOOLEAN;
+};
+
+export const isFieldTypeMultilineText = (field: FieldMetaData): boolean => {
+  return field.fieldDataType?.name === EntityFieldDataType.MULTILINE_TEXT;
 };
 
 export const isFileField = (field: FieldMetaData): boolean => {

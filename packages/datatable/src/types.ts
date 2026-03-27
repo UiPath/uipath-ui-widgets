@@ -40,3 +40,5 @@ export enum TelemetryStatus {
   Success = "DT.Success",
   Error = "DT.Error",
 }
+
+export const IdColumn = "Id";

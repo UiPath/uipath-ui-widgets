@@ -5,7 +5,7 @@ import {
   EntityFieldDataType,
 } from "@uipath/uipath-typescript/entities";
 import { vi } from "vitest";
-import { GridRow } from "../../src/types";
+import { GridRow, IdColumn } from "../../src/types";
 
 /**
  * Factory functions for creating mock data in tests
@@ -31,7 +31,11 @@ export const createMockEntity = (
     name: "TestEntity",
     displayName: "Test Entity",
     fields: [
-      createMockField({ name: "Id", displayName: "ID", isSystemField: true }),
+      createMockField({
+        name: IdColumn,
+        displayName: IdColumn,
+        isSystemField: true,
+      }),
       createMockField({ name: "name", displayName: "Name" }),
       createMockField({ name: "status", displayName: "Status" }),
     ],

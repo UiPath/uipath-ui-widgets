@@ -7,7 +7,8 @@ import { ColDef } from "ag-grid-community";
 import { useCallback, useState } from "react";
 import { DateTimeCellRenderer } from "../components/DateTimeCellRenderer";
 import { FileCellRenderer } from "../components/FileCellRenderer";
-import { GridRow, TelemetryService, TelemetryStatus } from "../types";
+import { MultilineTextCellRenderer } from "../components/MultilineTextCellRenderer";
+import { GridRow, IdColumn, TelemetryService, TelemetryStatus } from "../types";
 import { deepClone } from "../utils/dataUtils";
 import {
   ChoiceSetValuesMap,
@@ -19,6 +20,7 @@ import {
   isFieldTypeBoolean,
   isFieldTypeDate,
   isFieldTypeDateTime,
+  isFieldTypeMultilineText,
   isFileField,
 } from "../utils/fieldUtils";
 import { trackTelemetry } from "../utils/telemetryUtils";
@@ -56,12 +58,12 @@ export const useEntityData = (
 
       if (items.length > 0) {
         let nonSystemFields = fetchedEntity.fields.filter((f) =>
-          f.name === "Id" ? showIdColumn : !f.isSystemField,
+          f.name === IdColumn ? showIdColumn : !f.isSystemField,
         );
 
         // Move Id column to first position if showIdColumn is true
         if (showIdColumn) {
-          const idIndex = nonSystemFields.findIndex((f) => f.name === "Id");
+          const idIndex = nonSystemFields.findIndex((f) => f.name === IdColumn);
           if (idIndex > 0) {
             const idField = nonSystemFields[idIndex];
             nonSystemFields = [
@@ -114,6 +116,10 @@ export const useEntityData = (
             ...columnConfig?.[f.displayName],
           };
 
+          if (f.name === IdColumn) {
+            colDef.editable = false;
+          }
+
           if (isFieldTypeDate(f)) {
             colDef.minWidth = 130;
           }
@@ -140,6 +146,18 @@ export const useEntityData = (
               };
               params.data[f.name] = map[params.newValue] ?? null;
               return true;
+            };
+          } else if (isFieldTypeMultilineText(f)) {
+            colDef.cellRenderer = MultilineTextCellRenderer;
+            colDef.suppressKeyboardEvent = (params) => {
+              if (
+                params.editing &&
+                params.event.key === "Enter" &&
+                params.event.shiftKey
+              ) {
+                return true;
+              }
+              return false;
             };
           }
 

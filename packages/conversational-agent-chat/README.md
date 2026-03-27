@@ -5,11 +5,11 @@ A React component that provides a conversational AI chat interface powered by Ui
 ## Features
 
 - Real-time streaming responses from conversational agents
+- File attachment support with drag and drop
 - Tool call visualization and tracking
-- Support for side-by-side and embedded chat modes
-- Customizable welcome experience with suggestions
-- Automatic conversation and session management
-- Multi-conversation support with "New Chat" functionality
+- Conversation history management
+- Start new conversations or continue existing ones
+- Built on Apollo React chat components
 - Built with TypeScript for type safety
 
 ## Installation
@@ -23,49 +23,39 @@ npm install @uipath/ui-widgets-conversational-agent-chat
 This package requires the following peer dependencies:
 
 ```bash
-npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript
+npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript@^1.2.0
 ```
 
 ## Usage
 
-### Basic Example
+> **Note:** Add either `light` or `dark` class to your HTML `<body>` element to enable proper theming.
 
 ```tsx
 import { ConversationalAgentChat } from "@uipath/ui-widgets-conversational-agent-chat";
 import "@uipath/ui-widgets-conversational-agent-chat/ConversationalAgentChat.css";
 import { UiPath } from "@uipath/uipath-typescript/core";
+import { useEffect, useState } from "react";
 
 function App() {
-  const sdk = new UiPath({
-    // Your UiPath SDK configuration
-  });
+  const [sdk, setSdk] = useState<UiPath | null>(null);
+
+  useEffect(() => {
+    const init = async () => {
+      const uipath = new UiPath({
+        baseUrl: "https://cloud.uipath.com",
+        orgName: "your-org",
+        tenantName: "your-tenant",
+        secret: "your-secret",
+      });
+      await uipath.initialize();
+      setSdk(uipath);
+    };
+    init();
+  }, []);
+
+  if (!sdk) return <div>Loading...</div>;
 
   return <ConversationalAgentChat sdk={sdk} agentId={123} folderId={456} />;
-}
-```
-
-### Customized Example
-
-```tsx
-import { ConversationalAgentChat } from "@uipath/ui-widgets-conversational-agent-chat";
-import "@uipath/ui-widgets-conversational-agent-chat/ConversationalAgentChat.css";
-import { AutopilotChatMode } from "@uipath/apollo-react/material/components";
-
-function App() {
-  const sdk = new UiPath({
-    // Your UiPath SDK configuration
-  });
-
-  return (
-    <ConversationalAgentChat
-      sdk={sdk}
-      agentId={123}
-      folderId={456}
-      mode={AutopilotChatMode.SideBySide}
-      title="Custom Chat Title"
-      description="Ask me anything about your business data."
-    />
-  );
 }
 ```
 
@@ -73,27 +63,21 @@ function App() {
 
 ### Props
 
-| Prop          | Type                | Required | Default                                                             | Description                                       |
-| ------------- | ------------------- | -------- | ------------------------------------------------------------------- | ------------------------------------------------- |
-| `sdk`         | `UiPath`            | Yes      | -                                                                   | UiPath SDK instance for API communication         |
-| `agentId`     | `number`            | Yes      | -                                                                   | The ID of the conversational agent release to use |
-| `folderId`    | `number`            | Yes      | -                                                                   | The folder ID where conversations will be stored  |
-| `mode`        | `AutopilotChatMode` | No       | `AutopilotChatMode.SideBySide`                                      | Chat display mode (SideBySide or Embedded)        |
-| `title`       | `string`            | No       | `'Welcome to UiPath Autopilot Chat!'`                               | Title displayed in the first-run experience       |
-| `description` | `string`            | No       | `'Ask me anything about your data or how to use this application.'` | Description shown in the first-run experience     |
-
-### Chat Modes
-
-The component supports different display modes via the `mode` prop:
-
-- `AutopilotChatMode.SideBySide` - Displays the chat in a side panel
-- `AutopilotChatMode.Embedded` - Embeds the chat inline within your layout
+| Prop       | Type     | Required | Description                                      |
+| ---------- | -------- | -------- | ------------------------------------------------ |
+| `sdk`      | `UiPath` | Yes      | UiPath SDK instance for API communication        |
+| `agentId`  | `number` | Yes      | The ID of the conversational agent release       |
+| `folderId` | `number` | Yes      | The folder ID where conversations will be stored |
 
 ## Features in Detail
 
 ### Streaming Responses
 
 The component supports real-time streaming of AI responses, providing a smooth conversational experience as the agent generates its reply.
+
+### File Attachments
+
+Users can attach files to their messages via drag and drop or file picker.
 
 ### Tool Call Tracking
 

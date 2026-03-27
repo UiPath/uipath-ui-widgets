@@ -4,15 +4,15 @@ A powerful and flexible React datatable component built with ag-Grid, designed f
 
 ## Features
 
-- 🔄 **CRUD Operations**: Full support for Create, Read, Update, Delete operations
-- 📊 **Master-Detail View**: Group data by foreign key relationships
-- ✏️ **Inline Editing**: Edit cells directly with support for different field types
-- 🔍 **Filtering & Sorting**: Built-in filtering and sorting capabilities
-- 📄 **Pagination**: Efficient data pagination
-- 🎨 **Customizable**: Flexible column configuration and styling
-- 🔗 **Foreign Key Support**: Special handling for relationship fields
-- 📝 **Diff Viewer**: Review changes before committing
-- ✅ **Fully Tested**: Comprehensive unit test coverage
+- CRUD Operations: Full support for Create, Read, Update, Delete operations
+- Master-Detail View: Group data by foreign key relationships
+- Inline Editing: Edit cells directly with support for different field types
+- Choice Set Support: Single and multi-select choice set fields
+- Foreign Key Display: Resolved display names for reference fields
+- Filtering & Sorting: Built-in filtering and sorting capabilities
+- Pagination: Efficient data pagination via ag-Grid
+- Diff Viewer: Review changes before committing
+- Customizable: Flexible column configuration and styling
 
 ## Installation
 
@@ -20,31 +20,65 @@ A powerful and flexible React datatable component built with ag-Grid, designed f
 npm install @uipath/ui-widgets-datatable
 ```
 
+## Peer Dependencies
+
+This package requires the following peer dependencies:
+
+```bash
+npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript@^1.2.0
+```
+
 ## Usage
+
+> **Note:** Add either `light` or `dark` class to your HTML `<body>` element to enable proper theming.
 
 ```tsx
 import { DataTable } from "@uipath/ui-widgets-datatable";
-import { UiPath } from "@uipath/uipath-typescript/entities";
+import "@uipath/ui-widgets-datatable/DataTable.css";
+import { UiPath } from "@uipath/uipath-typescript/core";
+import { useEffect, useState } from "react";
 
 function App() {
-  const sdk = new UiPath({
-    /* config */
-  });
+  const [sdk, setSdk] = useState<UiPath | null>(null);
 
-  return <DataTable sdk={sdk} entityId="your-entity-id" pageSize={50} />;
+  useEffect(() => {
+    const init = async () => {
+      const uipath = new UiPath({
+        baseUrl: "https://cloud.uipath.com",
+        orgName: "your-org",
+        tenantName: "your-tenant",
+        secret: "your-secret",
+      });
+      await uipath.initialize();
+      setSdk(uipath);
+    };
+    init();
+  }, []);
+
+  if (!sdk) return <div>Loading...</div>;
+
+  return (
+    <DataTable
+      sdk={sdk}
+      entityId="your-entity-id"
+      pageSize={50}
+      showIdColumn={true}
+    />
+  );
 }
 ```
 
 ## Props
 
-| Prop            | Type                     | Required | Default | Description                 |
-| --------------- | ------------------------ | -------- | ------- | --------------------------- |
-| `sdk`           | `UiPath`                 | Yes      | -       | UiPath SDK instance         |
-| `entityId`      | `string`                 | Yes      | -       | ID of the entity to display |
-| `className`     | `string`                 | No       | `''`    | Additional CSS class name   |
-| `pageSize`      | `number`                 | No       | `50`    | Number of rows per page     |
-| `columnConfig`  | `Record<string, ColDef>` | No       | -       | Custom column configuration |
-| `rowClassRules` | `RowClassRules`          | No       | -       | Custom row styling rules    |
+| Prop                          | Type                     | Required | Default | Description                                                   |
+| ----------------------------- | ------------------------ | -------- | ------- | ------------------------------------------------------------- |
+| `sdk`                         | `UiPath`                 | Yes      | -       | UiPath SDK instance                                           |
+| `entityId`                    | `string`                 | Yes      | -       | The UUID of the Data Fabric entity to display                 |
+| `pageSize`                    | `number`                 | No       | `50`    | Number of rows per page                                       |
+| `showIdColumn`                | `boolean`                | No       | -       | Whether to show the Id column in the grid                     |
+| `columnConfig`                | `Record<string, ColDef>` | No       | -       | Column configuration overrides keyed by display name          |
+| `rowClassRules`               | `RowClassRules`          | No       | -       | ag-Grid row class rules for conditional row styling           |
+| `customPaddingForExpandedRow` | `number`                 | No       | -       | Custom padding (in pixels) for expanded rows in group-by mode |
 
 ## Features in Detail
 
@@ -87,9 +121,15 @@ Group records by foreign key relationships:
 The datatable automatically handles different field types:
 
 - **Text**: Standard text input
-- **Number**: Numeric input
+- **Multiline Text**: Textarea editor with Shift+Enter for new lines
+- **Number**: Numeric input (Integer, Decimal, Float, Double, Big Integer)
 - **Date**: Date picker
+- **DateTime**: Date-time display (read-only)
+- **Boolean**: Yes/No/None select
+- **Choice Set (Single)**: Dropdown with choice set values
+- **Choice Set (Multiple)**: Multi-select with choice set values
 - **Foreign Key**: Dropdown with reference entity records
+- **File**: File upload, download, and removal
 
 ### Custom Column Configuration
 
@@ -120,6 +160,16 @@ The datatable automatically handles different field types:
 />
 ```
 
+## Styling
+
+The component comes with default styles. Import the CSS file in your application:
+
+```tsx
+import "@uipath/ui-widgets-datatable/DataTable.css";
+```
+
+The interface supports both light and dark themes through the UiPath Apollo design system.
+
 ## Development
 
 ### Running Tests
@@ -129,7 +179,7 @@ The datatable automatically handles different field types:
 npm test
 
 # Run tests in watch mode
-npm test -- --watch
+npm run test:watch
 
 # Run tests with UI
 npm run test:ui
@@ -144,49 +194,14 @@ npm run test:coverage
 npm run build
 ```
 
-## Architecture
+## TypeScript Support
 
-### Components
+This package is written in TypeScript and includes type definitions. Import types as needed:
 
-- **DataTable**: Main component that orchestrates the entire datatable
-- **Toolbar**: Action buttons and controls
-- **DiffDialog**: Modal for reviewing changes
-- **DetailPanel**: Nested grid for master-detail view
-- **CellWithExpandButton**: Custom cell renderer with expand/collapse
-- **RefFieldCellEditor**: Custom editor for foreign key fields
-
-### Hooks
-
-- **useEntityData**: Manages entity data fetching and column definitions
-- **useRowEditing**: Handles row editing state and operations
-- **useEntityRecordsCache**: Caches entity records for performance
-
-### Utils
-
-- **dataUtils**: Data manipulation utilities (deepClone, getDiffData, hasRowChanges)
-- **fieldUtils**: Field-related utilities (getFieldValue, createValueSetter, createCellEditorSelector)
-
-## Testing
-
-This package includes comprehensive unit tests following best practices:
-
-- **Utils**: 100% coverage of utility functions
-- **Hooks**: Full coverage of custom hooks with various scenarios
-- **Components**: Component rendering, user interactions, and edge cases
-
-See [TEST_GUIDE.md](../../TEST_GUIDE.md) for detailed testing guidelines.
-
-## Browser Support
-
-- Chrome (latest)
-- Firefox (latest)
-- Safari (latest)
-- Edge (latest)
+```tsx
+import type { DataTableProps } from "@uipath/ui-widgets-datatable";
+```
 
 ## License
 
 MIT
-
-## Contributing
-
-Contributions are welcome! Please follow the testing guidelines and ensure all tests pass before submitting a PR.

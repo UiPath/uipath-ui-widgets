@@ -187,10 +187,12 @@ function App() {
     agentId: {
       description: "ID of the conversational agent to use",
       control: "number",
+      type: { name: "number", required: true },
     },
     folderId: {
       description: "ID of the folder containing the agent",
       control: "number",
+      type: { name: "number", required: true },
     },
   },
   args: {
