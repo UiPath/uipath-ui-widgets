@@ -1,9 +1,34 @@
 import { UiPath } from "@uipath/uipath-typescript/core";
 
+export type Locale =
+  | "en"
+  | "es"
+  | "pt"
+  | "de"
+  | "fr"
+  | "ja"
+  | "ko"
+  | "ru"
+  | "tr"
+  | "zh-CN"
+  | "zh-TW"
+  | "pt-BR"
+  | "es-MX";
+
+export interface OverrideLabels {
+  title?: string;
+  footerDisclaimer?: string;
+  inputPlaceholder?: string;
+}
+
 export interface ConversationalAgentChatProps {
   sdk: UiPath;
   agentId: number;
   folderId: number;
+  locale?: Locale;
+  theme?: "light" | "dark" | "light-hc" | "dark-hc";
+  readOnly?: boolean;
+  overrideLabels?: OverrideLabels;
 }
 
 export enum MessageWidget {
