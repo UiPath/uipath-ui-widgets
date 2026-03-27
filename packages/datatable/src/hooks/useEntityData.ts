@@ -7,6 +7,7 @@ import { ColDef } from "ag-grid-community";
 import { useCallback, useState } from "react";
 import { DateTimeCellRenderer } from "../components/DateTimeCellRenderer";
 import { FileCellRenderer } from "../components/FileCellRenderer";
+import { MultilineTextCellRenderer } from "../components/MultilineTextCellRenderer";
 import { GridRow, TelemetryService, TelemetryStatus } from "../types";
 import { deepClone } from "../utils/dataUtils";
 import {
@@ -19,6 +20,7 @@ import {
   isFieldTypeBoolean,
   isFieldTypeDate,
   isFieldTypeDateTime,
+  isFieldTypeMultilineText,
   isFileField,
 } from "../utils/fieldUtils";
 import { trackTelemetry } from "../utils/telemetryUtils";
@@ -114,6 +116,10 @@ export const useEntityData = (
             ...columnConfig?.[f.displayName],
           };
 
+          if (f.name === "Id") {
+            colDef.editable = false;
+          }
+
           if (isFieldTypeDate(f)) {
             colDef.minWidth = 130;
           }
@@ -140,6 +146,18 @@ export const useEntityData = (
               };
               params.data[f.name] = map[params.newValue] ?? null;
               return true;
+            };
+          } else if (isFieldTypeMultilineText(f)) {
+            colDef.cellRenderer = MultilineTextCellRenderer;
+            colDef.suppressKeyboardEvent = (params) => {
+              if (
+                params.editing &&
+                params.event.key === "Enter" &&
+                params.event.shiftKey
+              ) {
+                return true;
+              }
+              return false;
             };
           }
 

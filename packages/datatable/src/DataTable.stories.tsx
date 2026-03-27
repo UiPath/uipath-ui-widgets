@@ -183,6 +183,7 @@ function App() {
     entityId: {
       description: "The UUID of the Data Fabric entity to display",
       control: "text",
+      type: { name: "string", required: true },
     },
     pageSize: {
       description: "Number of rows per page in the ag-Grid pagination",
