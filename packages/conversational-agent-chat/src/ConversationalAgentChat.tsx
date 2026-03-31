@@ -49,6 +49,10 @@ import {
 } from "./utils";
 import { trackTelemetry } from "./utils/telemetryUtils";
 
+const DEFAULT_FOOTER_DISCLAIMER =
+  "Agent can make mistakes. Please double check the responses.";
+const DEFAULT_INPUT_PLACEHOLDER = "Talk with your agent...";
+
 export const ConversationalAgentChat = ({
   sdk,
   agentId,
@@ -458,12 +462,12 @@ export const ConversationalAgentChat = ({
           },
           overrideLabels: {
             title: overrideLabelsRef.current?.title ?? agentRelease.name,
-            ...(overrideLabelsRef.current?.footerDisclaimer !== undefined && {
-              footerDisclaimer: overrideLabelsRef.current.footerDisclaimer,
-            }),
-            ...(overrideLabelsRef.current?.inputPlaceholder !== undefined && {
-              inputPlaceholder: overrideLabelsRef.current.inputPlaceholder,
-            }),
+            footerDisclaimer:
+              overrideLabelsRef.current?.footerDisclaimer ??
+              DEFAULT_FOOTER_DISCLAIMER,
+            inputPlaceholder:
+              overrideLabelsRef.current?.inputPlaceholder ??
+              DEFAULT_INPUT_PLACEHOLDER,
           },
           paginatedHistory: true,
           disabledFeatures: {
