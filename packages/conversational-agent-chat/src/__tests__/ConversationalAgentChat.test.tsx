@@ -319,6 +319,9 @@ describe("ConversationalAgentChat", () => {
             config: expect.objectContaining({
               overrideLabels: {
                 title: "Test Agent",
+                footerDisclaimer:
+                  "Agent can make mistakes. Please double check the responses.",
+                inputPlaceholder: "Talk with your agent...",
               },
             }),
           }),
