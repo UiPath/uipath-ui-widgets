@@ -7,6 +7,7 @@ import {
   AutopilotChatMode,
   AutopilotChatService,
 } from "@uipath/apollo-react/material/components";
+import { i18n } from "@lingui/core";
 import { Alert, AlertDescription, Button } from "@uipath/apollo-wind";
 import {
   ContentPartChunkEvent,
@@ -23,7 +24,13 @@ import {
   ToolCallEndEvent,
   ToolCallStream,
 } from "@uipath/uipath-typescript/conversational-agent";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { FeedbackDialog } from "./components/FeedbackDialog";
 import "./ConversationalAgentChat.css";
 import {
@@ -42,14 +49,29 @@ import {
 } from "./utils";
 import { trackTelemetry } from "./utils/telemetryUtils";
 
+const DEFAULT_FOOTER_DISCLAIMER =
+  "Agent can make mistakes. Please double check the responses.";
+const DEFAULT_INPUT_PLACEHOLDER = "Talk with your agent...";
+
 export const ConversationalAgentChat = ({
   sdk,
   agentId,
   folderId,
+  locale = "en",
+  theme = "light",
+  readOnly = false,
+  overrideLabels,
 }: ConversationalAgentChatProps) => {
   const agentService = useRef(new ConversationalAgent(sdk));
   const currentConversation = useRef<ConversationCreateResponse | null>(null);
   const initializedFor = useRef<string | null>(null);
+  // Refs for values used in initChat that shouldn't trigger re-initialization
+  const localeRef = useRef(locale);
+  localeRef.current = locale;
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
+  const overrideLabelsRef = useRef(overrideLabels);
+  overrideLabelsRef.current = overrideLabels;
   const session = useRef<SessionStream | null>(null);
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
@@ -423,6 +445,9 @@ export const ConversationalAgentChat = ({
       const chatServiceInstance = AutopilotChatService.Instantiate({
         config: {
           mode: AutopilotChatMode.Embedded,
+          locale: localeRef.current,
+          theme: themeRef.current,
+          readOnly,
           firstRunExperience: {
             title:
               agentRelease.appearance?.welcomeTitle ||
@@ -436,9 +461,13 @@ export const ConversationalAgentChat = ({
             ),
           },
           overrideLabels: {
-            title: agentRelease.name,
+            title: overrideLabelsRef.current?.title ?? agentRelease.name,
             footerDisclaimer:
-              "Agent can make mistakes. Please double check the responses.",
+              overrideLabelsRef.current?.footerDisclaimer ??
+              DEFAULT_FOOTER_DISCLAIMER,
+            inputPlaceholder:
+              overrideLabelsRef.current?.inputPlaceholder ??
+              DEFAULT_INPUT_PLACEHOLDER,
           },
           paginatedHistory: true,
           disabledFeatures: {
@@ -455,7 +484,7 @@ export const ConversationalAgentChat = ({
       setError(message);
       initializedFor.current = null;
     }
-  }, [agentId, folderId]);
+  }, [agentId, folderId, readOnly]);
 
   const handleReload = useCallback(() => {
     initializedFor.current = null;
@@ -514,6 +543,31 @@ export const ConversationalAgentChat = ({
       initChat();
     }
   }, [agentId, folderId, initChat]);
+
+  // Update locale/theme on the existing service. Locale must be set
+  // synchronously (not in an effect) so that when ApChat remounts via
+  // key={locale}, its LocaleProvider reads the correct value from
+  // chatService.getLocale() on first render.
+  // Sync locale to the service and Lingui before ApChat remounts via
+  // key={locale}. Uses useLayoutEffect so the values are set before the
+  // browser paints. We set _locale directly instead of calling
+  // setLocale()/activate() because those publish events that trigger
+  // setState in other components.
+  useLayoutEffect(() => {
+    if (chatService && chatService.getLocale() !== locale) {
+      /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/immutability */
+      // Mutating internal properties directly to avoid triggering event-bus
+      // side effects (setState in other components). The key={locale} on
+      // ApChat ensures a clean remount that reads these values.
+      (chatService as any)._locale = locale;
+      (i18n as any)._locale = locale;
+      /* eslint-enable @typescript-eslint/no-explicit-any, react-hooks/immutability */
+    }
+  }, [chatService, locale]);
+
+  useEffect(() => {
+    chatService?.setTheme(theme);
+  }, [chatService, theme]);
 
   // Register event handlers after chatService is available
   useEffect(() => {
@@ -589,7 +643,13 @@ export const ConversationalAgentChat = ({
       )}
 
       {!error && chatService && (
-        <ApChat chatServiceInstance={chatService} locale="en" theme="light" />
+        <ApChat
+          key={locale}
+          chatServiceInstance={chatService}
+          locale={locale}
+          theme={theme}
+          enableInternalThemeProvider
+        />
       )}
 
       <FeedbackDialog

@@ -147,6 +147,14 @@ function App() {
       sdk={sdk}
       agentId={123}
       folderId={456}
+      locale="en"
+      theme="light"
+      readOnly={false}
+      overrideLabels={{
+        title: "My Agent",
+        footerDisclaimer: "Custom disclaimer",
+        inputPlaceholder: "Ask me anything...",
+      }}
     />
   );
 }
@@ -194,6 +202,39 @@ function App() {
       control: "number",
       type: { name: "number", required: true },
     },
+    locale: {
+      description: "Locale for the chat UI",
+      control: "select",
+      options: [
+        "en",
+        "es",
+        "pt",
+        "de",
+        "fr",
+        "ja",
+        "ko",
+        "ru",
+        "tr",
+        "zh-CN",
+        "zh-TW",
+        "pt-BR",
+        "es-MX",
+      ],
+    },
+    theme: {
+      description: "Visual theme for the chat UI",
+      control: "select",
+      options: ["light", "dark", "light-hc", "dark-hc"],
+    },
+    readOnly: {
+      description: "When true, disables user input",
+      control: "boolean",
+    },
+    overrideLabels: {
+      description:
+        "Override default labels for title, footer disclaimer, and input placeholder",
+      control: "object",
+    },
   },
   args: {
     baseUrl: "cloud.uipath.com",
@@ -202,6 +243,10 @@ function App() {
     secret: "",
     agentId: 0,
     folderId: 0,
+    locale: "en",
+    theme: "light",
+    readOnly: false,
+    overrideLabels: undefined,
   },
 } satisfies Meta<typeof ConversationalAgentChatWithSdk>;
 
@@ -214,6 +259,63 @@ export const Default: Story = {
       description: {
         story:
           "Default conversational agent chat. Fill in the SDK configuration, agent ID, and folder ID in the controls panel to start chatting.",
+      },
+    },
+  },
+};
+
+export const DarkTheme: Story = {
+  args: {
+    theme: "dark",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: "Chat widget using the dark theme.",
+      },
+    },
+  },
+};
+
+export const Japanese: Story = {
+  args: {
+    locale: "ja",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: "Chat widget with Japanese locale.",
+      },
+    },
+  },
+};
+
+export const ReadOnly: Story = {
+  args: {
+    readOnly: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: "Chat widget in read-only mode with user input disabled.",
+      },
+    },
+  },
+};
+
+export const CustomLabels: Story = {
+  args: {
+    overrideLabels: {
+      title: "Support Assistant",
+      footerDisclaimer: "Responses are AI-generated and may be inaccurate.",
+      inputPlaceholder: "Describe your issue...",
+    },
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Chat widget with custom title, footer disclaimer, and input placeholder.",
       },
     },
   },

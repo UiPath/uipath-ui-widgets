@@ -18,13 +18,16 @@ const createMockChatService = () => ({
   stopResponse: vi.fn(),
   clearError: vi.fn(),
   appendOlderHistoryItems: vi.fn(),
+  setLocale: vi.fn(),
+  setTheme: vi.fn(),
+  getLocale: vi.fn().mockReturnValue("en"),
 });
 
 let mockChatService = createMockChatService();
 
 vi.mock("@uipath/apollo-react/material/components", () => ({
-  ApChat: ({ chatServiceInstance }: any) => (
-    <div data-testid="ap-chat">
+  ApChat: ({ chatServiceInstance, locale, theme }: any) => (
+    <div data-testid="ap-chat" data-locale={locale} data-theme={theme}>
       {chatServiceInstance ? "Chat Loaded" : "Loading..."}
     </div>
   ),
@@ -318,6 +321,7 @@ describe("ConversationalAgentChat", () => {
                 title: "Test Agent",
                 footerDisclaimer:
                   "Agent can make mistakes. Please double check the responses.",
+                inputPlaceholder: "Talk with your agent...",
               },
             }),
           }),
@@ -349,12 +353,40 @@ describe("ConversationalAgentChat", () => {
     );
   });
 
-  it("should render with correct locale and theme", async () => {
+  it("should render with default locale 'en' when no locale prop is provided", async () => {
     render(<ConversationalAgentChat {...defaultProps} />);
 
     await waitFor(
       () => {
-        expect(screen.getByTestId("ap-chat")).toBeInTheDocument();
+        const apChat = screen.getByTestId("ap-chat");
+        expect(apChat).toBeInTheDocument();
+        expect(apChat).toHaveAttribute("data-locale", "en");
+        expect(apChat).toHaveAttribute("data-theme", "light");
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it("should pass custom locale to ApChat", async () => {
+    render(<ConversationalAgentChat {...defaultProps} locale="ja" />);
+
+    await waitFor(
+      () => {
+        const apChat = screen.getByTestId("ap-chat");
+        expect(apChat).toBeInTheDocument();
+        expect(apChat).toHaveAttribute("data-locale", "ja");
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it("should pass custom theme to ApChat", async () => {
+    render(<ConversationalAgentChat {...defaultProps} theme="dark" />);
+
+    await waitFor(
+      () => {
+        const apChat = screen.getByTestId("ap-chat");
+        expect(apChat).toHaveAttribute("data-theme", "dark");
       },
       { timeout: 3000 },
     );
@@ -411,6 +443,46 @@ describe("ConversationalAgentChat", () => {
           expect.objectContaining({
             config: expect.objectContaining({
               paginatedHistory: true,
+            }),
+          }),
+        );
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it("should not set readOnly in config by default", async () => {
+    const { AutopilotChatService } =
+      await import("@uipath/apollo-react/material/components");
+
+    render(<ConversationalAgentChat {...defaultProps} />);
+
+    await waitFor(
+      () => {
+        expect(AutopilotChatService.Instantiate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            config: expect.objectContaining({
+              readOnly: false,
+            }),
+          }),
+        );
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it("should pass readOnly to AutopilotChatService config when true", async () => {
+    const { AutopilotChatService } =
+      await import("@uipath/apollo-react/material/components");
+
+    render(<ConversationalAgentChat {...defaultProps} readOnly={true} />);
+
+    await waitFor(
+      () => {
+        expect(AutopilotChatService.Instantiate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            config: expect.objectContaining({
+              readOnly: true,
             }),
           }),
         );
