@@ -1,7 +1,7 @@
 {
-  "name": "@uipath/ui-widgets-multi-file-upload",
-  "version": "1.0.0",
-  "description": "A React component for uploading multiple files simultaneously to UiPath Orchestrator Storage Bucket",
+  "name": "@uipath/ui-widgets-validation-station",
+  "version": "1.0.1-beta.3",
+  "description": "A React component for UiPath Document Understanding Validation Station.",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
@@ -11,15 +11,16 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./MultiFileUpload.css": "./dist/MultiFileUpload.css"
+    "./ValidationStation.css": "./dist/ValidationStation.css"
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "npm run clean && tsc && npm run copy-styles",
+    "prepack": "rimraf *.tgz",
+    "build": "npm run clean && tsc",
     "clean": "rimraf dist",
-    "copy-styles": "sass --no-source-map src/MultiFileUpload.scss | postcss -o dist/MultiFileUpload.css",
+    "copy-styles": "sass --no-source-map src/ValidationStation.scss | postcss -o dist/ValidationStation.css",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
@@ -27,34 +28,27 @@
   },
   "keywords": [
     "react",
-    "multi-file-upload",
-    "upload",
-    "tailwind",
-    "tailwindcss",
-    "ui"
+    "validation-station",
+    "validation",
+    "ui-widgets"
   ],
-  "author": "UiPath",
+  "author": "",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/UiPath/uipath-ui-widgets.git",
-    "directory": "packages/multi-file-upload"
+    "directory": "packages/validation-station"
   },
   "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org"
+    "registry": "https://npm.pkg.github.com"
   },
-  "bugs": {
-    "url": "https://github.com/UiPath/uipath-ui-widgets/issues"
-  },
-  "homepage": "https://uipath.github.io/uipath-ui-widgets/?path=/docs/components-multifileupload--docs",
   "peerDependencies": {
+    "@uipath/uipath-typescript": "^1.2.2",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "@uipath/uipath-typescript": "^1.2.2"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "rimraf": "^6.0.1",
+    "@tailwindcss/oxide": "^4.1.18",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
@@ -65,17 +59,19 @@
     "@vitest/coverage-v8": "^4.0.18",
     "@vitest/ui": "^4.0.18",
     "jsdom": "^25.0.1",
-    "typescript": "~5.9.3",
-    "vite": "^6.0.3",
-    "vitest": "^4.0.18",
+    "lightningcss": "^1.30.2",
     "postcss": "^8.5.6",
     "postcss-cli": "^11.0.1",
+    "rimraf": "^6.0.1",
+    "rollup": "^4.55.1",
     "sass": "^1.83.4",
-    "lightningcss": "^1.30.2",
-    "@tailwindcss/oxide": "^4.1.18"
+    "typescript": "~5.9.3",
+    "vite": "^6.0.3",
+    "vitest": "^4.0.18"
   },
   "dependencies": {
-    "@uipath/apollo-core": "^5.7.0",
-    "@uipath/apollo-wind": "^0.10.0"
+    "@uipath/du-shared-util-mfe": "2.6.4",
+    "@uipath/du-validation-station-wc": "1.0.0-beta21",
+    "fflate": "^0.8.2"
   }
 }

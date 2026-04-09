@@ -1,10 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
+  Box,
   Grid,
   List,
   ListItem,
   ListItemButton,
   ListItemText,
+  Tab,
+  Tabs,
+  Typography,
+  Button,
 } from "@mui/material";
 import { ConversationalAgentChat } from "@uipath/ui-widgets-conversational-agent-chat";
 import { DataTable } from "@uipath/ui-widgets-datatable";
@@ -12,8 +17,19 @@ import { MultiFileUpload } from "@uipath/ui-widgets-multi-file-upload";
 import "@uipath/ui-widgets-multi-file-upload/MultiFileUpload.css";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import { Entities } from "@uipath/uipath-typescript/entities";
+import { Tasks, TaskType } from "@uipath/uipath-typescript/tasks";
+import type {
+  RawTaskGetResponse,
+  TaskGetResponse,
+} from "@uipath/uipath-typescript/tasks";
+import type { ContentValidationData } from "@uipath/du-shared-util-mfe";
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
+import {
+  ValidationStation,
+  type ISetFieldValueParameters,
+  type ISelectAndFocusFieldValueParams,
+} from "@uipath/ui-widgets-validation-station";
 
 interface AppProps {
   uipathSdk: UiPath;
@@ -31,6 +47,23 @@ function App({ uipathSdk }: AppProps) {
     import.meta.env.VITE_SELECTED_ENTITY_ID,
   );
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState(
+    parseInt(import.meta.env.VITE_DEFAULT_TAB || "0"),
+  );
+
+  const [taskList, setTaskList] = useState<RawTaskGetResponse[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [setFieldValue, setSetFieldValue] = useState<
+    ISetFieldValueParameters[] | undefined
+  >(undefined);
+  const [selectAndFocusFieldValue, setSelectAndFocusFieldValue] = useState<
+    ISelectAndFocusFieldValueParams | undefined
+  >(undefined);
+  const [selectedTask, setSelectedTask] = useState<TaskGetResponse | null>(
+    null,
+  );
+  const [taskLoading, setTaskLoading] = useState(false);
 
   const columnConfig = useMemo(
     () => ({
@@ -41,7 +74,7 @@ function App({ uipathSdk }: AppProps) {
       "Inventory Left": {
         cellClassRules: {
           "datatable-cell-low-inventory": (params: any) =>
-            params.data.inventoryLeft < 3, // params.data = entity record
+            params.data.inventoryLeft < 3,
         },
       },
     }),
@@ -57,6 +90,7 @@ function App({ uipathSdk }: AppProps) {
   );
 
   useEffect(() => {
+    if (activeTab !== 0) return;
     const fetchEntities = async () => {
       try {
         setLoading(true);
@@ -71,7 +105,56 @@ function App({ uipathSdk }: AppProps) {
     };
 
     fetchEntities();
-  }, [uipathSdk]);
+  }, [activeTab, uipathSdk]);
+
+  useEffect(() => {
+    if (activeTab !== 1) return;
+    const fetchTasks = async () => {
+      try {
+        setTasksLoading(true);
+        const tasksService = new Tasks(uipathSdk);
+        const result = await tasksService.getAll();
+        setTaskList(
+          result.items.filter(
+            (task) => task.type === TaskType.DocumentValidation,
+          ),
+        );
+      } catch (error) {
+        console.error("Failed to fetch tasks:", error);
+      } finally {
+        setTasksLoading(false);
+      }
+    };
+    fetchTasks();
+  }, [uipathSdk, activeTab]);
+
+  useEffect(() => {
+    if (selectedTaskId == null) return;
+    const listTask = taskList.find((t) => t.id === selectedTaskId);
+    if (!listTask) return;
+
+    let cancelled = false;
+    const fetchTask = async () => {
+      try {
+        setTaskLoading(true);
+        const tasksService = new Tasks(uipathSdk);
+        const task = await tasksService.getById(
+          selectedTaskId,
+          { taskType: TaskType.DocumentValidation },
+          listTask.folderId,
+        );
+        if (!cancelled) setSelectedTask(task);
+      } catch (error) {
+        console.error("Failed to fetch task:", error);
+      } finally {
+        if (!cancelled) setTaskLoading(false);
+      }
+    };
+    fetchTask();
+    return () => {
+      cancelled = true;
+    };
+  }, [uipathSdk, selectedTaskId, taskList]);
 
   return (
     <div className="app-container">
@@ -80,97 +163,236 @@ function App({ uipathSdk }: AppProps) {
         <p>Explore and manage your data entities with elegance</p>
       </div>
 
-      <div className="app-grid">
-        <div className="entity-sidebar">
-          <div className="entity-sidebar-header">📊 Data Entities</div>
-          <List className="entity-list">
-            {loading ? (
-              <div className="loading-container">
-                <div className="loading-spinner"></div>
-                <div className="loading-text">Loading entities...</div>
-              </div>
-            ) : entities.length === 0 ? (
-              <ListItem>
-                <ListItemText primary="No entities found" />
-              </ListItem>
-            ) : (
-              entities.map((entity) => (
-                <ListItem
-                  key={entity.id}
-                  disablePadding
-                  className="entity-list-item"
-                >
-                  <ListItemButton
-                    className="entity-list-button"
-                    selected={selectedEntityId === entity.id}
-                    onClick={() => setSelectedEntityId(entity.id)}
-                  >
-                    <ListItemText
-                      className="entity-list-text"
-                      primary={entity.displayName || entity.name}
-                    />
-                  </ListItemButton>
-                </ListItem>
-              ))
-            )}
-          </List>
-        </div>
+      <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}>
+          <Tab label="DataTable" />
+          <Tab label="Validation Station" />
+          <Tab label="Multi File Upload" />
+          <Tab label="Conversational Agent" />
+        </Tabs>
+      </Box>
 
-        <div className="content-area">
-          {selectedEntityId ? (
-            <>
-              <div className="content-header">
-                <div className="content-header-icon">📋</div>
-                <h2 className="content-header-title">
-                  {entities.find((e) => e.id === selectedEntityId)
-                    ?.displayName || "Entity Data"}
-                </h2>
-              </div>
-              <div className="datatable-wrapper">
-                <DataTable
-                  sdk={uipathSdk}
-                  entityId={selectedEntityId}
-                  pageSize={20}
-                  columnConfig={columnConfig}
-                  rowClassRules={rowClassRules}
-                  customPaddingForExpandedRow={80}
-                />
-              </div>
-            </>
-          ) : (
-            <div className="empty-state">
-              <Grid container spacing={2} height={"100%"}>
-                <Grid size={6}>
-                  <MultiFileUpload
-                    sdk={uipathSdk}
-                    bucketId={parseInt(import.meta.env.VITE_MFU_BUCKET_ID)}
-                    folderId={parseInt(
-                      import.meta.env.VITE_MFU_BUCKET_FOLDER_ID,
-                    )}
-                    maxFileSizeInMb={2}
-                    accept="image/*"
-                    onUploadSuccess={(files: File[]) => {
-                      console.log("Files uploaded:", files);
-                    }}
-                    onUploadError={(error: Error) => {
-                      console.error("Upload error:", error);
-                    }}
-                  />
-                </Grid>
-                <Grid size={6} height={800}>
-                  <ConversationalAgentChat
-                    sdk={uipathSdk}
-                    agentId={parseInt(import.meta.env.VITE_CONV_AGENT_ID)}
-                    folderId={parseInt(
-                      import.meta.env.VITE_CONV_AGENT_FOLDER_ID,
-                    )}
-                  />
-                </Grid>
-              </Grid>
+      <Box sx={{ flex: 1, overflow: "auto", height: "calc(100vh - 160px)" }}>
+        {activeTab === 0 && (
+          <div className="app-grid">
+            <div className="entity-sidebar">
+              <div className="entity-sidebar-header">Data Entities</div>
+              <List
+                className="entity-list"
+                sx={{ maxHeight: "calc(100vh - 220px)", overflow: "auto" }}
+              >
+                {loading ? (
+                  <div className="loading-container">
+                    <div className="loading-spinner"></div>
+                    <div className="loading-text">Loading entities...</div>
+                  </div>
+                ) : entities.length === 0 ? (
+                  <ListItem>
+                    <ListItemText primary="No entities found" />
+                  </ListItem>
+                ) : (
+                  entities.map((entity) => (
+                    <ListItem
+                      key={entity.id}
+                      disablePadding
+                      className="entity-list-item"
+                    >
+                      <ListItemButton
+                        className="entity-list-button"
+                        selected={selectedEntityId === entity.id}
+                        onClick={() => setSelectedEntityId(entity.id)}
+                      >
+                        <ListItemText
+                          className="entity-list-text"
+                          primary={entity.displayName || entity.name}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  ))
+                )}
+              </List>
             </div>
-          )}
-        </div>
-      </div>
+
+            <div className="content-area">
+              {selectedEntityId ? (
+                <>
+                  <div className="content-header">
+                    <div className="content-header-icon">📋</div>
+                    <h2 className="content-header-title">
+                      {entities.find((e) => e.id === selectedEntityId)
+                        ?.displayName || "Entity Data"}
+                    </h2>
+                  </div>
+                  <div className="datatable-wrapper">
+                    <DataTable
+                      sdk={uipathSdk}
+                      entityId={selectedEntityId}
+                      pageSize={20}
+                      columnConfig={columnConfig}
+                      rowClassRules={rowClassRules}
+                      customPaddingForExpandedRow={80}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="empty-state">
+                  <p>Select an entity from the sidebar to view its data</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 1 && (
+          <Grid container sx={{ height: "100%" }}>
+            <Grid
+              size={3}
+              sx={{
+                borderRight: 1,
+                borderColor: "divider",
+                height: "100%",
+                overflow: "auto",
+              }}
+            >
+              <Box sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}>
+                <Typography variant="subtitle1" fontWeight="bold">
+                  Tasks
+                </Typography>
+              </Box>
+              <List dense>
+                {tasksLoading ? (
+                  <Box sx={{ p: 2, textAlign: "center" }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Loading tasks...
+                    </Typography>
+                  </Box>
+                ) : taskList.length === 0 ? (
+                  <Box sx={{ p: 2, textAlign: "center" }}>
+                    <Typography variant="body2" color="text.secondary">
+                      No tasks found
+                    </Typography>
+                  </Box>
+                ) : (
+                  taskList.map((task) => (
+                    <ListItem key={task.id} disablePadding>
+                      <ListItemButton
+                        selected={selectedTaskId === task.id}
+                        onClick={() => {
+                          setSelectedTask(null);
+                          setSelectedTaskId(task.id);
+                        }}
+                      >
+                        <ListItemText
+                          primary={task.title}
+                          secondary={`#${task.id} - ${task.status}`}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  ))
+                )}
+              </List>
+            </Grid>
+            <Grid size={9} sx={{ height: "100%" }}>
+              {selectedTask ? (
+                taskLoading ? (
+                  <Box
+                    sx={{
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Typography variant="body2" color="text.secondary">
+                      Loading task...
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box sx={{ height: "100%", p: 2 }}>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      sx={{ mb: 2 }}
+                      onClick={() =>
+                        setSelectAndFocusFieldValue({
+                          fieldId: "NoGroup.NoCategory.CMS1500.PatientName",
+                        })
+                      }
+                    >
+                      Focus Patient Name
+                    </Button>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      sx={{ ml: 1, mb: 2 }}
+                      onClick={() =>
+                        setSetFieldValue([
+                          {
+                            fieldId: "NoGroup.NoCategory.CMS1500.PatientName",
+                            value: "abcd",
+                          },
+                        ])
+                      }
+                    >
+                      Set Patient Name
+                    </Button>
+                    <ValidationStation
+                      sdk={uipathSdk}
+                      data={
+                        selectedTask.data as unknown as ContentValidationData
+                      }
+                      folderId={selectedTask.folderId}
+                      setFieldValue={setFieldValue}
+                      selectAndFocusFieldValue={selectAndFocusFieldValue}
+                    />
+                  </Box>
+                )
+              ) : (
+                <Box
+                  sx={{
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Typography variant="body1" color="text.secondary">
+                    Select a task from the list
+                  </Typography>
+                </Box>
+              )}
+            </Grid>
+          </Grid>
+        )}
+
+        {activeTab === 2 && (
+          <Box sx={{ p: 2 }}>
+            <MultiFileUpload
+              sdk={uipathSdk}
+              bucketId={parseInt(import.meta.env.VITE_MFU_BUCKET_ID)}
+              folderId={parseInt(import.meta.env.VITE_MFU_BUCKET_FOLDER_ID)}
+              maxFileSizeInMb={2}
+              accept="image/*"
+              onUploadSuccess={(files: File[]) => {
+                console.log("Files uploaded:", files);
+              }}
+              onUploadError={(error: Error) => {
+                console.error("Upload error:", error);
+              }}
+            />
+          </Box>
+        )}
+
+        {activeTab === 3 && (
+          <Box sx={{ height: 800, p: 2 }}>
+            <ConversationalAgentChat
+              sdk={uipathSdk}
+              agentId={parseInt(import.meta.env.VITE_CONV_AGENT_ID)}
+              folderId={parseInt(import.meta.env.VITE_CONV_AGENT_FOLDER_ID)}
+            />
+          </Box>
+        )}
+      </Box>
     </div>
   );
 }
