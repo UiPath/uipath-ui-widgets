@@ -21,14 +21,43 @@ export interface OverrideLabels {
   inputPlaceholder?: string;
 }
 
+export interface FirstRunExperience {
+  title?: string;
+  description?: string;
+  suggestions?: { label: string; prompt: string }[];
+}
+
+export interface DisabledFeatures {
+  attachments?: boolean;
+  resize?: boolean;
+  fullScreen?: boolean;
+  close?: boolean;
+  preview?: boolean;
+  history?: boolean;
+  settings?: boolean;
+  newChat?: boolean;
+  htmlPreview?: boolean;
+}
+
 export interface ConversationalAgentChatProps {
   sdk: UiPath;
-  agentId: number;
-  folderId: number;
+  agentId?: number;
+  folderId?: number;
+  /** Allow for loading an existing conversation by ID instead of creating a new one on first message */
+  existingConversationId?: string;
   locale?: Locale;
   theme?: "light" | "dark" | "light-hc" | "dark-hc";
   readOnly?: boolean;
   overrideLabels?: OverrideLabels;
+  /** Override the first-run experience. When omitted, derived from agent appearance data. */
+  firstRunExperience?: FirstRunExperience;
+  /** Override which features are disabled. Merged with defaults (fullScreen, preview, close are always disabled). */
+  disabledFeatures?: DisabledFeatures;
+  /** Called when the user sends a message */
+  onMessageSent?: (message: {
+    content: string;
+    attachments?: { name: string; type: string }[];
+  }) => void;
 }
 
 export enum MessageWidget {
