@@ -18,12 +18,14 @@ import {
   ExchangeGetResponse,
   ExchangeStream,
   FeedbackRating,
+  InterruptType,
   MessageStream,
   SessionStream,
   SortOrder,
   ToolCallEndEvent,
   ToolCallStream,
 } from "@uipath/uipath-typescript/conversational-agent";
+import type { ToolCallConfirmationValue } from "@uipath/uipath-typescript/conversational-agent";
 import {
   useCallback,
   useEffect,
@@ -31,7 +33,10 @@ import {
   useRef,
   useState,
 } from "react";
+import { InputsPage } from "./components/InputsPage";
+import type { InputSchema } from "./components/AgentSchemaForm/types";
 import { FeedbackDialog } from "./components/FeedbackDialog";
+import { renderToolConfirmation } from "./components/ToolConfirmationRenderer";
 import "./ConversationalAgentChat.css";
 import {
   AttachFileOutput,
@@ -48,6 +53,22 @@ import {
   normalizeInput,
 } from "./utils";
 import { trackTelemetry } from "./utils/telemetryUtils";
+
+/**
+ * Mutates a message's meta in the chat service's conversation array.
+ * Fragile: relies on getConversation() returning references, not copies.
+ * Centralized here so the pattern is easy to find when the API improves.
+ */
+function updateMessageMeta(
+  chatService: AutopilotChatService,
+  messageId: string,
+  patch: Record<string, unknown>,
+) {
+  const msg = chatService
+    .getConversation()
+    ?.find((m: AutopilotChatMessage) => m.id === messageId);
+  if (msg?.meta) Object.assign(msg.meta, patch);
+}
 
 const DEFAULT_FOOTER_DISCLAIMER =
   "Agent can make mistakes. Please double check the responses.";
@@ -78,6 +99,11 @@ export const ConversationalAgentChat = ({
   const conversationsCursor = useRef<{ value: string } | undefined>(undefined);
   const [chatService, setChatService] = useState<AutopilotChatService>();
   const [error, setError] = useState<string | null>(null);
+  const [inputSchemaState, setInputSchemaState] = useState<InputSchema | null>(
+    null,
+  );
+  const [showInputPage, setShowInputPage] = useState(false);
+  const [agentNameState, setAgentNameState] = useState("");
   const activeExchange = useRef<ExchangeStream | null>(null);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
@@ -129,41 +155,122 @@ export const ConversationalAgentChat = ({
             }
           });
 
+          // Track tool calls so we can defer the spinner when an interrupt arrives
+          const pendingToolCalls = new Map<
+            string,
+            {
+              toolCall: ToolCallStream;
+              toolName: string;
+              toolInput: Record<string, unknown>;
+              startTimeIso: string;
+              spinnerSent: boolean;
+            }
+          >();
+
+          const sendToolCallSpinner = (toolCallId: string) => {
+            const pending = pendingToolCalls.get(toolCallId);
+            if (!pending || pending.spinnerSent) return;
+            pending.spinnerSent = true;
+            chatService.sendResponse({
+              id: toolCallId,
+              content: `Running ${pending.toolName}`,
+              created_at: pending.startTimeIso,
+              widget: MessageWidget.ApolloAgentsToolCall,
+              meta: {
+                toolName: pending.toolName,
+                input: pending.toolInput,
+                startTime: pending.startTimeIso,
+              },
+            });
+          };
+
           message.onToolCallStart((toolCall: ToolCallStream) => {
             const startEvent = toolCall.startEvent;
             const startTimeIso = new Date().toISOString();
             const toolInput = startEvent.input
               ? normalizeInput(startEvent.input)
               : {};
-            chatService.sendResponse({
-              id: toolCall.toolCallId,
-              content: `Performing ${startEvent.toolName}`,
-              created_at: startTimeIso,
-              widget: MessageWidget.ApolloAgentsToolCall,
-              meta: {
-                toolName: startEvent.toolName,
-                input: toolInput,
-                startTime: startTimeIso,
-              },
+
+            pendingToolCalls.set(toolCall.toolCallId, {
+              toolCall,
+              toolName: startEvent.toolName,
+              toolInput,
+              startTimeIso,
+              spinnerSent: false,
             });
 
+            // Show spinner immediately — if an interrupt arrives, the
+            // confirmation form replaces it and the spinner is deferred
+            // until the user confirms.
+            sendToolCallSpinner(toolCall.toolCallId);
+
             toolCall.onToolCallEnd((endEvent: ToolCallEndEvent) => {
-              const endTimeIso = new Date().toISOString();
+              const pending = pendingToolCalls.get(toolCall.toolCallId);
+              if (pending?.spinnerSent) {
+                const endTimeIso = new Date().toISOString();
+                chatService.sendResponse({
+                  id: toolCall.toolCallId,
+                  content: `Performing ${startEvent.toolName}`,
+                  created_at: endTimeIso,
+                  widget: MessageWidget.ApolloAgentsToolCall,
+                  meta: {
+                    toolName: startEvent.toolName,
+                    input: toolInput,
+                    startTime: startTimeIso,
+                    output: endEvent.output,
+                    endTime: endTimeIso,
+                    isError: endEvent.isError,
+                  },
+                });
+              }
+              pendingToolCalls.delete(toolCall.toolCallId);
+            });
+          });
+
+          message.onInterruptStart(({ interruptId, startEvent }) => {
+            if (startEvent.type === InterruptType.ToolCallConfirmation) {
+              const confirmationData =
+                startEvent.value as ToolCallConfirmationValue;
+              const widgetMessageId = `confirmation-${confirmationData.toolCallId}`;
+
+              // Hide the spinner — it will be re-sent after the user confirms
+              const pending = pendingToolCalls.get(confirmationData.toolCallId);
+              if (pending) pending.spinnerSent = false;
+
               chatService.sendResponse({
-                id: toolCall.toolCallId,
-                content: `Performing ${startEvent.toolName}`,
-                created_at: endTimeIso,
-                widget: MessageWidget.ApolloAgentsToolCall,
+                id: widgetMessageId,
+                content: "Tool confirmation required",
+                created_at: new Date().toISOString(),
+                widget: MessageWidget.ToolConfirmation,
+                stream: false,
+                done: true,
                 meta: {
-                  toolName: startEvent.toolName,
-                  input: toolInput,
-                  startTime: startTimeIso,
-                  output: endEvent.output,
-                  endTime: endTimeIso,
-                  isError: endEvent.isError,
+                  confirmationData,
+                  isCompleted: false,
+                  wasRejected: false,
+                  onApprove: (endValue: { input?: unknown }) => {
+                    updateMessageMeta(chatService, widgetMessageId, {
+                      isCompleted: true,
+                    });
+                    sendToolCallSpinner(confirmationData.toolCallId);
+                    message.sendInterruptEnd(interruptId, {
+                      type: InterruptType.ToolCallConfirmation,
+                      value: { approved: true, input: endValue.input },
+                    });
+                  },
+                  onCancel: () => {
+                    updateMessageMeta(chatService, widgetMessageId, {
+                      isCompleted: true,
+                      wasRejected: true,
+                    });
+                    message.sendInterruptEnd(interruptId, {
+                      type: InterruptType.ToolCallConfirmation,
+                      value: { approved: false },
+                    });
+                  },
                 },
               });
-            });
+            }
           });
         }
       });
@@ -442,6 +549,23 @@ export const ConversationalAgentChat = ({
         agentId,
         folderId,
       );
+
+      const agentName = agentRelease?.name ?? "";
+
+      // Extract inputSchema (returned by API but not typed in SDK)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const inputSchema = (agentRelease as any)?.inputSchema as
+        | InputSchema
+        | undefined;
+
+      // Show input page if there's an inputSchema with properties and this is a new conversation
+      const hasRequiredInputs = (inputSchema?.required?.length ?? 0) > 0;
+      if (hasRequiredInputs) {
+        setInputSchemaState(inputSchema ?? null);
+        setAgentNameState(agentName);
+        setShowInputPage(true);
+      }
+
       const chatServiceInstance = AutopilotChatService.Instantiate({
         config: {
           mode: AutopilotChatMode.Embedded,
@@ -451,7 +575,7 @@ export const ConversationalAgentChat = ({
           firstRunExperience: {
             title:
               agentRelease.appearance?.welcomeTitle ||
-              `Welcome to ${agentRelease.name}!`,
+              `Welcome to ${agentName}!`,
             description: agentRelease.appearance?.welcomeDescription || "",
             suggestions: (agentRelease.appearance?.startingPrompts || []).map(
               (prompt) => ({
@@ -461,7 +585,7 @@ export const ConversationalAgentChat = ({
             ),
           },
           overrideLabels: {
-            title: overrideLabelsRef.current?.title ?? agentRelease.name,
+            title: overrideLabelsRef.current?.title ?? agentName,
             footerDisclaimer:
               overrideLabelsRef.current?.footerDisclaimer ??
               DEFAULT_FOOTER_DISCLAIMER,
@@ -585,6 +709,11 @@ export const ConversationalAgentChat = ({
           getConversationHistoryDisplayItems(pastConversations.current),
           !result.hasNextPage,
         );
+        chatService.injectMessageRenderer({
+          name: MessageWidget.ToolConfirmation,
+          render: (container, message) =>
+            renderToolConfirmation(container, message),
+        });
         chatService.on(AutopilotChatEvent.NewChat, onNewChat);
         chatService.on(AutopilotChatEvent.Request, onSendMessage);
         chatService.on(AutopilotChatEvent.SetAttachments, onSetAttachments);
@@ -623,6 +752,20 @@ export const ConversationalAgentChat = ({
 
   return (
     <div className="uipath-conversational-agent-chat">
+      {!error && showInputPage && inputSchemaState && (
+        <InputsPage
+          key={agentId}
+          agentName={agentNameState}
+          inputSchema={inputSchemaState}
+          onSubmit={() => {
+            // TODO: Pass form data as agentInput to conversations.create() once
+            // @uipath/uipath-typescript adds agentInput to ConversationCreateOptions.
+            // The react-sdk sent this as: { agentInput: { inline: formData } }
+            setShowInputPage(false);
+          }}
+        />
+      )}
+
       {error && (
         <div className="info-container">
           <Alert variant="destructive">
@@ -642,7 +785,7 @@ export const ConversationalAgentChat = ({
         </div>
       )}
 
-      {!error && chatService && (
+      {!error && chatService && !showInputPage && (
         <ApChat
           key={locale}
           chatServiceInstance={chatService}
