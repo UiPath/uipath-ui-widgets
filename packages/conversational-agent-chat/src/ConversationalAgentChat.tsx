@@ -55,9 +55,9 @@ import {
 import { trackTelemetry } from "./utils/telemetryUtils";
 
 /**
- * Mutates a message's meta in the chat service's conversation array.
- * Fragile: relies on getConversation() returning references, not copies.
- * Centralized here so the pattern is easy to find when the API improves.
+ * Mutates a message's meta in the chat service's conversation array. Needed to support tool confirmation status
+ * when user approves or cancels a tool call. Fragile: relies on getConversation() returning references,
+ * not copies. TODO: use update message API if exposed by apollo chat service in the future.
  */
 function updateMessageMeta(
   chatService: AutopilotChatService,
@@ -565,6 +565,9 @@ export const ConversationalAgentChat = ({
         setAgentNameState(agentName);
         setShowInputPage(true);
       }
+      
+      const welcomeTitle = agentRelease?.appearance?.welcomeTitle
+      || (agentName ? `Welcome to ${agentName}!` : "Welcome!");
 
       const chatServiceInstance = AutopilotChatService.Instantiate({
         config: {
@@ -573,9 +576,7 @@ export const ConversationalAgentChat = ({
           theme: themeRef.current,
           readOnly,
           firstRunExperience: {
-            title:
-              agentRelease.appearance?.welcomeTitle ||
-              `Welcome to ${agentName}!`,
+            title: welcomeTitle,
             description: agentRelease.appearance?.welcomeDescription || "",
             suggestions: (agentRelease.appearance?.startingPrompts || []).map(
               (prompt) => ({
