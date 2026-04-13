@@ -1,0 +1,20 @@
+{
+  "chat_input_placeholder": "chat_input_placeholder",
+  "disclaimer_message": "disclaimer_message",
+  "performing_action_message": "performing_action_message",
+  "error_open_conversation": "error_open_conversation",
+  "error_generic": "error_generic",
+  "error_send_message": "error_send_message",
+  "error_upload_attachments": "error_upload_attachments",
+  "error_initialize_chat": "error_initialize_chat",
+  "error_load_history": "error_load_history",
+  "loading": "loading",
+  "reload": "reload",
+  "new_chat": "new_chat",
+  "feedback_placeholder": "feedback_placeholder",
+  "cancel": "cancel",
+  "submit": "submit",
+  "feedback_title": "feedback_title",
+  "feedback_optional": "feedback_optional",
+  "welcome_to_agent": "welcome_to_agent"
+}

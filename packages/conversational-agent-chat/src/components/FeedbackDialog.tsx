@@ -8,6 +8,7 @@ import {
   Textarea,
 } from "@uipath/apollo-wind";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface FeedbackDialogProps {
   open: boolean;
@@ -22,6 +23,7 @@ export const FeedbackDialog = ({
   onSubmit,
   onCancel,
 }: FeedbackDialogProps) => {
+  const { t } = useTranslation();
   const [comment, setComment] = useState("");
 
   const handleSubmit = () => {
@@ -38,18 +40,18 @@ export const FeedbackDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Provide additional feedback (optional)</DialogTitle>
+          <DialogTitle>{t("feedback_title")}</DialogTitle>
         </DialogHeader>
         <Textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="What would you like to share?"
+          placeholder={t("feedback_placeholder")}
         />
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel}>
-            Cancel
+            {t("cancel")}
           </Button>
-          <Button onClick={handleSubmit}>Submit</Button>
+          <Button onClick={handleSubmit}>{t("submit")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
