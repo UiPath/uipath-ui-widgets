@@ -1,0 +1,7 @@
+{
+  "chat_input_placeholder": "Hable con su agente...",
+  "disclaimer_message": "Los agentes pueden cometer errores. Compruebe las respuestas.",
+  "performing_action_message": "Ejecutando {{action}}",
+  "feedback_title": "Proporcione comentarios adicionales",
+  "feedback_optional": "(opcional)"
+}

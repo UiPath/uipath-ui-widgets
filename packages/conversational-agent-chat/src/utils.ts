@@ -62,11 +62,12 @@ export const convertAttachmentToFile = (
 
 export const getConversationHistoryDisplayItems = (
   conversations: RawConversationGetResponse[],
+  newChatLabel: string,
 ) => {
   return conversations.map((conversation) => {
     return {
       id: conversation.id,
-      name: conversation.label || `New chat`,
+      name: conversation.label || newChatLabel,
       timestamp: new Date(conversation.lastActivityTime).toISOString(),
     };
   });

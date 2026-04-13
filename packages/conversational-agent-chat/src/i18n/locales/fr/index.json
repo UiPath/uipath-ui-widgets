@@ -1,0 +1,7 @@
+{
+  "chat_input_placeholder": "Conversez avec votre agent…",
+  "disclaimer_message": "Les agents peuvent commettre des erreurs. Veuillez vérifier soigneusement les réponses.",
+  "performing_action_message": "Exécution de {{action}}",
+  "feedback_title": "Fournir un commentaire supplémentaire",
+  "feedback_optional": "(facultatif)"
+}

@@ -1,0 +1,7 @@
+{
+  "chat_input_placeholder": "Sprechen Sie mit Ihrem Agent…",
+  "disclaimer_message": "Agents können Fehler machen. Überprüfen Sie die Antworten sorgfältig.",
+  "performing_action_message": "Durchführen von {{action}}",
+  "feedback_title": "Zusätzliches Feedback bereitstellen",
+  "feedback_optional": "(optional)"
+}

@@ -1,0 +1,7 @@
+{
+  "chat_input_placeholder": "Agent'ınızla konuşun...",
+  "disclaimer_message": "Agent'lar hata yapabilir. Lütfen yanıtları tekrar kontrol edin.",
+  "performing_action_message": "{{action}} gerçekleştiriliyor",
+  "feedback_title": "Ek geri bildirim sağlayın",
+  "feedback_optional": "(isteğe bağlı)"
+}

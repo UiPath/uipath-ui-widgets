@@ -13,7 +13,8 @@ export type Locale =
   | "zh-CN"
   | "zh-TW"
   | "pt-BR"
-  | "es-MX";
+  | "es-MX"
+  | "keys";
 
 export interface OverrideLabels {
   title?: string;

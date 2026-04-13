@@ -42,12 +42,11 @@
     "registry": "https://npm.pkg.github.com"
   },
   "peerDependencies": {
+    "@uipath/uipath-typescript": "^1.2.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "@uipath/uipath-typescript": "^1.2.0"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "rimraf": "^6.0.1",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
@@ -58,14 +57,17 @@
     "@vitest/coverage-v8": "^4.0.18",
     "@vitest/ui": "^4.0.18",
     "jsdom": "^25.0.1",
+    "rimraf": "^6.0.1",
     "sass-embedded": "^1.93.3",
     "typescript": "~5.9.3",
     "vite": "^6.0.3",
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "@uipath/apollo-react": "^3.51.1",
     "@uipath/apollo-core": "^5.7.0",
-    "@uipath/apollo-wind": "^0.10.0"
+    "@uipath/apollo-react": "^3.51.1",
+    "@uipath/apollo-wind": "^0.10.0",
+    "i18next": "^26.0.4",
+    "react-i18next": "^17.0.2"
   }
 }

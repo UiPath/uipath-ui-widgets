@@ -1,0 +1,7 @@
+{
+  "chat_input_placeholder": "에이전트와 상의하십시오...",
+  "disclaimer_message": "에이전트는 실수를 할 수 있습니다. 응답을 다시 확인하십시오.",
+  "performing_action_message": "{{action}} 수행",
+  "feedback_title": "추가 피드백 제공",
+  "feedback_optional": "(선택 사항)"
+}
