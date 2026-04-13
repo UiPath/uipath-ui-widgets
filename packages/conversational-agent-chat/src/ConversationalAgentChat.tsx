@@ -64,7 +64,6 @@ export const ConversationalAgentChat = ({
   overrideLabels,
   firstRunExperience,
   disabledFeatures,
-  onMessageSent,
 }: ConversationalAgentChatProps) => {
   const agentService = useRef(new ConversationalAgent(sdk));
   const currentConversation = useRef<ConversationCreateResponse | null>(null);
@@ -80,8 +79,6 @@ export const ConversationalAgentChat = ({
   disabledFeaturesRef.current = disabledFeatures;
   const firstRunExperienceRef = useRef(firstRunExperience);
   firstRunExperienceRef.current = firstRunExperience;
-  const onMessageSentRef = useRef(onMessageSent);
-  onMessageSentRef.current = onMessageSent;
   const initialConversationConsumed = useRef(false);
   const session = useRef<SessionStream | null>(null);
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
@@ -304,13 +301,6 @@ export const ConversationalAgentChat = ({
           }
         }
         message.sendMessageEnd();
-        onMessageSentRef.current?.({
-          content: data.content,
-          attachments: data.attachments?.map((a) => ({
-            name: a.name,
-            type: a.type,
-          })),
-        });
         trackTelemetry(TelemetryEvent.SendMessage, TelemetryStatus.Success);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);

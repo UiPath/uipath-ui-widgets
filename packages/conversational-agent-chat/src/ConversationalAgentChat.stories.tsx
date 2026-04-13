@@ -164,7 +164,6 @@ function App() {
       }}
       disabledFeatures={{ attachments: true }}
       existingConversationId="optional-conversation-id"
-      onMessageSent={(msg) => console.log("Sent:", msg)}
     />
   );
 }
@@ -257,11 +256,6 @@ function App() {
       description:
         "Override which features are disabled. Merged with defaults (fullScreen, preview, close are always disabled).",
       control: "object",
-    },
-    onMessageSent: {
-      description: "Called when the user sends a message",
-      action: "onMessageSent",
-      table: { category: "Events" },
     },
   },
   args: {

@@ -53,11 +53,6 @@ export interface ConversationalAgentChatProps {
   firstRunExperience?: FirstRunExperience;
   /** Override which features are disabled. Merged with defaults (fullScreen, preview, close are always disabled). */
   disabledFeatures?: DisabledFeatures;
-  /** Called when the user sends a message */
-  onMessageSent?: (message: {
-    content: string;
-    attachments?: { name: string; type: string }[];
-  }) => void;
 }
 
 export enum MessageWidget {
