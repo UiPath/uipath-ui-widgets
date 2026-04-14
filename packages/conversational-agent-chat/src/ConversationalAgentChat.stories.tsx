@@ -155,6 +155,15 @@ function App() {
         footerDisclaimer: "Custom disclaimer",
         inputPlaceholder: "Ask me anything...",
       }}
+      firstRunExperience={{
+        title: "Welcome!",
+        description: "How can I help you today?",
+        suggestions: [
+          { label: "Get started", prompt: "Help me get started" },
+        ],
+      }}
+      disabledFeatures={{ attachments: true }}
+      existingConversationId="optional-conversation-id"
     />
   );
 }
@@ -195,12 +204,10 @@ function App() {
     agentId: {
       description: "ID of the conversational agent to use",
       control: "number",
-      type: { name: "number", required: true },
     },
     folderId: {
       description: "ID of the folder containing the agent",
       control: "number",
-      type: { name: "number", required: true },
     },
     locale: {
       description: "Locale for the chat UI",
@@ -235,6 +242,21 @@ function App() {
         "Override default labels for title, footer disclaimer, and input placeholder",
       control: "object",
     },
+    existingConversationId: {
+      description:
+        "Load an existing conversation by ID instead of creating a new one on first message",
+      control: "text",
+    },
+    firstRunExperience: {
+      description:
+        "Override the first-run experience. When omitted, derived from agent appearance data.",
+      control: "object",
+    },
+    disabledFeatures: {
+      description:
+        "Override which features are disabled. Merged with defaults (fullScreen, preview, close are always disabled).",
+      control: "object",
+    },
   },
   args: {
     baseUrl: "cloud.uipath.com",
@@ -247,6 +269,9 @@ function App() {
     theme: "light",
     readOnly: false,
     overrideLabels: undefined,
+    existingConversationId: undefined,
+    firstRunExperience: undefined,
+    disabledFeatures: undefined,
   },
 } satisfies Meta<typeof ConversationalAgentChatWithSdk>;
 
@@ -316,6 +341,67 @@ export const CustomLabels: Story = {
       description: {
         story:
           "Chat widget with custom title, footer disclaimer, and input placeholder.",
+      },
+    },
+  },
+};
+
+export const ExistingConversation: Story = {
+  args: {
+    existingConversationId: "your-conversation-id-here",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Load an existing conversation by ID. Replace the conversation ID in the controls panel with a real one to test.",
+      },
+    },
+  },
+};
+
+export const CustomFirstRun: Story = {
+  args: {
+    firstRunExperience: {
+      title: "Welcome to Support",
+      description: "I can help you troubleshoot issues and answer questions.",
+      suggestions: [
+        {
+          label: "Check order status",
+          prompt: "What is the status of my order?",
+        },
+        { label: "Reset password", prompt: "How do I reset my password?" },
+        {
+          label: "Contact support",
+          prompt: "I need to speak with a human agent",
+        },
+      ],
+    },
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Chat widget with a custom first-run experience including title, description, and suggestion chips.",
+      },
+    },
+  },
+};
+
+export const DisabledFeatures: Story = {
+  args: {
+    disabledFeatures: {
+      attachments: true,
+      history: true,
+      settings: true,
+      newChat: true,
+    },
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Chat widget with attachments, history, settings, and new chat features disabled.",
       },
     },
   },
