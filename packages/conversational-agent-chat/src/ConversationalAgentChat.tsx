@@ -171,7 +171,6 @@ export const ConversationalAgentChat = ({
       exchange.onExchangeEnd(() => {
         activeExchange.current = null;
         chatService.sendOutputStreamEvent({ turnComplete: true });
-        chatService.stopResponse();
         chatService.setShowLoading(false);
         chatService.setWaiting(false);
       });
@@ -500,7 +499,6 @@ export const ConversationalAgentChat = ({
       activeExchange.current = null;
     }
     chatService.sendOutputStreamEvent({ turnComplete: true });
-    chatService.stopResponse();
     chatService.setShowLoading(false);
     chatService.setWaiting(false);
   }, [chatService]);
