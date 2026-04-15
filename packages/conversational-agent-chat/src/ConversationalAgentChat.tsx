@@ -571,32 +571,39 @@ export const ConversationalAgentChat = ({
   useEffect(() => {
     if (!chatService) return;
 
+    let cancelled = false;
+    const unsubscribers: Array<() => void> = [];
+
     const registerEvents = async () => {
       try {
         const result = await agentService.current.conversations.getAll({
           sort: SortOrder.Descending,
           pageSize: 20,
         });
+        // only register handlers if the component is still mounted
+        if (cancelled) return;
         conversationsCursor.current = result.nextCursor;
         pastConversations.current = result.items;
         chatService.setHistory(
           getConversationHistoryDisplayItems(pastConversations.current),
           !result.hasNextPage,
         );
-        chatService.on(AutopilotChatEvent.NewChat, onNewChat);
-        chatService.on(AutopilotChatEvent.Request, onSendMessage);
-        chatService.on(AutopilotChatEvent.SetAttachments, onSetAttachments);
-        chatService.on(
-          AutopilotChatEvent.OpenConversation,
-          onClickOpenConversation,
+        unsubscribers.push(
+          chatService.on(AutopilotChatEvent.NewChat, onNewChat),
+          chatService.on(AutopilotChatEvent.Request, onSendMessage),
+          chatService.on(AutopilotChatEvent.SetAttachments, onSetAttachments),
+          chatService.on(
+            AutopilotChatEvent.OpenConversation,
+            onClickOpenConversation,
+          ),
+          chatService.on(
+            AutopilotChatEvent.DeleteConversation,
+            onClickDeleteConversation,
+          ),
+          chatService.on(AutopilotChatEvent.HistoryLoadMore, onHistoryLoadMore),
+          chatService.on(AutopilotChatEvent.Feedback, onFeedback),
+          chatService.on(AutopilotChatEvent.StopResponse, onStopResponse),
         );
-        chatService.on(
-          AutopilotChatEvent.DeleteConversation,
-          onClickDeleteConversation,
-        );
-        chatService.on(AutopilotChatEvent.HistoryLoadMore, onHistoryLoadMore);
-        chatService.on(AutopilotChatEvent.Feedback, onFeedback);
-        chatService.on(AutopilotChatEvent.StopResponse, onStopResponse);
       } catch (err) {
         const message =
           err instanceof Error
@@ -607,6 +614,11 @@ export const ConversationalAgentChat = ({
     };
 
     registerEvents();
+
+    return () => {
+      cancelled = true;
+      unsubscribers.forEach((unsub) => unsub());
+    };
   }, [
     chatService,
     onClickDeleteConversation,
