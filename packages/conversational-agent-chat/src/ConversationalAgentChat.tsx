@@ -1,6 +1,7 @@
 import {
   ApChat,
   AutopilotChatActionPayload,
+  AutopilotChatCustomHeaderAction,
   AutopilotChatEvent,
   AutopilotChatFileInfo,
   AutopilotChatMessage,
@@ -46,6 +47,7 @@ import {
   getConversationHistoryDisplayItems,
   mapExchangesToChatMessages,
   normalizeInput,
+  sortEvaluationSets,
 } from "./utils";
 import { trackTelemetry } from "./utils/telemetryUtils";
 
@@ -64,6 +66,10 @@ export const ConversationalAgentChat = ({
   overrideLabels,
   firstRunExperience,
   disabledFeatures,
+  isDebugMode = false,
+  evaluationSets,
+  addToEvalButtonLabel,
+  onEvaluationSetClicked,
 }: ConversationalAgentChatProps) => {
   const agentService = useRef(new ConversationalAgent(sdk));
   const currentConversation = useRef<ConversationCreateResponse | null>(null);
@@ -89,6 +95,9 @@ export const ConversationalAgentChat = ({
   const activeExchange = useRef<ExchangeStream | null>(null);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
+  const [hasMessages, setHasMessages] = useState(false);
+  const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
+  onEvaluationSetClickedRef.current = onEvaluationSetClicked;
 
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
@@ -182,6 +191,7 @@ export const ConversationalAgentChat = ({
         chatService.stopResponse();
         chatService.setShowLoading(false);
         chatService.setWaiting(false);
+        setHasMessages(true);
       });
     },
     [chatService],
@@ -235,6 +245,7 @@ export const ConversationalAgentChat = ({
     currentConversation.current = null;
     session.current = null;
     activeExchange.current = null;
+    setHasMessages(false);
     trackTelemetry(TelemetryEvent.NewChat, TelemetryStatus.Success);
   }, []);
 
@@ -435,7 +446,9 @@ export const ConversationalAgentChat = ({
         session.current = null;
 
         const allExchanges = await fetchExchanges(selectedConversation.id);
-        chatService.setConversation(mapExchangesToChatMessages(allExchanges));
+        const messages = mapExchangesToChatMessages(allExchanges);
+        chatService.setConversation(messages);
+        setHasMessages(messages.length > 0);
         trackTelemetry(
           TelemetryEvent.OpenConversation,
           TelemetryStatus.Success,
@@ -559,6 +572,16 @@ export const ConversationalAgentChat = ({
     chatService.setWaiting(false);
   }, [chatService]);
 
+  const onCustomHeaderActionClicked = useCallback(
+    (action: AutopilotChatCustomHeaderAction) => {
+      if (action.id.startsWith("eval-")) {
+        const evaluationSetId = action.id.replace("eval-", "");
+        onEvaluationSetClickedRef.current?.(evaluationSetId);
+      }
+    },
+    [],
+  );
+
   const onFeedback = useCallback((data: AutopilotChatActionPayload) => {
     pendingFeedback.current = data;
     setFeedbackDialogOpen(true);
@@ -676,6 +699,40 @@ export const ConversationalAgentChat = ({
     onSetAttachments,
     onStopResponse,
   ]);
+
+  useEffect(() => {
+    if (
+      !chatService ||
+      !isDebugMode ||
+      !evaluationSets ||
+      evaluationSets.length === 0
+    ) {
+      return;
+    }
+
+    const label = addToEvalButtonLabel || "Add to Evaluation Set";
+    const sortedSets = sortEvaluationSets(evaluationSets);
+    const headerAction: AutopilotChatCustomHeaderAction = {
+      id: "add-to-eval-button",
+      name: label,
+      description: label,
+      disabled: !hasMessages,
+      children: sortedSets.map((s) => ({
+        id: `eval-${s.id}`,
+        name: s.name,
+        description: `Add to ${s.name}`,
+        disabled: s.isDisabled,
+      })),
+    };
+    chatService.setCustomHeaderActions([headerAction]);
+    const unsubscribe = chatService.on(
+      AutopilotChatEvent.CustomHeaderActionClicked,
+      onCustomHeaderActionClicked,
+    );
+    return () => {
+      unsubscribe?.();
+    };
+  }, [chatService, isDebugMode, evaluationSets, addToEvalButtonLabel, hasMessages, onCustomHeaderActionClicked]);
 
   return (
     <div className="uipath-conversational-agent-chat">
