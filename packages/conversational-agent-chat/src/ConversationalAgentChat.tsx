@@ -103,6 +103,7 @@ export const ConversationalAgentChat = ({
   evaluationSets,
   addToEvalButtonLabel,
   onEvaluationSetClicked,
+  onUserMessageSent,
 }: ConversationalAgentChatProps) => {
   // must change language before useTranslation is called to avoid stale translations
   if (i18next.language !== locale) {
@@ -143,6 +144,8 @@ export const ConversationalAgentChat = ({
   const [hasMessages, setHasMessages] = useState(false);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
   onEvaluationSetClickedRef.current = onEvaluationSetClicked;
+  const onUserMessageSentRef = useRef(onUserMessageSent);
+  onUserMessageSentRef.current = onUserMessageSent;
 
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
@@ -170,7 +173,7 @@ export const ConversationalAgentChat = ({
                   id: messageId,
                   content: chunk.data,
                   created_at: messageTimestamp,
-                  widget: MessageWidget.AI,
+                  widget: "AI",
                   stream: true,
                   done: false,
                 });
@@ -181,7 +184,7 @@ export const ConversationalAgentChat = ({
                   id: messageId,
                   content: fullResponse,
                   created_at: messageTimestamp,
-                  widget: MessageWidget.AI,
+                  widget: "AI",
                   stream: false,
                   done: true,
                 });
@@ -370,7 +373,7 @@ export const ConversationalAgentChat = ({
     const conversation = await getConversation();
     const sessionHelper = agentService.current.conversations.startSession(
       conversation.id,
-      { echo: false },
+      { echo: true },
     );
     return new Promise((resolve) => {
       sessionHelper.onSessionStarted(() => {
@@ -426,12 +429,21 @@ export const ConversationalAgentChat = ({
 
   const onSendMessage = useCallback(
     async (data: AutopilotChatMessage) => {
+      // Notify the consumer first — debug-mode hosts use this to gate agent
+      // execution (e.g., kicking off the robotdebug Start command). Must run
+      // BEFORE the SDK send so the host can prepare any required side channels.
+      onUserMessageSentRef.current?.({ content: data.content });
       try {
         const sessionHelper = await getSessionHelper();
         const exchange = sessionHelper.startExchange();
         activeExchange.current = exchange;
         setupExchangeHandlers(exchange);
-        const message = exchange.startMessage({});
+        // isLocalUserMessage tells ApChat to render the user bubble locally
+        // immediately instead of waiting for the echo. Mirrors the react-sdk
+        // (which used `properties`; new SDK uses `metaData`).
+        const message = exchange.startMessage({
+          metaData: { isLocalUserMessage: true },
+        });
         await message.sendContentPart({
           mimeType: "text/plain",
           data: data.content,
@@ -686,10 +698,35 @@ export const ConversationalAgentChat = ({
 
       if (existingConversationId) {
         const conversation = await getConversation();
+        // Fetch feature flags before opening the session — the agent runtime
+        // appears to gate response routing on this signal. Mirrors the
+        // react-sdk's eager `/api/utility/feature-flags` call.
+        try {
+          await agentService.current.getFeatureFlags();
+        } catch {
+          // non-fatal — flags are advisory; continue anyway
+        }
+        // Open the WebSocket session BEFORE fetching exchanges — the working
+        // react-sdk flow opens the socket before the exchanges call. Agent
+        // runtime may gate on a listener being present on the conversation
+        // channel before it processes messages.
+        const sessionHelper =
+          agentService.current.conversations.startSession(conversation.id, {
+            echo: true,
+          });
+        sessionHelper.onSessionStarted(() => {
+          session.current = sessionHelper;
+        });
         const allExchanges = await fetchExchanges(conversation.id);
-        chatServiceInstance.setConversation(
-          mapExchangesToChatMessages(allExchanges),
-        );
+        // Only call setConversation when there are actually messages to load.
+        // Calling it with [] puts ApChat into "managed" mode where it
+        // expects the consumer to handle all rendering — and incoming
+        // assistant messages don't get displayed automatically.
+        if (allExchanges.length > 0) {
+          chatServiceInstance.setConversation(
+            mapExchangesToChatMessages(allExchanges),
+          );
+        }
       }
 
       setChatService(chatServiceInstance);

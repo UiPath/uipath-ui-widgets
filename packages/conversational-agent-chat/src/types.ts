@@ -70,6 +70,12 @@ export interface ConversationalAgentChatProps {
   addToEvalButtonLabel?: string;
   /** @internal */
   onEvaluationSetClicked?: (id: string) => void;
+  /**
+   * Called when the user sends a message. Used by debug-mode consumers that
+   * need to gate agent execution on the first user message.
+   * @internal
+   */
+  onUserMessageSent?: (message: { content: string }) => void;
 }
 
 export enum MessageWidget {
