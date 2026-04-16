@@ -6,8 +6,9 @@ import {
   AutopilotChatMessage,
   AutopilotChatMode,
   AutopilotChatService,
+  type SupportedLocale,
 } from "@uipath/apollo-react/material/components";
-import { i18n } from "@lingui/core";
+import i18next from "i18next";
 import { Alert, AlertDescription, Button } from "@uipath/apollo-wind";
 import {
   ContentPartChunkEvent,
@@ -33,6 +34,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { InputsPage } from "./components/InputsPage";
 import type { InputSchema } from "./components/AgentSchemaForm/types";
 import { FeedbackDialog } from "./components/FeedbackDialog";
@@ -41,6 +43,7 @@ import "./ConversationalAgentChat.css";
 import {
   AttachFileOutput,
   ConversationalAgentChatProps,
+  Locale,
   TelemetryEvent,
   MessageWidget,
   TelemetryStatus,
@@ -53,6 +56,14 @@ import {
   normalizeInput,
 } from "./utils";
 import { trackTelemetry } from "./utils/telemetryUtils";
+import { initI18n } from "./i18n";
+
+initI18n();
+
+// Map widget Locale to Apollo supported locale to allow for locales not supported by Apollo
+function toApolloSupportedLocale(widgetLocale: Locale): SupportedLocale {
+  return widgetLocale === "keys" ? "en" : (widgetLocale as SupportedLocale);
+}
 
 /**
  * Mutates a message's meta in the chat service's conversation array. Needed to support tool confirmation status
@@ -70,9 +81,6 @@ function updateMessageMeta(
   if (msg?.meta) Object.assign(msg.meta, patch);
 }
 
-const DEFAULT_FOOTER_DISCLAIMER =
-  "Agent can make mistakes. Please double check the responses.";
-const DEFAULT_INPUT_PLACEHOLDER = "Talk with your agent...";
 
 export const ConversationalAgentChat = ({
   sdk,
@@ -86,20 +94,26 @@ export const ConversationalAgentChat = ({
   firstRunExperience,
   disabledFeatures,
 }: ConversationalAgentChatProps) => {
+  // must change language before useTranslation is called to avoid stale translations
+  if (i18next.language !== locale) {
+    i18next.changeLanguage(locale);
+  }
+  const { t } = useTranslation();
   const agentService = useRef(new ConversationalAgent(sdk));
   const currentConversation = useRef<ConversationCreateResponse | null>(null);
   const initializedFor = useRef<string | null>(null);
-  // Refs for values used in initChat that shouldn't trigger re-initialization
-  const localeRef = useRef(locale);
-  localeRef.current = locale;
   const themeRef = useRef(theme);
-  themeRef.current = theme;
   const overrideLabelsRef = useRef(overrideLabels);
-  overrideLabelsRef.current = overrideLabels;
   const disabledFeaturesRef = useRef(disabledFeatures);
-  disabledFeaturesRef.current = disabledFeatures;
   const firstRunExperienceRef = useRef(firstRunExperience);
-  firstRunExperienceRef.current = firstRunExperience;
+  // useLayoutEffect is ok here because the work is minimal enough that the cost is essentially zero
+  // needed because React 19 doesn't support ref writes on render
+  useLayoutEffect(() => {
+    themeRef.current = theme;
+    overrideLabelsRef.current = overrideLabels;
+    disabledFeaturesRef.current = disabledFeatures;
+    firstRunExperienceRef.current = firstRunExperience;
+  }, [theme, overrideLabels, disabledFeatures, firstRunExperience]);
   const initialConversationConsumed = useRef(false);
   const session = useRef<SessionStream | null>(null);
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
@@ -124,9 +138,7 @@ export const ConversationalAgentChat = ({
         trackTelemetry(TelemetryEvent.SendMessage, TelemetryStatus.Error, {
           error: error.message,
         });
-        chatService.setError(
-          error.message || "Something went wrong. Please try again.",
-        );
+        chatService.setError(error.message || t("error_generic"));
       });
 
       exchange.onMessageStart((message: MessageStream) => {
@@ -181,7 +193,7 @@ export const ConversationalAgentChat = ({
             pending.spinnerSent = true;
             chatService.sendResponse({
               id: toolCallId,
-              content: `Running ${pending.toolName}`,
+              content: t("performing_action_message", { action: pending.toolName }),
               created_at: pending.startTimeIso,
               widget: MessageWidget.ApolloAgentsToolCall,
               meta: {
@@ -218,7 +230,7 @@ export const ConversationalAgentChat = ({
                 const endTimeIso = new Date().toISOString();
                 chatService.sendResponse({
                   id: toolCall.toolCallId,
-                  content: `Performing ${startEvent.toolName}`,
+                  content: t("performing_action_message", { action: startEvent.toolName }),
                   created_at: endTimeIso,
                   widget: MessageWidget.ApolloAgentsToolCall,
                   meta: {
@@ -290,7 +302,7 @@ export const ConversationalAgentChat = ({
         chatService.setWaiting(false);
       });
     },
-    [chatService],
+    [chatService, t],
   );
 
   const getConversation =
@@ -358,10 +370,10 @@ export const ConversationalAgentChat = ({
     conversationsCursor.current = result.nextCursor;
     pastConversations.current = [...pastConversations.current, ...result.items];
     chatService.appendOlderHistoryItems(
-      getConversationHistoryDisplayItems(result.items),
+      getConversationHistoryDisplayItems(result.items, t("new_chat")),
       !result.hasNextPage,
     );
-  }, [chatService]);
+  }, [chatService, t]);
 
   const onClickDeleteConversation = useCallback(
     async (id: string) => {
@@ -371,13 +383,13 @@ export const ConversationalAgentChat = ({
         (c) => c.id !== id,
       );
       chatService.setHistory(
-        getConversationHistoryDisplayItems(pastConversations.current),
+        getConversationHistoryDisplayItems(pastConversations.current, t("new_chat")),
       );
       if (currentConversation.current?.id === id) {
         onNewChat();
       }
     },
-    [chatService, onNewChat],
+    [chatService, onNewChat, t],
   );
 
   const onSendMessage = useCallback(
@@ -413,10 +425,10 @@ export const ConversationalAgentChat = ({
         trackTelemetry(TelemetryEvent.SendMessage, TelemetryStatus.Error, {
           error: errorMessage,
         });
-        chatService?.setError(`Failed to send message: ${errorMessage}`);
+        chatService?.setError(t("error_send_message", { errorMessage }));
       }
     },
-    [chatService, getSessionHelper, setupExchangeHandlers],
+    [chatService, getSessionHelper, setupExchangeHandlers, t],
   );
 
   const processAttachmentsInBatch = useCallback(
@@ -486,9 +498,7 @@ export const ConversationalAgentChat = ({
           // Handle any failed uploads
           const failedUploads = results.filter((result) => !result.success);
           if (failedUploads.length > 0) {
-            chatService.setError(
-              "Failed to upload attachments. Please try again.",
-            );
+            chatService.setError(t("error_upload_attachments"));
             for (const failedUpload of failedUploads) {
               const key = createFileKey(failedUpload.attachment);
               uploadedAttachments.current.delete(key);
@@ -508,7 +518,7 @@ export const ConversationalAgentChat = ({
         }
       }
     },
-    [chatService, processAttachmentsInBatch],
+    [chatService, processAttachmentsInBatch, t],
   );
 
   const fetchExchanges = useCallback(
@@ -555,10 +565,10 @@ export const ConversationalAgentChat = ({
           conversationId: id,
           error: errorMessage,
         });
-        chatService.setError(`Failed to open conversation: ${errorMessage}`);
+        chatService.setError(t("error_open_conversation", { errorMessage }));
       }
     },
-    [chatService, fetchExchanges],
+    [chatService, fetchExchanges, t],
   );
 
   const initChat = useCallback(async () => {
@@ -599,7 +609,7 @@ export const ConversationalAgentChat = ({
         : {
             title:
               agentRelease?.appearance?.welcomeTitle ||
-              (agentName ? `Welcome to ${agentName}!` : ""),
+              (agentName ? t("welcome_to_agent", { agentName }) : ""),
             description: agentRelease?.appearance?.welcomeDescription || "",
             suggestions: (agentRelease?.appearance?.startingPrompts || []).map(
               (prompt) => ({
@@ -612,7 +622,7 @@ export const ConversationalAgentChat = ({
       const chatServiceInstance = AutopilotChatService.Instantiate({
         config: {
           mode: AutopilotChatMode.Embedded,
-          locale: localeRef.current,
+          locale: toApolloSupportedLocale(locale),
           theme: themeRef.current,
           readOnly,
           firstRunExperience: firstRunExperienceConfig,
@@ -620,10 +630,10 @@ export const ConversationalAgentChat = ({
             title: overrideLabelsRef.current?.title ?? agentName,
             footerDisclaimer:
               overrideLabelsRef.current?.footerDisclaimer ??
-              DEFAULT_FOOTER_DISCLAIMER,
+              t("disclaimer_message"),
             inputPlaceholder:
               overrideLabelsRef.current?.inputPlaceholder ??
-              DEFAULT_INPUT_PLACEHOLDER,
+              t("chat_input_placeholder"),
           },
           paginatedHistory: true,
           disabledFeatures: {
@@ -647,7 +657,7 @@ export const ConversationalAgentChat = ({
       setChatService(chatServiceInstance);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Failed to initialize chat";
+        err instanceof Error ? err.message : t("error_initialize_chat");
       setError(message);
       initializedFor.current = null;
     }
@@ -655,7 +665,9 @@ export const ConversationalAgentChat = ({
     agentId,
     folderId,
     existingConversationId,
+    locale,
     readOnly,
+    t,
     getConversation,
     fetchExchanges,
   ]);
@@ -717,27 +729,6 @@ export const ConversationalAgentChat = ({
     }
   }, [agentId, folderId, existingConversationId, initChat]);
 
-  // Update locale/theme on the existing service. Locale must be set
-  // synchronously (not in an effect) so that when ApChat remounts via
-  // key={locale}, its LocaleProvider reads the correct value from
-  // chatService.getLocale() on first render.
-  // Sync locale to the service and Lingui before ApChat remounts via
-  // key={locale}. Uses useLayoutEffect so the values are set before the
-  // browser paints. We set _locale directly instead of calling
-  // setLocale()/activate() because those publish events that trigger
-  // setState in other components.
-  useLayoutEffect(() => {
-    if (chatService && chatService.getLocale() !== locale) {
-      /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/immutability */
-      // Mutating internal properties directly to avoid triggering event-bus
-      // side effects (setState in other components). The key={locale} on
-      // ApChat ensures a clean remount that reads these values.
-      (chatService as any)._locale = locale;
-      (i18n as any)._locale = locale;
-      /* eslint-enable @typescript-eslint/no-explicit-any, react-hooks/immutability */
-    }
-  }, [chatService, locale]);
-
   useEffect(() => {
     chatService?.setTheme(theme);
   }, [chatService, theme]);
@@ -761,7 +752,7 @@ export const ConversationalAgentChat = ({
           conversationsCursor.current = result.nextCursor;
           pastConversations.current = result.items;
           chatService.setHistory(
-            getConversationHistoryDisplayItems(pastConversations.current),
+            getConversationHistoryDisplayItems(pastConversations.current, t("new_chat")),
             !result.hasNextPage,
           );
         }
@@ -791,7 +782,7 @@ export const ConversationalAgentChat = ({
         const message =
           err instanceof Error
             ? err.message
-            : "Failed to load conversation history";
+            : t("error_load_history");
         setError(message);
       }
     };
@@ -812,6 +803,7 @@ export const ConversationalAgentChat = ({
     onSendMessage,
     onSetAttachments,
     onStopResponse,
+    t,
   ]);
 
   return (
@@ -836,7 +828,7 @@ export const ConversationalAgentChat = ({
             <AlertDescription>{error}</AlertDescription>
           </Alert>
           <Button variant={"outline"} onClick={handleReload}>
-            Reload
+            {t("reload")}
           </Button>
         </div>
       )}
@@ -844,7 +836,7 @@ export const ConversationalAgentChat = ({
       {!error && !chatService && (
         <div className="info-container">
           <Alert>
-            <AlertDescription>Loading...</AlertDescription>
+            <AlertDescription>{t("loading")}</AlertDescription>
           </Alert>
         </div>
       )}
@@ -853,7 +845,7 @@ export const ConversationalAgentChat = ({
         <ApChat
           key={locale}
           chatServiceInstance={chatService}
-          locale={locale}
+          locale={toApolloSupportedLocale(locale)}
           theme={theme}
           enableInternalThemeProvider
         />

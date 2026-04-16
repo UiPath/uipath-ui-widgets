@@ -1,0 +1,7 @@
+{
+  "chat_input_placeholder": "與您的代理交談...",
+  "disclaimer_message": "代理可能會犯錯。請仔細檢查回應。",
+  "performing_action_message": "正在執行 {{action}}",
+  "feedback_title": "提供其他意見反應",
+  "feedback_optional": "(可選)"
+}

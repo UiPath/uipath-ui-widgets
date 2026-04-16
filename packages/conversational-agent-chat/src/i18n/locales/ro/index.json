@@ -1,0 +1,7 @@
+{
+  "chat_input_placeholder": "Vorbește cu agentul tău...",
+  "disclaimer_message": "Agenții pot face greșeli. Vă rugăm să verificați cu atenție răspunsurile.",
+  "performing_action_message": "Efectuarea {{action}}",
+  "feedback_title": "Oferiți feedback suplimentar",
+  "feedback_optional": "(opțional)"
+}

@@ -1,0 +1,7 @@
+{
+  "chat_input_placeholder": "エージェントに話しかけてください...",
+  "disclaimer_message": "エージェントは間違うことがあります。必ず回答を再確認してください。",
+  "performing_action_message": "{{action}} を実行しています。",
+  "feedback_title": "追加のフィードバックを送信",
+  "feedback_optional": "(任意)"
+}

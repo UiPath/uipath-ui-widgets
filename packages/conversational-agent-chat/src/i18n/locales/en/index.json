@@ -1,0 +1,20 @@
+{
+  "error_open_conversation": "Failed to open conversation: {{errorMessage}}",
+  "error_generic": "Something went wrong. Please try again.",
+  "error_send_message": "Failed to send message: {{errorMessage}}",
+  "error_upload_attachments": "Failed to upload attachments. Please try again.",
+  "error_initialize_chat": "Failed to initialize chat",
+  "error_load_history": "Failed to load conversation history",
+  "loading": "Loading...",
+  "reload": "Reload",
+  "new_chat": "New chat",
+  "feedback_placeholder": "What would you like to share?",
+  "cancel": "Cancel",
+  "submit": "Submit",
+  "chat_input_placeholder": "Talk with your agent...",
+  "disclaimer_message": "Agent can make mistakes. Please double check the responses.",
+  "welcome_to_agent": "Welcome to {{agentName}}!",
+  "performing_action_message": "Performing {{action}}",
+  "feedback_title": "Provide additional feedback",
+  "feedback_optional": "(optional)"
+}

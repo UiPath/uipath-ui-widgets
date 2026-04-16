@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import i18next from "i18next";
 import { ConversationalAgentChat } from "../ConversationalAgentChat";
 import { UiPath } from "@uipath/uipath-typescript/core";
 
@@ -171,6 +172,7 @@ describe("ConversationalAgentChat", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    i18next.changeLanguage("en");
     mockSdk = {} as any;
     mockChatService = createMockChatService();
     mockMessageBuilder = {
@@ -321,7 +323,7 @@ describe("ConversationalAgentChat", () => {
               overrideLabels: {
                 title: "Test Agent",
                 footerDisclaimer:
-                  "Agent can make mistakes. Please double check the responses.",
+                  "Agents can make mistakes. Please double check the responses.",
                 inputPlaceholder: "Talk with your agent...",
               },
             }),
