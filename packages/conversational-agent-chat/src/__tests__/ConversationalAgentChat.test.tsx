@@ -114,7 +114,9 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
   return {
     ConversationalAgent: class {
       getById = vi.fn().mockResolvedValue({
+        id: 1,
         name: "Test Agent",
+        folderId: 100,
         appearance: {
           welcomeTitle: "Welcome to Test Agent",
           welcomeDescription: "This is a test agent",
@@ -122,7 +124,21 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
             { displayPrompt: "Test Prompt", actualPrompt: "test" },
           ],
         },
+        conversations: {
+          create: vi.fn().mockResolvedValue({ id: "conv-123" }),
+        },
       });
+
+      getAll = vi.fn().mockResolvedValue([
+        {
+          id: 1,
+          name: "Test Agent",
+          folderId: 100,
+          conversations: {
+            create: vi.fn().mockResolvedValue({ id: "conv-123" }),
+          },
+        },
+      ]);
 
       conversations = {
         create: vi.fn().mockResolvedValue({ id: "conv-123" }),
