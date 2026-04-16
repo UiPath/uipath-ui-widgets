@@ -21,6 +21,7 @@ const createMockChatService = () => ({
   setLocale: vi.fn(),
   setTheme: vi.fn(),
   getLocale: vi.fn().mockReturnValue("en"),
+  injectMessageRenderer: vi.fn(),
 });
 
 let mockChatService = createMockChatService();
@@ -1028,6 +1029,7 @@ describe("ConversationalAgentChat", () => {
           onToolCallStart: vi.fn((handler: any) => {
             toolCallStartHandler = handler;
           }),
+          onInterruptStart: vi.fn(),
         };
         messageStartHandler(mockMessage);
 
@@ -1085,6 +1087,7 @@ describe("ConversationalAgentChat", () => {
             toolCallStartHandler = handler;
             handler(mockToolCall);
           }),
+          onInterruptStart: vi.fn(),
         };
         messageStartHandler(mockMessage);
 
@@ -1131,6 +1134,7 @@ describe("ConversationalAgentChat", () => {
           },
           onContentPartStart: vi.fn(),
           onToolCallStart: vi.fn((handler: any) => handler(mockToolCall)),
+          onInterruptStart: vi.fn(),
         };
         messageStartHandler(mockMessage);
       }
@@ -1164,6 +1168,7 @@ describe("ConversationalAgentChat", () => {
           startEvent: { role: "user", timestamp: "2024-01-01T10:00:00Z" },
           onContentPartStart: vi.fn(),
           onToolCallStart: vi.fn(),
+          onInterruptStart: vi.fn(),
         };
         messageStartHandler(mockMessage);
 
@@ -1208,6 +1213,7 @@ describe("ConversationalAgentChat", () => {
           },
           onContentPartStart: vi.fn((handler: any) => handler(mockContentPart)),
           onToolCallStart: vi.fn(),
+          onInterruptStart: vi.fn(),
         };
         messageStartHandler(mockMessage);
 
