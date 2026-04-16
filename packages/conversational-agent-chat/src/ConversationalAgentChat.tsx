@@ -24,6 +24,10 @@ import {
   ToolCallEndEvent,
   ToolCallStream,
 } from "@uipath/uipath-typescript/conversational-agent";
+import type {
+  AgentGetResponse,
+  AgentGetByIdResponse,
+} from "@uipath/uipath-typescript/conversational-agent";
 import {
   useCallback,
   useEffect,
@@ -80,6 +84,7 @@ export const ConversationalAgentChat = ({
   const firstRunExperienceRef = useRef(firstRunExperience);
   firstRunExperienceRef.current = firstRunExperience;
   const initialConversationConsumed = useRef(false);
+  const resolvedAgent = useRef<AgentGetResponse | null>(null);
   const session = useRef<SessionStream | null>(null);
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
@@ -187,6 +192,24 @@ export const ConversationalAgentChat = ({
     [chatService],
   );
 
+  const resolveAgent = useCallback(async (): Promise<
+    AgentGetResponse | AgentGetByIdResponse | undefined
+  > => {
+    if (!agentId) return undefined;
+    if (resolvedAgent.current?.id === agentId) return resolvedAgent.current;
+    if (folderId) {
+      // folderId was passed — use getById directly (skips the getAll round-trip)
+      const agent = await agentService.current.getById(agentId, folderId);
+      resolvedAgent.current = agent;
+      return agent;
+    }
+    // No folderId — resolve from getAll
+    const agents = await agentService.current.getAll();
+    const agent = agents.find((a) => a.id === agentId);
+    if (agent) resolvedAgent.current = agent;
+    return agent;
+  }, [agentId, folderId]);
+
   const getConversation =
     useCallback(async (): Promise<ConversationCreateResponse> => {
       if (currentConversation.current) {
@@ -201,18 +224,16 @@ export const ConversationalAgentChat = ({
         initialConversationConsumed.current = true;
         return existing;
       }
-      if (!agentId || !folderId) {
+      const agent = await resolveAgent();
+      if (!agent) {
         throw new Error(
-          "Either conversationId or agentId and folderId must be provided",
+          "Either existingConversationId or agentId must be provided",
         );
       }
-      const newConversation = await agentService.current.conversations.create(
-        agentId,
-        folderId,
-      );
+      const newConversation = await agent.conversations.create();
       currentConversation.current = newConversation;
       return newConversation;
-    }, [agentId, folderId, existingConversationId]);
+    }, [existingConversationId, resolveAgent]);
 
   const getSessionHelper = useCallback(async (): Promise<SessionStream> => {
     if (session.current) {
@@ -456,14 +477,18 @@ export const ConversationalAgentChat = ({
   );
 
   const initChat = useCallback(async () => {
-    const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}`;
+    const initKey = `${agentId}-${existingConversationId ?? ""}`;
     try {
       initializedFor.current = initKey;
 
+      const agent = await resolveAgent();
+      // getById returns appearance data; if we resolved from getAll, do a follow-up call
       const agentRelease =
-        agentId && folderId
-          ? await agentService.current.getById(agentId, folderId)
-          : undefined;
+        agent && "appearance" in agent
+          ? (agent as AgentGetByIdResponse)
+          : agent
+            ? await agentService.current.getById(agent.id, agent.folderId)
+            : undefined;
 
       const agentName = agentRelease?.name ?? "";
 
@@ -510,7 +535,7 @@ export const ConversationalAgentChat = ({
             fullScreen: true,
             preview: true,
             close: true,
-            ...(!agentId || !folderId ? { newChat: true, history: true } : {}),
+            ...(!agentId ? { newChat: true, history: true } : {}),
             ...disabledFeaturesRef.current,
           },
         },
@@ -533,9 +558,9 @@ export const ConversationalAgentChat = ({
     }
   }, [
     agentId,
-    folderId,
     existingConversationId,
     readOnly,
+    resolveAgent,
     getConversation,
     fetchExchanges,
   ]);
@@ -590,13 +615,13 @@ export const ConversationalAgentChat = ({
     setFeedbackDialogOpen(false);
   }, []);
 
-  // Initialize chat service on mount and when agentId/folderId changes
+  // Initialize chat service on mount and when agentId changes
   useEffect(() => {
-    const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}`;
+    const initKey = `${agentId}-${existingConversationId ?? ""}`;
     if (initializedFor.current !== initKey) {
       initChat();
     }
-  }, [agentId, folderId, existingConversationId, initChat]);
+  }, [agentId, existingConversationId, initChat]);
 
   // Update locale/theme on the existing service. Locale must be set
   // synchronously (not in an effect) so that when ApChat remounts via
@@ -629,7 +654,7 @@ export const ConversationalAgentChat = ({
 
     const registerEvents = async () => {
       try {
-        if (agentId && folderId) {
+        if (agentId) {
           const result = await agentService.current.conversations.getAll({
             sort: SortOrder.Descending,
             pageSize: 20,
