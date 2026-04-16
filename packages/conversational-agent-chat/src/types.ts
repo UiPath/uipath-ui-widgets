@@ -40,6 +40,14 @@ export interface DisabledFeatures {
   htmlPreview?: boolean;
 }
 
+/** @internal */
+export interface EvaluationSet {
+  id: string;
+  name: string;
+  isDefault?: boolean;
+  isDisabled?: boolean;
+}
+
 export interface ConversationalAgentChatProps {
   sdk: UiPath;
   agentId?: number;
@@ -54,6 +62,14 @@ export interface ConversationalAgentChatProps {
   firstRunExperience?: FirstRunExperience;
   /** Override which features are disabled. Merged with defaults (fullScreen, preview, close are always disabled). */
   disabledFeatures?: DisabledFeatures;
+  /** @internal */
+  isDebugMode?: boolean;
+  /** @internal */
+  evaluationSets?: EvaluationSet[];
+  /** @internal */
+  addToEvalButtonLabel?: string;
+  /** @internal */
+  onEvaluationSetClicked?: (id: string) => void;
 }
 
 export enum MessageWidget {
