@@ -11,7 +11,7 @@ import {
   ExchangeGetResponse,
   RawConversationGetResponse,
 } from "@uipath/uipath-typescript/conversational-agent";
-import { MessageWidget } from "./types";
+import { EvaluationSet, MessageWidget } from "./types";
 
 export const createFileKey = (attachment: AutopilotChatFileInfo) => {
   const name = attachment.name;
@@ -235,3 +235,21 @@ export const mapExchangesToChatMessages = (
       return [mainMessage, ...toolCallMessages];
     }),
   );
+
+/**
+ * Sorts evaluation sets: non-disabled first (default first within non-disabled),
+ * then disabled sets in their original order.
+ * @internal
+ */
+export const sortEvaluationSets = (
+  evaluationSets: EvaluationSet[],
+): EvaluationSet[] =>
+  [...evaluationSets].sort((a, b) => {
+    if (!a.isDisabled && b.isDisabled) return -1;
+    if (a.isDisabled && !b.isDisabled) return 1;
+    if (!a.isDisabled && !b.isDisabled) {
+      if (a.isDefault && !b.isDefault) return -1;
+      if (!a.isDefault && b.isDefault) return 1;
+    }
+    return 0;
+  });
