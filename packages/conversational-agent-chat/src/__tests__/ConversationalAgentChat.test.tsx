@@ -8,7 +8,7 @@ import { UiPath } from "@uipath/uipath-typescript/core";
 vi.mock("@uipath/apollo-react/core/fonts/font.css", () => ({}));
 
 const createMockChatService = () => ({
-  on: vi.fn(),
+  on: vi.fn(() => vi.fn()),
   open: vi.fn(),
   sendResponse: vi.fn(),
   setAttachmentsLoading: vi.fn(),
