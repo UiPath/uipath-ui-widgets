@@ -1,19 +1,8 @@
 import { UiPath } from "@uipath/uipath-typescript/core";
 
-export type Locale =
-  | "en"
-  | "es"
-  | "pt"
-  | "de"
-  | "fr"
-  | "ja"
-  | "ko"
-  | "ru"
-  | "tr"
-  | "zh-CN"
-  | "zh-TW"
-  | "pt-BR"
-  | "es-MX";
+// "keys" is a dev-debug mode that renders raw translation keys instead of resolved strings.
+// Additional locales will be bundled once the localization team delivers translations.
+export type Locale = "en" | "keys";
 
 export interface OverrideLabels {
   title?: string;
