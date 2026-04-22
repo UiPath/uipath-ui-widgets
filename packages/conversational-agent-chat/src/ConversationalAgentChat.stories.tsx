@@ -302,19 +302,6 @@ export const DarkTheme: Story = {
   },
 };
 
-export const Japanese: Story = {
-  args: {
-    locale: "ja",
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: "Chat widget with Japanese locale.",
-      },
-    },
-  },
-};
-
 export const ReadOnly: Story = {
   args: {
     readOnly: true,
