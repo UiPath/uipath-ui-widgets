@@ -40,7 +40,7 @@ export const FeedbackDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("feedback_title")}</DialogTitle>
+          <DialogTitle>{t("feedback_title_required")}</DialogTitle>
         </DialogHeader>
         <Textarea
           value={comment}

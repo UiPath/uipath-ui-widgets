@@ -98,7 +98,14 @@ export const ConversationalAgentChat = ({
     overrideLabelsRef.current = overrideLabels;
     disabledFeaturesRef.current = disabledFeatures;
     firstRunExperienceRef.current = firstRunExperience;
-  }, [theme, overrideLabels, disabledFeatures, firstRunExperience]);
+    onEvaluationSetClickedRef.current = onEvaluationSetClicked;
+  }, [
+    theme,
+    overrideLabels,
+    disabledFeatures,
+    firstRunExperience,
+    onEvaluationSetClicked,
+  ]);
   const session = useRef<SessionStream | null>(null);
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
@@ -111,7 +118,6 @@ export const ConversationalAgentChat = ({
   const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
   const [hasMessages, setHasMessages] = useState(false);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
-  onEvaluationSetClickedRef.current = onEvaluationSetClicked;
 
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
@@ -730,7 +736,14 @@ export const ConversationalAgentChat = ({
     return () => {
       unsubscribe?.();
     };
-  }, [chatService, isDebugMode, evaluationSets, addToEvalButtonLabel, hasMessages, onCustomHeaderActionClicked]);
+  }, [
+    chatService,
+    isDebugMode,
+    evaluationSets,
+    addToEvalButtonLabel,
+    hasMessages,
+    onCustomHeaderActionClicked,
+  ]);
 
   return (
     <div className="uipath-conversational-agent-chat">
