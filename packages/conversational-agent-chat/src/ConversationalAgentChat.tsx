@@ -26,6 +26,7 @@ import {
   ToolCallEndEvent,
   ToolCallStream,
 } from "@uipath/uipath-typescript/conversational-agent";
+import type { AgentGetByIdResponse } from "@uipath/uipath-typescript/conversational-agent";
 import {
   useCallback,
   useEffect,
@@ -91,6 +92,7 @@ export const ConversationalAgentChat = ({
   const disabledFeaturesRef = useRef(disabledFeatures);
   const firstRunExperienceRef = useRef(firstRunExperience);
   const initialConversationConsumed = useRef(false);
+  const resolvedAgent = useRef<AgentGetByIdResponse | null>(null);
   // useLayoutEffect is ok here because the work is minimal enought that the cost is essentially zero
   // needed because React 19 doesn't support ref writes on render
   useLayoutEffect(() => {
@@ -212,6 +214,29 @@ export const ConversationalAgentChat = ({
     [chatService, t],
   );
 
+  const resolveAgent = useCallback(async (): Promise<
+    AgentGetByIdResponse | undefined
+  > => {
+    if (!agentId) return undefined;
+    if (resolvedAgent.current?.id === agentId) return resolvedAgent.current;
+    if (folderId) {
+      resolvedAgent.current = await agentService.current.getById(
+        agentId,
+        folderId,
+      );
+      return resolvedAgent.current;
+    }
+    const found = (await agentService.current.getAll()).find(
+      (a) => a.id === agentId,
+    );
+    if (!found) return undefined;
+    resolvedAgent.current = await agentService.current.getById(
+      found.id,
+      found.folderId,
+    );
+    return resolvedAgent.current;
+  }, [agentId, folderId]);
+
   const getConversation =
     useCallback(async (): Promise<ConversationCreateResponse> => {
       if (currentConversation.current) {
@@ -226,18 +251,16 @@ export const ConversationalAgentChat = ({
         initialConversationConsumed.current = true;
         return existing;
       }
-      if (!agentId || !folderId) {
+      const agent = await resolveAgent();
+      if (!agent) {
         throw new Error(
-          "Either conversationId or agentId and folderId must be provided",
+          "Either conversationId or agentId must be provided",
         );
       }
-      const newConversation = await agentService.current.conversations.create(
-        agentId,
-        folderId,
-      );
+      const newConversation = await agent.conversations.create();
       currentConversation.current = newConversation;
       return newConversation;
-    }, [agentId, folderId, existingConversationId]);
+    }, [existingConversationId, resolveAgent]);
 
   const getSessionHelper = useCallback(async (): Promise<SessionStream> => {
     if (session.current) {
@@ -489,11 +512,7 @@ export const ConversationalAgentChat = ({
     try {
       initializedFor.current = initKey;
 
-      const agentRelease =
-        agentId && folderId
-          ? await agentService.current.getById(agentId, folderId)
-          : undefined;
-
+      const agentRelease = await resolveAgent();
       const agentName = agentRelease?.name ?? "";
 
       // All-or-nothing first-run experience configuration
@@ -539,7 +558,7 @@ export const ConversationalAgentChat = ({
             fullScreen: true,
             preview: true,
             close: true,
-            ...(!agentId || !folderId ? { newChat: true, history: true } : {}),
+            ...(!agentId ? { newChat: true, history: true } : {}),
             ...disabledFeaturesRef.current,
           },
         },
@@ -566,6 +585,7 @@ export const ConversationalAgentChat = ({
     existingConversationId,
     locale,
     readOnly,
+    resolveAgent,
     getConversation,
     fetchExchanges,
     t,
@@ -630,7 +650,7 @@ export const ConversationalAgentChat = ({
     setFeedbackDialogOpen(false);
   }, []);
 
-  // Initialize chat service on mount and when agentId/folderId changes
+  // Initialize chat service on mount and when agentId/folderId/existingConversationId changes
   useEffect(() => {
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}`;
     if (initializedFor.current !== initKey) {
@@ -648,7 +668,7 @@ export const ConversationalAgentChat = ({
 
     const registerEvents = async () => {
       try {
-        if (agentId && folderId) {
+        if (agentId) {
           const result = await agentService.current.conversations.getAll({
             sort: SortOrder.Descending,
             pageSize: 20,
