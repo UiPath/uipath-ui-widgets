@@ -33,8 +33,10 @@ import {
   useRef,
   useState,
 } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import { useTranslation } from "react-i18next";
 import { FeedbackDialog } from "./components/FeedbackDialog";
+import { SettingsDialogWithProviders } from "./components/SettingsDialog";
 import "./ConversationalAgentChat.css";
 import {
   AttachFileOutput,
@@ -91,7 +93,7 @@ export const ConversationalAgentChat = ({
   const disabledFeaturesRef = useRef(disabledFeatures);
   const firstRunExperienceRef = useRef(firstRunExperience);
   const initialConversationConsumed = useRef(false);
-  // useLayoutEffect is ok here because the work is minimal enought that the cost is essentially zero
+  // useLayoutEffect is ok here because the work is minimal enough that the cost is essentially zero
   // needed because React 19 doesn't support ref writes on render
   useLayoutEffect(() => {
     themeRef.current = theme;
@@ -111,7 +113,12 @@ export const ConversationalAgentChat = ({
   const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
   const [hasMessages, setHasMessages] = useState(false);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
-  onEvaluationSetClickedRef.current = onEvaluationSetClicked;
+  const chatServiceRef = useRef<AutopilotChatService | null>(null);
+  const settingsRootRef = useRef<Root | null>(null);
+
+  useLayoutEffect(() => {
+    onEvaluationSetClickedRef.current = onEvaluationSetClicked;
+  }, [onEvaluationSetClicked]);
 
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
@@ -518,6 +525,27 @@ export const ConversationalAgentChat = ({
             ),
           };
 
+      // TODO: if Apollo adds more renderer slots (footer, first-run, etc.),
+      // extract this mount/unmount plumbing into a `useApolloRenderer` hook.
+      const renderSettings = (element: HTMLElement) => {
+        // Apollo clears `element.innerHTML` before every call to the renderer.
+        // Reusing a React root would leave its virtual DOM out of sync with the
+        // wiped real DOM, so we unmount and recreate on every invocation.
+        if (settingsRootRef.current) {
+          settingsRootRef.current.unmount();
+          settingsRootRef.current = null;
+        }
+        const root = createRoot(element);
+        settingsRootRef.current = root;
+        root.render(
+          <SettingsDialogWithProviders
+            conversationalAgent={agentService.current}
+            theme={themeRef.current}
+            onClose={() => chatServiceRef.current?.toggleSettings(false)}
+          />,
+        );
+      };
+
       const chatServiceInstance = AutopilotChatService.Instantiate({
         config: {
           mode: AutopilotChatMode.Embedded,
@@ -535,15 +563,21 @@ export const ConversationalAgentChat = ({
               t("chat_input_placeholder"),
           },
           paginatedHistory: true,
+          settingsRenderer: renderSettings,
           disabledFeatures: {
             fullScreen: true,
             preview: true,
             close: true,
+            // Apollo defaults `settings: true`; flip it so our gear renders
+            // by default. Consumers can still opt out via `disabledFeatures`.
+            settings: false,
             ...(!agentId || !folderId ? { newChat: true, history: true } : {}),
             ...disabledFeaturesRef.current,
           },
         },
       });
+
+      chatServiceRef.current = chatServiceInstance;
 
       if (existingConversationId) {
         const conversation = await getConversation();
@@ -638,6 +672,30 @@ export const ConversationalAgentChat = ({
     }
   }, [agentId, folderId, existingConversationId, initChat]);
 
+  // Unmount the detached settings-dialog root on widget unmount
+  useEffect(() => {
+    return () => {
+      if (settingsRootRef.current) {
+        settingsRootRef.current.unmount();
+        settingsRootRef.current = null;
+      }
+    };
+  }, []);
+
+  // Keep the open settings dialog in sync when the host toggles theme.
+  // The detached root doesn't re-render with the parent, so push new props
+  // imperatively. `root.render` on an existing root reconciles (no remount).
+  useEffect(() => {
+    if (!settingsRootRef.current) return;
+    settingsRootRef.current.render(
+      <SettingsDialogWithProviders
+        conversationalAgent={agentService.current}
+        theme={theme}
+        onClose={() => chatServiceRef.current?.toggleSettings(false)}
+      />,
+    );
+  }, [theme]);
+
   useEffect(() => {
     chatService?.setTheme(theme);
   }, [chatService, theme]);
@@ -730,7 +788,14 @@ export const ConversationalAgentChat = ({
     return () => {
       unsubscribe?.();
     };
-  }, [chatService, isDebugMode, evaluationSets, addToEvalButtonLabel, hasMessages, onCustomHeaderActionClicked]);
+  }, [
+    chatService,
+    isDebugMode,
+    evaluationSets,
+    addToEvalButtonLabel,
+    hasMessages,
+    onCustomHeaderActionClicked,
+  ]);
 
   return (
     <div className="uipath-conversational-agent-chat">

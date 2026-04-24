@@ -4,6 +4,12 @@ import { UiPath } from "@uipath/uipath-typescript/core";
 // Additional locales will be bundled once the localization team delivers translations.
 export type Locale = "en" | "keys";
 
+export type ConversationalAgentChatTheme =
+  | "light"
+  | "dark"
+  | "light-hc"
+  | "dark-hc";
+
 export interface OverrideLabels {
   title?: string;
   footerDisclaimer?: string;
@@ -43,7 +49,7 @@ export interface ConversationalAgentChatProps {
   /** Allow for loading an existing conversation by ID instead of creating a new one on first message */
   existingConversationId?: string;
   locale?: Locale;
-  theme?: "light" | "dark" | "light-hc" | "dark-hc";
+  theme?: ConversationalAgentChatTheme;
   readOnly?: boolean;
   overrideLabels?: OverrideLabels;
   /** Override the first-run experience. When omitted, derived from agent appearance data. */
