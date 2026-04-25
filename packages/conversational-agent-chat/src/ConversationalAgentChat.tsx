@@ -140,6 +140,9 @@ export const ConversationalAgentChat = ({
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
   const conversationsCursor = useRef<{ value: string } | undefined>(undefined);
+  const agentReleaseIdRef = useRef<number | undefined>(undefined);
+  const agentReleaseKeyRef = useRef<string | undefined>(undefined);
+  const searchTextRef = useRef<string>("");
 
   const [chatService, setChatService] = useState<AutopilotChatService>();
   const [error, setError] = useState<string | null>(null);
@@ -338,6 +341,38 @@ export const ConversationalAgentChat = ({
     trackTelemetry(TelemetryEvent.NewChat, TelemetryStatus.Success);
   }, []);
 
+  const buildHistoryFilterOptions = useCallback(() => {
+    // The SDK's URL builder calls value.toString() without a null check, so
+    // omit any param that is undefined/empty rather than passing it as such.
+    const opts: {
+      agentReleaseKey?: string;
+      agentReleaseId?: number;
+      search?: string;
+    } = {};
+    if (agentReleaseKeyRef.current) opts.agentReleaseKey = agentReleaseKeyRef.current;
+    if (agentReleaseIdRef.current !== undefined) opts.agentReleaseId = agentReleaseIdRef.current;
+    if (searchTextRef.current) opts.search = searchTextRef.current;
+    return opts;
+  }, []);
+
+  const fetchFirstHistoryPage = useCallback(async () => {
+    if (!chatService) return;
+    const result = await agentService.current.conversations.getAll({
+      sort: SortOrder.Descending,
+      pageSize: 20,
+      ...buildHistoryFilterOptions(),
+    });
+    conversationsCursor.current = result.nextCursor;
+    pastConversations.current = result.items;
+    chatService.setHistory(
+      getConversationHistoryDisplayItems(
+        pastConversations.current,
+        t("new_chat"),
+      ),
+      !result.hasNextPage,
+    );
+  }, [buildHistoryFilterOptions, chatService, t]);
+
   const onHistoryLoadMore = useCallback(async () => {
     if (!chatService) return;
     if (!conversationsCursor.current) {
@@ -348,6 +383,7 @@ export const ConversationalAgentChat = ({
       sort: SortOrder.Descending,
       pageSize: 20,
       cursor: conversationsCursor.current,
+      ...buildHistoryFilterOptions(),
     });
     conversationsCursor.current = result.nextCursor;
     pastConversations.current = [...pastConversations.current, ...result.items];
@@ -355,7 +391,15 @@ export const ConversationalAgentChat = ({
       getConversationHistoryDisplayItems(result.items, t("new_chat")),
       !result.hasNextPage,
     );
-  }, [chatService, t]);
+  }, [buildHistoryFilterOptions, chatService, t]);
+
+  const onHistorySearch = useCallback(
+    async ({ searchText }: { searchText: string }) => {
+      searchTextRef.current = searchText;
+      await fetchFirstHistoryPage();
+    },
+    [fetchFirstHistoryPage],
+  );
 
   const onClickDeleteConversation = useCallback(
     async (id: string) => {
@@ -566,6 +610,10 @@ export const ConversationalAgentChat = ({
       initializedFor.current = initKey;
 
       const agentRelease = await resolveAgent();
+
+      agentReleaseIdRef.current = agentRelease?.id;
+      agentReleaseKeyRef.current = agentRelease?.releaseKey;
+
       const agentName = agentRelease?.name ?? "";
 
       // All-or-nothing first-run experience configuration
@@ -623,6 +671,10 @@ export const ConversationalAgentChat = ({
         chatServiceInstance.setConversation(
           mapExchangesToChatMessages(allExchanges),
         );
+      } else {
+        // AutopilotChatService is a singleton, so it may still hold the
+        // previous agent's messages. Reset before showing the new agent.
+        chatServiceInstance.setConversation([]);
       }
 
       setChatService(chatServiceInstance);
@@ -716,6 +768,24 @@ export const ConversationalAgentChat = ({
     chatService?.setTheme(theme);
   }, [chatService, theme]);
 
+  // Close the SDK session on unmount so the WebSocket doesn't linger.
+  useEffect(() => {
+    return () => {
+      try {
+        activeExchange.current?.sendExchangeEnd();
+      } catch {
+        /* exchange already ended */
+      }
+      try {
+        session.current?.sendSessionEnd();
+      } catch {
+        /* session already closed */
+      }
+      activeExchange.current = null;
+      session.current = null;
+    };
+  }, []);
+
   // Register event handlers after chatService is available
   useEffect(() => {
     if (!chatService) return;
@@ -726,21 +796,9 @@ export const ConversationalAgentChat = ({
     const registerEvents = async () => {
       try {
         if (agentId) {
-          const result = await agentService.current.conversations.getAll({
-            sort: SortOrder.Descending,
-            pageSize: 20,
-          });
+          await fetchFirstHistoryPage();
           // only register handlers if the component is still mounted
           if (cancelled) return;
-          conversationsCursor.current = result.nextCursor;
-          pastConversations.current = result.items;
-          chatService.setHistory(
-            getConversationHistoryDisplayItems(
-              pastConversations.current,
-              t("new_chat"),
-            ),
-            !result.hasNextPage,
-          );
         }
         unsubscribers.push(
           chatService.on(AutopilotChatEvent.NewChat, onNewChat),
@@ -755,6 +813,7 @@ export const ConversationalAgentChat = ({
             onClickDeleteConversation,
           ),
           chatService.on(AutopilotChatEvent.HistoryLoadMore, onHistoryLoadMore),
+          chatService.on(AutopilotChatEvent.HistorySearch, onHistorySearch),
           chatService.on(AutopilotChatEvent.Feedback, onFeedback),
           chatService.on(AutopilotChatEvent.StopResponse, onStopResponse),
         );
@@ -772,11 +831,15 @@ export const ConversationalAgentChat = ({
       unsubscribers.forEach((unsub) => unsub());
     };
   }, [
+    agentId,
     chatService,
+    fetchFirstHistoryPage,
+    folderId,
     onClickDeleteConversation,
     onClickOpenConversation,
     onFeedback,
     onHistoryLoadMore,
+    onHistorySearch,
     onNewChat,
     onSendMessage,
     onSetAttachments,

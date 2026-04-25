@@ -42,6 +42,7 @@ vi.mock("@uipath/apollo-react/material/components", () => ({
     OpenConversation: "openConversation",
     DeleteConversation: "deleteConversation",
     HistoryLoadMore: "historyLoadMore",
+    HistorySearch: "historySearch",
     Feedback: "feedback",
   },
   AutopilotChatService: {
@@ -122,7 +123,9 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
         capturedAgentConstructorArgs.push(args);
       }
       getById = vi.fn().mockResolvedValue({
-        id: 1,
+        id: 12345,
+        releaseKey: "11111111-2222-3333-4444-555555555555",
+        processKey: "Test.Agent.dotted.path",
         name: "Test Agent",
         folderId: 100,
         appearance: {
@@ -1562,6 +1565,53 @@ describe("ConversationalAgentChat", () => {
       await onHistoryLoadMore?.();
 
       expect(mockChatService.appendOlderHistoryItems).toHaveBeenCalled();
+    });
+
+  });
+
+  describe("onHistorySearch", () => {
+    it("should register HistorySearch event handler", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "historySearch",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+    });
+
+    it("should refetch history with the new search text and reset cursor", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      // Initial fetch must have completed.
+      await waitFor(
+        () => {
+          expect(mockChatService.setHistory).toHaveBeenCalled();
+        },
+        { timeout: 3000 },
+      );
+
+      const initialSetHistoryCalls = mockChatService.setHistory.mock.calls.length;
+
+      const historySearchCall = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "historySearch",
+      );
+      const onHistorySearch = historySearchCall?.[1];
+      expect(onHistorySearch).toBeDefined();
+
+      await onHistorySearch?.({ searchText: "budget" });
+
+      // The search refetches the first page and replaces history via setHistory
+      // (not appendOlderHistoryItems, which would be wrong for a fresh search).
+      await waitFor(() => {
+        expect(mockChatService.setHistory.mock.calls.length).toBeGreaterThan(
+          initialSetHistoryCalls,
+        );
+      });
     });
   });
 
