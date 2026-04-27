@@ -147,6 +147,14 @@ npm install @uipath/ui-widgets-validation-station
 
 > **Note:** Add either \`light\` or \`dark\` class to your HTML \`<body>\` element to enable proper theming.
 
+The component loads the underlying Validation Station web component on mount —
+consumers do not need to call \`loadValidationStationWebComponent\` themselves.
+By default it expects the web component assets to be served at
+\`node_modules/@uipath/du-validation-station-wc\` (which works with Vite's
+dev server). For production, copy the contents of
+\`node_modules/@uipath/du-validation-station-wc\` into your public assets and
+point \`wcAssetsUrl\` at that location.
+
 \`\`\`tsx
 import { ValidationStation } from '@uipath/ui-widgets-validation-station';
 import "@uipath/ui-widgets-validation-station/ValidationStation.css";
@@ -170,6 +178,7 @@ function App() {
       theme="light"
       language="en"
       save={{ validate: true }}
+      // wcAssetsUrl="/assets/du-validation-station-wc"
     />
   );
 }
