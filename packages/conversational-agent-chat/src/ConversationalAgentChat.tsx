@@ -67,6 +67,7 @@ export const ConversationalAgentChat = ({
   agentId,
   folderId,
   existingConversationId,
+  externalUserId,
   locale = "en",
   theme = "light",
   readOnly = false,
@@ -83,7 +84,12 @@ export const ConversationalAgentChat = ({
     i18next.changeLanguage(locale);
   }
   const { t } = useTranslation();
-  const agentService = useRef(new ConversationalAgent(sdk));
+  const agentService = useRef(
+    new ConversationalAgent(
+      sdk,
+      externalUserId ? { externalUserId } : undefined,
+    ),
+  );
   const currentConversation = useRef<ConversationCreateResponse | null>(null);
   const initializedFor = useRef<string | null>(null);
   const themeRef = useRef(theme);
@@ -99,6 +105,21 @@ export const ConversationalAgentChat = ({
     disabledFeaturesRef.current = disabledFeatures;
     firstRunExperienceRef.current = firstRunExperience;
   }, [theme, overrideLabels, disabledFeatures, firstRunExperience]);
+  // Rebuild the SDK service when sdk or externalUserId change. Skip the first run because the
+  // useRef initializer above already built it with the initial values. The chat is re-initialized
+  // via initKey (which includes externalUserId) so dependent refs (session, currentConversation,
+  // activeExchange) are reset by onNewChat / initChat downstream.
+  const didMountAgentServiceRef = useRef(false);
+  useLayoutEffect(() => {
+    if (!didMountAgentServiceRef.current) {
+      didMountAgentServiceRef.current = true;
+      return;
+    }
+    agentService.current = new ConversationalAgent(
+      sdk,
+      externalUserId ? { externalUserId } : undefined,
+    );
+  }, [sdk, externalUserId]);
   const session = useRef<SessionStream | null>(null);
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
@@ -485,7 +506,7 @@ export const ConversationalAgentChat = ({
   );
 
   const initChat = useCallback(async () => {
-    const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}`;
+    const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
     try {
       initializedFor.current = initKey;
 
@@ -564,6 +585,7 @@ export const ConversationalAgentChat = ({
     agentId,
     folderId,
     existingConversationId,
+    externalUserId,
     locale,
     readOnly,
     getConversation,
@@ -630,13 +652,13 @@ export const ConversationalAgentChat = ({
     setFeedbackDialogOpen(false);
   }, []);
 
-  // Initialize chat service on mount and when agentId/folderId changes
+  // Initialize chat service on mount and when agentId/folderId/externalUserId changes
   useEffect(() => {
-    const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}`;
+    const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
     if (initializedFor.current !== initKey) {
       initChat();
     }
-  }, [agentId, folderId, existingConversationId, initChat]);
+  }, [agentId, folderId, existingConversationId, externalUserId, initChat]);
 
   useEffect(() => {
     chatService?.setTheme(theme);

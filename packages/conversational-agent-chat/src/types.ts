@@ -42,6 +42,13 @@ export interface ConversationalAgentChatProps {
   folderId?: number;
   /** Allow for loading an existing conversation by ID instead of creating a new one on first message */
   existingConversationId?: string;
+  /**
+   * External User ID to associate with conversational agent requests.
+   * Required when authenticating via an app-scoped external app (client credential grant);
+   * omit for standard user tokens. Sent as the `x-uipath-external-user-id` header on HTTP
+   * requests and as a query parameter on the WebSocket connection.
+   */
+  externalUserId?: string;
   locale?: Locale;
   theme?: "light" | "dark" | "light-hc" | "dark-hc";
   readOnly?: boolean;
