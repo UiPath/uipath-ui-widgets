@@ -345,6 +345,7 @@ describe("ConversationalAgentChat", () => {
                 fullScreen: true,
                 preview: true,
                 close: true,
+                settings: false,
               },
             }),
           }),
