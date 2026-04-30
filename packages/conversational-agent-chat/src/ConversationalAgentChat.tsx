@@ -93,6 +93,7 @@ export const ConversationalAgentChat = ({
   const firstRunExperienceRef = useRef(firstRunExperience);
   const initialConversationConsumed = useRef(false);
   const resolvedAgent = useRef<AgentGetByIdResponse | null>(null);
+  const folderIdRef = useRef<number | undefined>(folderId);
   // useLayoutEffect is ok here because the work is minimal enought that the cost is essentially zero
   // needed because React 19 doesn't support ref writes on render
   useLayoutEffect(() => {
@@ -100,7 +101,8 @@ export const ConversationalAgentChat = ({
     overrideLabelsRef.current = overrideLabels;
     disabledFeaturesRef.current = disabledFeatures;
     firstRunExperienceRef.current = firstRunExperience;
-  }, [theme, overrideLabels, disabledFeatures, firstRunExperience]);
+    folderIdRef.current = folderId;
+  }, [theme, overrideLabels, disabledFeatures, firstRunExperience, folderId]);
   const session = useRef<SessionStream | null>(null);
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
@@ -218,22 +220,32 @@ export const ConversationalAgentChat = ({
     AgentGetByIdResponse | undefined
   > => {
     if (!agentId) return undefined;
-    if (resolvedAgent.current?.id === agentId) return resolvedAgent.current;
-    if (folderId) {
+    if (resolvedAgent.current?.id === agentId) {
+      const cachedFolderId = resolvedAgent.current.folderId;
+      const expectedFolderId = folderIdRef.current;
+      if (expectedFolderId == null || cachedFolderId === expectedFolderId) {
+        return resolvedAgent.current;
+      }
+    }
+
+    if (folderIdRef.current != null) {
       resolvedAgent.current = await agentService.current.getById(
         agentId,
-        folderId,
+        folderIdRef.current,
       );
+      folderIdRef.current = resolvedAgent.current.folderId;
       return resolvedAgent.current;
     }
     const found = (await agentService.current.getAll()).find(
       (a) => a.id === agentId,
     );
     if (!found) return undefined;
+    folderIdRef.current = found.folderId;
     resolvedAgent.current = await agentService.current.getById(
       found.id,
       found.folderId,
     );
+    folderIdRef.current = resolvedAgent.current.folderId;
     return resolvedAgent.current;
   }, [agentId, folderId]);
 
