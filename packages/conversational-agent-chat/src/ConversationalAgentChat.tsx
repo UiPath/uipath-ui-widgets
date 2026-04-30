@@ -20,24 +20,38 @@ import {
   ExchangeGetResponse,
   ExchangeStream,
   FeedbackRating,
+  InterruptType,
   MessageStream,
   SessionStream,
   SortOrder,
   ToolCallEndEvent,
   ToolCallStream,
 } from "@uipath/uipath-typescript/conversational-agent";
-import type { AgentGetByIdResponse } from "@uipath/uipath-typescript/conversational-agent";
+import type {
+  AgentGetByIdResponse,
+  JSONObject,
+  JSONValue,
+  ToolCallConfirmationValue,
+} from "@uipath/uipath-typescript/conversational-agent";
 import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { useTranslation } from "react-i18next";
+import { InputsPage } from "./components/InputsPage";
+import type { InputSchema } from "./components/AgentSchemaForm/types";
 import { FeedbackDialog } from "./components/FeedbackDialog";
 import { SettingsDialog } from "./components/SettingsDialog";
+import type { ToolConfirmationLabels } from "./components/ToolConfirmation";
+import {
+  createToolConfirmationRenderer,
+  type ToolConfirmationRenderer,
+} from "./components/ToolConfirmationRenderer";
 import "./ConversationalAgentChat.css";
 import {
   AttachFileOutput,
@@ -59,6 +73,11 @@ import { trackTelemetry } from "./utils/telemetryUtils";
 import { initI18n } from "./i18n";
 
 initI18n();
+
+const TOOL_CONFIRMATION_WIDGET_ID_PREFIX = "confirmation-";
+type ConversationCreateOptionsArg = Parameters<
+  ConversationalAgent["conversations"]["create"]
+>[2];
 
 // Map widget Locale to Apollo supported locale to allow for locales not supported by Apollo
 function toApolloSupportedLocale(widgetLocale: Locale): SupportedLocale {
@@ -104,8 +123,15 @@ export const ConversationalAgentChat = ({
   const initialConversationConsumed = useRef(false);
   const resolvedAgent = useRef<AgentGetByIdResponse | null>(null);
   const folderIdRef = useRef<number | undefined>(folderId);
-  // useLayoutEffect is ok here because the work is minimal enought that the cost is essentially zero
+  const toolConfirmationLabelsRef = useRef<ToolConfirmationLabels | null>(null);
+  // Per-instance so unmounting one widget doesn't tear down another's React roots.
+  const toolConfirmationRenderer = useMemo<ToolConfirmationRenderer>(
+    () => createToolConfirmationRenderer(),
+    [],
+  );
+  // useLayoutEffect is ok here because the work is minimal enough that the cost is essentially zero
   // needed because React 19 doesn't support ref writes on render
+
   useLayoutEffect(() => {
     themeRef.current = theme;
     overrideLabelsRef.current = overrideLabels;
@@ -114,6 +140,12 @@ export const ConversationalAgentChat = ({
     folderIdRef.current = folderId;
     onEvaluationSetClickedRef.current = onEvaluationSetClicked;
     onUserMessageSentRef.current = onUserMessageSent;
+    toolConfirmationLabelsRef.current = {
+      cancel: t("cancel"),
+      confirm: t("tool_confirmation_confirm"),
+      statusCancelled: t("tool_confirmation_status_cancelled"),
+      statusConfirmed: t("tool_confirmation_status_confirmed"),
+    };
   }, [
     theme,
     overrideLabels,
@@ -121,7 +153,8 @@ export const ConversationalAgentChat = ({
     firstRunExperience,
     onEvaluationSetClicked,
     onUserMessageSent,
-    folderId
+    folderId,
+    t,
   ]);
   // Rebuild the SDK service when sdk or externalUserId change. Skip the first run because the
   // useRef initializer above already built it with the initial values. The chat is re-initialized
@@ -148,6 +181,13 @@ export const ConversationalAgentChat = ({
 
   const [chatService, setChatService] = useState<AutopilotChatService>();
   const [error, setError] = useState<string | null>(null);
+  const [inputSchemaState, setInputSchemaState] = useState<InputSchema | null>(
+    null,
+  );
+  const [showInputPage, setShowInputPage] = useState(false);
+  const [agentNameState, setAgentNameState] = useState("");
+  // Bumped on New Chat to force a fresh <InputsPage> mount with cleared form state.
+  const [inputsInstance, setInputsInstance] = useState(0);
   const activeExchange = useRef<ExchangeStream | null>(null);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
@@ -206,45 +246,186 @@ export const ConversationalAgentChat = ({
             }
           });
 
+          // Track tool calls so we can defer the spinner when an interrupt arrives
+          const pendingToolCalls = new Map<
+            string,
+            {
+              toolName: string;
+              toolInput: Record<string, unknown>;
+              startTimeIso: string;
+              spinnerSent: boolean;
+            }
+          >();
+
+          const sendToolCallSpinner = (toolCallId: string) => {
+            const pending = pendingToolCalls.get(toolCallId);
+            if (!pending || pending.spinnerSent) return;
+            pending.spinnerSent = true;
+            chatService.sendResponse({
+              id: toolCallId,
+              content: t("performing_action_message", {
+                action: pending.toolName,
+              }),
+              created_at: pending.startTimeIso,
+              widget: MessageWidget.ApolloAgentsToolCall,
+              meta: {
+                toolName: pending.toolName,
+                input: pending.toolInput,
+                startTime: pending.startTimeIso,
+              },
+            });
+          };
+
+          // Shared by both flows — caller supplies the approve/reject channel.
+          const sendToolConfirmationWidget = (params: {
+            toolCallId: string;
+            toolName: string;
+            inputSchema?: JSONValue;
+            inputValue?: JSONValue;
+            onApprove: (input?: unknown) => void;
+            onCancel: () => void;
+          }) => {
+            const widgetMessageId = `${TOOL_CONFIRMATION_WIDGET_ID_PREFIX}${params.toolCallId}`;
+            const confirmationData: ToolCallConfirmationValue = {
+              toolCallId: params.toolCallId,
+              toolName: params.toolName,
+              inputSchema: params.inputSchema ?? {},
+              inputValue: params.inputValue,
+            };
+            const createdAt = new Date().toISOString();
+
+            const sendUpdate = (
+              isCompleted: boolean,
+              wasRejected: boolean,
+            ) => {
+              chatService.sendResponse({
+                id: widgetMessageId,
+                content: t("tool_confirmation_required"),
+                created_at: createdAt,
+                widget: MessageWidget.ToolConfirmation,
+                stream: false,
+                done: true,
+                meta: {
+                  confirmationData,
+                  isCompleted,
+                  wasRejected,
+                  // No-ops once completed — the form's buttons are gone but meta shape stays stable.
+                  onApprove: isCompleted ? noopApprove : handleApprove,
+                  onCancel: isCompleted ? noop : handleCancel,
+                },
+              });
+            };
+
+            const noop = () => {};
+            const noopApprove = (endValue: { input?: unknown }) => {
+              void endValue;
+            };
+            const handleApprove = (endValue: { input?: unknown }) => {
+              sendUpdate(true, false);
+              params.onApprove(endValue.input);
+            };
+            const handleCancel = () => {
+              sendUpdate(true, true);
+              params.onCancel();
+            };
+
+            sendUpdate(false, false);
+          };
+
           message.onToolCallStart((toolCall: ToolCallStream) => {
             const startEvent = toolCall.startEvent;
             const startTimeIso = new Date().toISOString();
             const toolInput = startEvent.input
               ? normalizeInput(startEvent.input)
               : {};
-            chatService.sendResponse({
-              id: toolCall.toolCallId,
-              content: t("performing_action_message", {
-                action: startEvent.toolName,
-              }),
-              created_at: startTimeIso,
-              widget: MessageWidget.ApolloAgentsToolCall,
-              meta: {
-                toolName: startEvent.toolName,
-                input: toolInput,
-                startTime: startTimeIso,
-              },
+
+            pendingToolCalls.set(toolCall.toolCallId, {
+              toolName: startEvent.toolName,
+              toolInput,
+              startTimeIso,
+              spinnerSent: false,
             });
 
-            toolCall.onToolCallEnd((endEvent: ToolCallEndEvent) => {
-              const endTimeIso = new Date().toISOString();
-              chatService.sendResponse({
-                id: toolCall.toolCallId,
-                content: t("performing_action_message", {
-                  action: startEvent.toolName,
-                }),
-                created_at: endTimeIso,
-                widget: MessageWidget.ApolloAgentsToolCall,
-                meta: {
-                  toolName: startEvent.toolName,
-                  input: toolInput,
-                  startTime: startTimeIso,
-                  output: endEvent.output,
-                  endTime: endTimeIso,
-                  isError: endEvent.isError,
+            // New flow: confirmation is a property of the tool call itself.
+            if (startEvent.requireConfirmation) {
+              sendToolConfirmationWidget({
+                toolCallId: toolCall.toolCallId,
+                toolName: startEvent.toolName,
+                inputSchema: startEvent.inputSchema,
+                inputValue: startEvent.input,
+                onApprove: (input) => {
+                  sendToolCallSpinner(toolCall.toolCallId);
+                  const approvedInput =
+                    (input as JSONValue | undefined) ??
+                    startEvent.input ??
+                    {};
+                  toolCall.sendToolCallConfirm({
+                    approved: true,
+                    input: approvedInput,
+                  });
+                },
+                onCancel: () => {
+                  toolCall.sendToolCallConfirm({ approved: false });
                 },
               });
+            } else {
+              // No confirmation needed — show spinner immediately.
+              sendToolCallSpinner(toolCall.toolCallId);
+            }
+
+            toolCall.onToolCallEnd((endEvent: ToolCallEndEvent) => {
+              const pending = pendingToolCalls.get(toolCall.toolCallId);
+              if (pending?.spinnerSent) {
+                const endTimeIso = new Date().toISOString();
+                chatService.sendResponse({
+                  id: toolCall.toolCallId,
+                  content: t("performing_action_message", {
+                    action: startEvent.toolName,
+                  }),
+                  created_at: endTimeIso,
+                  widget: MessageWidget.ApolloAgentsToolCall,
+                  meta: {
+                    toolName: startEvent.toolName,
+                    input: toolInput,
+                    startTime: startTimeIso,
+                    output: endEvent.output,
+                    endTime: endTimeIso,
+                    isError: endEvent.isError,
+                  },
+                });
+              }
+              pendingToolCalls.delete(toolCall.toolCallId);
             });
+          });
+
+          // Legacy interrupt-based flow, still used by temporal runtime.
+          message.onInterruptStart(({ interruptId, startEvent }) => {
+            if (startEvent.type === InterruptType.ToolCallConfirmation) {
+              const confirmationData =
+                startEvent.value as ToolCallConfirmationValue;
+              const pending = pendingToolCalls.get(confirmationData.toolCallId);
+              if (pending) pending.spinnerSent = false;
+
+              sendToolConfirmationWidget({
+                toolCallId: confirmationData.toolCallId,
+                toolName: confirmationData.toolName,
+                inputSchema: confirmationData.inputSchema,
+                inputValue: confirmationData.inputValue,
+                onApprove: (input) => {
+                  sendToolCallSpinner(confirmationData.toolCallId);
+                  message.sendInterruptEnd(interruptId, {
+                    type: InterruptType.ToolCallConfirmation,
+                    value: { approved: true, input },
+                  });
+                },
+                onCancel: () => {
+                  message.sendInterruptEnd(interruptId, {
+                    type: InterruptType.ToolCallConfirmation,
+                    value: { approved: false },
+                  });
+                },
+              });
+            }
           });
         }
       });
@@ -321,12 +502,10 @@ export const ConversationalAgentChat = ({
       }
       const agent = await resolveAgent();
       if (!agent) {
-        throw new Error(
-          "Either conversationId or agentId must be provided",
-        );
+        throw new Error(t("error_missing_conversation_params"));
       }
       const newConversation = await agent.conversations.create(
-        jobStartOverrides ? { jobStartOverrides } : undefined
+        jobStartOverrides ? { jobStartOverrides } : undefined,
       );
       currentConversation.current = newConversation;
       // Show the new conversation in the sidebar immediately so its label
@@ -334,7 +513,13 @@ export const ConversationalAgentChat = ({
       // in place via onLabelUpdated rather than waiting for a history reload.
       setConversationHistory([newConversation, ...pastConversations.current]);
       return newConversation;
-    }, [existingConversationId, jobStartOverrides, resolveAgent, setConversationHistory]);
+    }, [
+      existingConversationId,
+      jobStartOverrides,
+      resolveAgent,
+      setConversationHistory,
+      t,
+    ]);
 
   const getSessionHelper = useCallback(async (): Promise<SessionStream> => {
     if (session.current) {
@@ -368,8 +553,15 @@ export const ConversationalAgentChat = ({
     session.current = null;
     activeExchange.current = null;
     setHasMessages(false);
+    // Re-show the InputsPage with a cleared form when the agent's schema has
+    // required inputs. Bumping the counter forces an unmount/remount via the
+    // key on <InputsPage>, which resets internal form state.
+    if ((inputSchemaState?.required?.length ?? 0) > 0) {
+      setInputsInstance((n) => n + 1);
+      setShowInputPage(true);
+    }
     trackTelemetry(TelemetryEvent.NewChat, TelemetryStatus.Success);
-  }, []);
+  }, [inputSchemaState]);
 
   const buildHistoryFilterOptions = useCallback(() => {
     // The SDK's URL builder calls value.toString() without a null check, so
@@ -633,6 +825,25 @@ export const ConversationalAgentChat = ({
       agentKeyRef.current = agentRelease?.processKey;
       const agentName = agentRelease?.name ?? "";
 
+      // TODO(sdk-typing): drop the cast once @uipath/uipath-typescript exposes
+      // inputSchema on AgentRelease. The API returns it but the SDK type
+      // definitions don't include it yet.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const inputSchema = (agentRelease as any)?.inputSchema as
+        | InputSchema
+        | undefined;
+
+      // Show input page if there's an inputSchema with required properties and
+      // this is a new conversation. Optional-only schemas use the settings panel.
+      // Skip when resuming an existing conversation — its inputs were already
+      // captured at creation time.
+      const hasRequiredInputs = (inputSchema?.required?.length ?? 0) > 0;
+      if (hasRequiredInputs && !existingConversationId) {
+        setInputSchemaState(inputSchema ?? null);
+        setAgentNameState(agentName);
+        setShowInputPage(true);
+      }
+
       // All-or-nothing first-run experience configuration
       // If an override is passed use it, otherwise use the agent's default.
       // Finally, if the agent has no default, use fallbacks/empty values
@@ -808,7 +1019,7 @@ export const ConversationalAgentChat = ({
   useEffect(() => {
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
     if (initializedFor.current !== initKey) {
-      initChat();
+      void Promise.resolve().then(initChat);
     }
   }, [agentId, folderId, existingConversationId, externalUserId, initChat]);
 
@@ -843,6 +1054,13 @@ export const ConversationalAgentChat = ({
     };
   }, []);
 
+  // Release React state held by the imperative tool-confirmation roots.
+  useEffect(() => {
+    return () => {
+      toolConfirmationRenderer.unmountAll();
+    };
+  }, [toolConfirmationRenderer]);
+
   // Register event handlers after chatService is available
   useEffect(() => {
     if (!chatService) return;
@@ -874,6 +1092,15 @@ export const ConversationalAgentChat = ({
           chatService.on(AutopilotChatEvent.Feedback, onFeedback),
           chatService.on(AutopilotChatEvent.StopResponse, onStopResponse),
         );
+        chatService.injectMessageRenderer({
+          name: MessageWidget.ToolConfirmation,
+          render: (container, message) =>
+            toolConfirmationRenderer.render(
+              container,
+              message,
+              toolConfirmationLabelsRef.current ?? undefined,
+            ),
+        });
       } catch (err) {
         const message =
           err instanceof Error ? err.message : t("error_load_history");
@@ -902,6 +1129,7 @@ export const ConversationalAgentChat = ({
     onSetAttachments,
     onStopResponse,
     t,
+    toolConfirmationRenderer,
   ]);
 
   useEffect(() => {
@@ -948,6 +1176,25 @@ export const ConversationalAgentChat = ({
 
   return (
     <div className="uipath-conversational-agent-chat">
+      {!error && showInputPage && inputSchemaState && (
+        <InputsPage
+          key={`${agentId}-${inputsInstance}`}
+          agentName={agentNameState}
+          inputSchema={inputSchemaState}
+          onSubmit={async (data) => {
+            if (!agentId || !folderId) {
+              throw new Error(t("error_missing_conversation_params"));
+            }
+            const conversation =
+              await agentService.current.conversations.create(agentId, folderId, {
+                agentInput: { inline: data as JSONObject },
+              } as ConversationCreateOptionsArg);
+            currentConversation.current = conversation;
+            setShowInputPage(false);
+          }}
+        />
+      )}
+
       {error && (
         <div className="info-container">
           <Alert variant="destructive">
@@ -967,7 +1214,7 @@ export const ConversationalAgentChat = ({
         </div>
       )}
 
-      {!error && chatService && (
+      {!error && chatService && !showInputPage && (
         <ApChat
           key={locale}
           chatServiceInstance={chatService}
