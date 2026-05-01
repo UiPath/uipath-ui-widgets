@@ -652,6 +652,9 @@ export const ConversationalAgentChat = ({
   useEffect(() => {
     if (!chatService) return;
 
+    let cancelled = false;
+    const unsubscribers: Array<() => void> = [];
+
     const registerEvents = async () => {
       try {
         if (agentId && folderId) {
@@ -669,20 +672,22 @@ export const ConversationalAgentChat = ({
             !result.hasNextPage,
           );
         }
-        chatService.on(AutopilotChatEvent.NewChat, onNewChat);
-        chatService.on(AutopilotChatEvent.Request, onSendMessage);
-        chatService.on(AutopilotChatEvent.SetAttachments, onSetAttachments);
-        chatService.on(
-          AutopilotChatEvent.OpenConversation,
-          onClickOpenConversation,
+        unsubscribers.push(
+          chatService.on(AutopilotChatEvent.NewChat, onNewChat),
+          chatService.on(AutopilotChatEvent.Request, onSendMessage),
+          chatService.on(AutopilotChatEvent.SetAttachments, onSetAttachments),
+          chatService.on(
+            AutopilotChatEvent.OpenConversation,
+            onClickOpenConversation,
+          ),
+          chatService.on(
+            AutopilotChatEvent.DeleteConversation,
+            onClickDeleteConversation,
+          ),
+          chatService.on(AutopilotChatEvent.HistoryLoadMore, onHistoryLoadMore),
+          chatService.on(AutopilotChatEvent.Feedback, onFeedback),
+          chatService.on(AutopilotChatEvent.StopResponse, onStopResponse),
         );
-        chatService.on(
-          AutopilotChatEvent.DeleteConversation,
-          onClickDeleteConversation,
-        );
-        chatService.on(AutopilotChatEvent.HistoryLoadMore, onHistoryLoadMore);
-        chatService.on(AutopilotChatEvent.Feedback, onFeedback);
-        chatService.on(AutopilotChatEvent.StopResponse, onStopResponse);
       } catch (err) {
         const message =
           err instanceof Error ? err.message : t("error_load_history");
@@ -691,6 +696,11 @@ export const ConversationalAgentChat = ({
     };
 
     registerEvents();
+
+    return () => {
+      cancelled = true;
+      unsubscribers.forEach((unsub) => unsub());
+    };
   }, [
     chatService,
     onClickDeleteConversation,
@@ -744,6 +754,40 @@ export const ConversationalAgentChat = ({
     hasMessages,
     onCustomHeaderActionClicked,
   ]);
+
+  useEffect(() => {
+    if (
+      !chatService ||
+      !isDebugMode ||
+      !evaluationSets ||
+      evaluationSets.length === 0
+    ) {
+      return;
+    }
+
+    const label = addToEvalButtonLabel || "Add to Evaluation Set";
+    const sortedSets = sortEvaluationSets(evaluationSets);
+    const headerAction: AutopilotChatCustomHeaderAction = {
+      id: "add-to-eval-button",
+      name: label,
+      description: label,
+      disabled: !hasMessages,
+      children: sortedSets.map((s) => ({
+        id: `eval-${s.id}`,
+        name: s.name,
+        description: `Add to ${s.name}`,
+        disabled: s.isDisabled,
+      })),
+    };
+    chatService.setCustomHeaderActions([headerAction]);
+    const unsubscribe = chatService.on(
+      AutopilotChatEvent.CustomHeaderActionClicked,
+      onCustomHeaderActionClicked,
+    );
+    return () => {
+      unsubscribe?.();
+    };
+  }, [chatService, isDebugMode, evaluationSets, addToEvalButtonLabel, hasMessages, onCustomHeaderActionClicked]);
 
   return (
     <div className="uipath-conversational-agent-chat">
