@@ -61,6 +61,22 @@ export interface ConversationalAgentChatProps {
   onUserMessageSent?: (message: { content: string }) => void;
 }
 
+export interface AgentSummary {
+  id: number;
+  name: string;
+  description: string;
+  folderId: number;
+}
+
+export interface ConversationalAgentPickerChatProps {
+  sdk: UiPath;
+  locale?: Locale;
+  theme?: "light" | "dark" | "light-hc" | "dark-hc";
+  readOnly?: boolean;
+  overrideLabels?: OverrideLabels;
+  onAgentSelected?: (agent: AgentSummary) => void;
+}
+
 export enum MessageWidget {
   AI = "ai",
   Human = "human",
@@ -80,6 +96,8 @@ export enum TelemetryEvent {
   OpenConversation = "CAC.OpenConversation",
   FileAttached = "CAC.FileAttached",
   Feedback = "CAC.Feedback",
+  LoadAgents = "CAC.LoadAgents",
+  SelectAgent = "CAC.SelectAgent",
 }
 
 export enum TelemetryStatus {

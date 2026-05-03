@@ -2,6 +2,7 @@
 @import "@uipath/apollo-wind/tailwind.css";
 @source "../node_modules/@uipath/apollo-wind/dist/**/*.js";
 @source "../../../node_modules/@uipath/apollo-wind/dist/**/*.js";
+@source "../dist/**/*.{js,css}";
 
 .uipath-conversational-agent-chat {
   width: 440px;
