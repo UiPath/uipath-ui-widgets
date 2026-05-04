@@ -98,7 +98,14 @@ export const ConversationalAgentChat = ({
     overrideLabelsRef.current = overrideLabels;
     disabledFeaturesRef.current = disabledFeatures;
     firstRunExperienceRef.current = firstRunExperience;
-  }, [theme, overrideLabels, disabledFeatures, firstRunExperience]);
+    onEvaluationSetClickedRef.current = onEvaluationSetClicked;
+  }, [
+    theme,
+    overrideLabels,
+    disabledFeatures,
+    firstRunExperience,
+    onEvaluationSetClicked,
+  ]);
   const session = useRef<SessionStream | null>(null);
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
@@ -111,7 +118,6 @@ export const ConversationalAgentChat = ({
   const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
   const [hasMessages, setHasMessages] = useState(false);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
-  onEvaluationSetClickedRef.current = onEvaluationSetClicked;
 
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
@@ -656,8 +662,6 @@ export const ConversationalAgentChat = ({
             sort: SortOrder.Descending,
             pageSize: 20,
           });
-          // only register handlers if the component is still mounted
-          if (cancelled) return;
           conversationsCursor.current = result.nextCursor;
           pastConversations.current = result.items;
           chatService.setHistory(
@@ -708,6 +712,47 @@ export const ConversationalAgentChat = ({
     onSetAttachments,
     onStopResponse,
     t,
+  ]);
+
+  useEffect(() => {
+    if (
+      !chatService ||
+      !isDebugMode ||
+      !evaluationSets ||
+      evaluationSets.length === 0
+    ) {
+      return;
+    }
+
+    const label = addToEvalButtonLabel || "Add to Evaluation Set";
+    const sortedSets = sortEvaluationSets(evaluationSets);
+    const headerAction: AutopilotChatCustomHeaderAction = {
+      id: "add-to-eval-button",
+      name: label,
+      description: label,
+      disabled: !hasMessages,
+      children: sortedSets.map((s) => ({
+        id: `eval-${s.id}`,
+        name: s.name,
+        description: `Add to ${s.name}`,
+        disabled: s.isDisabled,
+      })),
+    };
+    chatService.setCustomHeaderActions([headerAction]);
+    const unsubscribe = chatService.on(
+      AutopilotChatEvent.CustomHeaderActionClicked,
+      onCustomHeaderActionClicked,
+    );
+    return () => {
+      unsubscribe?.();
+    };
+  }, [
+    chatService,
+    isDebugMode,
+    evaluationSets,
+    addToEvalButtonLabel,
+    hasMessages,
+    onCustomHeaderActionClicked,
   ]);
 
   useEffect(() => {
