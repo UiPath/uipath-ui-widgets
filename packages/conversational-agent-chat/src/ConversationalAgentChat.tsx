@@ -77,6 +77,7 @@ export const ConversationalAgentChat = ({
   evaluationSets,
   addToEvalButtonLabel,
   onEvaluationSetClicked,
+  onUserMessageSent,
 }: ConversationalAgentChatProps) => {
   // must change language before useTranslation is called to avoid stale translations
   if (i18next.language !== locale) {
@@ -99,12 +100,14 @@ export const ConversationalAgentChat = ({
     disabledFeaturesRef.current = disabledFeatures;
     firstRunExperienceRef.current = firstRunExperience;
     onEvaluationSetClickedRef.current = onEvaluationSetClicked;
+    onUserMessageSentRef.current = onUserMessageSent;
   }, [
     theme,
     overrideLabels,
     disabledFeatures,
     firstRunExperience,
     onEvaluationSetClicked,
+    onUserMessageSent,
   ]);
   const session = useRef<SessionStream | null>(null);
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
@@ -118,6 +121,7 @@ export const ConversationalAgentChat = ({
   const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
   const [hasMessages, setHasMessages] = useState(false);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
+  const onUserMessageSentRef = useRef(onUserMessageSent);
 
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
@@ -316,6 +320,8 @@ export const ConversationalAgentChat = ({
   const onSendMessage = useCallback(
     async (data: AutopilotChatMessage) => {
       try {
+        // required for debug-mode hosts that need to gate agent execution on the first user message
+        onUserMessageSentRef.current?.({ content: data.content });
         const sessionHelper = await getSessionHelper();
         const exchange = sessionHelper.startExchange();
         activeExchange.current = exchange;
