@@ -53,6 +53,12 @@ export interface ConversationalAgentChatProps {
   firstRunExperience?: FirstRunExperience;
   /** Override which features are disabled. Merged with defaults (fullScreen, preview, close are always disabled). */
   disabledFeatures?: DisabledFeatures;
+  /**
+   * Called when the user sends a message. Used by debug-mode consumers that need to gate agent execution on the
+   * first user message.
+   * @internal
+   */
+  onUserMessageSent?: (message: { content: string }) => void;
 }
 
 export enum MessageWidget {

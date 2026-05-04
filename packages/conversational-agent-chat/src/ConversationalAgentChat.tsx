@@ -64,6 +64,7 @@ export const ConversationalAgentChat = ({
   overrideLabels,
   firstRunExperience,
   disabledFeatures,
+  onUserMessageSent,
 }: ConversationalAgentChatProps) => {
   const agentService = useRef(new ConversationalAgent(sdk));
   const currentConversation = useRef<ConversationCreateResponse | null>(null);
@@ -79,6 +80,8 @@ export const ConversationalAgentChat = ({
   disabledFeaturesRef.current = disabledFeatures;
   const firstRunExperienceRef = useRef(firstRunExperience);
   firstRunExperienceRef.current = firstRunExperience;
+  const onUserMessageSentRef = useRef(onUserMessageSent);
+  onUserMessageSentRef.current = onUserMessageSent;
   const initialConversationConsumed = useRef(false);
   const session = useRef<SessionStream | null>(null);
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
@@ -276,6 +279,8 @@ export const ConversationalAgentChat = ({
   const onSendMessage = useCallback(
     async (data: AutopilotChatMessage) => {
       try {
+        // required for debug-mode hosts that need to gate agent execution on the first user message
+        onUserMessageSentRef.current?.({ content: data.content });
         const sessionHelper = await getSessionHelper();
         const exchange = sessionHelper.startExchange();
         activeExchange.current = exchange;
