@@ -1,5 +1,5 @@
 import { telemetryClient } from "@uipath/uipath-typescript/core";
-import { version } from "../../package.json";
+import { version } from "../version";
 import { TelemetryEvent, TelemetryStatus } from "../types";
 
 export const trackTelemetry = (

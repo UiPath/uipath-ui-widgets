@@ -17,8 +17,9 @@
     "dist"
   ],
   "scripts": {
-    "build": "npm run clean && tsc && npm run copy-styles",
+    "build": "npm run clean && npm run sync-version && tsc && npm run copy-styles",
     "clean": "rimraf dist",
+    "sync-version": "node scripts/sync-version.mjs",
     "copy-styles": "sass --no-source-map src/ConversationalAgentChat.scss | postcss -o dist/ConversationalAgentChat.css",
     "test": "vitest --run",
     "test:watch": "vitest",
