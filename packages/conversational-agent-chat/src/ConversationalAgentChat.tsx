@@ -57,10 +57,14 @@ export const ConversationalAgentChat = ({
   sdk,
   agentId,
   folderId,
+  existingConversationId,
   locale = "en",
   theme = "light",
   readOnly = false,
   overrideLabels,
+  firstRunExperience,
+  disabledFeatures,
+  onUserMessageSent,
 }: ConversationalAgentChatProps) => {
   const agentService = useRef(new ConversationalAgent(sdk));
   const currentConversation = useRef<ConversationCreateResponse | null>(null);
@@ -72,6 +76,13 @@ export const ConversationalAgentChat = ({
   themeRef.current = theme;
   const overrideLabelsRef = useRef(overrideLabels);
   overrideLabelsRef.current = overrideLabels;
+  const disabledFeaturesRef = useRef(disabledFeatures);
+  disabledFeaturesRef.current = disabledFeatures;
+  const firstRunExperienceRef = useRef(firstRunExperience);
+  firstRunExperienceRef.current = firstRunExperience;
+  const onUserMessageSentRef = useRef(onUserMessageSent);
+  onUserMessageSentRef.current = onUserMessageSent;
+  const initialConversationConsumed = useRef(false);
   const session = useRef<SessionStream | null>(null);
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
@@ -183,13 +194,27 @@ export const ConversationalAgentChat = ({
       if (currentConversation.current) {
         return currentConversation.current;
       }
+      // Only load the existing conversation on first call to getConversation
+      if (existingConversationId && !initialConversationConsumed.current) {
+        const existing = await agentService.current.conversations.getById(
+          existingConversationId,
+        );
+        currentConversation.current = existing;
+        initialConversationConsumed.current = true;
+        return existing;
+      }
+      if (!agentId || !folderId) {
+        throw new Error(
+          "Either conversationId or agentId and folderId must be provided",
+        );
+      }
       const newConversation = await agentService.current.conversations.create(
         agentId,
         folderId,
       );
       currentConversation.current = newConversation;
       return newConversation;
-    }, [agentId, folderId]);
+    }, [agentId, folderId, existingConversationId]);
 
   const getSessionHelper = useCallback(async (): Promise<SessionStream> => {
     if (session.current) {
@@ -254,6 +279,8 @@ export const ConversationalAgentChat = ({
   const onSendMessage = useCallback(
     async (data: AutopilotChatMessage) => {
       try {
+        // required for debug-mode hosts that need to gate agent execution on the first user message
+        onUserMessageSentRef.current?.({ content: data.content });
         const sessionHelper = await getSessionHelper();
         const exchange = sessionHelper.startExchange();
         activeExchange.current = exchange;
@@ -433,34 +460,48 @@ export const ConversationalAgentChat = ({
   );
 
   const initChat = useCallback(async () => {
-    const initKey = `${agentId}-${folderId}`;
+    const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}`;
     try {
       initializedFor.current = initKey;
 
-      const agentRelease = await agentService.current.getById(
-        agentId,
-        folderId,
-      );
+      const agentRelease =
+        agentId && folderId
+          ? await agentService.current.getById(agentId, folderId)
+          : undefined;
+
+      const agentName = agentRelease?.name ?? "";
+
+      // All-or-nothing first-run experience configuration
+      // If an override is passed use it, otherwise use the agent's default.
+      // Finally, if the agent has no default, use fallbacks/empty values
+      const firstRunExperienceConfig = firstRunExperienceRef.current
+        ? {
+            title: firstRunExperienceRef.current.title ?? "",
+            description: firstRunExperienceRef.current.description ?? "",
+            suggestions: firstRunExperienceRef.current.suggestions ?? [],
+          }
+        : {
+            title:
+              agentRelease?.appearance?.welcomeTitle ||
+              (agentName ? `Welcome to ${agentName}!` : ""),
+            description: agentRelease?.appearance?.welcomeDescription || "",
+            suggestions: (agentRelease?.appearance?.startingPrompts || []).map(
+              (prompt) => ({
+                label: prompt.displayPrompt,
+                prompt: prompt.actualPrompt,
+              }),
+            ),
+          };
+
       const chatServiceInstance = AutopilotChatService.Instantiate({
         config: {
           mode: AutopilotChatMode.Embedded,
           locale: localeRef.current,
           theme: themeRef.current,
           readOnly,
-          firstRunExperience: {
-            title:
-              agentRelease.appearance?.welcomeTitle ||
-              `Welcome to ${agentRelease.name}!`,
-            description: agentRelease.appearance?.welcomeDescription || "",
-            suggestions: (agentRelease.appearance?.startingPrompts || []).map(
-              (prompt) => ({
-                label: prompt.displayPrompt,
-                prompt: prompt.actualPrompt,
-              }),
-            ),
-          },
+          firstRunExperience: firstRunExperienceConfig,
           overrideLabels: {
-            title: overrideLabelsRef.current?.title ?? agentRelease.name,
+            title: overrideLabelsRef.current?.title ?? agentName,
             footerDisclaimer:
               overrideLabelsRef.current?.footerDisclaimer ??
               DEFAULT_FOOTER_DISCLAIMER,
@@ -473,9 +514,20 @@ export const ConversationalAgentChat = ({
             fullScreen: true,
             preview: true,
             close: true,
+            ...(!agentId || !folderId ? { newChat: true, history: true } : {}),
+            ...disabledFeaturesRef.current,
           },
         },
       });
+
+      if (existingConversationId) {
+        const conversation = await getConversation();
+        const allExchanges = await fetchExchanges(conversation.id);
+        chatServiceInstance.setConversation(
+          mapExchangesToChatMessages(allExchanges),
+        );
+      }
+
       setChatService(chatServiceInstance);
     } catch (err) {
       const message =
@@ -483,7 +535,14 @@ export const ConversationalAgentChat = ({
       setError(message);
       initializedFor.current = null;
     }
-  }, [agentId, folderId, readOnly]);
+  }, [
+    agentId,
+    folderId,
+    existingConversationId,
+    readOnly,
+    getConversation,
+    fetchExchanges,
+  ]);
 
   const handleReload = useCallback(() => {
     initializedFor.current = null;
@@ -536,11 +595,11 @@ export const ConversationalAgentChat = ({
 
   // Initialize chat service on mount and when agentId/folderId changes
   useEffect(() => {
-    const initKey = `${agentId}-${folderId}`;
+    const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}`;
     if (initializedFor.current !== initKey) {
       initChat();
     }
-  }, [agentId, folderId, initChat]);
+  }, [agentId, folderId, existingConversationId, initChat]);
 
   // Update locale/theme on the existing service. Locale must be set
   // synchronously (not in an effect) so that when ApChat remounts via
@@ -576,18 +635,20 @@ export const ConversationalAgentChat = ({
 
     const registerEvents = async () => {
       try {
-        const result = await agentService.current.conversations.getAll({
-          sort: SortOrder.Descending,
-          pageSize: 20,
-        });
-        // only register handlers if the component is still mounted
-        if (cancelled) return;
-        conversationsCursor.current = result.nextCursor;
-        pastConversations.current = result.items;
-        chatService.setHistory(
-          getConversationHistoryDisplayItems(pastConversations.current),
-          !result.hasNextPage,
-        );
+        if (agentId && folderId) {
+          const result = await agentService.current.conversations.getAll({
+            sort: SortOrder.Descending,
+            pageSize: 20,
+          });
+          // only register handlers if the component is still mounted
+          if (cancelled) return;
+          conversationsCursor.current = result.nextCursor;
+          pastConversations.current = result.items;
+          chatService.setHistory(
+            getConversationHistoryDisplayItems(pastConversations.current),
+            !result.hasNextPage,
+          );
+        }
         unsubscribers.push(
           chatService.on(AutopilotChatEvent.NewChat, onNewChat),
           chatService.on(AutopilotChatEvent.Request, onSendMessage),
