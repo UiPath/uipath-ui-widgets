@@ -15,6 +15,5 @@
   "disclaimer_message": "Agents can make mistakes. Please double check the responses.",
   "welcome_to_agent": "Welcome to {{agentName}}!",
   "performing_action_message": "Performing {{action}}",
-  "feedback_title": "Provide additional feedback",
-  "feedback_optional": "(optional)"
+  "feedback_title_required": "Provide additional feedback"
 }

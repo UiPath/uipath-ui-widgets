@@ -26,6 +26,7 @@ import {
   ToolCallEndEvent,
   ToolCallStream,
 } from "@uipath/uipath-typescript/conversational-agent";
+import type { AgentGetByIdResponse } from "@uipath/uipath-typescript/conversational-agent";
 import {
   useCallback,
   useEffect,
@@ -78,6 +79,7 @@ export const ConversationalAgentChat = ({
   evaluationSets,
   addToEvalButtonLabel,
   onEvaluationSetClicked,
+  onUserMessageSent,
 }: ConversationalAgentChatProps) => {
   // must change language before useTranslation is called to avoid stale translations
   if (i18next.language !== locale) {
@@ -97,6 +99,8 @@ export const ConversationalAgentChat = ({
   const disabledFeaturesRef = useRef(disabledFeatures);
   const firstRunExperienceRef = useRef(firstRunExperience);
   const initialConversationConsumed = useRef(false);
+  const resolvedAgent = useRef<AgentGetByIdResponse | null>(null);
+  const folderIdRef = useRef<number | undefined>(folderId);
   // useLayoutEffect is ok here because the work is minimal enought that the cost is essentially zero
   // needed because React 19 doesn't support ref writes on render
   useLayoutEffect(() => {
@@ -104,7 +108,18 @@ export const ConversationalAgentChat = ({
     overrideLabelsRef.current = overrideLabels;
     disabledFeaturesRef.current = disabledFeatures;
     firstRunExperienceRef.current = firstRunExperience;
-  }, [theme, overrideLabels, disabledFeatures, firstRunExperience]);
+    folderIdRef.current = folderId;
+    onEvaluationSetClickedRef.current = onEvaluationSetClicked;
+    onUserMessageSentRef.current = onUserMessageSent;
+  }, [
+    theme,
+    overrideLabels,
+    disabledFeatures,
+    firstRunExperience,
+    onEvaluationSetClicked,
+    onUserMessageSent,
+    folderId
+  ]);
   // Rebuild the SDK service when sdk or externalUserId change. Skip the first run because the
   // useRef initializer above already built it with the initial values. The chat is re-initialized
   // via initKey (which includes externalUserId) so dependent refs (session, currentConversation,
@@ -132,7 +147,7 @@ export const ConversationalAgentChat = ({
   const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
   const [hasMessages, setHasMessages] = useState(false);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
-  onEvaluationSetClickedRef.current = onEvaluationSetClicked;
+  const onUserMessageSentRef = useRef(onUserMessageSent);
 
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
@@ -149,13 +164,11 @@ export const ConversationalAgentChat = ({
         if (message.startEvent.role === "assistant") {
           const messageId = message.messageId;
           const messageTimestamp = message.startEvent.timestamp;
+          const exchangeId = exchange.exchangeId;
 
           message.onContentPartStart((contentPart: ContentPartStream) => {
             if (contentPart.startEvent.mimeType.startsWith("text/")) {
-              let fullResponse = "";
-
               contentPart.onChunk((chunk: ContentPartChunkEvent) => {
-                fullResponse += chunk.data;
                 chatService.sendResponse({
                   id: messageId,
                   content: chunk.data,
@@ -163,17 +176,23 @@ export const ConversationalAgentChat = ({
                   widget: MessageWidget.AI,
                   stream: true,
                   done: false,
+                  meta: { exchangeId },
                 });
               });
 
               contentPart.onContentPartEnd(() => {
+                // stream: true so Apollo's actions row (copy, thumbs) renders.
+                // useIsStreamingMessage only listens to SendChunk events; the
+                // stream: false branch fires Response and leaves isStreaming
+                // stuck at true. content: "" because chunks already accumulated.
                 chatService.sendResponse({
                   id: messageId,
-                  content: fullResponse,
+                  content: "",
                   created_at: messageTimestamp,
                   widget: MessageWidget.AI,
-                  stream: false,
+                  stream: true,
                   done: true,
+                  meta: { exchangeId },
                 });
               });
             }
@@ -233,6 +252,39 @@ export const ConversationalAgentChat = ({
     [chatService, t],
   );
 
+  const resolveAgent = useCallback(async (): Promise<
+    AgentGetByIdResponse | undefined
+  > => {
+    if (!agentId) return undefined;
+    if (resolvedAgent.current?.id === agentId) {
+      const cachedFolderId = resolvedAgent.current.folderId;
+      const expectedFolderId = folderIdRef.current;
+      if (expectedFolderId == null || cachedFolderId === expectedFolderId) {
+        return resolvedAgent.current;
+      }
+    }
+
+    if (folderIdRef.current != null) {
+      resolvedAgent.current = await agentService.current.getById(
+        agentId,
+        folderIdRef.current,
+      );
+      folderIdRef.current = resolvedAgent.current.folderId;
+      return resolvedAgent.current;
+    }
+    const found = (await agentService.current.getAll()).find(
+      (a) => a.id === agentId,
+    );
+    if (!found) return undefined;
+    folderIdRef.current = found.folderId;
+    resolvedAgent.current = await agentService.current.getById(
+      found.id,
+      found.folderId,
+    );
+    folderIdRef.current = resolvedAgent.current.folderId;
+    return resolvedAgent.current;
+  }, [agentId, folderId]);
+
   const getConversation =
     useCallback(async (): Promise<ConversationCreateResponse> => {
       if (currentConversation.current) {
@@ -247,18 +299,16 @@ export const ConversationalAgentChat = ({
         initialConversationConsumed.current = true;
         return existing;
       }
-      if (!agentId || !folderId) {
+      const agent = await resolveAgent();
+      if (!agent) {
         throw new Error(
-          "Either conversationId or agentId and folderId must be provided",
+          "Either conversationId or agentId must be provided",
         );
       }
-      const newConversation = await agentService.current.conversations.create(
-        agentId,
-        folderId,
-      );
+      const newConversation = await agent.conversations.create();
       currentConversation.current = newConversation;
       return newConversation;
-    }, [agentId, folderId, existingConversationId]);
+    }, [existingConversationId, resolveAgent]);
 
   const getSessionHelper = useCallback(async (): Promise<SessionStream> => {
     if (session.current) {
@@ -327,6 +377,8 @@ export const ConversationalAgentChat = ({
   const onSendMessage = useCallback(
     async (data: AutopilotChatMessage) => {
       try {
+        // required for debug-mode hosts that need to gate agent execution on the first user message
+        onUserMessageSentRef.current?.({ content: data.content });
         const sessionHelper = await getSessionHelper();
         const exchange = sessionHelper.startExchange();
         activeExchange.current = exchange;
@@ -510,11 +562,7 @@ export const ConversationalAgentChat = ({
     try {
       initializedFor.current = initKey;
 
-      const agentRelease =
-        agentId && folderId
-          ? await agentService.current.getById(agentId, folderId)
-          : undefined;
-
+      const agentRelease = await resolveAgent();
       const agentName = agentRelease?.name ?? "";
 
       // All-or-nothing first-run experience configuration
@@ -560,7 +608,7 @@ export const ConversationalAgentChat = ({
             fullScreen: true,
             preview: true,
             close: true,
-            ...(!agentId || !folderId ? { newChat: true, history: true } : {}),
+            ...(!agentId ? { newChat: true, history: true } : {}),
             ...disabledFeaturesRef.current,
           },
         },
@@ -588,6 +636,7 @@ export const ConversationalAgentChat = ({
     externalUserId,
     locale,
     readOnly,
+    resolveAgent,
     getConversation,
     fetchExchanges,
     t,
@@ -628,17 +677,17 @@ export const ConversationalAgentChat = ({
 
   const onFeedbackSubmit = useCallback((comment: string) => {
     const data = pendingFeedback.current;
-    if (data) {
+    // Streamed messages may not have meta.exchangeId yet; guard against it
+    // so a missing id doesn't throw and leave the dialog stuck open.
+    const exchangeId = data?.message.meta?.exchangeId;
+    if (data && exchangeId) {
       const rating = data.action.details?.isPositive
         ? FeedbackRating.Positive
         : FeedbackRating.Negative;
-      currentConversation.current?.exchanges?.createFeedback(
-        data.message.meta.exchangeId,
-        {
-          rating,
-          comment,
-        },
-      );
+      currentConversation.current?.exchanges?.createFeedback(exchangeId, {
+        rating,
+        comment,
+      });
       trackTelemetry(TelemetryEvent.Feedback, TelemetryStatus.Success, {
         rating,
       });
@@ -652,7 +701,7 @@ export const ConversationalAgentChat = ({
     setFeedbackDialogOpen(false);
   }, []);
 
-  // Initialize chat service on mount and when agentId/folderId/externalUserId changes
+  // Initialize chat service on mount and when agentId/folderId/externalUserId/existingConversationId changes
   useEffect(() => {
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
     if (initializedFor.current !== initKey) {
@@ -673,7 +722,7 @@ export const ConversationalAgentChat = ({
 
     const registerEvents = async () => {
       try {
-        if (agentId && folderId) {
+        if (agentId) {
           const result = await agentService.current.conversations.getAll({
             sort: SortOrder.Descending,
             pageSize: 20,
@@ -764,7 +813,55 @@ export const ConversationalAgentChat = ({
     return () => {
       unsubscribe?.();
     };
-  }, [chatService, isDebugMode, evaluationSets, addToEvalButtonLabel, hasMessages, onCustomHeaderActionClicked]);
+  }, [
+    chatService,
+    isDebugMode,
+    evaluationSets,
+    addToEvalButtonLabel,
+    hasMessages,
+    onCustomHeaderActionClicked,
+  ]);
+
+  useEffect(() => {
+    if (
+      !chatService ||
+      !isDebugMode ||
+      !evaluationSets ||
+      evaluationSets.length === 0
+    ) {
+      return;
+    }
+
+    const label = addToEvalButtonLabel || "Add to Evaluation Set";
+    const sortedSets = sortEvaluationSets(evaluationSets);
+    const headerAction: AutopilotChatCustomHeaderAction = {
+      id: "add-to-eval-button",
+      name: label,
+      description: label,
+      disabled: !hasMessages,
+      children: sortedSets.map((s) => ({
+        id: `eval-${s.id}`,
+        name: s.name,
+        description: `Add to ${s.name}`,
+        disabled: s.isDisabled,
+      })),
+    };
+    chatService.setCustomHeaderActions([headerAction]);
+    const unsubscribe = chatService.on(
+      AutopilotChatEvent.CustomHeaderActionClicked,
+      onCustomHeaderActionClicked,
+    );
+    return () => {
+      unsubscribe?.();
+    };
+  }, [
+    chatService,
+    isDebugMode,
+    evaluationSets,
+    addToEvalButtonLabel,
+    hasMessages,
+    onCustomHeaderActionClicked,
+  ]);
 
   return (
     <div className="uipath-conversational-agent-chat">

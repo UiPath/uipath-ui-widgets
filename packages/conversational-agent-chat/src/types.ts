@@ -35,10 +35,15 @@ export interface EvaluationSet {
   isDefault?: boolean;
   isDisabled?: boolean;
 }
-
 export interface ConversationalAgentChatProps {
   sdk: UiPath;
+  /** ID of the agent release to chat with. Required unless `existingConversationId` is provided. */
   agentId?: number;
+  /**
+   * ID of the folder the agent lives in. Optional — when omitted, the widget resolves it by
+   * listing agents and matching on `agentId`. Prefer passing this when known, since the fallback
+   * lists all agents accessible to the SDK's scope.
+   */
   folderId?: number;
   /** Allow for loading an existing conversation by ID instead of creating a new one on first message */
   existingConversationId?: string;
@@ -65,6 +70,12 @@ export interface ConversationalAgentChatProps {
   addToEvalButtonLabel?: string;
   /** @internal */
   onEvaluationSetClicked?: (id: string) => void;
+  /**
+   * Called when the user sends a message. Used by debug-mode consumers that need to gate agent execution on the
+   * first user message.
+   * @internal
+   */
+  onUserMessageSent?: (message: { content: string }) => void;
 }
 
 export enum MessageWidget {

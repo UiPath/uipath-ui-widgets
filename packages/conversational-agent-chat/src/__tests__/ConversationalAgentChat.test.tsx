@@ -122,7 +122,9 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
         capturedAgentConstructorArgs.push(args);
       }
       getById = vi.fn().mockResolvedValue({
+        id: 1,
         name: "Test Agent",
+        folderId: 100,
         appearance: {
           welcomeTitle: "Welcome to Test Agent",
           welcomeDescription: "This is a test agent",
@@ -130,7 +132,21 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
             { displayPrompt: "Test Prompt", actualPrompt: "test" },
           ],
         },
+        conversations: {
+          create: vi.fn().mockResolvedValue({ id: "conv-123" }),
+        },
       });
+
+      getAll = vi.fn().mockResolvedValue([
+        {
+          id: 1,
+          name: "Test Agent",
+          folderId: 100,
+          conversations: {
+            create: vi.fn().mockResolvedValue({ id: "conv-123" }),
+          },
+        },
+      ]);
 
       conversations = {
         create: vi.fn().mockResolvedValue({ id: "conv-123" }),
@@ -441,6 +457,64 @@ describe("ConversationalAgentChat", () => {
       },
       { timeout: 3000 },
     );
+  });
+
+  describe("folderId resolution", () => {
+    it("should render successfully when only agentId is provided (getAll fallback)", async () => {
+      render(<ConversationalAgentChat sdk={mockSdk as UiPath} agentId={1} />);
+
+      await waitFor(
+        () => {
+          expect(screen.getByText("Chat Loaded")).toBeInTheDocument();
+        },
+        { timeout: 3000 },
+      );
+    });
+
+    it("should keep newChat/history enabled when only agentId is provided", async () => {
+      const { AutopilotChatService } = await import(
+        "@uipath/apollo-react/material/components"
+      );
+
+      render(<ConversationalAgentChat sdk={mockSdk as UiPath} agentId={1} />);
+
+      await waitFor(
+        () => {
+          const call = (AutopilotChatService.Instantiate as any).mock.calls.at(
+            -1,
+          );
+          const disabled = call?.[0]?.config?.disabledFeatures ?? {};
+          expect(disabled.newChat).toBeUndefined();
+          expect(disabled.history).toBeUndefined();
+        },
+        { timeout: 3000 },
+      );
+    });
+
+    it("should disable newChat/history when agentId is not provided", async () => {
+      const { AutopilotChatService } = await import(
+        "@uipath/apollo-react/material/components"
+      );
+
+      render(
+        <ConversationalAgentChat
+          sdk={mockSdk as UiPath}
+          existingConversationId="conv-1"
+        />,
+      );
+
+      await waitFor(
+        () => {
+          const call = (AutopilotChatService.Instantiate as any).mock.calls.at(
+            -1,
+          );
+          const disabled = call?.[0]?.config?.disabledFeatures ?? {};
+          expect(disabled.newChat).toBe(true);
+          expect(disabled.history).toBe(true);
+        },
+        { timeout: 3000 },
+      );
+    });
   });
 
   it("should enable paginatedHistory in config", async () => {

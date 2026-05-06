@@ -1,6 +1,6 @@
 {
   "name": "@uipath/ui-widgets-validation-station",
-  "version": "1.0.1-beta.3",
+  "version": "1.0.1-beta.5",
   "description": "A React component for UiPath Document Understanding Validation Station.",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -70,8 +70,8 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "@uipath/du-shared-util-mfe": "2.6.4",
-    "@uipath/du-validation-station-wc": "1.0.0-beta21",
+    "@uipath/du-shared-util-mfe": "2.6.5",
+    "@uipath/du-validation-station-wc": "1.0.0-beta24",
     "fflate": "^0.8.2"
   }
 }

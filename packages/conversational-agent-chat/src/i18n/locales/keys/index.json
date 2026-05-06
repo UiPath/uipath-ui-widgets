@@ -14,7 +14,6 @@
   "feedback_placeholder": "feedback_placeholder",
   "cancel": "cancel",
   "submit": "submit",
-  "feedback_title": "feedback_title",
-  "feedback_optional": "feedback_optional",
+  "feedback_title_required": "feedback_title_required",
   "welcome_to_agent": "welcome_to_agent"
 }
