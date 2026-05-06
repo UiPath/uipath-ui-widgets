@@ -20,6 +20,14 @@ react-dom >= 19.2.0
 
 > **Note:** Add either `light` or `dark` class to your HTML `<body>` element to enable proper theming.
 
+The component loads the underlying Validation Station web component
+(`@uipath/du-validation-station-wc`) on mount — you do not need to call
+`loadValidationStationWebComponent` yourself. By default, the assets are loaded
+from `node_modules/@uipath/du-validation-station-wc` (which works with Vite's
+dev server). For production builds, copy the contents of
+`node_modules/@uipath/du-validation-station-wc` into your public assets and
+point `wcAssetsUrl` at that location.
+
 ```tsx
 import {
   ValidationStation,
@@ -45,6 +53,7 @@ function App() {
       folderId={12345}
       theme="light"
       language={Language.English}
+      // wcAssetsUrl="/assets/du-validation-station-wc" // override for production
     />
   );
 }
@@ -52,23 +61,24 @@ function App() {
 
 ## Props
 
-| Prop                       | Type                                           | Required | Default   | Description                                                               |
-| -------------------------- | ---------------------------------------------- | -------- | --------- | ------------------------------------------------------------------------- |
-| `sdk`                      | `UiPath`                                       | Yes      | —         | UiPath SDK instance for authentication and API calls                      |
-| `data`                     | `ContentValidationData`                        | Yes      | —         | Document data containing bucket paths, document ID, and folder references |
-| `folderId`                 | `number`                                       | No       | —         | Storage bucket folder ID. Falls back to `data.FolderId` if not provided   |
-| `theme`                    | `'light' \| 'dark' \| 'light-hc' \| 'dark-hc'` | No       | `'light'` | Visual theme                                                              |
-| `language`                 | `Language`                                     | No       | —         | UI language (see Language enum below)                                     |
-| `isReadonly`               | `boolean`                                      | No       | `false`   | When `true`, renders in read-only mode                                    |
-| `enableSaveAsDraft`        | `boolean`                                      | No       | `false`   | Enables the "Save as draft" action                                        |
-| `options`                  | `IValidationStationOptions`                    | No       | —         | Fine-grained UI feature flags                                             |
-| `save`                     | `{ validate: boolean }`                        | No       | —         | Trigger a save. Set `{ validate: true }` to validate before saving        |
-| `discardChanges`           | `{ value: boolean }`                           | No       | —         | Trigger a discard-changes operation                                       |
-| `setFieldValue`            | `ISetFieldValueParameters[]`                   | No       | —         | Set one or more field values programmatically                             |
-| `setTableCellValue`        | `ISetTableCellValueParameters[]`               | No       | —         | Set one or more table cell values programmatically                        |
-| `deleteFieldValue`         | `IDeleteFieldValueParameters[]`                | No       | —         | Delete one or more field values programmatically                          |
-| `deleteTableCellValue`     | `IDeleteTableCellValueParameters[]`            | No       | —         | Delete one or more table cell values programmatically                     |
-| `selectAndFocusFieldValue` | `ISelectAndFocusFieldValueParams`              | No       | —         | Scroll to and focus a specific field value                                |
+| Prop                             | Type                                           | Required | Default                                           | Description                                                                               |
+| -------------------------------- | ---------------------------------------------- | -------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `sdk`                            | `UiPath`                                       | Yes      | —                                                 | UiPath SDK instance for authentication and API calls                                      |
+| `data`                           | `ContentValidationData`                        | Yes      | —                                                 | Document data containing bucket paths, document ID, and folder references                 |
+| `folderId`                       | `number`                                       | No       | —                                                 | Storage bucket folder ID. Falls back to `data.FolderId` if not provided                   |
+| `theme`                          | `'light' \| 'dark' \| 'light-hc' \| 'dark-hc'` | No       | `'light'`                                         | Visual theme                                                                              |
+| `language`                       | `Language`                                     | No       | —                                                 | UI language (see Language enum below)                                                     |
+| `isReadonly`                     | `boolean`                                      | No       | `false`                                           | When `true`, renders in read-only mode                                                    |
+| `enableSaveAsDraft`              | `boolean`                                      | No       | `false`                                           | Enables the "Save as draft" action                                                        |
+| `options`                        | `IValidationStationOptions`                    | No       | —                                                 | Fine-grained UI feature flags                                                             |
+| `save`                           | `{ validate: boolean }`                        | No       | —                                                 | Trigger a save. Set `{ validate: true }` to validate before saving                        |
+| `discardChanges`                 | `{ value: boolean }`                           | No       | —                                                 | Trigger a discard-changes operation                                                       |
+| `setTableCellValue`              | `ISetTableCellValueParameters[]`               | No       | —                                                 | Set one or more table cell values programmatically                                        |
+| `deleteTableCellValue`           | `IDeleteTableCellValueParameters[]`            | No       | —                                                 | Delete one or more table cell values programmatically                                     |
+| `setFieldValueByPath`            | `SetFieldValueByPath`                          | No       | —                                                 | Set a field value addressed by a path of `{ fieldName, valueIndex }` segments             |
+| `selectAndFocusFieldValueByPath` | `SelectAndFocusFieldValueByPath`               | No       | —                                                 | Select and focus a field value addressed by a path; focuses the document reference if any |
+| `deleteFieldValueByPath`         | `DeleteFieldValueByPath`                       | No       | —                                                 | Delete a field value addressed by a path                                                  |
+| `wcAssetsUrl`                    | `string`                                       | No       | `"node_modules/@uipath/du-validation-station-wc"` | Base URL for the Validation Station web component assets (`main.js`, `polyfills.js`)      |
 
 ## Language enum
 
@@ -101,81 +111,92 @@ All parameter types are re-exported from the package for convenience:
 import { Language } from "@uipath/ui-widgets-validation-station";
 import type {
   ValidationStationProps,
-  ISetFieldValueParameters,
   ISetTableCellValueParameters,
-  IDeleteFieldValueParameters,
   IDeleteTableCellValueParameters,
-  ISelectAndFocusFieldValueParams,
   IValidationStationOptions,
+  SetFieldValueByPath,
+  SelectAndFocusFieldValueByPath,
+  DeleteFieldValueByPath,
 } from "@uipath/ui-widgets-validation-station";
 ```
 
 ## Examples
 
-### Setting a field value
+### Setting a field value by path
+
+Address fields by path when you have nested groups or table rows. Each segment is `{ fieldName, valueIndex }`.
 
 ```tsx
 import { useState } from "react";
 import {
   ValidationStation,
-  type ISetFieldValueParameters,
+  type SetFieldValueByPath,
 } from "@uipath/ui-widgets-validation-station";
 
 function App({ sdk, data }) {
-  const [setFieldValue, setSetFieldValue] = useState<
-    ISetFieldValueParameters[] | undefined
+  const [fieldValueByPath, setFieldValueByPath] = useState<
+    SetFieldValueByPath | undefined
   >(undefined);
 
   return (
     <>
       <button
         onClick={() =>
-          setSetFieldValue([
-            { fieldId: "NoGroup.NoCategory.Invoice.Amount", value: "100.00" },
-          ])
+          setFieldValueByPath({
+            path: [
+              { fieldName: "Invoice", valueIndex: 0 }, // parent field name
+              { fieldName: "Amount", valueIndex: 0 }, // child field name
+            ],
+            update: { Value: "100.00", OperatorConfirmed: true },
+          })
         }
       >
-        Set Amount
+        Set Amount by path
       </button>
       <ValidationStation
         sdk={sdk}
         data={data}
         folderId={67}
-        setFieldValue={setFieldValue}
+        setFieldValueByPath={fieldValueByPath}
       />
     </>
   );
 }
 ```
 
-### Focusing a field
+### Focusing a field by path
 
 ```tsx
 import { useState } from "react";
 import {
   ValidationStation,
-  type ISelectAndFocusFieldValueParams,
+  type SelectAndFocusFieldValueByPath,
 } from "@uipath/ui-widgets-validation-station";
 
 function App({ sdk, data }) {
   const [focus, setFocus] = useState<
-    ISelectAndFocusFieldValueParams | undefined
+    SelectAndFocusFieldValueByPath | undefined
   >(undefined);
 
   return (
     <>
       <button
         onClick={() =>
-          setFocus({ fieldId: "NoGroup.NoCategory.Invoice.Amount" })
+          setFocus({
+            path: [
+              { fieldName: "Invoice", valueIndex: 0 }, // parent field name
+              { fieldName: "Amount", valueIndex: 0 }, // child field name
+            ],
+          })
         }
       >
-        Focus Amount
+        Focus Amount by path
       </button>
       <ValidationStation
         sdk={sdk}
         data={data}
         folderId={67}
-        selectAndFocusFieldValue={focus}
+        selectAndFocusFieldValueByPath={focus}
       />
     </>
   );

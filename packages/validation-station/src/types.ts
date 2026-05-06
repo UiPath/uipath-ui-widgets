@@ -1,19 +1,15 @@
 export type {
-  IDeleteFieldValueParameters,
-  IDeleteTableCellValueParameters,
-  ISelectAndFocusFieldValueParams,
-  ISetFieldValueParameters,
-  ISetTableCellValueParameters,
+  DeleteFieldValueByPath,
   IValidationStationOptions,
+  SelectAndFocusFieldValueByPath,
+  SetFieldValueByPath,
 } from "@uipath/du-shared-util-mfe";
 import type {
-  IDeleteFieldValueParameters,
-  IDeleteTableCellValueParameters,
-  ISelectAndFocusFieldValueParams,
-  ISetFieldValueParameters,
-  ISetTableCellValueParameters,
-  IValidationStationOptions,
   ContentValidationData,
+  DeleteFieldValueByPath,
+  IValidationStationOptions,
+  SelectAndFocusFieldValueByPath,
+  SetFieldValueByPath,
 } from "@uipath/du-shared-util-mfe";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 
@@ -54,9 +50,16 @@ export interface ValidationStationProps {
   options?: IValidationStationOptions;
   save?: { validate: boolean };
   discardChanges?: { value: boolean };
-  setFieldValue?: ISetFieldValueParameters[];
-  setTableCellValue?: ISetTableCellValueParameters[];
-  deleteFieldValue?: IDeleteFieldValueParameters[];
-  deleteTableCellValue?: IDeleteTableCellValueParameters[];
-  selectAndFocusFieldValue?: ISelectAndFocusFieldValueParams;
+  setFieldValueByPath?: SetFieldValueByPath;
+  selectAndFocusFieldValueByPath?: SelectAndFocusFieldValueByPath;
+  deleteFieldValueByPath?: DeleteFieldValueByPath;
+  /**
+   * Base URL where the validation station web component assets
+   * (main.js, polyfills.js) are served. Defaults to
+   * "node_modules/@uipath/du-validation-station-wc", which works with Vite's
+   * dev server. For production builds, copy the contents of
+   * node_modules/@uipath/du-validation-station-wc into your public assets and
+   * point this prop at that location.
+   */
+  wcAssetsUrl?: string;
 }
