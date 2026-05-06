@@ -44,12 +44,7 @@ describe("i18n", () => {
         "zh-TW",
       ];
       // Keys that exist in react-sdk locale files (professionally translated)
-      const reactSdkKeys = [
-        "disclaimer_message",
-        "chat_input_placeholder",
-        "feedback_title",
-        "feedback_optional",
-      ];
+      const reactSdkKeys = ["disclaimer_message", "chat_input_placeholder"];
 
       for (const locale of locales) {
         const t = i18next.getFixedT(locale);
@@ -76,6 +71,7 @@ describe("i18n", () => {
         "reload",
         "new_chat",
         "feedback_placeholder",
+        "feedback_title_required",
         "cancel",
         "submit",
       ];

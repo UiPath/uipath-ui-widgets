@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import { ValidationStation } from "../ValidationStation";
 
 const mockLoadValidationStationWebComponent = vi.fn();
@@ -9,6 +9,10 @@ vi.mock("@uipath/du-shared-util-mfe", () => ({
   loadValidationStationWebComponent: (...args: any[]) =>
     mockLoadValidationStationWebComponent(...args),
 }));
+
+beforeEach(() => {
+  mockLoadValidationStationWebComponent.mockResolvedValue(undefined);
+});
 
 const mockUseBucketArtifacts = vi.fn();
 
@@ -41,12 +45,38 @@ beforeEach(() => {
 });
 
 describe("ValidationStation", () => {
-  it("calls loadValidationStationWebComponent on mount", () => {
+  it("loads the validation station web component on mount with the default asset URL", async () => {
     render(<ValidationStation {...baseProps} />);
-    expect(mockLoadValidationStationWebComponent).toHaveBeenCalledWith(
-      document,
-      "packages/validation-station/node_modules/@uipath/du-validation-station-wc",
+    await waitFor(() => {
+      expect(mockLoadValidationStationWebComponent).toHaveBeenCalledWith(
+        document,
+        "node_modules/@uipath/du-validation-station-wc",
+      );
+    });
+  });
+
+  it("loads the validation station web component from a custom wcAssetsUrl", async () => {
+    render(<ValidationStation {...baseProps} wcAssetsUrl="/assets/vs-wc" />);
+    await waitFor(() => {
+      expect(mockLoadValidationStationWebComponent).toHaveBeenCalledWith(
+        document,
+        "/assets/vs-wc",
+      );
+    });
+  });
+
+  it("renders an error when the web component fails to load", async () => {
+    mockLoadValidationStationWebComponent.mockRejectedValueOnce(
+      new Error("script load failed"),
     );
+
+    const { container } = render(<ValidationStation {...baseProps} />);
+    await waitFor(() => {
+      expect(container.textContent).toContain(
+        "Failed to load validation station",
+      );
+      expect(container.textContent).toContain("script load failed");
+    });
   });
 
   it("renders the standalone web component element", () => {

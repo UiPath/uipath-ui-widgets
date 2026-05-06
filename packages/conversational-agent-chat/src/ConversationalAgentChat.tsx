@@ -78,6 +78,7 @@ export const ConversationalAgentChat = ({
   evaluationSets,
   addToEvalButtonLabel,
   onEvaluationSetClicked,
+  onUserMessageSent,
 }: ConversationalAgentChatProps) => {
   // must change language before useTranslation is called to avoid stale translations
   if (i18next.language !== locale) {
@@ -102,7 +103,17 @@ export const ConversationalAgentChat = ({
     disabledFeaturesRef.current = disabledFeatures;
     firstRunExperienceRef.current = firstRunExperience;
     folderIdRef.current = folderId;
-  }, [theme, overrideLabels, disabledFeatures, firstRunExperience, folderId]);
+    onEvaluationSetClickedRef.current = onEvaluationSetClicked;
+    onUserMessageSentRef.current = onUserMessageSent;
+  }, [
+    theme,
+    overrideLabels,
+    disabledFeatures,
+    firstRunExperience,
+    onEvaluationSetClicked,
+    onUserMessageSent,
+    folderId
+  ]);
   const session = useRef<SessionStream | null>(null);
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
@@ -115,7 +126,7 @@ export const ConversationalAgentChat = ({
   const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
   const [hasMessages, setHasMessages] = useState(false);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
-  onEvaluationSetClickedRef.current = onEvaluationSetClicked;
+  const onUserMessageSentRef = useRef(onUserMessageSent);
 
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
@@ -132,13 +143,11 @@ export const ConversationalAgentChat = ({
         if (message.startEvent.role === "assistant") {
           const messageId = message.messageId;
           const messageTimestamp = message.startEvent.timestamp;
+          const exchangeId = exchange.exchangeId;
 
           message.onContentPartStart((contentPart: ContentPartStream) => {
             if (contentPart.startEvent.mimeType.startsWith("text/")) {
-              let fullResponse = "";
-
               contentPart.onChunk((chunk: ContentPartChunkEvent) => {
-                fullResponse += chunk.data;
                 chatService.sendResponse({
                   id: messageId,
                   content: chunk.data,
@@ -146,17 +155,23 @@ export const ConversationalAgentChat = ({
                   widget: MessageWidget.AI,
                   stream: true,
                   done: false,
+                  meta: { exchangeId },
                 });
               });
 
               contentPart.onContentPartEnd(() => {
+                // stream: true so Apollo's actions row (copy, thumbs) renders.
+                // useIsStreamingMessage only listens to SendChunk events; the
+                // stream: false branch fires Response and leaves isStreaming
+                // stuck at true. content: "" because chunks already accumulated.
                 chatService.sendResponse({
                   id: messageId,
-                  content: fullResponse,
+                  content: "",
                   created_at: messageTimestamp,
                   widget: MessageWidget.AI,
-                  stream: false,
+                  stream: true,
                   done: true,
+                  meta: { exchangeId },
                 });
               });
             }
@@ -341,6 +356,8 @@ export const ConversationalAgentChat = ({
   const onSendMessage = useCallback(
     async (data: AutopilotChatMessage) => {
       try {
+        // required for debug-mode hosts that need to gate agent execution on the first user message
+        onUserMessageSentRef.current?.({ content: data.content });
         const sessionHelper = await getSessionHelper();
         const exchange = sessionHelper.startExchange();
         activeExchange.current = exchange;
@@ -638,17 +655,17 @@ export const ConversationalAgentChat = ({
 
   const onFeedbackSubmit = useCallback((comment: string) => {
     const data = pendingFeedback.current;
-    if (data) {
+    // Streamed messages may not have meta.exchangeId yet; guard against it
+    // so a missing id doesn't throw and leave the dialog stuck open.
+    const exchangeId = data?.message.meta?.exchangeId;
+    if (data && exchangeId) {
       const rating = data.action.details?.isPositive
         ? FeedbackRating.Positive
         : FeedbackRating.Negative;
-      currentConversation.current?.exchanges?.createFeedback(
-        data.message.meta.exchangeId,
-        {
-          rating,
-          comment,
-        },
-      );
+      currentConversation.current?.exchanges?.createFeedback(exchangeId, {
+        rating,
+        comment,
+      });
       trackTelemetry(TelemetryEvent.Feedback, TelemetryStatus.Success, {
         rating,
       });
@@ -774,7 +791,55 @@ export const ConversationalAgentChat = ({
     return () => {
       unsubscribe?.();
     };
-  }, [chatService, isDebugMode, evaluationSets, addToEvalButtonLabel, hasMessages, onCustomHeaderActionClicked]);
+  }, [
+    chatService,
+    isDebugMode,
+    evaluationSets,
+    addToEvalButtonLabel,
+    hasMessages,
+    onCustomHeaderActionClicked,
+  ]);
+
+  useEffect(() => {
+    if (
+      !chatService ||
+      !isDebugMode ||
+      !evaluationSets ||
+      evaluationSets.length === 0
+    ) {
+      return;
+    }
+
+    const label = addToEvalButtonLabel || "Add to Evaluation Set";
+    const sortedSets = sortEvaluationSets(evaluationSets);
+    const headerAction: AutopilotChatCustomHeaderAction = {
+      id: "add-to-eval-button",
+      name: label,
+      description: label,
+      disabled: !hasMessages,
+      children: sortedSets.map((s) => ({
+        id: `eval-${s.id}`,
+        name: s.name,
+        description: `Add to ${s.name}`,
+        disabled: s.isDisabled,
+      })),
+    };
+    chatService.setCustomHeaderActions([headerAction]);
+    const unsubscribe = chatService.on(
+      AutopilotChatEvent.CustomHeaderActionClicked,
+      onCustomHeaderActionClicked,
+    );
+    return () => {
+      unsubscribe?.();
+    };
+  }, [
+    chatService,
+    isDebugMode,
+    evaluationSets,
+    addToEvalButtonLabel,
+    hasMessages,
+    onCustomHeaderActionClicked,
+  ]);
 
   return (
     <div className="uipath-conversational-agent-chat">

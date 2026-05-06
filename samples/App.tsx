@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Box,
+  Button,
   Grid,
   List,
   ListItem,
@@ -9,27 +10,25 @@ import {
   Tab,
   Tabs,
   Typography,
-  Button,
 } from "@mui/material";
+import type {
+  ContentValidationData,
+  SelectAndFocusFieldValueByPath,
+} from "@uipath/du-shared-util-mfe";
 import { ConversationalAgentChat } from "@uipath/ui-widgets-conversational-agent-chat";
 import { DataTable } from "@uipath/ui-widgets-datatable";
 import { MultiFileUpload } from "@uipath/ui-widgets-multi-file-upload";
 import "@uipath/ui-widgets-multi-file-upload/MultiFileUpload.css";
+import { ValidationStation } from "@uipath/ui-widgets-validation-station";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import { Entities } from "@uipath/uipath-typescript/entities";
-import { Tasks, TaskType } from "@uipath/uipath-typescript/tasks";
 import type {
   RawTaskGetResponse,
   TaskGetResponse,
 } from "@uipath/uipath-typescript/tasks";
-import type { ContentValidationData } from "@uipath/du-shared-util-mfe";
+import { Tasks, TaskType } from "@uipath/uipath-typescript/tasks";
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
-import {
-  ValidationStation,
-  type ISetFieldValueParameters,
-  type ISelectAndFocusFieldValueParams,
-} from "@uipath/ui-widgets-validation-station";
 
 interface AppProps {
   uipathSdk: UiPath;
@@ -54,12 +53,8 @@ function App({ uipathSdk }: AppProps) {
   const [taskList, setTaskList] = useState<RawTaskGetResponse[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
-  const [setFieldValue, setSetFieldValue] = useState<
-    ISetFieldValueParameters[] | undefined
-  >(undefined);
-  const [selectAndFocusFieldValue, setSelectAndFocusFieldValue] = useState<
-    ISelectAndFocusFieldValueParams | undefined
-  >(undefined);
+  const [selectAndFocusFieldValueByPath, setSelectAndFocusFieldValueByPath] =
+    useState<SelectAndFocusFieldValueByPath | undefined>(undefined);
   const [selectedTask, setSelectedTask] = useState<TaskGetResponse | null>(
     null,
   );
@@ -312,29 +307,20 @@ function App({ uipathSdk }: AppProps) {
                     <Button
                       variant="contained"
                       size="small"
-                      sx={{ mb: 2 }}
+                      sx={{ ml: 1, mb: 2 }}
                       onClick={() =>
-                        setSelectAndFocusFieldValue({
-                          fieldId: "NoGroup.NoCategory.CMS1500.PatientName",
+                        setSelectAndFocusFieldValueByPath({
+                          path: [
+                            { fieldName: "items", valueIndex: 1 },
+                            {
+                              fieldName: "Items - Quantities",
+                              valueIndex: 0,
+                            },
+                          ],
                         })
                       }
                     >
-                      Focus Patient Name
-                    </Button>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      sx={{ ml: 1, mb: 2 }}
-                      onClick={() =>
-                        setSetFieldValue([
-                          {
-                            fieldId: "NoGroup.NoCategory.CMS1500.PatientName",
-                            value: "abcd",
-                          },
-                        ])
-                      }
-                    >
-                      Set Patient Name
+                      Focus Item Quantity By Path
                     </Button>
                     <ValidationStation
                       sdk={uipathSdk}
@@ -342,8 +328,9 @@ function App({ uipathSdk }: AppProps) {
                         selectedTask.data as unknown as ContentValidationData
                       }
                       folderId={selectedTask.folderId}
-                      setFieldValue={setFieldValue}
-                      selectAndFocusFieldValue={selectAndFocusFieldValue}
+                      selectAndFocusFieldValueByPath={
+                        selectAndFocusFieldValueByPath
+                      }
                     />
                   </Box>
                 )

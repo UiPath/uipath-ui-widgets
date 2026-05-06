@@ -88,6 +88,67 @@ docs: update README with new examples
 
 All packages must maintain **80% code coverage** for new code. The CI pipeline will fail if coverage drops below this threshold.
 
+## Internationalization (i18n)
+
+The `conversational-agent-chat` package is consumed by both external customers
+and UiPath internal production products, so every string rendered to the UI
+must be translated. PRs that add hardcoded English strings will fail lint.
+
+**Convention:** wrap user-facing strings with `t("key")` from `react-i18next`
+and register the key in `packages/conversational-agent-chat/src/i18n/locales/en/index.json` and `packages/conversational-agent-chat/src/i18n/locales/keys/index.json`.
+
+The rule intentionally ignores `className`, `variant`, `data-*`, `console.*`,
+`throw new Error(...)`, enum-like strings, and other non-rendered literals — you
+should not need `eslint-disable` in normal development. If the rule fires on
+something that isn't user-facing, please flag it on the PR rather than
+disabling.
+
+**What the check verifies:**
+
+- `i18next/no-literal-string` — flags untranslated JSX text and specific attrs
+- `no-restricted-syntax` — flags raw literals passed to `setError(...)` and
+  dynamic keys passed to `t(...)` (see below)
+- `npm run check-i18n` — every key used in `t(...)` must exist in `en/index.json`
+
+**`t()` keys must be static string literals.** `t("key")`, `t('key')`, and
+``t(`key`)`` are all fine. Dynamic forms are rejected because they silently
+leak English — if `t(x)` is called with a value that isn't a registered key,
+i18next falls back to rendering the raw key string:
+
+```tsx
+// ❌ rejected — dynamic keys can't be verified at PR time
+t(someVariable);
+t(`error_${type}`);
+
+// ✅ use a switch/conditional on static keys (preferred)
+t(isFatal ? "error_fatal" : "error_recoverable");
+
+// ✅ lookup table (preferred when the mapping is closed)
+const STATUS_KEYS = {
+  active: "status_active",
+  pending: "status_pending",
+  failed: "status_failed",
+} as const;
+t(STATUS_KEYS[status]);
+```
+
+**Escape hatch** for genuinely dynamic lookups (API-driven enums, error-code
+maps): enumerate every possible key in a comment above the call, then disable
+the rule on the next line. The enumeration gets picked up by `check-i18n`,
+so each listed key is still verified against `en/index.json`:
+
+```tsx
+// Possible keys: t("status_active"), t("status_pending"), t("status_failed")
+// eslint-disable-next-line no-restricted-syntax -- dynamic key, enumerated above
+t(`status_${status}`);
+```
+
+This follows [i18next-parser's documented workaround](https://github.com/i18next/i18next-parser#caveats)
+for dynamic keys. If the enumeration grows unwieldy, that's a signal to use a
+lookup table instead (see above).
+
+Run `npm run lint` locally before pushing.
+
 ## Pull Request Process
 
 1. **Ensure your code builds** without warnings: `npm run build`
@@ -104,6 +165,7 @@ Your PR must pass the following automated checks:
 - Commit message validation (commitlint)
 - Code formatting (Prettier)
 - Linting (ESLint)
+- i18n key coverage (`check-i18n`, see [Internationalization](#internationalization-i18n))
 - Unit tests with 80% coverage threshold
 
 ## Code Style
