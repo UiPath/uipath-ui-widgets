@@ -1019,9 +1019,10 @@ export const ConversationalAgentChat = ({
   useEffect(() => {
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
     if (initializedFor.current !== initKey) {
-      // Defer to a microtask so React 19's `react-hooks/set-state-in-effect`
-      // rule doesn't flag the chain of setState calls inside initChat.
-      void Promise.resolve().then(initChat);
+      // initChat is async; its setStates run after awaits, not synchronously
+      // inside the effect body. The lint rule can't see that.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      initChat();
     }
   }, [agentId, folderId, existingConversationId, externalUserId, initChat]);
 
