@@ -1,4 +1,5 @@
 import { UiPath } from "@uipath/uipath-typescript/core";
+import type { ConversationJobStartOverrides } from "@uipath/uipath-typescript/conversational-agent";
 
 // "keys" is a dev-debug mode that renders raw translation keys instead of resolved strings.
 // Additional locales will be bundled once the localization team delivers translations.
@@ -55,6 +56,8 @@ export interface ConversationalAgentChatProps {
   firstRunExperience?: FirstRunExperience;
   /** Override which features are disabled. Merged with defaults (fullScreen, preview, close are always disabled). */
   disabledFeatures?: DisabledFeatures;
+  /** Optional configuration for job start behavior */
+  jobStartOverrides?: ConversationJobStartOverrides;
   /** @internal */
   isDebugMode?: boolean;
   /** @internal */
