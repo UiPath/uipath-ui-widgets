@@ -126,7 +126,6 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
       getById = vi.fn().mockResolvedValue({
         id: 12345,
         releaseKey: "11111111-2222-3333-4444-555555555555",
-        processKey: "Test.Agent.dotted.path",
         name: "Test Agent",
         folderId: 100,
         appearance: {
@@ -1506,7 +1505,7 @@ describe("ConversationalAgentChat", () => {
       expect(other?.name).toBe("Second Chat");
     });
 
-    it("should add brand-new conversations to the sidebar on create and refresh the label when the service generates one", async () => {
+    const sendFirstMessage = async () => {
       render(<ConversationalAgentChat {...defaultProps} />);
 
       await waitFor(
@@ -1520,23 +1519,30 @@ describe("ConversationalAgentChat", () => {
         { timeout: 3000 },
       );
 
-      // Sending a message on first run creates a fresh conversation (id:
-      // "conv-123" per the create() mock). It must appear in the sidebar
-      // before the service auto-generates its label.
       const requestCall = mockChatService.on.mock.calls.find(
         (call: any) => call[0] === "request",
       );
       const onSendMessage = requestCall?.[1];
       mockChatService.setHistory.mockClear();
       await onSendMessage?.({ content: "Hi", attachments: [] });
+    };
+
+    it("should add brand-new conversations to the sidebar on create", async () => {
+      // Sending a message on first run creates a fresh conversation (id:
+      // "conv-123" per the create() mock). It must appear in the sidebar
+      // before the service auto-generates its label.
+      await sendFirstMessage();
 
       await waitFor(() => {
         expect(mockChatService.setHistory).toHaveBeenCalled();
       });
-      const afterCreate =
-        mockChatService.setHistory.mock.calls[0][0];
+      const afterCreate = mockChatService.setHistory.mock.calls[0][0];
       const newEntry = afterCreate.find((i: any) => i.id === "conv-123");
       expect(newEntry).toBeDefined();
+    });
+
+    it("should refresh the new conversation's label when the service generates one", async () => {
+      await sendFirstMessage();
 
       await waitFor(() => {
         expect(labelUpdatedHandler).toBeTruthy();
@@ -1673,7 +1679,6 @@ describe("ConversationalAgentChat", () => {
 
       expect(mockChatService.appendOlderHistoryItems).toHaveBeenCalled();
     });
-
   });
 
   describe("onHistorySearch", () => {
@@ -1702,7 +1707,8 @@ describe("ConversationalAgentChat", () => {
         { timeout: 3000 },
       );
 
-      const initialSetHistoryCalls = mockChatService.setHistory.mock.calls.length;
+      const initialSetHistoryCalls =
+        mockChatService.setHistory.mock.calls.length;
 
       const historySearchCall = mockChatService.on.mock.calls.find(
         (call: any) => call[0] === "historySearch",
