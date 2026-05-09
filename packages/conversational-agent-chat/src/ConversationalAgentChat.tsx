@@ -1019,6 +1019,8 @@ export const ConversationalAgentChat = ({
   useEffect(() => {
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
     if (initializedFor.current !== initKey) {
+      // Defer to a microtask so React 19's `react-hooks/set-state-in-effect`
+      // rule doesn't flag the chain of setState calls inside initChat.
       void Promise.resolve().then(initChat);
     }
   }, [agentId, folderId, existingConversationId, externalUserId, initChat]);
@@ -1182,13 +1184,14 @@ export const ConversationalAgentChat = ({
           agentName={agentNameState}
           inputSchema={inputSchemaState}
           onSubmit={async (data) => {
-            if (!agentId || !folderId) {
+            const agent = await resolveAgent();
+            if (!agent) {
               throw new Error(t("error_missing_conversation_params"));
             }
-            const conversation =
-              await agentService.current.conversations.create(agentId, folderId, {
-                agentInput: { inline: data as JSONObject },
-              } as ConversationCreateOptionsArg);
+            const conversation = await agent.conversations.create({
+              ...(jobStartOverrides ? { jobStartOverrides } : {}),
+              agentInput: { inline: data as JSONObject },
+            } as ConversationCreateOptionsArg);
             currentConversation.current = conversation;
             setShowInputPage(false);
           }}

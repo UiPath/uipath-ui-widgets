@@ -50,12 +50,42 @@ const hasAnyRequiredDescendant = (prop: InputSchemaProperty): boolean => {
   return Object.values(nestedProps).some(hasAnyRequiredDescendant);
 };
 
-const getFieldIcon = (prop: InputSchemaProperty): ReactNode => {
+type DateFormat = "date" | "time" | "date-time";
+
+// Real-world tool input schemas rarely set `format`, so fall back to detecting
+// date-like values to decide between text and date/time inputs.
+const inferDateFormatFromValue = (value: unknown): DateFormat | undefined => {
+  if (value instanceof Date) return "date-time";
+  if (typeof value !== "string" || value.length === 0) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return "date";
+  if (/^\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(value)) return "time";
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) return "date-time";
+  return undefined;
+};
+
+const resolveDateFormat = (
+  prop: InputSchemaProperty,
+  value: unknown,
+): DateFormat | undefined => {
+  if (
+    prop.format === "date" ||
+    prop.format === "time" ||
+    prop.format === "date-time"
+  ) {
+    return prop.format;
+  }
+  return inferDateFormatFromValue(value);
+};
+
+const getFieldIcon = (
+  prop: InputSchemaProperty,
+  dateFormat: DateFormat | undefined,
+): ReactNode => {
   if (prop.type === "boolean") return <BooleanIcon />;
   if (prop.type === "number" || prop.type === "integer") return <NumbersIcon />;
-  if (prop.format === "date") return <DateIcon />;
-  if (prop.format === "time") return <TimeIcon />;
-  if (prop.format === "date-time") return <DateTimeIcon />;
+  if (dateFormat === "date") return <DateIcon />;
+  if (dateFormat === "time") return <TimeIcon />;
+  if (dateFormat === "date-time") return <DateTimeIcon />;
   if (prop.type === "array") return <ArrayIcon />;
   if (prop.type === "object") return <ObjectIcon />;
   return <TextIcon />;
@@ -66,6 +96,8 @@ interface FieldLabelProps {
   fieldKey: string;
   isRequired?: boolean;
   hasError?: boolean;
+  /** Resolved date/time format (schema-driven if set, else inferred from value). */
+  dateFormat?: DateFormat;
 }
 
 export const FieldLabel = ({
@@ -73,6 +105,7 @@ export const FieldLabel = ({
   fieldKey,
   isRequired,
   hasError = false,
+  dateFormat,
 }: FieldLabelProps) => {
   return (
     <span
@@ -81,7 +114,7 @@ export const FieldLabel = ({
         hasError ? "text-destructive" : "text-muted-foreground",
       )}
     >
-      {getFieldIcon(prop)}
+      {getFieldIcon(prop, dateFormat)}
       <span>
         {(prop.title as string) || fieldKey}
         {isRequired && <span>*</span>}
@@ -103,12 +136,14 @@ export const AgentSchemaField = ({
 }: AgentSchemaFieldProps) => {
   const { t } = useTranslation();
   const showRequired = isRequired || hasAnyRequiredDescendant(prop);
+  const dateFormat = resolveDateFormat(prop, value);
   const label = (
     <FieldLabel
       prop={prop}
       fieldKey={fieldKey}
       isRequired={showRequired}
       hasError={error}
+      dateFormat={dateFormat}
     />
   );
 
@@ -134,15 +169,11 @@ export const AgentSchemaField = ({
     );
   }
 
-  if (
-    prop.format === "date" ||
-    prop.format === "date-time" ||
-    prop.format === "time"
-  ) {
+  if (dateFormat) {
     const inputType =
-      prop.format === "date"
+      dateFormat === "date"
         ? "date"
-        : prop.format === "time"
+        : dateFormat === "time"
           ? "time"
           : "datetime-local";
     return (
@@ -151,7 +182,9 @@ export const AgentSchemaField = ({
           type={inputType}
           value={(value as string) ?? ""}
           disabled={disabled}
-          onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
+          onChange={(e: ChangeEvent<HTMLInputElement>) =>
+            onChange(e.target.value)
+          }
           className={cn(
             "w-full",
             error && "border-destructive focus-visible:ring-destructive",
@@ -239,9 +272,7 @@ export const AgentSchemaField = ({
         disabled={disabled}
         onChange={(e: ChangeEvent<HTMLInputElement>) => {
           const val = e.target.value;
-          onChange(
-            isNumeric ? (val === "" ? undefined : Number(val)) : val,
-          );
+          onChange(isNumeric ? (val === "" ? undefined : Number(val)) : val);
         }}
         placeholder={
           isNumeric
