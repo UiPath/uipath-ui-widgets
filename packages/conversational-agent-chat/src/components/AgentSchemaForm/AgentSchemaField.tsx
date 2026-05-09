@@ -52,18 +52,21 @@ const hasAnyRequiredDescendant = (prop: InputSchemaProperty): boolean => {
 
 type DateFormat = "date" | "time" | "date-time";
 
-// Real-world tool input schemas rarely set `format`, so fall back to detecting
-// date-like values to decide between text and date/time inputs.
-const inferDateFormatFromValue = (value: unknown): DateFormat | undefined => {
-  if (value instanceof Date) return "date-time";
-  if (typeof value !== "string" || value.length === 0) return undefined;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return "date";
-  if (/^\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(value)) return "time";
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) return "date-time";
-  return undefined;
-};
+const DATE_TIME_FIELD_NAME_KEYWORDS = [
+  "date",
+  "time",
+  "from",
+  "until",
+  "start",
+  "end",
+  "timestamp",
+  "datetime",
+];
 
+// Tool input schemas rarely set `format`, so fall back to value shape and
+// field-name heuristics. Precedence: schema → value → name → undefined.
 const resolveDateFormat = (
+  fieldKey: string,
   prop: InputSchemaProperty,
   value: unknown,
 ): DateFormat | undefined => {
@@ -74,7 +77,19 @@ const resolveDateFormat = (
   ) {
     return prop.format;
   }
-  return inferDateFormatFromValue(value);
+  if (value instanceof Date) return "date-time";
+  if (typeof value === "string" && value.length > 0) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return "date";
+    if (/^\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(value)) return "time";
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) return "date-time";
+  }
+  const lowerName = fieldKey.toLowerCase();
+  if (
+    DATE_TIME_FIELD_NAME_KEYWORDS.some((keyword) => lowerName.includes(keyword))
+  ) {
+    return "date-time";
+  }
+  return undefined;
 };
 
 const getFieldIcon = (
@@ -136,7 +151,7 @@ export const AgentSchemaField = ({
 }: AgentSchemaFieldProps) => {
   const { t } = useTranslation();
   const showRequired = isRequired || hasAnyRequiredDescendant(prop);
-  const dateFormat = resolveDateFormat(prop, value);
+  const dateFormat = resolveDateFormat(fieldKey, prop, value);
   const label = (
     <FieldLabel
       prop={prop}
