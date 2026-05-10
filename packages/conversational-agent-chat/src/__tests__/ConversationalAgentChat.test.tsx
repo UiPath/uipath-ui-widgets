@@ -150,7 +150,11 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
           name: "Test Agent",
           folderId: 100,
           conversations: {
-            create: vi.fn().mockResolvedValue({ id: "conv-123" }),
+            create: vi.fn().mockResolvedValue({
+              id: "conv-123",
+              label: "",
+              lastActivityTime: "2024-01-03T10:00:00Z",
+            }),
           },
         },
       ]);
