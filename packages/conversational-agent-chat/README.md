@@ -69,6 +69,59 @@ function App() {
 | `agentId`  | `number` | Yes      | The ID of the conversational agent release       |
 | `folderId` | `number` | Yes      | The folder ID where conversations will be stored |
 
+## `ConversationalAgentPickerChat` (agent picker + chat)
+
+A higher-level component that lists all conversational agents accessible to a given SDK and opens a chat with the selected one. Useful when you don't know the `agentId`/`folderId` up front and want the user to pick.
+
+### Usage
+
+```tsx
+import { ConversationalAgentPickerChat } from "@uipath/ui-widgets-conversational-agent-chat";
+import "@uipath/ui-widgets-conversational-agent-chat/ConversationalAgentChat.css";
+import { UiPath } from "@uipath/uipath-typescript/core";
+import { useEffect, useState } from "react";
+
+function App() {
+  const [sdk, setSdk] = useState<UiPath | null>(null);
+
+  useEffect(() => {
+    const init = async () => {
+      const uipath = new UiPath({
+        baseUrl: "https://cloud.uipath.com",
+        orgName: "your-org",
+        tenantName: "your-tenant",
+        secret: "your-secret",
+      });
+      await uipath.initialize();
+      setSdk(uipath);
+    };
+    init();
+  }, []);
+
+  if (!sdk) return <div>Loading...</div>;
+
+  return <ConversationalAgentPickerChat sdk={sdk} />;
+}
+```
+
+### Props
+
+| Prop              | Type                                           | Required | Description                                                            |
+| ----------------- | ---------------------------------------------- | -------- | ---------------------------------------------------------------------- |
+| `sdk`             | `UiPath`                                       | Yes      | UiPath SDK instance. Changing it refetches the list and resets the UI. |
+| `locale`          | `Locale`                                       | No       | Passthrough to the inner chat.                                         |
+| `theme`           | `"light" \| "dark" \| "light-hc" \| "dark-hc"` | No       | Passthrough to the inner chat.                                         |
+| `readOnly`        | `boolean`                                      | No       | Passthrough to the inner chat.                                         |
+| `overrideLabels`  | `OverrideLabels`                               | No       | Passthrough to the inner chat.                                         |
+| `onAgentSelected` | `(agent: AgentSummary) => void`                | No       | Fired when the user picks an agent (telemetry, routing, etc.).         |
+
+### Behavior
+
+- Calls `ConversationalAgent(sdk).getAll()` on mount → renders one row per agent (`name` + `description`).
+- Clicking an agent swaps to the chat view with that agent's `id` and `folderId`.
+- "Back" clears the selection and returns to the list (no refetch).
+- If the user's accessible tenants live behind your own auth/chrome, switch tenants by rebuilding the `UiPath` instance and passing the new one as `sdk` — the picker handles the rest.
+
 ## Features in Detail
 
 ### Streaming Responses
