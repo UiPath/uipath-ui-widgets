@@ -34,8 +34,10 @@ import {
   useRef,
   useState,
 } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import { useTranslation } from "react-i18next";
 import { FeedbackDialog } from "./components/FeedbackDialog";
+import { SettingsDialog } from "./components/SettingsDialog";
 import "./ConversationalAgentChat.css";
 import {
   AttachFileOutput,
@@ -152,6 +154,8 @@ export const ConversationalAgentChat = ({
   const [hasMessages, setHasMessages] = useState(false);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
   const onUserMessageSentRef = useRef(onUserMessageSent);
+  const chatServiceRef = useRef<AutopilotChatService | null>(null);
+  const settingsRootRef = useRef<Root | null>(null);
 
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
@@ -651,6 +655,31 @@ export const ConversationalAgentChat = ({
             ),
           };
 
+      // TODO: if Apollo adds more renderer slots (footer, first-run, etc.),
+      // extract this mount/unmount plumbing into a `useApolloRenderer` hook.
+      const renderSettings = (element: HTMLElement) => {
+        // Apollo clears `element.innerHTML` before every call to the renderer.
+        // Reusing a React root would leave its virtual DOM out of sync with the
+        // wiped real DOM, so we unmount and recreate on every invocation.
+        if (settingsRootRef.current) {
+          settingsRootRef.current.unmount();
+          settingsRootRef.current = null;
+        }
+        const root = createRoot(element);
+        settingsRootRef.current = root;
+        const profileResetKey =
+          agentId != null && folderId != null
+            ? `${agentId}-${folderId}`
+            : "no-agent";
+        root.render(
+          <SettingsDialog
+            profileResetKey={profileResetKey}
+            conversationalAgent={agentService.current}
+            onClose={() => chatServiceRef.current?.toggleSettings(false)}
+          />,
+        );
+      };
+
       const chatServiceInstance = AutopilotChatService.Instantiate({
         config: {
           mode: AutopilotChatMode.Embedded,
@@ -668,15 +697,21 @@ export const ConversationalAgentChat = ({
               t("chat_input_placeholder"),
           },
           paginatedHistory: true,
+          settingsRenderer: renderSettings,
           disabledFeatures: {
             fullScreen: true,
             preview: true,
             close: true,
+            // Apollo defaults `settings: true`; flip it so our gear renders
+            // by default. Consumers can still opt out via `disabledFeatures`.
+            settings: false,
             ...(!agentId ? { newChat: true, history: true } : {}),
             ...disabledFeaturesRef.current,
           },
         },
       });
+
+      chatServiceRef.current = chatServiceInstance;
 
       if (existingConversationId) {
         const conversation = await getConversation();
@@ -778,6 +813,15 @@ export const ConversationalAgentChat = ({
   }, [agentId, folderId, existingConversationId, externalUserId, initChat]);
 
   useEffect(() => {
+    return () => {
+      if (settingsRootRef.current) {
+        settingsRootRef.current.unmount();
+        settingsRootRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     chatService?.setTheme(theme);
   }, [chatService, theme]);
 
@@ -870,7 +914,7 @@ export const ConversationalAgentChat = ({
       return;
     }
 
-    const label = addToEvalButtonLabel || "Add to Evaluation Set";
+    const label = addToEvalButtonLabel || t("add_to_evaluation_set");
     const sortedSets = sortEvaluationSets(evaluationSets);
     const headerAction: AutopilotChatCustomHeaderAction = {
       id: "add-to-eval-button",
@@ -880,7 +924,7 @@ export const ConversationalAgentChat = ({
       children: sortedSets.map((s) => ({
         id: `eval-${s.id}`,
         name: s.name,
-        description: `Add to ${s.name}`,
+        description: t("add_to_evaluation_set_named", { name: s.name }),
         disabled: s.isDisabled,
       })),
     };
@@ -899,47 +943,7 @@ export const ConversationalAgentChat = ({
     addToEvalButtonLabel,
     hasMessages,
     onCustomHeaderActionClicked,
-  ]);
-
-  useEffect(() => {
-    if (
-      !chatService ||
-      !isDebugMode ||
-      !evaluationSets ||
-      evaluationSets.length === 0
-    ) {
-      return;
-    }
-
-    const label = addToEvalButtonLabel || "Add to Evaluation Set";
-    const sortedSets = sortEvaluationSets(evaluationSets);
-    const headerAction: AutopilotChatCustomHeaderAction = {
-      id: "add-to-eval-button",
-      name: label,
-      description: label,
-      disabled: !hasMessages,
-      children: sortedSets.map((s) => ({
-        id: `eval-${s.id}`,
-        name: s.name,
-        description: `Add to ${s.name}`,
-        disabled: s.isDisabled,
-      })),
-    };
-    chatService.setCustomHeaderActions([headerAction]);
-    const unsubscribe = chatService.on(
-      AutopilotChatEvent.CustomHeaderActionClicked,
-      onCustomHeaderActionClicked,
-    );
-    return () => {
-      unsubscribe?.();
-    };
-  }, [
-    chatService,
-    isDebugMode,
-    evaluationSets,
-    addToEvalButtonLabel,
-    hasMessages,
-    onCustomHeaderActionClicked,
+    t,
   ]);
 
   return (
