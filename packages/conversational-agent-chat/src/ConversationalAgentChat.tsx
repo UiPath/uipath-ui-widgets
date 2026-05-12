@@ -626,7 +626,7 @@ export const ConversationalAgentChat = ({
 
       const agentRelease = await resolveAgent();
       agentIdRef.current = agentRelease?.id;
-      agentKeyRef.current = agentRelease?.releaseKey;
+      agentKeyRef.current = agentRelease?.processKey;
       const agentName = agentRelease?.name ?? "";
 
       // All-or-nothing first-run experience configuration
