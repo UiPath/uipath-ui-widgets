@@ -54,6 +54,12 @@ vi.mock("../utils/telemetryUtils", () => ({
   trackTelemetry: (...args: any[]) => mockTrackTelemetry(...args),
 }));
 
+// Capture ConversationalAgent constructor invocations so we can assert that
+// props (e.g. externalUserId) are threaded through to the SDK.
+const { capturedAgentConstructorArgs } = vi.hoisted(() => ({
+  capturedAgentConstructorArgs: [] as any[][],
+}));
+
 // Store handlers for testing
 let exchangeErrorHandler: any = null;
 let messageStartHandler: any = null;
@@ -112,6 +118,9 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
 
   return {
     ConversationalAgent: class {
+      constructor(...args: any[]) {
+        capturedAgentConstructorArgs.push(args);
+      }
       getById = vi.fn().mockResolvedValue({
         id: 1,
         name: "Test Agent",
@@ -187,6 +196,7 @@ describe("ConversationalAgentChat", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    capturedAgentConstructorArgs.length = 0;
     i18next.changeLanguage("en");
     mockSdk = {} as any;
     mockChatService = createMockChatService();
@@ -1821,6 +1831,79 @@ describe("ConversationalAgentChat", () => {
 
       // Chat should be visible when no error
       expect(screen.queryByText("Reload")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("externalUserId", () => {
+    it("does not pass options to the ConversationalAgent constructor when externalUserId is omitted", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(capturedAgentConstructorArgs.length).toBeGreaterThan(0);
+      });
+
+      const [, options] = capturedAgentConstructorArgs[0];
+      expect(options).toBeUndefined();
+    });
+
+    it("threads externalUserId through to the ConversationalAgent constructor", async () => {
+      render(
+        <ConversationalAgentChat
+          {...defaultProps}
+          externalUserId="ext-user-42"
+        />,
+      );
+
+      await waitFor(() => {
+        expect(
+          capturedAgentConstructorArgs.some(
+            (args) => args[1]?.externalUserId === "ext-user-42",
+          ),
+        ).toBe(true);
+      });
+    });
+
+    it("rebuilds the ConversationalAgent when externalUserId changes", async () => {
+      const { rerender } = render(
+        <ConversationalAgentChat
+          {...defaultProps}
+          externalUserId="ext-user-1"
+        />,
+      );
+
+      await waitFor(() => {
+        expect(
+          capturedAgentConstructorArgs.some(
+            (args) => args[1]?.externalUserId === "ext-user-1",
+          ),
+        ).toBe(true);
+      });
+
+      rerender(
+        <ConversationalAgentChat
+          {...defaultProps}
+          externalUserId="ext-user-2"
+        />,
+      );
+
+      await waitFor(() => {
+        expect(
+          capturedAgentConstructorArgs.some(
+            (args) => args[1]?.externalUserId === "ext-user-2",
+          ),
+        ).toBe(true);
+      });
+    });
+
+    it("treats an empty externalUserId as omitted", async () => {
+      render(<ConversationalAgentChat {...defaultProps} externalUserId="" />);
+
+      await waitFor(() => {
+        expect(capturedAgentConstructorArgs.length).toBeGreaterThan(0);
+      });
+
+      const [, options] = capturedAgentConstructorArgs[0];
+      expect(options).toBeUndefined();
     });
   });
 });
