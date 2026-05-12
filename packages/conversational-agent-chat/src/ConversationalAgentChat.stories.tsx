@@ -247,6 +247,11 @@ function App() {
         "Load an existing conversation by ID instead of creating a new one on first message",
       control: "text",
     },
+    externalUserId: {
+      description:
+        "External User ID sent on the x-uipath-external-user-id header (and matching WebSocket query param). Required when authenticating via an app-scoped external app (client credential grant).",
+      control: "text",
+    },
     firstRunExperience: {
       description:
         "Override the first-run experience. When omitted, derived from agent appearance data.",
@@ -270,6 +275,7 @@ function App() {
     readOnly: false,
     overrideLabels: undefined,
     existingConversationId: undefined,
+    externalUserId: undefined,
     firstRunExperience: undefined,
     disabledFeatures: undefined,
   },
