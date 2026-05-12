@@ -74,6 +74,7 @@ export const ConversationalAgentChat = ({
   overrideLabels,
   firstRunExperience,
   disabledFeatures,
+  jobStartOverrides,
   isDebugMode = false,
   evaluationSets,
   addToEvalButtonLabel,
@@ -284,10 +285,12 @@ export const ConversationalAgentChat = ({
           "Either conversationId or agentId must be provided",
         );
       }
-      const newConversation = await agent.conversations.create();
+      const newConversation = await agent.conversations.create(
+        jobStartOverrides ? { jobStartOverrides } : undefined
+      );
       currentConversation.current = newConversation;
       return newConversation;
-    }, [existingConversationId, resolveAgent]);
+    }, [existingConversationId, resolveAgent, jobStartOverrides]);
 
   const getSessionHelper = useCallback(async (): Promise<SessionStream> => {
     if (session.current) {
