@@ -7,3 +7,4 @@ export type {
   Locale,
   OverrideLabels,
 } from "./types";
+export type { ConversationJobStartOverrides } from "@uipath/uipath-typescript/conversational-agent";
