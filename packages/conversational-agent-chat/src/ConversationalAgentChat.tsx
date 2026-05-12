@@ -140,8 +140,8 @@ export const ConversationalAgentChat = ({
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
   const conversationsCursor = useRef<{ value: string } | undefined>(undefined);
-  const agentReleaseIdRef = useRef<number | undefined>(undefined);
-  const agentReleaseKeyRef = useRef<string | undefined>(undefined);
+  const agentIdRef = useRef<number | undefined>(undefined);
+  const agentKeyRef = useRef<string | undefined>(undefined);
   const searchTextRef = useRef<string>("");
 
   const [chatService, setChatService] = useState<AutopilotChatService>();
@@ -371,15 +371,15 @@ export const ConversationalAgentChat = ({
     // The SDK's URL builder calls value.toString() without a null check, so
     // omit any param that is undefined/empty rather than passing it as such.
     const opts: {
-      agentReleaseKey?: string;
-      agentReleaseId?: number;
-      search?: string;
+      agentKey?: string;
+      agentId?: number;
+      label?: string;
     } = {};
-    if (agentReleaseKeyRef.current)
-      opts.agentReleaseKey = agentReleaseKeyRef.current;
-    if (agentReleaseIdRef.current !== undefined)
-      opts.agentReleaseId = agentReleaseIdRef.current;
-    if (searchTextRef.current) opts.search = searchTextRef.current;
+    if (agentKeyRef.current)
+      opts.agentKey = agentKeyRef.current;
+    if (agentIdRef.current !== undefined)
+      opts.agentId = agentIdRef.current;
+    if (searchTextRef.current) opts.label = searchTextRef.current;
     return opts;
   }, []);
 
@@ -625,10 +625,8 @@ export const ConversationalAgentChat = ({
       initializedFor.current = initKey;
 
       const agentRelease = await resolveAgent();
-
-      agentReleaseIdRef.current = agentRelease?.id;
-      agentReleaseKeyRef.current = agentRelease?.releaseKey;
-
+      agentIdRef.current = agentRelease?.id;
+      agentKeyRef.current = agentRelease?.releaseKey;
       const agentName = agentRelease?.name ?? "";
 
       // All-or-nothing first-run experience configuration
