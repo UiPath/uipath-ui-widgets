@@ -516,9 +516,8 @@ describe("ConversationalAgentChat", () => {
     });
 
     it("should keep newChat/history enabled when only agentId is provided", async () => {
-      const { AutopilotChatService } = await import(
-        "@uipath/apollo-react/material/components"
-      );
+      const { AutopilotChatService } =
+        await import("@uipath/apollo-react/material/components");
 
       render(<ConversationalAgentChat sdk={mockSdk as UiPath} agentId={1} />);
 
@@ -536,9 +535,8 @@ describe("ConversationalAgentChat", () => {
     });
 
     it("should disable newChat/history when agentId is not provided", async () => {
-      const { AutopilotChatService } = await import(
-        "@uipath/apollo-react/material/components"
-      );
+      const { AutopilotChatService } =
+        await import("@uipath/apollo-react/material/components");
 
       render(
         <ConversationalAgentChat
@@ -796,7 +794,16 @@ describe("ConversationalAgentChat", () => {
   });
 
   describe("InputsPage agentInput flow", () => {
-    const inputSchemaAgent = {
+    const buildInputSchemaAgent = (
+      createImpl: () => Promise<unknown> = () =>
+        Promise.resolve({
+          id: "conv-from-inputs",
+          label: "",
+          lastActivityTime: "2024-01-03T10:00:00Z",
+        }),
+    ) => ({
+      id: defaultProps.agentId,
+      folderId: defaultProps.folderId,
       name: "Test Agent",
       appearance: {},
       inputSchema: {
@@ -806,10 +813,13 @@ describe("ConversationalAgentChat", () => {
         },
         required: ["customerName"],
       },
-    };
+      conversations: {
+        create: vi.fn().mockImplementation(createImpl),
+      },
+    });
 
     it("renders InputsPage when inputSchema has required fields", async () => {
-      mockGetById.mockResolvedValueOnce(inputSchemaAgent);
+      mockGetById.mockResolvedValueOnce(buildInputSchemaAgent());
       render(<ConversationalAgentChat {...defaultProps} />);
 
       expect(
@@ -820,7 +830,7 @@ describe("ConversationalAgentChat", () => {
     });
 
     it("does not render InputsPage when existingConversationId is set", async () => {
-      mockGetById.mockResolvedValueOnce(inputSchemaAgent);
+      mockGetById.mockResolvedValueOnce(buildInputSchemaAgent());
       render(
         <ConversationalAgentChat
           {...defaultProps}
@@ -840,7 +850,8 @@ describe("ConversationalAgentChat", () => {
     });
 
     it("submitting InputsPage creates a conversation with agentInput", async () => {
-      mockGetById.mockResolvedValueOnce(inputSchemaAgent);
+      const agent = buildInputSchemaAgent();
+      mockGetById.mockResolvedValueOnce(agent);
       render(<ConversationalAgentChat {...defaultProps} />);
 
       const submit = await screen.findByRole("button", {
@@ -851,17 +862,16 @@ describe("ConversationalAgentChat", () => {
       fireEvent.click(submit);
 
       await waitFor(() => {
-        expect(mockCreate).toHaveBeenCalledWith(
-          defaultProps.agentId,
-          defaultProps.folderId,
-          { agentInput: { inline: { customerName: "Acme Corp" } } },
-        );
+        expect(agent.conversations.create).toHaveBeenCalledWith({
+          agentInput: { inline: { customerName: "Acme Corp" } },
+        });
       });
     });
 
     it("InputsPage submit failure surfaces an inline error and keeps form mounted", async () => {
-      mockGetById.mockResolvedValueOnce(inputSchemaAgent);
-      mockCreate.mockRejectedValueOnce(new Error("Network down"));
+      mockGetById.mockResolvedValueOnce(
+        buildInputSchemaAgent(() => Promise.reject(new Error("Network down"))),
+      );
       render(<ConversationalAgentChat {...defaultProps} />);
 
       const submit = await screen.findByRole("button", {

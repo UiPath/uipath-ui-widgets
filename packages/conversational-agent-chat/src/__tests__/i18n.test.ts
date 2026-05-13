@@ -94,7 +94,7 @@ describe("i18n", () => {
         "agent_schema_number_placeholder",
         "agent_schema_text_placeholder",
         "add_to_evaluation_set",
-        "add_to_evaluation_set_item",
+        "add_to_evaluation_set_named",
       ];
 
       for (const key of newKeys) {
