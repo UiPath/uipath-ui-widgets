@@ -7,7 +7,7 @@ import {
   DialogTitle,
   Textarea,
 } from "@uipath/apollo-wind";
-import { useState } from "react";
+import { type ChangeEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 interface FeedbackDialogProps {
@@ -44,7 +44,9 @@ export const FeedbackDialog = ({
         </DialogHeader>
         <Textarea
           value={comment}
-          onChange={(e) => setComment(e.target.value)}
+          onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+            setComment(e.target.value)
+          }
           placeholder={t("feedback_placeholder")}
         />
         <DialogFooter>

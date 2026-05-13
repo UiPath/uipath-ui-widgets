@@ -169,6 +169,8 @@ export const ProfileSection = ({
     () =>
       (Object.keys(COUNTRY_CODES) as CountryCode[])
         .map((code) => {
+          // Keys come from COUNTRY_CODES (country_name_*), enumerated in en/index.json.
+          // eslint-disable-next-line no-restricted-syntax
           const label = t(COUNTRY_CODES[code]);
           return {
             value: `${code.toLowerCase()}|${label.toLowerCase()}`,
@@ -182,7 +184,9 @@ export const ProfileSection = ({
   const countryValue = useMemo(() => {
     if (!form.country) return "";
     const prefix = `${form.country.toLowerCase()}|`;
-    return countryItems.find((item) => item.value.startsWith(prefix))?.value ?? "";
+    return (
+      countryItems.find((item) => item.value.startsWith(prefix))?.value ?? ""
+    );
   }, [form.country, countryItems]);
 
   const handleCountryChange = (encoded: string) => {
@@ -281,10 +285,7 @@ export const ProfileSection = ({
           className="col-span-2"
         />
         <div className="flex flex-col gap-1.5">
-          <Label
-            id={countryLabelId}
-            className="text-sm text-muted-foreground"
-          >
+          <Label id={countryLabelId} className="text-sm text-muted-foreground">
             {t("country_label")}
           </Label>
           <Combobox
@@ -294,10 +295,7 @@ export const ProfileSection = ({
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label
-            id={timezoneLabelId}
-            className="text-sm text-muted-foreground"
-          >
+          <Label id={timezoneLabelId} className="text-sm text-muted-foreground">
             {t("timezone_label")}
           </Label>
           <Combobox
