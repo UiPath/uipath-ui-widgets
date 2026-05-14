@@ -28,6 +28,9 @@ jobs:
           registry-url: "https://npm.pkg.github.com"
           scope: "@uipath"
 
+      - name: Ensure npm >= 11.5.0 (required for minimum-release-age)
+        run: npm install -g npm@^11.5.0
+
       - name: Install dependencies
         run: npm install --include=optional --legacy-peer-deps
 
