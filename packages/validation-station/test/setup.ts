@@ -29,3 +29,10 @@ global.IntersectionObserver = class IntersectionObserver {
   unobserve() {}
   disconnect() {}
 } as any;
+
+// Pre-register the validation station custom element so
+// customElements.whenDefined(...) resolves in tests without booting the real WC.
+const VS_TAG = "ui-du-validation-station-standalone-wc-element";
+if (typeof window !== "undefined" && !customElements.get(VS_TAG)) {
+  customElements.define(VS_TAG, class extends HTMLElement {});
+}

@@ -79,23 +79,29 @@ describe("ValidationStation", () => {
     });
   });
 
-  it("renders the standalone web component element", () => {
+  it("renders the standalone web component element", async () => {
     const { container } = render(<ValidationStation {...baseProps} />);
-    expect(
-      container.querySelector("ui-du-validation-station-standalone-wc-element"),
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        container.querySelector(
+          "ui-du-validation-station-standalone-wc-element",
+        ),
+      ).toBeInTheDocument();
+    });
   });
 
-  it("renders the web component as root element", () => {
+  it("renders the web component as root element", async () => {
     const { container } = render(<ValidationStation {...baseProps} />);
-    const root = container.firstElementChild;
-    expect(root).toBeInTheDocument();
-    expect(root?.tagName.toLowerCase()).toBe(
-      "ui-du-validation-station-standalone-wc-element",
-    );
+    await waitFor(() => {
+      const root = container.firstElementChild;
+      expect(root).toBeInTheDocument();
+      expect(root?.tagName.toLowerCase()).toBe(
+        "ui-du-validation-station-standalone-wc-element",
+      );
+    });
   });
 
-  it("passes props to the web component", () => {
+  it("passes props to the web component", async () => {
     const { container } = render(
       <ValidationStation
         {...baseProps}
@@ -106,31 +112,37 @@ describe("ValidationStation", () => {
       />,
     );
 
-    const el = container.querySelector(
-      "ui-du-validation-station-standalone-wc-element",
-    );
-    expect(el).toBeInTheDocument();
+    await waitFor(() => {
+      const el = container.querySelector(
+        "ui-du-validation-station-standalone-wc-element",
+      );
+      expect(el).toBeInTheDocument();
+    });
   });
 
-  it("renders error when useBucketArtifacts returns error", () => {
+  it("renders error when useBucketArtifacts returns error", async () => {
     mockUseBucketArtifacts.mockReturnValue({
       artifacts: null,
       error: "Something went wrong",
     });
 
     const { container } = render(<ValidationStation {...baseProps} />);
-    expect(container.textContent).toContain(
-      "Failed to load document artifacts",
-    );
+    await waitFor(() => {
+      expect(container.textContent).toContain(
+        "Failed to load document artifacts",
+      );
+    });
   });
 
-  it("renders loading state when artifacts are null", () => {
+  it("renders loading state when artifacts are null", async () => {
     mockUseBucketArtifacts.mockReturnValue({
       artifacts: null,
       error: null,
     });
 
     const { container } = render(<ValidationStation {...baseProps} />);
-    expect(container.textContent).toContain("Loading...");
+    await waitFor(() => {
+      expect(container.textContent).toContain("Loading...");
+    });
   });
 });
