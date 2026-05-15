@@ -469,6 +469,10 @@ export const ConversationalAgentChat = ({
           ? await agentService.current.getById(agentId, folderId)
           : undefined;
 
+      const featureFlags = await agentService.current.getFeatureFlags();
+      const audioStreamingEnabled = featureFlags.audioStreamingEnabled as boolean ?? false;
+      const speechToTextEnabled = featureFlags.speechToTextEnabled as boolean ?? false;
+
       const agentName = agentRelease?.name ?? "";
 
       // All-or-nothing first-run experience configuration
@@ -516,6 +520,8 @@ export const ConversationalAgentChat = ({
             preview: true,
             close: true,
             ...(!agentId || !folderId ? { newChat: true, history: true } : {}),
+            audio: !speechToTextEnabled,
+            audioStreaming: !audioStreamingEnabled,
             ...disabledFeaturesRef.current,
           },
         },
