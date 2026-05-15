@@ -121,6 +121,7 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
           ],
         },
       });
+      getFeatureFlags = vi.fn().mockResolvedValue({});
 
       conversations = {
         create: vi.fn().mockResolvedValue({ id: "conv-123" }),
@@ -293,11 +294,13 @@ describe("ConversationalAgentChat", () => {
         expect(AutopilotChatService.Instantiate).toHaveBeenCalledWith(
           expect.objectContaining({
             config: expect.objectContaining({
-              disabledFeatures: {
+              disabledFeatures: expect.objectContaining({
                 fullScreen: true,
                 preview: true,
                 close: true,
-              },
+                audio: true,
+                audioStreaming: true,
+              }),
             }),
           }),
         );
