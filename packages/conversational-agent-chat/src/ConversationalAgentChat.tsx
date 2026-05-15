@@ -470,8 +470,10 @@ export const ConversationalAgentChat = ({
           : undefined;
 
       const featureFlags = await agentService.current.getFeatureFlags();
-      const audioStreamingEnabled = featureFlags.audioStreamingEnabled as boolean ?? false;
-      const speechToTextEnabled = featureFlags.speechToTextEnabled as boolean ?? false;
+      const audioStreamingEnabled =
+        (featureFlags.audioStreamingEnabled as boolean) ?? false;
+      const speechToTextEnabled =
+        (featureFlags.speechToTextEnabled as boolean) ?? false;
 
       const agentName = agentRelease?.name ?? "";
 
