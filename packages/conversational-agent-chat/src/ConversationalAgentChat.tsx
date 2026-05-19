@@ -294,10 +294,7 @@ export const ConversationalAgentChat = ({
             };
             const createdAt = new Date().toISOString();
 
-            const sendUpdate = (
-              isCompleted: boolean,
-              wasRejected: boolean,
-            ) => {
+            const sendUpdate = (isCompleted: boolean, wasRejected: boolean) => {
               chatService.sendResponse({
                 id: widgetMessageId,
                 content: t("tool_confirmation_required"),
@@ -356,9 +353,7 @@ export const ConversationalAgentChat = ({
                 onApprove: (input) => {
                   sendToolCallSpinner(toolCall.toolCallId);
                   const approvedInput =
-                    (input as JSONValue | undefined) ??
-                    startEvent.input ??
-                    {};
+                    (input as JSONValue | undefined) ?? startEvent.input ?? {};
                   toolCall.sendToolCallConfirm({
                     approved: true,
                     input: approvedInput,
@@ -571,10 +566,8 @@ export const ConversationalAgentChat = ({
       agentId?: number;
       label?: string;
     } = {};
-    if (agentKeyRef.current)
-      opts.agentKey = agentKeyRef.current;
-    if (agentIdRef.current !== undefined)
-      opts.agentId = agentIdRef.current;
+    if (agentKeyRef.current) opts.agentKey = agentKeyRef.current;
+    if (agentIdRef.current !== undefined) opts.agentId = agentIdRef.current;
     if (searchTextRef.current) opts.label = searchTextRef.current;
     return opts;
   }, []);
@@ -822,7 +815,7 @@ export const ConversationalAgentChat = ({
 
       const agentRelease = await resolveAgent();
       agentIdRef.current = agentRelease?.id;
-      agentKeyRef.current = agentRelease?.processKey;
+      agentKeyRef.current = agentRelease?.releaseKey;
       const agentName = agentRelease?.name ?? "";
 
       // TODO(sdk-typing): drop the cast once @uipath/uipath-typescript exposes
