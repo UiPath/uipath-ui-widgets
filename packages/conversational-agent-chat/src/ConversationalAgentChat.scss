@@ -8,7 +8,6 @@
   width: 100%;
   height: 100%;
   min-height: 600px;
-  border: 1px solid var(--color-border-de-emp);
   text-align: left;
 
   .info-container {
@@ -19,5 +18,71 @@
     gap: 16px;
     height: 100%;
     padding: 24px;
+  }
+
+  // Apollo's MUI ApChat sizes header icons at 18-20px; the legacy portal-shell
+  // component renders them larger. Bump to match the legacy visual weight.
+  [data-testid="autopilot-chat-new-chat"],
+  [data-testid="autopilot-chat-settings"],
+  [data-testid="autopilot-chat-history"] {
+    .MuiIcon-root,
+    .MuiSvgIcon-root {
+      font-size: 22px;
+    }
+  }
+
+  // Two bracket strokes that chase each other through the brand color cycle.
+  .uipath-loader path {
+    stroke: #0a66d7;
+    stroke-width: 32;
+    stroke-dasharray: 672 672;
+    stroke-dashoffset: 672;
+    animation: uipath-loader-dash 7s linear infinite;
+  }
+}
+
+@keyframes uipath-loader-dash {
+  12.5% {
+    stroke: #fa4b16;
+  }
+  25% {
+    stroke: #fa4b16;
+    stroke-dashoffset: -672;
+    stroke-width: 32.01;
+  }
+  25.01% {
+    stroke-dashoffset: 672;
+    stroke-width: 32;
+  }
+  37.5% {
+    stroke: #f7b612;
+  }
+  50% {
+    stroke: #f7b612;
+    stroke-dashoffset: -672;
+    stroke-width: 32.01;
+  }
+  50.01% {
+    stroke-dashoffset: 672;
+    stroke-width: 32;
+  }
+  62.5% {
+    stroke: #32d96e;
+  }
+  75% {
+    stroke: #32d96e;
+    stroke-dashoffset: -672;
+    stroke-width: 32.01;
+  }
+  75.01% {
+    stroke-dashoffset: 672;
+    stroke-width: 32;
+  }
+  87.5% {
+    stroke: #0a66d7;
+  }
+  100% {
+    stroke-dashoffset: -672;
+    stroke-width: 32.01;
   }
 }

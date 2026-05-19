@@ -46,6 +46,7 @@ import { useTranslation } from "react-i18next";
 import { InputsPage } from "./components/InputsPage";
 import type { InputSchema } from "./components/AgentSchemaForm/types";
 import { FeedbackDialog } from "./components/FeedbackDialog";
+import { Loader } from "./components/Loader";
 import { SettingsDialog } from "./components/SettingsDialog";
 import type { ToolConfirmationLabels } from "./components/ToolConfirmation";
 import {
@@ -294,10 +295,7 @@ export const ConversationalAgentChat = ({
             };
             const createdAt = new Date().toISOString();
 
-            const sendUpdate = (
-              isCompleted: boolean,
-              wasRejected: boolean,
-            ) => {
+            const sendUpdate = (isCompleted: boolean, wasRejected: boolean) => {
               chatService.sendResponse({
                 id: widgetMessageId,
                 content: t("tool_confirmation_required"),
@@ -356,9 +354,7 @@ export const ConversationalAgentChat = ({
                 onApprove: (input) => {
                   sendToolCallSpinner(toolCall.toolCallId);
                   const approvedInput =
-                    (input as JSONValue | undefined) ??
-                    startEvent.input ??
-                    {};
+                    (input as JSONValue | undefined) ?? startEvent.input ?? {};
                   toolCall.sendToolCallConfirm({
                     approved: true,
                     input: approvedInput,
@@ -472,7 +468,7 @@ export const ConversationalAgentChat = ({
     );
     folderIdRef.current = resolvedAgent.current.folderId;
     return resolvedAgent.current;
-  }, [agentId, folderId]);
+  }, [agentId]);
 
   const setConversationHistory = useCallback(
     (next: ConversationCreateResponse[], allLoaded?: boolean) => {
@@ -571,10 +567,8 @@ export const ConversationalAgentChat = ({
       agentId?: number;
       label?: string;
     } = {};
-    if (agentKeyRef.current)
-      opts.agentKey = agentKeyRef.current;
-    if (agentIdRef.current !== undefined)
-      opts.agentId = agentIdRef.current;
+    if (agentKeyRef.current) opts.agentKey = agentKeyRef.current;
+    if (agentIdRef.current !== undefined) opts.agentId = agentIdRef.current;
     if (searchTextRef.current) opts.label = searchTextRef.current;
     return opts;
   }, []);
@@ -1212,9 +1206,8 @@ export const ConversationalAgentChat = ({
 
       {!error && !chatService && (
         <div className="info-container">
-          <Alert>
-            <AlertDescription>{t("loading")}</AlertDescription>
-          </Alert>
+          <div>{t("loading")}</div>
+          <Loader />
         </div>
       )}
 

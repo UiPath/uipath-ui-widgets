@@ -6,7 +6,7 @@
   "error_missing_conversation_params": "Either conversationId or agentId and folderId must be provided.",
   "error_initialize_chat": "Failed to initialize chat",
   "error_load_history": "Failed to load conversation history",
-  "loading": "Loading...",
+  "loading": "Connecting to agent...",
   "reload": "Reload",
   "new_chat": "New chat",
   "feedback_placeholder": "What would you like to share?",
