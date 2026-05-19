@@ -10,6 +10,7 @@ interface ArrayFieldProps extends AgentSchemaFieldProps {
 }
 
 export const ArrayField = ({
+  prop,
   value,
   onChange,
   error = false,
@@ -36,7 +37,12 @@ export const ArrayField = ({
   };
 
   return (
-    <FieldShell label={label} error={error} disabled={disabled}>
+    <FieldShell
+      label={label}
+      error={error}
+      disabled={disabled}
+      helperText={prop.description}
+    >
       <div
         className={cn(
           "flex min-h-9 w-full flex-wrap items-center gap-1 rounded-md border border-input bg-background px-3 py-1 text-sm",
@@ -46,11 +52,7 @@ export const ArrayField = ({
         )}
       >
         {chips.map((chip, i) => (
-          <Badge
-            key={i}
-            variant="secondary"
-            className="gap-1 pr-1"
-          >
+          <Badge key={i} variant="secondary" className="gap-1 pr-1">
             <span>{chip}</span>
             <button
               type="button"

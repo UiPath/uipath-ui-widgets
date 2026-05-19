@@ -76,6 +76,7 @@ export const ObjectField = ({
       error={error}
       disabled={disabled}
       label={label}
+      description={prop.description}
     />
   );
 };
@@ -123,6 +124,11 @@ const NestedObjectField = ({
         </CollapsibleTrigger>
         <span className="text-sm font-semibold">{label}</span>
       </div>
+      {prop.description && (
+        <p className="ml-7 mt-1 text-xs text-muted-foreground">
+          {prop.description}
+        </p>
+      )}
       <CollapsibleContent>
         <div className="ml-3 mt-2 flex flex-col gap-4 border-l-2 border-border pl-4">
           {Object.entries(nestedProperties).map(([nestedKey, nestedProp]) => (
@@ -154,6 +160,7 @@ interface JsonObjectFieldProps {
   error?: boolean;
   disabled?: boolean;
   label: React.ReactNode;
+  description?: string;
 }
 
 const JsonObjectField = ({
@@ -163,6 +170,7 @@ const JsonObjectField = ({
   error = false,
   disabled,
   label,
+  description,
 }: JsonObjectFieldProps) => {
   const { t } = useTranslation();
   const [objectText, setObjectText] = useState(() => {
@@ -205,7 +213,7 @@ const JsonObjectField = ({
       label={label}
       error={hasError}
       disabled={disabled}
-      helperText={jsonError}
+      helperText={jsonError ?? description}
     >
       <Textarea
         value={objectText}

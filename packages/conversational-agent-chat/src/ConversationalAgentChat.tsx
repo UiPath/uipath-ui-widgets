@@ -200,6 +200,15 @@ export const ConversationalAgentChat = ({
   const onUserMessageSentRef = useRef(onUserMessageSent);
   const chatServiceRef = useRef<AutopilotChatService | null>(null);
   const settingsRootRef = useRef<Root | null>(null);
+  // Last-applied agent inputs for the active conversation. Pre-populates the
+  // settings inputs form when reopened; cleared on New Chat.
+  const storedAgentInputs = useRef<Record<string, unknown>>({});
+  // Mirrors `inputSchemaState` so the imperative `renderSettings` closure always
+  // sees the current schema without re-instantiating the chat service.
+  const inputSchemaStateRef = useRef<InputSchema | null>(null);
+  useLayoutEffect(() => {
+    inputSchemaStateRef.current = inputSchemaState;
+  }, [inputSchemaState]);
 
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
@@ -582,6 +591,7 @@ export const ConversationalAgentChat = ({
     currentConversation.current = null;
     session.current = null;
     activeExchange.current = null;
+    storedAgentInputs.current = {};
     setHasMessages(false);
     // Re-show the InputsPage with a cleared form when the agent's schema has
     // required inputs. Bumping the counter forces an unmount/remount via the
@@ -866,8 +876,10 @@ export const ConversationalAgentChat = ({
       // Skip when resuming an existing conversation — its inputs were already
       // captured at creation time.
       const hasRequiredInputs = (inputSchema?.required?.length ?? 0) > 0;
+      // Persist the schema regardless of `hasRequiredInputs` so the settings
+      // panel can render optional-input editing.
+      setInputSchemaState(inputSchema ?? null);
       if (hasRequiredInputs && !existingConversationId) {
-        setInputSchemaState(inputSchema ?? null);
         setAgentNameState(agentName);
         setShowInputPage(true);
       }
@@ -900,6 +912,22 @@ export const ConversationalAgentChat = ({
             suggestions: hostFallback?.suggestions ?? [],
           };
 
+      // Persists agent inputs against the active conversation via
+      // updateConversation. Server-side this applies to all subsequent
+      // messages; we don't prepend per send.
+      const handleApplySettingsInputs = async (
+        inputs: Record<string, unknown>,
+      ) => {
+        const conversationId = currentConversation.current?.id;
+        if (!conversationId) {
+          throw new Error(t("error_missing_conversation_params"));
+        }
+        await agentService.current.conversations.updateById(conversationId, {
+          agentInput: { inline: inputs as JSONObject },
+        });
+        storedAgentInputs.current = inputs;
+      };
+
       // TODO: if Apollo adds more renderer slots (footer, first-run, etc.),
       // extract this mount/unmount plumbing into a `useApolloRenderer` hook.
       const renderSettings = (element: HTMLElement) => {
@@ -916,11 +944,17 @@ export const ConversationalAgentChat = ({
           agentId != null && folderId != null
             ? `${agentId}-${folderId}`
             : "no-agent";
+        const conversationId = currentConversation.current?.id ?? "no-conv";
+        const inputsResetKey = `${profileResetKey}-${conversationId}`;
         root.render(
           <SettingsDialog
             profileResetKey={profileResetKey}
             conversationalAgent={agentService.current}
             onClose={() => chatServiceRef.current?.toggleSettings(false)}
+            inputSchema={inputSchemaStateRef.current}
+            initialInputs={storedAgentInputs.current}
+            onApplyInputs={handleApplySettingsInputs}
+            inputsResetKey={inputsResetKey}
           />,
         );
       };
@@ -1258,11 +1292,13 @@ export const ConversationalAgentChat = ({
             if (!agent) {
               throw new Error(t("error_missing_conversation_params"));
             }
+            const inputs = data as Record<string, unknown>;
             const conversation = await agent.conversations.create({
               ...(jobStartOverrides ? { jobStartOverrides } : {}),
-              agentInput: { inline: data as JSONObject },
+              agentInput: { inline: inputs as JSONObject },
             } as ConversationCreateOptionsArg);
             currentConversation.current = conversation;
+            storedAgentInputs.current = inputs;
             setShowInputPage(false);
           }}
         />
