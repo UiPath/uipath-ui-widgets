@@ -59,6 +59,21 @@ export interface ConversationalAgentChatProps {
    * @internal
    */
   onUserMessageSent?: (message: { content: string }) => void;
+  /**
+   * Optional identifier used in UiPath logs to identify the implementing service
+   * of requests. External consumers do not need to set it; the server logs
+   * missing values as "unknown".
+   *
+   * @internal Intended for UiPath first-party surfaces.
+   */
+  surfaceName?: string;
+  /**
+   * Optional version of the implementing service of requests. Paired with
+   * `surfaceName` for internal telemetry.
+   *
+   * @internal Intended for UiPath first-party surfaces.
+   */
+  surfaceVersion?: string;
 }
 
 export interface AgentSummary {

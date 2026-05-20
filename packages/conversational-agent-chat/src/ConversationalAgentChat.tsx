@@ -65,8 +65,12 @@ export const ConversationalAgentChat = ({
   firstRunExperience,
   disabledFeatures,
   onUserMessageSent,
+  surfaceName,
+  surfaceVersion,
 }: ConversationalAgentChatProps) => {
-  const agentService = useRef(new ConversationalAgent(sdk));
+  const agentService = useRef(
+    new ConversationalAgent(sdk, { surfaceName, surfaceVersion }),
+  );
   const currentConversation = useRef<ConversationCreateResponse | null>(null);
   const initializedFor = useRef<string | null>(null);
   // Refs for values used in initChat that shouldn't trigger re-initialization
