@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "npm": ">=11.5.0"
+  },
   "workspaces": [
     "packages/multi-file-upload",
     "packages/datatable",
