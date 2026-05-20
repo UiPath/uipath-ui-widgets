@@ -52,7 +52,7 @@ describe("ProfileSection", () => {
   it("disables save until a field is edited", async () => {
     const { agent } = makeAgent();
     render(<ProfileSection conversationalAgent={agent} />);
-    const save = await screen.findByRole("button", { name: /save changes/i });
+    const save = await screen.findByRole("button", { name: /apply changes/i });
     expect(save).toBeDisabled();
   });
 
@@ -63,7 +63,7 @@ describe("ProfileSection", () => {
     const nameInput = await screen.findByDisplayValue("Test User");
     await userEvent.clear(nameInput);
     await userEvent.type(nameInput, "Updated Name");
-    const save = screen.getByRole("button", { name: /save changes/i });
+    const save = screen.getByRole("button", { name: /apply changes/i });
     await userEvent.click(save);
     await waitFor(() => expect(updateSettings).toHaveBeenCalled());
     expect(updateSettings.mock.calls[0][0]).toMatchObject({
@@ -90,7 +90,7 @@ describe("ProfileSection", () => {
     await userEvent.clear(nameInput);
     await userEvent.type(nameInput, "Updated Name");
     await userEvent.click(
-      screen.getByRole("button", { name: /save changes/i }),
+      screen.getByRole("button", { name: /apply changes/i }),
     );
     await waitFor(() => expect(updateSettings).toHaveBeenCalled());
     expect(updateSettings.mock.calls[0][0]).toEqual({ name: "Updated Name" });
@@ -103,7 +103,7 @@ describe("ProfileSection", () => {
     await userEvent.clear(emailInput);
     await userEvent.type(emailInput, "not-an-email");
     expect(
-      screen.getByRole("button", { name: /save changes/i }),
+      screen.getByRole("button", { name: /apply changes/i }),
     ).toBeDisabled();
     expect(
       screen.getByText(/enter a valid email address/i),

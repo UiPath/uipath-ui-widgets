@@ -312,13 +312,15 @@ export const ProfileSection = ({
           </AlertDescription>
         </Alert>
       )}
-      <div className="flex justify-end">
+      <div className="flex justify-start">
         <Button
           onClick={handleSave}
           disabled={!dirty || saving || emailInvalid}
         >
           {saving && <Spinner size="sm" className="mr-2" />}
-          {saving ? t("saving_button_label") : t("save_changes_button_label")}
+          {saving
+            ? t("applying_changes_button_label")
+            : t("apply_changes_button_label")}
         </Button>
       </div>
     </div>

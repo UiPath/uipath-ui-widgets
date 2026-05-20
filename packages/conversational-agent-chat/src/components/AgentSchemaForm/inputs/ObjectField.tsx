@@ -130,23 +130,31 @@ const NestedObjectField = ({
         </p>
       )}
       <CollapsibleContent>
-        <div className="ml-3 mt-2 flex flex-col gap-4 border-l-2 border-border pl-4">
-          {Object.entries(nestedProperties).map(([nestedKey, nestedProp]) => (
-            <AgentSchemaField
-              key={nestedKey}
-              prop={nestedProp}
-              fieldKey={nestedKey}
-              isRequired={requiredFields.includes(nestedKey)}
-              value={objectValue[nestedKey]}
-              onChange={(newVal) =>
-                onChange({ ...objectValue, [nestedKey]: newVal })
-              }
-              onValidationError={onValidationError}
-              error={errorMap?.[nestedKey] ?? false}
-              errorMap={getNestedErrorMap(errorMap, nestedKey)}
-              disabled={disabled}
-            />
-          ))}
+        <div className="uipath-cas-schema-grid ml-3 mt-2 grid grid-cols-1 gap-4 border-l-2 border-border pl-4">
+          {Object.entries(nestedProperties).map(([nestedKey, nestedProp]) => {
+            const isFullSpan =
+              nestedProp.type === "object" || nestedProp.type === "array";
+            return (
+              <div
+                key={nestedKey}
+                className={isFullSpan ? "col-span-2" : "col-span-1"}
+              >
+                <AgentSchemaField
+                  prop={nestedProp}
+                  fieldKey={nestedKey}
+                  isRequired={requiredFields.includes(nestedKey)}
+                  value={objectValue[nestedKey]}
+                  onChange={(newVal) =>
+                    onChange({ ...objectValue, [nestedKey]: newVal })
+                  }
+                  onValidationError={onValidationError}
+                  error={errorMap?.[nestedKey] ?? false}
+                  errorMap={getNestedErrorMap(errorMap, nestedKey)}
+                  disabled={disabled}
+                />
+              </div>
+            );
+          })}
         </div>
       </CollapsibleContent>
     </Collapsible>
@@ -220,7 +228,7 @@ const JsonObjectField = ({
         onChange={handleObjectChange}
         disabled={disabled}
         className={cn(
-          "min-h-14 resize-y",
+          "min-h-14 resize-y bg-background",
           hasError && "border-destructive focus-visible:ring-destructive",
         )}
       />

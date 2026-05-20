@@ -60,7 +60,7 @@ export const InputsSection = ({
           </AlertDescription>
         </Alert>
       )}
-      <div className="flex justify-end">
+      <div className="flex justify-start">
         <Button onClick={() => formRef.current?.submit()} disabled={applying}>
           {applying && <Spinner size="sm" className="mr-2" />}
           {applying

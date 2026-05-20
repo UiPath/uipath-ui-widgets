@@ -57,14 +57,19 @@ export const SettingsDialog = ({
   return (
     <div className="p-4">
       <Accordion
-        type="single"
-        collapsible
-        defaultValue={showInputs ? "inputs" : "profile"}
+        type="multiple"
+        defaultValue={[]}
+        className="flex flex-col gap-2"
       >
         {showInputs && (
-          <AccordionItem value="inputs">
-            <AccordionTrigger>{t("agent_inputs_title")}</AccordionTrigger>
-            <AccordionContent>
+          <AccordionItem
+            value="inputs"
+            className="rounded-md border-b-0 bg-accent"
+          >
+            <AccordionTrigger className="px-4 hover:no-underline">
+              {t("agent_inputs_title")}
+            </AccordionTrigger>
+            <AccordionContent className="px-4">
               <InputsSection
                 key={inputsResetKey}
                 inputSchema={inputSchema}
@@ -75,9 +80,14 @@ export const SettingsDialog = ({
             </AccordionContent>
           </AccordionItem>
         )}
-        <AccordionItem value="profile">
-          <AccordionTrigger>{t("profile_information_title")}</AccordionTrigger>
-          <AccordionContent>
+        <AccordionItem
+          value="profile"
+          className="rounded-md border-b-0 bg-accent"
+        >
+          <AccordionTrigger className="px-4 hover:no-underline">
+            {t("profile_information_title")}
+          </AccordionTrigger>
+          <AccordionContent className="px-4">
             <ProfileSection
               key={profileResetKey}
               conversationalAgent={conversationalAgent}

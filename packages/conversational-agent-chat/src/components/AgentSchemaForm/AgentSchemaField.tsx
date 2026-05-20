@@ -198,7 +198,11 @@ export const AgentSchemaField = ({
             onChange(e.target.value)
           }
           className={cn(
-            "w-full",
+            "relative w-full bg-background pr-10",
+            "[&::-webkit-calendar-picker-indicator]:absolute",
+            "[&::-webkit-calendar-picker-indicator]:right-3",
+            "[&::-webkit-calendar-picker-indicator]:top-1/2",
+            "[&::-webkit-calendar-picker-indicator]:-translate-y-1/2",
             error && "border-destructive focus-visible:ring-destructive",
           )}
         />
@@ -262,7 +266,7 @@ export const AgentSchemaField = ({
         >
           <SelectTrigger
             className={cn(
-              "w-full",
+              "w-full bg-background",
               error && "border-destructive focus:ring-destructive",
             )}
           >
@@ -302,6 +306,7 @@ export const AgentSchemaField = ({
             : t("agent_schema_text_placeholder")
         }
         className={cn(
+          "bg-background",
           error && "border-destructive focus-visible:ring-destructive",
         )}
       />
