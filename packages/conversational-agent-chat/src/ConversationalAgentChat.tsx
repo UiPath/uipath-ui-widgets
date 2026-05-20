@@ -498,6 +498,7 @@ export const ConversationalAgentChat = ({
           };
 
       const chatServiceInstance = AutopilotChatService.Instantiate({
+        instanceName: `agent-${agentId}-${folderId}`,
         config: {
           mode: AutopilotChatMode.Embedded,
           locale: localeRef.current,
@@ -604,6 +605,39 @@ export const ConversationalAgentChat = ({
       initChat();
     }
   }, [agentId, folderId, existingConversationId, initChat]);
+
+  // End the WebSocket session and tear down the chat service singleton when
+  // the agent changes or the component unmounts. Removing the singleton from
+  // AutopilotChatService's private static instance map (rather than calling
+  // newChat()) gives a complete reset on revisit — fresh conversation array,
+  // fresh locale/theme, no stale internal state.
+  useEffect(() => {
+    const instanceName = `agent-${agentId}-${folderId}`;
+    return () => {
+      const conversation = currentConversation.current;
+      currentConversation.current = null;
+      session.current = null;
+      activeExchange.current = null;
+      if (conversation) {
+        try {
+          conversation.endSession();
+        } catch {
+          // best effort; the session may already be closed
+        }
+      }
+      // Private-field reach-in: AutopilotChatService keeps a static map of
+      // its singletons keyed by instanceName. Deleting the entry forces the
+      // next Instantiate() call for this agent to construct a fresh service.
+      const instances = (
+        AutopilotChatService as unknown as {
+          _instances?: Record<string, unknown>;
+        }
+      )._instances;
+      if (instances) {
+        delete instances[instanceName];
+      }
+    };
+  }, [agentId, folderId]);
 
   // Update locale/theme on the existing service. Locale must be set
   // synchronously (not in an effect) so that when ApChat remounts via

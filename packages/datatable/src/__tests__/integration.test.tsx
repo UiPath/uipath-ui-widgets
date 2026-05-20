@@ -59,6 +59,7 @@ let storedGetRowClass: any;
 let storedIsFullWidthRow: any;
 let storedFullWidthCellRenderer: any;
 let storedOnGroupByChange: any;
+let storedColumnDefs: any;
 let mockGridApi: any;
 
 // Mock Toolbar to capture callbacks and avoid Radix Select issues in jsdom
@@ -131,6 +132,7 @@ vi.mock("ag-grid-react", () => ({
     storedGetRowClass = getRowClass;
     storedIsFullWidthRow = isFullWidthRow;
     storedFullWidthCellRenderer = fullWidthCellRenderer;
+    storedColumnDefs = columnDefs;
 
     // Create mock grid API
     mockGridApi = {
@@ -1001,5 +1003,64 @@ describe("DataTable Group By Tests", () => {
       api: mockGridApi,
     });
     expect(result).toBeGreaterThan(0);
+  });
+
+  it("first-column cellRenderer renders an expand button for normal rows", async () => {
+    render(<DataTable sdk={mockSdk as UiPath} entityId="entity-1" />);
+
+    await waitFor(() => {
+      expect(storedOnGroupByChange).toBeDefined();
+    });
+
+    await storedOnGroupByChange("category");
+
+    await waitFor(() => {
+      expect(storedColumnDefs?.[0]?.cellRenderer).toBeDefined();
+    });
+
+    const rendered = storedColumnDefs[0].cellRenderer({
+      data: { Id: "row1" },
+      value: "Item 1",
+    });
+    expect(rendered).toBeDefined();
+  });
+
+  it("first-column cellRenderer returns undefined when data is missing", async () => {
+    render(<DataTable sdk={mockSdk as UiPath} entityId="entity-1" />);
+
+    await waitFor(() => {
+      expect(storedOnGroupByChange).toBeDefined();
+    });
+
+    await storedOnGroupByChange("category");
+
+    await waitFor(() => {
+      expect(storedColumnDefs?.[0]?.cellRenderer).toBeDefined();
+    });
+
+    expect(
+      storedColumnDefs[0].cellRenderer({ data: undefined, value: "" }),
+    ).toBeUndefined();
+  });
+
+  it("first-column cellRenderer returns undefined for expanded rows", async () => {
+    render(<DataTable sdk={mockSdk as UiPath} entityId="entity-1" />);
+
+    await waitFor(() => {
+      expect(storedOnGroupByChange).toBeDefined();
+    });
+
+    await storedOnGroupByChange("category");
+
+    await waitFor(() => {
+      expect(storedColumnDefs?.[0]?.cellRenderer).toBeDefined();
+    });
+
+    expect(
+      storedColumnDefs[0].cellRenderer({
+        data: { Id: "detail-row1", _isExpandedRow: true },
+        value: "",
+      }),
+    ).toBeUndefined();
   });
 });
