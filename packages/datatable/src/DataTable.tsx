@@ -86,7 +86,7 @@ export const DataTable = ({
         .filter((field) => field.isForeignKey && !field.isSystemField)
         .map((field) => ({
           name: field.name,
-          displayName: field.displayName,
+          displayName: field.displayName ?? field.name,
         })) || []
     );
   }, [entity?.fields]);
@@ -172,15 +172,15 @@ export const DataTable = ({
             columns[0].cellRenderer = (
               params: ICellRendererParams<GridRow>,
             ) => {
-              if (params.data?._isExpandedRow) {
+              if (!params.data || params.data._isExpandedRow) {
                 return undefined;
               }
               const detailRow =
-                rowsMapInGroupByMode.current[`detailRow-${params.data?.Id}`];
+                rowsMapInGroupByMode.current[`detailRow-${params.data.Id}`];
               const isExpanded = detailRow ? !detailRow._isHidden : false;
               return CellWithExpandButton({
                 cellName: params.value,
-                cellId: params.data?.Id,
+                cellId: params.data.Id,
                 isExpanded: isExpanded,
                 onToggleExpand: toggleExpand,
               });
