@@ -681,8 +681,6 @@ describe("utils", () => {
           id: 1,
           title: "Wikipedia",
           url: "https://wikipedia.org",
-          download_url: "",
-          page_number: 0,
         },
       ]);
       expect(result[0].contentParts![2].text).toBe(" for more info.");

@@ -65,6 +65,7 @@ import {
   convertAttachmentToFile,
   createFileKey,
   getConversationHistoryDisplayItems,
+  mapCitationSource,
   mapExchangesToChatMessages,
   normalizeInput,
   sortEvaluationSets,
@@ -216,26 +217,57 @@ export const ConversationalAgentChat = ({
 
           message.onContentPartStart((contentPart: ContentPartStream) => {
             if (contentPart.startEvent.mimeType.startsWith("text/")) {
+              // Apollo dictates citation boundaries by chunk index — text and
+              // its citation share one index, the next text segment uses index+1.
+              let chunkIndex = 0;
+              let isFirstChunk = true;
+
               contentPart.onChunk((chunk: ContentPartChunkEvent) => {
-                chatService.sendResponse({
-                  id: messageId,
-                  content: chunk.data,
-                  created_at: messageTimestamp,
-                  widget: MessageWidget.AI,
-                  stream: true,
-                  done: false,
-                  meta: { exchangeId },
-                });
+                if (chunk.citation?.startCitation && !isFirstChunk) {
+                  chunkIndex++;
+                }
+
+                if (chunk.data !== undefined) {
+                  chatService.sendResponse({
+                    id: messageId,
+                    contentPartChunk: { text: chunk.data, index: chunkIndex },
+                    created_at: messageTimestamp,
+                    widget: MessageWidget.AI,
+                    stream: true,
+                    done: false,
+                    meta: { exchangeId },
+                  });
+                }
+
+                if (chunk.citation?.endCitation) {
+                  for (const source of chunk.citation.endCitation.sources) {
+                    chatService.sendResponse({
+                      id: messageId,
+                      contentPartChunk: {
+                        citation: mapCitationSource(source),
+                        index: chunkIndex,
+                      },
+                      created_at: messageTimestamp,
+                      widget: MessageWidget.AI,
+                      stream: true,
+                      done: false,
+                      meta: { exchangeId },
+                    });
+                  }
+                  chunkIndex++;
+                }
+
+                isFirstChunk = false;
               });
 
               contentPart.onContentPartEnd(() => {
                 // stream: true so Apollo's actions row (copy, thumbs) renders.
                 // useIsStreamingMessage only listens to SendChunk events; the
                 // stream: false branch fires Response and leaves isStreaming
-                // stuck at true. content: "" because chunks already accumulated.
+                // stuck at true.
                 chatService.sendResponse({
                   id: messageId,
-                  content: "",
+                  contentPartChunk: { index: chunkIndex },
                   created_at: messageTimestamp,
                   widget: MessageWidget.AI,
                   stream: true,
