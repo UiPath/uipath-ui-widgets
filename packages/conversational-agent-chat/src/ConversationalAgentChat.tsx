@@ -844,26 +844,32 @@ export const ConversationalAgentChat = ({
         setShowInputPage(true);
       }
 
-      // All-or-nothing first-run experience configuration
-      // If an override is passed use it, otherwise use the agent's default.
-      // Finally, if the agent has no default, use fallbacks/empty values
-      const firstRunExperienceConfig = firstRunExperienceRef.current
+      // If the agent provides any first-run appearance data, show only what
+      // the agent provides. The `firstRunExperience` prop is a fallback used
+      // when the agent has no welcome title, description, or starting
+      // prompts at all — it must not be mixed with partial agent data.
+      const appearance = agentRelease?.appearance;
+      const agentSuggestions = (appearance?.startingPrompts ?? []).map(
+        (prompt) => ({
+          label: prompt.displayPrompt,
+          prompt: prompt.actualPrompt,
+        }),
+      );
+      const agentHasFre =
+        !!appearance?.welcomeTitle ||
+        !!appearance?.welcomeDescription ||
+        agentSuggestions.length > 0;
+      const hostFallback = firstRunExperienceRef.current;
+      const firstRunExperienceConfig = agentHasFre
         ? {
-            title: firstRunExperienceRef.current.title ?? "",
-            description: firstRunExperienceRef.current.description ?? "",
-            suggestions: firstRunExperienceRef.current.suggestions ?? [],
+            title: appearance?.welcomeTitle ?? "",
+            description: appearance?.welcomeDescription ?? "",
+            suggestions: agentSuggestions,
           }
         : {
-            title:
-              agentRelease?.appearance?.welcomeTitle ||
-              (agentName ? t("welcome_to_agent", { agentName }) : ""),
-            description: agentRelease?.appearance?.welcomeDescription || "",
-            suggestions: (agentRelease?.appearance?.startingPrompts || []).map(
-              (prompt) => ({
-                label: prompt.displayPrompt,
-                prompt: prompt.actualPrompt,
-              }),
-            ),
+            title: hostFallback?.title ?? "",
+            description: hostFallback?.description ?? "",
+            suggestions: hostFallback?.suggestions ?? [],
           };
 
       // TODO: if Apollo adds more renderer slots (footer, first-run, etc.),
