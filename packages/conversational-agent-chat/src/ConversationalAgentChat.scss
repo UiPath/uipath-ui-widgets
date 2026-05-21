@@ -5,7 +5,9 @@
 @source "../dist/**/*.{js,css}";
 
 .uipath-conversational-agent-chat {
-  width: 440px;
+  width: 100%;
+  max-width: 1500px;
+  margin: 0 auto;
   height: 100%;
   min-height: 600px;
   border: 1px solid var(--color-border-de-emp);
