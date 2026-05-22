@@ -1,5 +1,5 @@
 /**
- * SVG icon for conversational agents, matching the react-sdk's ConversationalAgentIcon.
+ * SVG icon for conversational agents.
  * Uses currentColor so the icon inherits from the parent wrapper's text color
  * (e.g. `text-secondary-foreground`), which keeps it readable in both themes.
  */

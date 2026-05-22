@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 
 interface FeedbackDialogProps {
   open: boolean;
+  isPositive: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (comment: string) => void;
   onCancel: () => void;
@@ -19,6 +20,7 @@ interface FeedbackDialogProps {
 
 export const FeedbackDialog = ({
   open,
+  isPositive,
   onOpenChange,
   onSubmit,
   onCancel,
@@ -38,9 +40,13 @@ export const FeedbackDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{t("feedback_title_required")}</DialogTitle>
+          <DialogTitle>
+            {isPositive
+              ? t("feedback_title_optional")
+              : t("feedback_title_required")}
+          </DialogTitle>
         </DialogHeader>
         <Textarea
           value={comment}
@@ -48,12 +54,18 @@ export const FeedbackDialog = ({
             setComment(e.target.value)
           }
           placeholder={t("feedback_placeholder")}
+          className="placeholder:text-[var(--color-foreground-de-emp)] placeholder:opacity-100"
         />
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel}>
             {t("cancel")}
           </Button>
-          <Button onClick={handleSubmit}>{t("submit")}</Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={!isPositive && comment.trim() === ""}
+          >
+            {t("submit")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
