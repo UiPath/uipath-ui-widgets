@@ -113,7 +113,7 @@ export const useEntityData = (
               entityService,
               choiceSetService,
             ),
-            ...columnConfig?.[f.displayName],
+            ...columnConfig?.[f.displayName ?? f.name],
           };
 
           if (f.name === IdColumn) {

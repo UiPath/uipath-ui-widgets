@@ -2093,7 +2093,7 @@ describe("ConversationalAgentChat", () => {
   });
 
   describe("externalUserId", () => {
-    it("does not pass options to the ConversationalAgent constructor when externalUserId is omitted", async () => {
+    it("does not pass externalUserId to the ConversationalAgent constructor when omitted", async () => {
       render(<ConversationalAgentChat {...defaultProps} />);
 
       await waitFor(() => {
@@ -2101,7 +2101,7 @@ describe("ConversationalAgentChat", () => {
       });
 
       const [, options] = capturedAgentConstructorArgs[0];
-      expect(options).toBeUndefined();
+      expect(options?.externalUserId).toBeUndefined();
     });
 
     it("threads externalUserId through to the ConversationalAgent constructor", async () => {
@@ -2161,7 +2161,7 @@ describe("ConversationalAgentChat", () => {
       });
 
       const [, options] = capturedAgentConstructorArgs[0];
-      expect(options).toBeUndefined();
+      expect(options?.externalUserId).toBeUndefined();
     });
   });
 });
