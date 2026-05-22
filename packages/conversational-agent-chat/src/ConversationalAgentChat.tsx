@@ -74,6 +74,7 @@ import {
 } from "./utils";
 import { trackTelemetry } from "./utils/telemetryUtils";
 import { initI18n } from "./i18n";
+import { resolveAgentCached } from "./utils/agentCache";
 
 initI18n();
 
@@ -491,27 +492,19 @@ export const ConversationalAgentChat = ({
         return resolvedAgent.current;
       }
     }
-
-    if (folderIdRef.current != null) {
-      resolvedAgent.current = await agentService.current.getById(
-        agentId,
-        folderIdRef.current,
-      );
-      folderIdRef.current = resolvedAgent.current.folderId;
-      return resolvedAgent.current;
-    }
-    const found = (await agentService.current.getAll()).find(
-      (a) => a.id === agentId,
+    // Funnel through the shared module-level cache so a `useResolvedAgent`
+    // mounted alongside the widget reuses the same in-flight fetch.
+    const release = await resolveAgentCached(
+      sdk,
+      agentId,
+      folderIdRef.current,
+      { externalUserId },
     );
-    if (!found) return undefined;
-    folderIdRef.current = found.folderId;
-    resolvedAgent.current = await agentService.current.getById(
-      found.id,
-      found.folderId,
-    );
-    folderIdRef.current = resolvedAgent.current.folderId;
-    return resolvedAgent.current;
-  }, [agentId]);
+    if (!release) return undefined;
+    resolvedAgent.current = release;
+    folderIdRef.current = release.folderId;
+    return release;
+  }, [agentId, sdk, externalUserId]);
 
   const setConversationHistory = useCallback(
     (next: ConversationCreateResponse[], allLoaded?: boolean) => {

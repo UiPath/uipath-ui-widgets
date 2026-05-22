@@ -210,6 +210,7 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
 
 describe("ConversationalAgentChat", () => {
   let mockSdk: Partial<UiPath>;
+  let defaultProps: { sdk: UiPath; agentId: number; folderId: number };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -257,13 +258,12 @@ describe("ConversationalAgentChat", () => {
     contentPartEndHandler = null;
     toolCallEndHandler = null;
     labelUpdatedHandler = null;
+    defaultProps = {
+      sdk: mockSdk as UiPath,
+      agentId: 1,
+      folderId: 100,
+    };
   });
-
-  const defaultProps = {
-    sdk: mockSdk as UiPath,
-    agentId: 1,
-    folderId: 100,
-  };
 
   it("should render loading state initially", () => {
     render(<ConversationalAgentChat {...defaultProps} />);

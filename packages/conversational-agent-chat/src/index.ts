@@ -1,5 +1,6 @@
 export { ConversationalAgentChat } from "./ConversationalAgentChat";
 export type {
+  AgentSummary,
   ConversationalAgentChatProps,
   DisabledFeatures,
   EvaluationSet,
@@ -21,3 +22,8 @@ export type {
   InputSchema,
   InputSchemaProperty,
 } from "./components/AgentSchemaForm";
+export { useResolvedAgent } from "./hooks/useResolvedAgent";
+export type {
+  UseResolvedAgentOptions,
+  UseResolvedAgentResult,
+} from "./hooks/useResolvedAgent";

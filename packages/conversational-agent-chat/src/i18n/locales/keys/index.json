@@ -30,6 +30,7 @@
   "error_initialize_chat": "error_initialize_chat",
   "error_load_history": "error_load_history",
   "loading": "loading",
+  "agent_loading_label": "agent_loading_label",
   "reload": "reload",
   "new_chat": "new_chat",
   "feedback_placeholder": "feedback_placeholder",
