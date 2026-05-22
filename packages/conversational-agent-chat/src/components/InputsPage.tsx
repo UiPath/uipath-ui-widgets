@@ -21,7 +21,6 @@ interface InputsPageProps {
 
 /**
  * Pre-chat input page that collects agent inputs before starting a conversation.
- * Matches the react-sdk's InputsPage pattern: agent icon, title, form fields, submit button.
  */
 export function InputsPage({
   agentName,

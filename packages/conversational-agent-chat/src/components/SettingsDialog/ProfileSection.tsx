@@ -43,7 +43,7 @@ const toFormState = (settings: UserSettingsGetResponse): FormState => ({
   role: settings.role ?? "",
   department: settings.department ?? "",
   company: settings.company ?? "",
-  // Legacy react-sdk records stored El Salvador as "EV" (not a valid ISO code).
+  // Legacy records stored El Salvador as "EV" (not a valid ISO code).
   // Coerce on read so the Combobox matches and we write "SV" back on save.
   country: settings.country === "EV" ? "SV" : (settings.country ?? ""),
   timezone: settings.timezone ?? "",
