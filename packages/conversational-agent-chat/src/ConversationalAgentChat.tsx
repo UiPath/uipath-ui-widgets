@@ -106,6 +106,8 @@ export const ConversationalAgentChat = ({
   addToEvalButtonLabel,
   onEvaluationSetClicked,
   onUserMessageSent,
+  surfaceName,
+  surfaceVersion,
 }: ConversationalAgentChatProps) => {
   // must change language before useTranslation is called to avoid stale translations
   if (i18next.language !== locale) {
@@ -113,10 +115,11 @@ export const ConversationalAgentChat = ({
   }
   const { t } = useTranslation();
   const agentService = useRef(
-    new ConversationalAgent(
-      sdk,
-      externalUserId ? { externalUserId } : undefined,
-    ),
+    new ConversationalAgent(sdk, {
+      ...(externalUserId ? { externalUserId } : {}),
+      surfaceName,
+      surfaceVersion,
+    }),
   );
   const currentConversation = useRef<ConversationCreateResponse | null>(null);
   const initializedFor = useRef<string | null>(null);
@@ -953,6 +956,7 @@ export const ConversationalAgentChat = ({
       };
 
       const chatServiceInstance = AutopilotChatService.Instantiate({
+        instanceName: `agent-${agentId}-${folderId}`,
         config: {
           mode: AutopilotChatMode.Embedded,
           locale: toApolloSupportedLocale(locale),

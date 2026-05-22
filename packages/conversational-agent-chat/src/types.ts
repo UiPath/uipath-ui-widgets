@@ -84,6 +84,37 @@ export interface ConversationalAgentChatProps {
    * @internal
    */
   onUserMessageSent?: (message: { content: string }) => void;
+  /**
+   * Optional identifier used in UiPath logs to identify the implementing service
+   * of requests. External consumers do not need to set it; the server logs
+   * missing values as "unknown".
+   *
+   * @internal Intended for UiPath first-party surfaces.
+   */
+  surfaceName?: string;
+  /**
+   * Optional version of the implementing service of requests. Paired with
+   * `surfaceName` for internal telemetry.
+   *
+   * @internal Intended for UiPath first-party surfaces.
+   */
+  surfaceVersion?: string;
+}
+
+export interface AgentSummary {
+  id: number;
+  name: string;
+  description: string;
+  folderId: number;
+}
+
+export interface ConversationalAgentPickerChatProps {
+  sdk: UiPath;
+  locale?: Locale;
+  theme?: "light" | "dark" | "light-hc" | "dark-hc";
+  readOnly?: boolean;
+  overrideLabels?: OverrideLabels;
+  onAgentSelected?: (agent: AgentSummary) => void;
 }
 
 export interface AgentSummary {
@@ -114,6 +145,8 @@ export enum TelemetryEvent {
   OpenConversation = "CAC.OpenConversation",
   FileAttached = "CAC.FileAttached",
   Feedback = "CAC.Feedback",
+  LoadAgents = "CAC.LoadAgents",
+  SelectAgent = "CAC.SelectAgent",
 }
 
 export enum TelemetryStatus {
