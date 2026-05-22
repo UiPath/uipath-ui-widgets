@@ -120,7 +120,7 @@ export const useResolvedAgent = (
     surfaceVersion,
   ]);
 
-  const displayName = agent?.name ?? t("loading");
+  const displayName = agent?.name ?? t("agent_loading_label");
 
   return { agent, isLoading, error, displayName };
 };

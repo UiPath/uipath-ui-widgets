@@ -71,6 +71,7 @@ import {
 } from "./utils";
 import { trackTelemetry } from "./utils/telemetryUtils";
 import { initI18n } from "./i18n";
+import { resolveAgentCached } from "./utils/agentCache";
 
 initI18n();
 
@@ -294,10 +295,7 @@ export const ConversationalAgentChat = ({
             };
             const createdAt = new Date().toISOString();
 
-            const sendUpdate = (
-              isCompleted: boolean,
-              wasRejected: boolean,
-            ) => {
+            const sendUpdate = (isCompleted: boolean, wasRejected: boolean) => {
               chatService.sendResponse({
                 id: widgetMessageId,
                 content: t("tool_confirmation_required"),
@@ -356,9 +354,7 @@ export const ConversationalAgentChat = ({
                 onApprove: (input) => {
                   sendToolCallSpinner(toolCall.toolCallId);
                   const approvedInput =
-                    (input as JSONValue | undefined) ??
-                    startEvent.input ??
-                    {};
+                    (input as JSONValue | undefined) ?? startEvent.input ?? {};
                   toolCall.sendToolCallConfirm({
                     approved: true,
                     input: approvedInput,
@@ -452,27 +448,19 @@ export const ConversationalAgentChat = ({
         return resolvedAgent.current;
       }
     }
-
-    if (folderIdRef.current != null) {
-      resolvedAgent.current = await agentService.current.getById(
-        agentId,
-        folderIdRef.current,
-      );
-      folderIdRef.current = resolvedAgent.current.folderId;
-      return resolvedAgent.current;
-    }
-    const found = (await agentService.current.getAll()).find(
-      (a) => a.id === agentId,
+    // Funnel through the shared module-level cache so a `useResolvedAgent`
+    // mounted alongside the widget reuses the same in-flight fetch.
+    const release = await resolveAgentCached(
+      sdk,
+      agentId,
+      folderIdRef.current,
+      { externalUserId },
     );
-    if (!found) return undefined;
-    folderIdRef.current = found.folderId;
-    resolvedAgent.current = await agentService.current.getById(
-      found.id,
-      found.folderId,
-    );
-    folderIdRef.current = resolvedAgent.current.folderId;
-    return resolvedAgent.current;
-  }, [agentId, folderId]);
+    if (!release) return undefined;
+    resolvedAgent.current = release;
+    folderIdRef.current = release.folderId;
+    return release;
+  }, [agentId, sdk, externalUserId]);
 
   const setConversationHistory = useCallback(
     (next: ConversationCreateResponse[], allLoaded?: boolean) => {
@@ -571,10 +559,8 @@ export const ConversationalAgentChat = ({
       agentId?: number;
       label?: string;
     } = {};
-    if (agentKeyRef.current)
-      opts.agentKey = agentKeyRef.current;
-    if (agentIdRef.current !== undefined)
-      opts.agentId = agentIdRef.current;
+    if (agentKeyRef.current) opts.agentKey = agentKeyRef.current;
+    if (agentIdRef.current !== undefined) opts.agentId = agentIdRef.current;
     if (searchTextRef.current) opts.label = searchTextRef.current;
     return opts;
   }, []);
