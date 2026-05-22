@@ -55,7 +55,7 @@ export function ToolConfirmation({
 
   if (isCompleted) {
     return (
-      <div className="flex flex-col gap-2 py-3">
+      <div className="my-3 flex flex-col gap-2 rounded-lg border border-border bg-background p-4">
         <span className="text-sm font-semibold">
           {confirmationData.toolName}
         </span>
@@ -72,8 +72,8 @@ export function ToolConfirmation({
   }
 
   return (
-    <div className="flex flex-col gap-2 py-3">
-      <span className="text-sm font-semibold">
+    <div className="my-3 flex flex-col gap-3 rounded-lg border border-border bg-background p-4">
+      <span className="border-b border-border pb-3 text-sm font-semibold">
         {confirmationData.toolName}
       </span>
       <AgentSchemaForm
