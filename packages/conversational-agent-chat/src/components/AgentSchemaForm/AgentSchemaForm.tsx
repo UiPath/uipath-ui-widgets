@@ -153,65 +153,76 @@ export function AgentSchemaForm({
         .map(([k, v]) => [k.slice(prefix.length), v]),
     );
 
+    // Nested objects/arrays render their own grid inside, so they take the
+    // full row. Scalars (string/number/boolean/date) share a row in pairs.
+    const isFullSpan = prop.type === "object" || prop.type === "array";
+
     return (
-      <AgentSchemaField
-        key={key}
-        prop={prop}
-        fieldKey={key}
-        isRequired={isRequired}
-        value={formData[key]}
-        onChange={(val) => {
-          setFormData((prev) => ({ ...prev, [key]: val }));
-          if (val !== undefined && val !== "" && val !== null) {
-            setFieldErrors((prev) => clearErrorsForKey(prev, key));
+      <div key={key} className={isFullSpan ? "col-span-2" : "col-span-1"}>
+        <AgentSchemaField
+          prop={prop}
+          fieldKey={key}
+          isRequired={isRequired}
+          value={formData[key]}
+          onChange={(val) => {
+            setFormData((prev) => ({ ...prev, [key]: val }));
+            if (val !== undefined && val !== "" && val !== null) {
+              setFieldErrors((prev) => clearErrorsForKey(prev, key));
+            }
+          }}
+          onValidationError={(hasValidationError) =>
+            setValidationErrors((prev) => ({
+              ...prev,
+              [key]: hasValidationError,
+            }))
           }
-        }}
-        onValidationError={(hasValidationError) =>
-          setValidationErrors((prev) => ({
-            ...prev,
-            [key]: hasValidationError,
-          }))
-        }
-        error={hasError}
-        errorMap={Object.keys(errorMap).length > 0 ? errorMap : undefined}
-        disabled={disabled}
-      />
+          error={hasError}
+          errorMap={Object.keys(errorMap).length > 0 ? errorMap : undefined}
+          disabled={disabled}
+        />
+      </div>
     );
   };
 
   return (
-    <div className="my-1 flex w-full flex-col gap-4">
-      {requiredEntries.map(([key, prop]) =>
-        renderField(key, prop as InputSchemaProperty, true),
-      )}
-      {collapsibleOptional && optionalEntries.length > 0 && (
-        <Collapsible open={showOptional} onOpenChange={setShowOptional}>
-          <CollapsibleTrigger
-            className={cn(
-              "flex w-full items-center gap-1 py-2 text-left text-sm font-semibold",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-            )}
-          >
-            <span>
-              {showOptional
-                ? t("agent_schema_show_less")
-                : t("agent_schema_show_more")}
-            </span>
-            {showOptional ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="flex flex-col gap-4">
-              {optionalEntries.map(([key, prop]) =>
-                renderField(key, prop as InputSchemaProperty, false),
-              )}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-      )}
-      {!collapsibleOptional &&
-        optionalEntries.map(([key, prop]) =>
-          renderField(key, prop as InputSchemaProperty, false),
+    <div className="uipath-cas-schema-form w-full">
+      <div className="uipath-cas-schema-grid my-1 grid w-full grid-cols-1 gap-4">
+        {requiredEntries.map(([key, prop]) =>
+          renderField(key, prop as InputSchemaProperty, true),
         )}
+        {collapsibleOptional && optionalEntries.length > 0 && (
+          <Collapsible
+            open={showOptional}
+            onOpenChange={setShowOptional}
+            className="col-span-2"
+          >
+            <CollapsibleTrigger
+              className={cn(
+                "flex w-full items-center gap-1 py-2 text-left text-sm font-semibold",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              )}
+            >
+              <span>
+                {showOptional
+                  ? t("agent_schema_show_less")
+                  : t("agent_schema_show_more")}
+              </span>
+              {showOptional ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="uipath-cas-schema-grid grid grid-cols-1 gap-4">
+                {optionalEntries.map(([key, prop]) =>
+                  renderField(key, prop as InputSchemaProperty, false),
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+        {!collapsibleOptional &&
+          optionalEntries.map(([key, prop]) =>
+            renderField(key, prop as InputSchemaProperty, false),
+          )}
+      </div>
     </div>
   );
 }

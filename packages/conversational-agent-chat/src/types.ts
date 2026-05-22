@@ -59,7 +59,12 @@ export interface ConversationalAgentChatProps {
   theme?: "light" | "dark" | "light-hc" | "dark-hc";
   readOnly?: boolean;
   overrideLabels?: OverrideLabels;
-  /** Override the first-run experience. When omitted, derived from agent appearance data. */
+  /**
+   * Fallback first-run experience. Used only when the agent's appearance
+   * provides no welcome title, description, or starting prompts. When the
+   * agent has any FRE data, this prop is ignored and only the agent's data
+   * is rendered.
+   */
   firstRunExperience?: FirstRunExperience;
   /** Override which features are disabled. Merged with defaults (fullScreen, preview, close are always disabled). */
   disabledFeatures?: DisabledFeatures;

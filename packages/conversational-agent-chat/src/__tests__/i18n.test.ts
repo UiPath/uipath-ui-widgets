@@ -27,7 +27,7 @@ describe("i18n", () => {
       );
     });
 
-    it("should have react-sdk translations for all locales", () => {
+    it("should have shared translations for all locales", () => {
       const locales = [
         "en",
         "es",
@@ -43,12 +43,11 @@ describe("i18n", () => {
         "zh-CN",
         "zh-TW",
       ];
-      // Keys that exist in react-sdk locale files (professionally translated)
-      const reactSdkKeys = ["disclaimer_message", "chat_input_placeholder"];
+      const sharedKeys = ["disclaimer_message", "chat_input_placeholder"];
 
       for (const locale of locales) {
         const t = i18next.getFixedT(locale);
-        for (const key of reactSdkKeys) {
+        for (const key of sharedKeys) {
           const value = t(key);
           expect(value, `${locale}.${key} should be defined`).toBeTruthy();
           expect(value, `${locale}.${key} should not return the key`).not.toBe(

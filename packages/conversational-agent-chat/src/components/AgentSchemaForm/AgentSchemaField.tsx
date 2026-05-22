@@ -52,42 +52,29 @@ const hasAnyRequiredDescendant = (prop: InputSchemaProperty): boolean => {
 
 type DateFormat = "date" | "time" | "date-time";
 
-const DATE_TIME_FIELD_NAME_KEYWORDS = [
-  "date",
-  "time",
-  "from",
-  "until",
-  "start",
-  "end",
-  "timestamp",
-  "datetime",
-];
-
-// Tool input schemas rarely set `format`, so fall back to value shape and
-// field-name heuristics. Precedence: schema → value → name → undefined.
+// Tool input schemas often arrive as plain `type: "string"` with no format,
+// even when the value is a date. Precedence: schema → value → undefined.
+// length >= 10 avoids bare years like "2026" matching as parseable dates.
+//
+// `format: "time"` is intentionally not trusted — calendar-style tool schemas
+// commonly misuse it for timezone identifier strings ("Europe/London"). A
+// genuine time-only value flows through the value check below and renders as
+// text, matching react-sdk's tool-confirmation behavior.
 const resolveDateFormat = (
-  fieldKey: string,
   prop: InputSchemaProperty,
   value: unknown,
 ): DateFormat | undefined => {
-  if (
-    prop.format === "date" ||
-    prop.format === "time" ||
-    prop.format === "date-time"
-  ) {
+  if (prop.format === "date" || prop.format === "date-time") {
     return prop.format;
   }
+  if (prop.type && prop.type !== "string") return undefined;
   if (value instanceof Date) return "date-time";
-  if (typeof value === "string" && value.length > 0) {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return "date";
-    if (/^\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(value)) return "time";
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) return "date-time";
-  }
-  const lowerName = fieldKey.toLowerCase();
   if (
-    DATE_TIME_FIELD_NAME_KEYWORDS.some((keyword) => lowerName.includes(keyword))
+    typeof value === "string" &&
+    value.length >= 10 &&
+    !isNaN(Date.parse(value))
   ) {
-    return "date-time";
+    return value.includes("T") ? "date-time" : "date";
   }
   return undefined;
 };
@@ -151,7 +138,7 @@ export const AgentSchemaField = ({
 }: AgentSchemaFieldProps) => {
   const { t } = useTranslation();
   const showRequired = isRequired || hasAnyRequiredDescendant(prop);
-  const dateFormat = resolveDateFormat(fieldKey, prop, value);
+  const dateFormat = resolveDateFormat(prop, value);
   const label = (
     <FieldLabel
       prop={prop}
@@ -164,7 +151,12 @@ export const AgentSchemaField = ({
 
   if (prop.type === "boolean") {
     return (
-      <FieldShell label={label} error={error} disabled={disabled}>
+      <FieldShell
+        label={label}
+        error={error}
+        disabled={disabled}
+        helperText={prop.description}
+      >
         <RadioGroup
           className="flex gap-4"
           value={value === undefined ? "" : String(value)}
@@ -192,7 +184,12 @@ export const AgentSchemaField = ({
           ? "time"
           : "datetime-local";
     return (
-      <FieldShell label={label} error={error} disabled={disabled}>
+      <FieldShell
+        label={label}
+        error={error}
+        disabled={disabled}
+        helperText={prop.description}
+      >
         <Input
           type={inputType}
           value={(value as string) ?? ""}
@@ -201,7 +198,11 @@ export const AgentSchemaField = ({
             onChange(e.target.value)
           }
           className={cn(
-            "w-full",
+            "relative w-full bg-background pr-10",
+            "[&::-webkit-calendar-picker-indicator]:absolute",
+            "[&::-webkit-calendar-picker-indicator]:right-3",
+            "[&::-webkit-calendar-picker-indicator]:top-1/2",
+            "[&::-webkit-calendar-picker-indicator]:-translate-y-1/2",
             error && "border-destructive focus-visible:ring-destructive",
           )}
         />
@@ -252,7 +253,12 @@ export const AgentSchemaField = ({
       oneOfOptions.map((o) => [o.const, o.title ?? o.const]),
     );
     return (
-      <FieldShell label={label} error={error} disabled={disabled}>
+      <FieldShell
+        label={label}
+        error={error}
+        disabled={disabled}
+        helperText={prop.description}
+      >
         <Select
           value={value === undefined ? "" : String(value)}
           onValueChange={onChange}
@@ -260,7 +266,7 @@ export const AgentSchemaField = ({
         >
           <SelectTrigger
             className={cn(
-              "w-full",
+              "w-full bg-background",
               error && "border-destructive focus:ring-destructive",
             )}
           >
@@ -280,7 +286,12 @@ export const AgentSchemaField = ({
 
   const isNumeric = prop.type === "number" || prop.type === "integer";
   return (
-    <FieldShell label={label} error={error} disabled={disabled}>
+    <FieldShell
+      label={label}
+      error={error}
+      disabled={disabled}
+      helperText={prop.description}
+    >
       <Input
         value={value === undefined ? "" : String(value)}
         type={isNumeric ? "number" : "text"}
@@ -295,6 +306,7 @@ export const AgentSchemaField = ({
             : t("agent_schema_text_placeholder")
         }
         className={cn(
+          "bg-background",
           error && "border-destructive focus-visible:ring-destructive",
         )}
       />

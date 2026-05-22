@@ -9,6 +9,7 @@ import {
   AutopilotChatService,
   type SupportedLocale,
 } from "@uipath/apollo-react/material/components";
+import { FontVariantToken } from "@uipath/apollo-core";
 import i18next from "i18next";
 import { Alert, AlertDescription, Button } from "@uipath/apollo-wind";
 import {
@@ -46,6 +47,7 @@ import { useTranslation } from "react-i18next";
 import { InputsPage } from "./components/InputsPage";
 import type { InputSchema } from "./components/AgentSchemaForm/types";
 import { FeedbackDialog } from "./components/FeedbackDialog";
+import { Loader } from "./components/Loader";
 import { SettingsDialog } from "./components/SettingsDialog";
 import type { ToolConfirmationLabels } from "./components/ToolConfirmation";
 import {
@@ -65,6 +67,7 @@ import {
   convertAttachmentToFile,
   createFileKey,
   getConversationHistoryDisplayItems,
+  mapCitationSource,
   mapExchangesToChatMessages,
   normalizeInput,
   sortEvaluationSets,
@@ -191,12 +194,22 @@ export const ConversationalAgentChat = ({
   const [inputsInstance, setInputsInstance] = useState(0);
   const activeExchange = useRef<ExchangeStream | null>(null);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const [feedbackIsPositive, setFeedbackIsPositive] = useState(false);
   const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
   const [hasMessages, setHasMessages] = useState(false);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
   const onUserMessageSentRef = useRef(onUserMessageSent);
   const chatServiceRef = useRef<AutopilotChatService | null>(null);
   const settingsRootRef = useRef<Root | null>(null);
+  // Last-applied agent inputs for the active conversation. Pre-populates the
+  // settings inputs form when reopened; cleared on New Chat.
+  const storedAgentInputs = useRef<Record<string, unknown>>({});
+  // Mirrors `inputSchemaState` so the imperative `renderSettings` closure always
+  // sees the current schema without re-instantiating the chat service.
+  const inputSchemaStateRef = useRef<InputSchema | null>(null);
+  useLayoutEffect(() => {
+    inputSchemaStateRef.current = inputSchemaState;
+  }, [inputSchemaState]);
 
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
@@ -217,26 +230,57 @@ export const ConversationalAgentChat = ({
 
           message.onContentPartStart((contentPart: ContentPartStream) => {
             if (contentPart.startEvent.mimeType.startsWith("text/")) {
+              // Apollo dictates citation boundaries by chunk index — text and
+              // its citation share one index, the next text segment uses index+1.
+              let chunkIndex = 0;
+              let isFirstChunk = true;
+
               contentPart.onChunk((chunk: ContentPartChunkEvent) => {
-                chatService.sendResponse({
-                  id: messageId,
-                  content: chunk.data,
-                  created_at: messageTimestamp,
-                  widget: MessageWidget.AI,
-                  stream: true,
-                  done: false,
-                  meta: { exchangeId },
-                });
+                if (chunk.citation?.startCitation && !isFirstChunk) {
+                  chunkIndex++;
+                }
+
+                if (chunk.data !== undefined) {
+                  chatService.sendResponse({
+                    id: messageId,
+                    contentPartChunk: { text: chunk.data, index: chunkIndex },
+                    created_at: messageTimestamp,
+                    widget: MessageWidget.AI,
+                    stream: true,
+                    done: false,
+                    meta: { exchangeId },
+                  });
+                }
+
+                if (chunk.citation?.endCitation) {
+                  for (const source of chunk.citation.endCitation.sources) {
+                    chatService.sendResponse({
+                      id: messageId,
+                      contentPartChunk: {
+                        citation: mapCitationSource(source),
+                        index: chunkIndex,
+                      },
+                      created_at: messageTimestamp,
+                      widget: MessageWidget.AI,
+                      stream: true,
+                      done: false,
+                      meta: { exchangeId },
+                    });
+                  }
+                  chunkIndex++;
+                }
+
+                isFirstChunk = false;
               });
 
               contentPart.onContentPartEnd(() => {
                 // stream: true so Apollo's actions row (copy, thumbs) renders.
                 // useIsStreamingMessage only listens to SendChunk events; the
                 // stream: false branch fires Response and leaves isStreaming
-                // stuck at true. content: "" because chunks already accumulated.
+                // stuck at true.
                 chatService.sendResponse({
                   id: messageId,
-                  content: "",
+                  contentPartChunk: { index: chunkIndex },
                   created_at: messageTimestamp,
                   widget: MessageWidget.AI,
                   stream: true,
@@ -540,6 +584,7 @@ export const ConversationalAgentChat = ({
     currentConversation.current = null;
     session.current = null;
     activeExchange.current = null;
+    storedAgentInputs.current = {};
     setHasMessages(false);
     // Re-show the InputsPage with a cleared form when the agent's schema has
     // required inputs. Bumping the counter forces an unmount/remount via the
@@ -808,7 +853,7 @@ export const ConversationalAgentChat = ({
 
       const agentRelease = await resolveAgent();
       agentIdRef.current = agentRelease?.id;
-      agentKeyRef.current = agentRelease?.processKey;
+      agentKeyRef.current = agentRelease?.releaseKey;
       const agentName = agentRelease?.name ?? "";
 
       // TODO(sdk-typing): drop the cast once @uipath/uipath-typescript exposes
@@ -824,33 +869,57 @@ export const ConversationalAgentChat = ({
       // Skip when resuming an existing conversation — its inputs were already
       // captured at creation time.
       const hasRequiredInputs = (inputSchema?.required?.length ?? 0) > 0;
+      // Persist the schema regardless of `hasRequiredInputs` so the settings
+      // panel can render optional-input editing.
+      setInputSchemaState(inputSchema ?? null);
       if (hasRequiredInputs && !existingConversationId) {
-        setInputSchemaState(inputSchema ?? null);
         setAgentNameState(agentName);
         setShowInputPage(true);
       }
 
-      // All-or-nothing first-run experience configuration
-      // If an override is passed use it, otherwise use the agent's default.
-      // Finally, if the agent has no default, use fallbacks/empty values
-      const firstRunExperienceConfig = firstRunExperienceRef.current
+      // If the agent provides any first-run appearance data, show only what
+      // the agent provides. The `firstRunExperience` prop is a fallback used
+      // when the agent has no welcome title, description, or starting
+      // prompts at all — it must not be mixed with partial agent data.
+      const appearance = agentRelease?.appearance;
+      const agentSuggestions = (appearance?.startingPrompts ?? []).map(
+        (prompt) => ({
+          label: prompt.displayPrompt,
+          prompt: prompt.actualPrompt,
+        }),
+      );
+      const agentHasFre =
+        !!appearance?.welcomeTitle ||
+        !!appearance?.welcomeDescription ||
+        agentSuggestions.length > 0;
+      const hostFallback = firstRunExperienceRef.current;
+      const firstRunExperienceConfig = agentHasFre
         ? {
-            title: firstRunExperienceRef.current.title ?? "",
-            description: firstRunExperienceRef.current.description ?? "",
-            suggestions: firstRunExperienceRef.current.suggestions ?? [],
+            title: appearance?.welcomeTitle ?? "",
+            description: appearance?.welcomeDescription ?? "",
+            suggestions: agentSuggestions,
           }
         : {
-            title:
-              agentRelease?.appearance?.welcomeTitle ||
-              (agentName ? t("welcome_to_agent", { agentName }) : ""),
-            description: agentRelease?.appearance?.welcomeDescription || "",
-            suggestions: (agentRelease?.appearance?.startingPrompts || []).map(
-              (prompt) => ({
-                label: prompt.displayPrompt,
-                prompt: prompt.actualPrompt,
-              }),
-            ),
+            title: hostFallback?.title ?? "",
+            description: hostFallback?.description ?? "",
+            suggestions: hostFallback?.suggestions ?? [],
           };
+
+      // Persists agent inputs against the active conversation via
+      // updateConversation. Server-side this applies to all subsequent
+      // messages; we don't prepend per send.
+      const handleApplySettingsInputs = async (
+        inputs: Record<string, unknown>,
+      ) => {
+        const conversationId = currentConversation.current?.id;
+        if (!conversationId) {
+          throw new Error(t("error_missing_conversation_params"));
+        }
+        await agentService.current.conversations.updateById(conversationId, {
+          agentInput: { inline: inputs as JSONObject },
+        });
+        storedAgentInputs.current = inputs;
+      };
 
       // TODO: if Apollo adds more renderer slots (footer, first-run, etc.),
       // extract this mount/unmount plumbing into a `useApolloRenderer` hook.
@@ -868,11 +937,17 @@ export const ConversationalAgentChat = ({
           agentId != null && folderId != null
             ? `${agentId}-${folderId}`
             : "no-agent";
+        const conversationId = currentConversation.current?.id ?? "no-conv";
+        const inputsResetKey = `${profileResetKey}-${conversationId}`;
         root.render(
           <SettingsDialog
             profileResetKey={profileResetKey}
             conversationalAgent={agentService.current}
             onClose={() => chatServiceRef.current?.toggleSettings(false)}
+            inputSchema={inputSchemaStateRef.current}
+            initialInputs={storedAgentInputs.current}
+            onApplyInputs={handleApplySettingsInputs}
+            inputsResetKey={inputsResetKey}
           />,
         );
       };
@@ -895,6 +970,24 @@ export const ConversationalAgentChat = ({
           },
           paginatedHistory: true,
           settingsRenderer: renderSettings,
+          // Apollo's ApChat defaults message text to fontSizeM (14px); the
+          // deprecated portal-shell chat used a larger size, so bump primary
+          // text and markdown body tokens to fontSizeL (16px) to match.
+          spacing: {
+            primaryFontToken: FontVariantToken.fontSizeL,
+            primaryBoldFontToken: FontVariantToken.fontSizeLBold,
+            suggestionFontToken: FontVariantToken.fontSizeL,
+            markdownTokens: {
+              p: FontVariantToken.fontSizeL,
+              li: FontVariantToken.fontSizeL,
+              th: FontVariantToken.fontSizeL,
+              td: FontVariantToken.fontSizeL,
+              em: FontVariantToken.fontSizeL,
+              del: FontVariantToken.fontSizeL,
+              strong: FontVariantToken.fontSizeLBold,
+              link: FontVariantToken.fontSizeL,
+            },
+          },
           disabledFeatures: {
             fullScreen: true,
             preview: true,
@@ -972,6 +1065,7 @@ export const ConversationalAgentChat = ({
 
   const onFeedback = useCallback((data: AutopilotChatActionPayload) => {
     pendingFeedback.current = data;
+    setFeedbackIsPositive(!!data.action.details?.isPositive);
     setFeedbackDialogOpen(true);
   }, []);
 
@@ -997,9 +1091,25 @@ export const ConversationalAgentChat = ({
   }, []);
 
   const onFeedbackCancel = useCallback(() => {
+    // Apollo's internal Feedback handler marks the message with `feedback`
+    // as soon as the thumb is clicked, which collapses the actions row to
+    // the chosen (disabled) thumb. If the user then cancels the dialog,
+    // re-send the message without `feedback` so the row reverts to both
+    // thumbs and the click can be retried.
+    const messageId = pendingFeedback.current?.message.id;
+    if (messageId && chatService) {
+      const current = chatService
+        .getConversation()
+        .find((m) => m.id === messageId);
+      if (current?.feedback) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { feedback: _feedback, ...withoutFeedback } = current;
+        chatService.sendResponse(withoutFeedback);
+      }
+    }
     pendingFeedback.current = null;
     setFeedbackDialogOpen(false);
-  }, []);
+  }, [chatService]);
 
   // Initialize chat service on mount and when agentId/folderId/externalUserId/existingConversationId changes
   useEffect(() => {
@@ -1175,11 +1285,13 @@ export const ConversationalAgentChat = ({
             if (!agent) {
               throw new Error(t("error_missing_conversation_params"));
             }
+            const inputs = data as Record<string, unknown>;
             const conversation = await agent.conversations.create({
               ...(jobStartOverrides ? { jobStartOverrides } : {}),
-              agentInput: { inline: data as JSONObject },
+              agentInput: { inline: inputs as JSONObject },
             } as ConversationCreateOptionsArg);
             currentConversation.current = conversation;
+            storedAgentInputs.current = inputs;
             setShowInputPage(false);
           }}
         />
@@ -1198,9 +1310,8 @@ export const ConversationalAgentChat = ({
 
       {!error && !chatService && (
         <div className="info-container">
-          <Alert>
-            <AlertDescription>{t("loading")}</AlertDescription>
-          </Alert>
+          <div>{t("loading")}</div>
+          <Loader />
         </div>
       )}
 
@@ -1216,6 +1327,7 @@ export const ConversationalAgentChat = ({
 
       <FeedbackDialog
         open={feedbackDialogOpen}
+        isPositive={feedbackIsPositive}
         onOpenChange={setFeedbackDialogOpen}
         onSubmit={onFeedbackSubmit}
         onCancel={onFeedbackCancel}

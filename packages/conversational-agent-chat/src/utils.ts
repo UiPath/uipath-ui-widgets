@@ -4,11 +4,15 @@ import {
   AutopilotChatMessage,
   AutopilotChatRole,
   ContentPart,
+  PdfCitation,
+  UrlCitation,
 } from "@uipath/apollo-react/ap-chat";
 import {
+  CitationSource,
   CompletedContentPart,
   ContentPartHelper,
   ExchangeGetResponse,
+  isCitationSourceUrl,
   RawConversationGetResponse,
 } from "@uipath/uipath-typescript/conversational-agent";
 import { EvaluationSet, MessageWidget } from "./types";
@@ -99,13 +103,23 @@ const getContentPartData = (
   return cp.data?.inline || "";
 };
 
-const mapCitationSource = (source: any) => ({
-  id: source.number,
-  title: source.title,
-  url: source.url || "",
-  download_url: source.downloadUrl || "",
-  page_number: source.pageNumber ? parseInt(source.pageNumber) : 0,
-});
+// Apollo discriminates PDF citations by `'download_url' in source` (property
+// presence, not value). Returning a merged shape misrenders URL citations as
+// broken PDFs, so we emit a discriminated UrlCitation | PdfCitation.
+export const mapCitationSource = (
+  source: CitationSource,
+): UrlCitation | PdfCitation => {
+  if (isCitationSourceUrl(source)) {
+    return { id: source.number, title: source.title, url: source.url };
+  }
+  const parsed = source.pageNumber ? parseInt(source.pageNumber, 10) : 0;
+  return {
+    id: source.number,
+    title: source.title,
+    download_url: source.downloadUrl ?? "",
+    page_number: Number.isNaN(parsed) ? 0 : parsed,
+  };
+};
 
 const mapTextContentPartToChatContentParts = (
   cp: ContentPartHelper | CompletedContentPart,
