@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ConversationalAgent } from "@uipath/uipath-typescript/conversational-agent";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { SettingsDialog } from "../../components/SettingsDialog";
@@ -36,7 +37,11 @@ describe("SettingsDialog", () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByText(/profile information/i)).toBeInTheDocument();
+    const trigger = screen.getByRole("button", {
+      name: /profile information/i,
+    });
+    expect(trigger).toBeInTheDocument();
+    await userEvent.click(trigger);
     await waitFor(() =>
       expect(screen.getByDisplayValue("Test User")).toBeInTheDocument(),
     );
