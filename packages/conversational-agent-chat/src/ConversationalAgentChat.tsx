@@ -487,11 +487,31 @@ export const ConversationalAgentChat = ({
   const resolveAgent = useCallback(async (): Promise<
     AgentGetByIdResponse | undefined
   > => {
-    if (!agentId) return undefined;
-    if (resolvedAgent.current?.id === agentId) {
+    let effectiveAgentId = agentId;
+    let effectiveFolderId = folderIdRef.current;
+    // When the host passes only existingConversationId, derive the agent from
+    // the conversation so the header title + FRE still render for empty replays.
+    if (effectiveAgentId == null && existingConversationId) {
+      if (
+        !currentConversation.current &&
+        !initialConversationConsumed.current
+      ) {
+        const existing = await agentService.current.conversations.getById(
+          existingConversationId,
+        );
+        currentConversation.current = existing;
+        initialConversationConsumed.current = true;
+      }
+      const conv = currentConversation.current;
+      if (conv?.agentId != null) {
+        effectiveAgentId = conv.agentId;
+        effectiveFolderId = conv.folderId;
+      }
+    }
+    if (effectiveAgentId == null) return undefined;
+    if (resolvedAgent.current?.id === effectiveAgentId) {
       const cachedFolderId = resolvedAgent.current.folderId;
-      const expectedFolderId = folderIdRef.current;
-      if (expectedFolderId == null || cachedFolderId === expectedFolderId) {
+      if (effectiveFolderId == null || cachedFolderId === effectiveFolderId) {
         return resolvedAgent.current;
       }
     }
@@ -499,15 +519,15 @@ export const ConversationalAgentChat = ({
     // mounted alongside the widget reuses the same in-flight fetch.
     const release = await resolveAgentCached(
       sdk,
-      agentId,
-      folderIdRef.current,
+      effectiveAgentId,
+      effectiveFolderId,
       { externalUserId },
     );
     if (!release) return undefined;
     resolvedAgent.current = release;
     folderIdRef.current = release.folderId;
     return release;
-  }, [agentId, sdk, externalUserId]);
+  }, [agentId, existingConversationId, sdk, externalUserId]);
 
   const setConversationHistory = useCallback(
     (next: ConversationCreateResponse[], allLoaded?: boolean) => {
