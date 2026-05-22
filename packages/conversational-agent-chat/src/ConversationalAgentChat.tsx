@@ -9,6 +9,7 @@ import {
   AutopilotChatService,
   type SupportedLocale,
 } from "@uipath/apollo-react/material/components";
+import { FontVariantToken } from "@uipath/apollo-core";
 import i18next from "i18next";
 import { Alert, AlertDescription, Button } from "@uipath/apollo-wind";
 import {
@@ -191,6 +192,7 @@ export const ConversationalAgentChat = ({
   const [inputsInstance, setInputsInstance] = useState(0);
   const activeExchange = useRef<ExchangeStream | null>(null);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const [feedbackIsPositive, setFeedbackIsPositive] = useState(false);
   const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
   const [hasMessages, setHasMessages] = useState(false);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
@@ -903,6 +905,24 @@ export const ConversationalAgentChat = ({
           },
           paginatedHistory: true,
           settingsRenderer: renderSettings,
+          // Apollo's ApChat defaults message text to fontSizeM (14px); the
+          // deprecated portal-shell chat used a larger size, so bump primary
+          // text and markdown body tokens to fontSizeL (16px) to match.
+          spacing: {
+            primaryFontToken: FontVariantToken.fontSizeL,
+            primaryBoldFontToken: FontVariantToken.fontSizeLBold,
+            suggestionFontToken: FontVariantToken.fontSizeL,
+            markdownTokens: {
+              p: FontVariantToken.fontSizeL,
+              li: FontVariantToken.fontSizeL,
+              th: FontVariantToken.fontSizeL,
+              td: FontVariantToken.fontSizeL,
+              em: FontVariantToken.fontSizeL,
+              del: FontVariantToken.fontSizeL,
+              strong: FontVariantToken.fontSizeLBold,
+              link: FontVariantToken.fontSizeL,
+            },
+          },
           disabledFeatures: {
             fullScreen: true,
             preview: true,
@@ -980,6 +1000,7 @@ export const ConversationalAgentChat = ({
 
   const onFeedback = useCallback((data: AutopilotChatActionPayload) => {
     pendingFeedback.current = data;
+    setFeedbackIsPositive(!!data.action.details?.isPositive);
     setFeedbackDialogOpen(true);
   }, []);
 
@@ -1005,9 +1026,25 @@ export const ConversationalAgentChat = ({
   }, []);
 
   const onFeedbackCancel = useCallback(() => {
+    // Apollo's internal Feedback handler marks the message with `feedback`
+    // as soon as the thumb is clicked, which collapses the actions row to
+    // the chosen (disabled) thumb. If the user then cancels the dialog,
+    // re-send the message without `feedback` so the row reverts to both
+    // thumbs and the click can be retried.
+    const messageId = pendingFeedback.current?.message.id;
+    if (messageId && chatService) {
+      const current = chatService
+        .getConversation()
+        .find((m) => m.id === messageId);
+      if (current?.feedback) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { feedback: _feedback, ...withoutFeedback } = current;
+        chatService.sendResponse(withoutFeedback);
+      }
+    }
     pendingFeedback.current = null;
     setFeedbackDialogOpen(false);
-  }, []);
+  }, [chatService]);
 
   // Initialize chat service on mount and when agentId/folderId/externalUserId/existingConversationId changes
   useEffect(() => {
@@ -1223,6 +1260,7 @@ export const ConversationalAgentChat = ({
 
       <FeedbackDialog
         open={feedbackDialogOpen}
+        isPositive={feedbackIsPositive}
         onOpenChange={setFeedbackDialogOpen}
         onSubmit={onFeedbackSubmit}
         onCancel={onFeedbackCancel}

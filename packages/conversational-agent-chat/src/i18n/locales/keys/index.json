@@ -36,6 +36,7 @@
   "cancel": "cancel",
   "submit": "submit",
   "feedback_title_required": "feedback_title_required",
+  "feedback_title_optional": "feedback_title_optional",
   "welcome_to_agent": "welcome_to_agent",
   "profile_information_title": "profile_information_title",
   "name_label": "name_label",
