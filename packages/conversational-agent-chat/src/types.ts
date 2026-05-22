@@ -86,6 +86,15 @@ export interface ConversationalAgentChatProps {
   onUserMessageSent?: (message: { content: string }) => void;
 }
 
+export interface AgentSummary {
+  id: number;
+  name: string;
+  description: string;
+  folderId: number;
+  /** Version of the deployed agent (e.g. "1.0.7"). Absent on draft agents. */
+  processVersion?: string;
+}
+
 export enum MessageWidget {
   AI = "ai",
   Human = "human",

@@ -39,7 +39,13 @@ export const ConversationalAgentIcon = () => (
       d="M1.08203 14C1.08203 13.4477 1.52975 13 2.08203 13H3.2487V18.4167H2.08203C1.52975 18.4167 1.08203 17.969 1.08203 17.4167V14Z"
       fill="currentColor"
     />
-    <rect x="3.25" y="15.166" width="2.16667" height="1.08333" fill="currentColor" />
+    <rect
+      x="3.25"
+      y="15.166"
+      width="2.16667"
+      height="1.08333"
+      fill="currentColor"
+    />
     <path
       d="M22.75 13H23.9167C24.4689 13 24.9167 13.4477 24.9167 14V17.4167C24.9167 17.969 24.469 18.4167 23.9167 18.4167H22.75V13Z"
       fill="currentColor"

@@ -7,6 +7,7 @@
   "error_initialize_chat": "Failed to initialize chat",
   "error_load_history": "Failed to load conversation history",
   "loading": "Connecting to agent...",
+  "agent_loading_label": "Loading...",
   "reload": "Reload",
   "new_chat": "New chat",
   "feedback_placeholder": "Share your experience or offer suggestions",
