@@ -23,7 +23,7 @@ npm install @uipath/ui-widgets-conversational-agent-chat
 This package requires the following peer dependencies:
 
 ```bash
-npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript@^1.3.9
+npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript@^1.3.10
 ```
 
 ## Usage
