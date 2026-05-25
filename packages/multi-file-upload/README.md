@@ -24,7 +24,7 @@ npm install @uipath/ui-widgets-multi-file-upload
 ```tsx
 import { MultiFileUpload } from "@uipath/ui-widgets-multi-file-upload";
 import "@uipath/ui-widgets-multi-file-upload/MultiFileUpload.css";
-import { UiPath } from "@uipath/uipath-typescript/entities";
+import { UiPath } from "@uipath/uipath-typescript/core";
 
 function App() {
   const sdk = new UiPath({
@@ -91,7 +91,7 @@ function App() {
 
 - React 19.2.0+
 - React DOM 19.2.0+
-- @uipath/uipath-typescript
+- @uipath/uipath-typescript ^1.3.9
 - @uipath/apollo-wind
 
 ## License

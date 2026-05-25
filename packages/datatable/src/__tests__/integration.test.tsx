@@ -31,14 +31,12 @@ vi.mock("@uipath/uipath-typescript/entities", async (importOriginal) => {
   };
 });
 
-// Mock telemetryClient
+// Mock trackEvent
 vi.mock("@uipath/uipath-typescript/core", async (importOriginal) => {
   const actual = await importOriginal<any>();
   return {
     ...actual,
-    telemetryClient: {
-      track: vi.fn(),
-    },
+    trackEvent: vi.fn(),
   };
 });
 
