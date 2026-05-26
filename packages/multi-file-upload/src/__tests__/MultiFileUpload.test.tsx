@@ -18,9 +18,13 @@ vi.mock("@uipath/uipath-typescript/buckets", () => {
 });
 
 // Mock trackEvent
-vi.mock("@uipath/uipath-typescript/core", () => ({
-  trackEvent: vi.fn(),
-}));
+vi.mock("@uipath/uipath-typescript/core", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    trackEvent: vi.fn(),
+  };
+});
 
 // Mock @uipath/apollo-wind components
 vi.mock("@uipath/apollo-wind", () => ({

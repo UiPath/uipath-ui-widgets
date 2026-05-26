@@ -23,7 +23,7 @@ npm install @uipath/ui-widgets-conversational-agent-chat
 This package requires the following peer dependencies:
 
 ```bash
-npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript@^1.3.3
+npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript@^1.3.9
 ```
 
 ## Usage
@@ -63,11 +63,11 @@ function App() {
 
 ### Props
 
-| Prop             | Type     | Required | Description                                                                                                                                                                                       |
-| ---------------- | -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sdk`            | `UiPath` | Yes      | UiPath SDK instance for API communication                                                                                                                                                         |
-| `agentId`        | `number` | Yes      | The ID of the conversational agent release                                                                                                                                                        |
-| `folderId`       | `number` | Yes      | The folder ID where conversations will be stored                                                                                                                                                  |
+| Prop             | Type     | Required | Description                                                                                                                                                                                     |
+| ---------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sdk`            | `UiPath` | Yes      | UiPath SDK instance for API communication                                                                                                                                                       |
+| `agentId`        | `number` | Yes      | The ID of the conversational agent release                                                                                                                                                      |
+| `folderId`       | `number` | Yes      | The folder ID where conversations will be stored                                                                                                                                                |
 | `externalUserId` | `string` | No       | External user identifier sent as `x-uipath-external-user-id` (HTTP header / WebSocket query param). Required when authenticating via an app-scoped external app; omit for standard user tokens. |
 
 ## `ConversationalAgentPickerChat` (agent picker + chat)

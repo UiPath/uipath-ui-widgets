@@ -14,7 +14,7 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "npm run build --workspaces --if-present",
+    "build": "node scripts/build-workspaces.mjs",
     "lint": "eslint . && npm run check-i18n",
     "check-i18n": "node scripts/check-i18n-keys.mjs",
     "preview": "rolldown-vite preview",

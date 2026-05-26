@@ -5,7 +5,7 @@ import { TelemetryService, TelemetryStatus } from "../types";
 export const trackTelemetry = (
   service: TelemetryService,
   status: TelemetryStatus,
-  properties?: Record<string, unknown>,
+  properties?: Record<string, string | number | boolean>,
 ) => {
   trackEvent(service, status, {
     ApplicationName: "Widget.Datatable",

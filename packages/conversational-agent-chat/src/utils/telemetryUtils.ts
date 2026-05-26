@@ -5,7 +5,7 @@ import { TelemetryEvent, TelemetryStatus } from "../types";
 export const trackTelemetry = (
   event: TelemetryEvent,
   status: TelemetryStatus,
-  properties?: Record<string, unknown>,
+  properties?: Record<string, string | number | boolean>,
 ) => {
   trackEvent(event, status, {
     ApplicationName: "Widget.ConversationalAgentChat",
