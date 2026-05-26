@@ -1,4 +1,4 @@
-import { telemetryClient } from "@uipath/uipath-typescript/core";
+import { trackEvent } from "@uipath/uipath-typescript/core";
 import { version } from "../../package.json";
 import { TelemetryService, TelemetryStatus } from "../types";
 
@@ -7,7 +7,7 @@ export const trackTelemetry = (
   status: TelemetryStatus,
   properties?: Record<string, unknown>,
 ) => {
-  telemetryClient.track(service, status, {
+  trackEvent(service, status, {
     ApplicationName: "Widget.Datatable",
     WidgetVersion: version,
     ...properties,
