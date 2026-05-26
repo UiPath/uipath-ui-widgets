@@ -10,7 +10,7 @@ describe("i18n", () => {
   describe("t() translation", () => {
     it("should return English translations by default", () => {
       const t = i18next.getFixedT("en");
-      expect(t("loading")).toBe("Loading...");
+      expect(t("loading")).toBe("Connecting to agent...");
       expect(t("cancel")).toBe("Cancel");
     });
 
@@ -105,7 +105,7 @@ describe("i18n", () => {
 
     it("should fall back to English for unsupported locale", () => {
       const t = i18next.getFixedT("xx");
-      expect(t("loading")).toBe("Loading...");
+      expect(t("loading")).toBe("Connecting to agent...");
     });
   });
 });

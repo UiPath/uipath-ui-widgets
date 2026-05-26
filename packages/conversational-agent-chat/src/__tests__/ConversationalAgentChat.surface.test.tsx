@@ -76,12 +76,18 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => ({
 }));
 
 describe("ConversationalAgentChat — surface prop forwarding", () => {
-  const mockSdk = {} as UiPath;
-  const baseProps = { sdk: mockSdk, agentId: 1, folderId: 100 };
+  // The widget constructs the chat's own agentService synchronously during the
+  // first render (call [0]); the shared agent cache may construct an additional
+  // resolver instance on a cold cache (call [1]). The cache is keyed by the sdk
+  // instance, so a fresh sdk per test keeps construction counts deterministic.
+  let mockSdk: UiPath;
+  let baseProps: { sdk: UiPath; agentId: number; folderId: number };
 
   beforeEach(() => {
     conversationalAgentCtorCalls.length = 0;
     vi.clearAllMocks();
+    mockSdk = {} as UiPath;
+    baseProps = { sdk: mockSdk, agentId: 1, folderId: 100 };
   });
 
   it("constructs ConversationalAgent with { surfaceName, surfaceVersion: undefined } when only surfaceName prop is set", () => {
@@ -92,7 +98,7 @@ describe("ConversationalAgentChat — surface prop forwarding", () => {
       />,
     );
 
-    expect(conversationalAgentCtorCalls).toHaveLength(1);
+    expect(conversationalAgentCtorCalls.length).toBeGreaterThanOrEqual(1);
     const [sdkArg, optionsArg] = conversationalAgentCtorCalls[0];
     expect(sdkArg).toBe(mockSdk);
     expect(optionsArg).toEqual({
@@ -110,7 +116,7 @@ describe("ConversationalAgentChat — surface prop forwarding", () => {
       />,
     );
 
-    expect(conversationalAgentCtorCalls).toHaveLength(1);
+    expect(conversationalAgentCtorCalls.length).toBeGreaterThanOrEqual(1);
     const [, optionsArg] = conversationalAgentCtorCalls[0];
     expect(optionsArg).toEqual({
       surfaceName: "uipath_instance_management",
@@ -121,7 +127,7 @@ describe("ConversationalAgentChat — surface prop forwarding", () => {
   it("constructs ConversationalAgent with undefined surface fields when props are omitted", () => {
     render(<ConversationalAgentChat {...baseProps} />);
 
-    expect(conversationalAgentCtorCalls).toHaveLength(1);
+    expect(conversationalAgentCtorCalls.length).toBeGreaterThanOrEqual(1);
     const [, optionsArg] = conversationalAgentCtorCalls[0];
     expect(optionsArg).toEqual({
       surfaceName: undefined,
