@@ -17,11 +17,9 @@ vi.mock("@uipath/uipath-typescript/buckets", () => {
   };
 });
 
-// Mock telemetryClient
-vi.mock("@uipath/uipath-typescript/entities", () => ({
-  telemetryClient: {
-    track: vi.fn(),
-  },
+// Mock trackEvent
+vi.mock("@uipath/uipath-typescript/core", () => ({
+  trackEvent: vi.fn(),
 }));
 
 // Mock @uipath/apollo-wind components

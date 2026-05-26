@@ -1,5 +1,5 @@
 import { Button, FileUpload } from "@uipath/apollo-wind";
-import { telemetryClient } from "@uipath/uipath-typescript/core";
+import { trackEvent } from "@uipath/uipath-typescript/core";
 import { BucketService } from "@uipath/uipath-typescript/buckets";
 import { FC, useCallback, useRef, useState } from "react";
 import "./MultiFileUpload.css";
@@ -59,7 +59,7 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
           errors[file.name] = errorMessage;
 
           // Telemetry: Log individual file upload error
-          telemetryClient.track(
+          trackEvent(
             TelemetryConstants.Service.UploadFile,
             TelemetryConstants.Telemetry.Error,
             {
@@ -72,7 +72,7 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
       });
 
       // Telemetry: Log upload results summary
-      telemetryClient.track(
+      trackEvent(
         TelemetryConstants.Service.UploadFile,
         TelemetryConstants.Telemetry.Usage,
         {
@@ -119,7 +119,7 @@ export const MultiFileUpload: FC<MultiFileUploadProps> = ({
       onUploadError?.(error as Error);
 
       // Telemetry: Log uncaught error
-      telemetryClient.track(
+      trackEvent(
         TelemetryConstants.Service.UploadFile,
         TelemetryConstants.Telemetry.Error,
         {
