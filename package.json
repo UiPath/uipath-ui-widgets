@@ -14,7 +14,7 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "npm run build --workspaces --if-present",
+    "build": "node scripts/build-workspaces.mjs",
     "lint": "eslint .",
     "preview": "rolldown-vite preview",
     "test": "npm run test --workspaces --if-present",
@@ -37,7 +37,7 @@
     "@uipath/ui-widgets-datatable": "file:./packages/datatable/dist",
     "@uipath/ui-widgets-validation-station": "file:./packages/validation-station/dist",
     "@uipath/ui-widgets-multi-file-upload": "file:./packages/multi-file-upload/dist",
-    "@uipath/uipath-typescript": "^1.2.2",
+    "@uipath/uipath-typescript": "^1.3.9",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "socket.io-client": "^4.8.3"

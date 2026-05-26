@@ -16,10 +16,9 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": false,
-    "baseUrl": "./src",
     "sourceMap": true,
     "paths": {
-      "@uipath/multi-file-upload/*": ["./*"]
+      "@uipath/multi-file-upload/*": ["./src/*"]
     }
   },
   "include": ["src"],

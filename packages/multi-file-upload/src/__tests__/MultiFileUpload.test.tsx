@@ -17,12 +17,14 @@ vi.mock("@uipath/uipath-typescript/buckets", () => {
   };
 });
 
-// Mock telemetryClient
-vi.mock("@uipath/uipath-typescript/entities", () => ({
-  telemetryClient: {
-    track: vi.fn(),
-  },
-}));
+// Mock trackEvent
+vi.mock("@uipath/uipath-typescript/core", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    trackEvent: vi.fn(),
+  };
+});
 
 // Mock @uipath/apollo-wind components
 vi.mock("@uipath/apollo-wind", () => ({

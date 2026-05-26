@@ -5,9 +5,7 @@ import { TelemetryEvent, TelemetryStatus } from "../types";
 
 const mockTrack = vi.fn();
 vi.mock("@uipath/uipath-typescript/core", () => ({
-  telemetryClient: {
-    track: (...args: unknown[]) => mockTrack(...args),
-  },
+  trackEvent: (...args: unknown[]) => mockTrack(...args),
 }));
 
 describe("telemetryUtils", () => {
@@ -16,7 +14,7 @@ describe("telemetryUtils", () => {
   });
 
   describe("trackTelemetry", () => {
-    it("should call telemetryClient.track with ApplicationName and WidgetVersion", () => {
+    it("should call trackEvent with ApplicationName and WidgetVersion", () => {
       trackTelemetry(TelemetryEvent.NewChat, TelemetryStatus.Success);
 
       expect(mockTrack).toHaveBeenCalledTimes(1);

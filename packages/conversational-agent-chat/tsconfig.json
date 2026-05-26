@@ -16,10 +16,9 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": false,
-    "baseUrl": "./src",
     "sourceMap": true,
     "paths": {
-      "@uipath/conversational-agent-chat/*": ["./*"]
+      "@uipath/conversational-agent-chat/*": ["./src/*"]
     }
   },
   "include": ["src"],
