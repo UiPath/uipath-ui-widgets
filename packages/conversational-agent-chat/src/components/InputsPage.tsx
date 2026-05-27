@@ -47,8 +47,8 @@ export function InputsPage({
   };
 
   return (
-    <div className="flex min-h-[calc(100%_-_48px)] flex-col items-center justify-center">
-      <div className="flex w-[30%] min-w-[300px] max-w-[450px] flex-col items-center justify-center py-[42px]">
+    <div className="flex min-h-[calc(100%_-_48px)] flex-col items-center overflow-y-auto">
+      <div className="my-auto flex w-[30%] min-w-[300px] max-w-[450px] flex-col items-center justify-center py-[42px]">
         <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-chip-info-background text-info-foreground">
           <ConversationalAgentIcon />
         </div>

@@ -1,5 +1,6 @@
 import { UiPath } from "@uipath/uipath-typescript/core";
 import type { ConversationJobStartOverrides } from "@uipath/uipath-typescript/conversational-agent";
+import type { InputSchema } from "./components/AgentSchemaForm/types";
 
 // "keys" is a dev-debug mode that renders raw translation keys instead of resolved strings.
 // Additional locales will be bundled once the localization team delivers translations.
@@ -48,6 +49,13 @@ export interface ConversationalAgentChatProps {
   folderId?: number;
   /** Allow for loading an existing conversation by ID instead of creating a new one on first message */
   existingConversationId?: string;
+  /**
+   * Agent input schema. When provided, takes precedence over the schema derived
+   * from the resolved agent. Use this when the caller has the schema but the
+   * agent can't be resolved from `agentId` or the conversation (e.g. an
+   * in-progress draft). Falls back to the resolved agent's schema when omitted.
+   */
+  inputSchema?: InputSchema;
   /**
    * External User ID to associate with conversational agent requests.
    * Required when authenticating via an app-scoped external app (client credential grant);

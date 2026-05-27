@@ -60,13 +60,17 @@ vi.mock("../utils/telemetryUtils", () => ({
 // props (e.g. externalUserId) are threaded through to the SDK. Hoisted shared
 // mocks so tests can override per-test (e.g. simulating an inputSchema for the
 // InputsPage flow). beforeEach re-establishes defaults.
-const { capturedAgentConstructorArgs, mockGetById, mockCreate } = vi.hoisted(
-  () => ({
-    capturedAgentConstructorArgs: [] as any[][],
-    mockGetById: vi.fn(),
-    mockCreate: vi.fn(),
-  }),
-);
+const {
+  capturedAgentConstructorArgs,
+  mockGetById,
+  mockCreate,
+  mockUpdateById,
+} = vi.hoisted(() => ({
+  capturedAgentConstructorArgs: [] as any[][],
+  mockGetById: vi.fn(),
+  mockCreate: vi.fn(),
+  mockUpdateById: vi.fn(),
+}));
 
 // Store handlers for testing
 let exchangeErrorHandler: any = null;
@@ -163,6 +167,7 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
 
       conversations = {
         create: mockCreate,
+        updateById: mockUpdateById,
         getAll: vi.fn().mockResolvedValue({
           items: mockConversations,
           nextCursor: { value: "cursor-1" },
@@ -240,6 +245,7 @@ describe("ConversationalAgentChat", () => {
       label: "",
       lastActivityTime: "2024-01-03T10:00:00Z",
     });
+    mockUpdateById.mockReset().mockResolvedValue(undefined);
     i18next.changeLanguage("en");
     mockSdk = {} as any;
     mockChatService = createMockChatService();
@@ -866,6 +872,73 @@ describe("ConversationalAgentChat", () => {
           agentInput: { inline: { customerName: "Acme Corp" } },
         });
       });
+    });
+
+    it("renders InputsPage in debug mode even when existingConversationId is set", async () => {
+      mockGetById.mockResolvedValue(buildInputSchemaAgent());
+      render(
+        <ConversationalAgentChat
+          {...defaultProps}
+          existingConversationId="conv-existing"
+          isDebugMode
+        />,
+      );
+
+      expect(
+        await screen.findByRole("button", { name: /start conversation/i }),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("ap-chat")).not.toBeInTheDocument();
+    });
+
+    it("submitting InputsPage in debug mode updates the existing conversation instead of creating one", async () => {
+      const agent = buildInputSchemaAgent();
+      mockGetById.mockResolvedValue(agent);
+      render(
+        <ConversationalAgentChat
+          {...defaultProps}
+          existingConversationId="conv-existing"
+          isDebugMode
+        />,
+      );
+
+      const submit = await screen.findByRole("button", {
+        name: /start conversation/i,
+      });
+      const input = await screen.findByPlaceholderText(/enter a value/i);
+      fireEvent.change(input, { target: { value: "Acme Corp" } });
+      fireEvent.click(submit);
+
+      await waitFor(() => {
+        expect(mockUpdateById).toHaveBeenCalledWith("conv-existing", {
+          agentInput: { inline: { customerName: "Acme Corp" } },
+        });
+      });
+      expect(agent.conversations.create).not.toHaveBeenCalled();
+    });
+
+    it("renders InputsPage from the inputSchema prop when the agent can't be resolved (debug, no agentId)", async () => {
+      // Mirrors the agent-builder debug flow: no agentId, and the existing
+      // conversation carries no agentId, so the agent (and any derived schema)
+      // never resolve. The explicit inputSchema prop must drive the page.
+      render(
+        <ConversationalAgentChat
+          sdk={defaultProps.sdk}
+          existingConversationId="conv-existing"
+          isDebugMode
+          inputSchema={{
+            type: "object",
+            properties: {
+              customerName: { type: "string", title: "Customer Name" },
+            },
+            required: ["customerName"],
+          }}
+        />,
+      );
+
+      expect(
+        await screen.findByRole("button", { name: /start conversation/i }),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("ap-chat")).not.toBeInTheDocument();
     });
 
     it("InputsPage submit failure surfaces an inline error and keeps form mounted", async () => {

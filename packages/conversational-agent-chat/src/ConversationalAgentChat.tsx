@@ -94,6 +94,7 @@ export const ConversationalAgentChat = ({
   folderId,
   existingConversationId,
   externalUserId,
+  inputSchema: inputSchemaProp,
   locale = "en",
   theme = "light",
   readOnly = false,
@@ -879,23 +880,28 @@ export const ConversationalAgentChat = ({
       agentKeyRef.current = agentRelease?.releaseKey;
       const agentName = agentRelease?.name ?? "";
 
+      // Prefer an explicitly-provided schema over the one derived from the
+      // resolved agent: the agent isn't always resolvable (e.g. the host passes
+      // only existingConversationId and the conversation carries no agentId),
+      // but the caller may still have the schema to display (e.g. an in-progress draft).
       // TODO(sdk-typing): drop the cast once @uipath/uipath-typescript exposes
       // inputSchema on AgentRelease. The API returns it but the SDK type
       // definitions don't include it yet.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const inputSchema = (agentRelease as any)?.inputSchema as
-        | InputSchema
-        | undefined;
+      const inputSchema =
+        inputSchemaProp ??
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ((agentRelease as any)?.inputSchema as InputSchema | undefined);
 
       // Show input page if there's an inputSchema with required properties and
       // this is a new conversation. Optional-only schemas use the settings panel.
       // Skip when resuming an existing conversation — its inputs were already
-      // captured at creation time.
+      // captured at creation time. The exception is debug mode, where the host
+      // opens an empty conversation up front, so inputs are still collected here.
       const hasRequiredInputs = (inputSchema?.required?.length ?? 0) > 0;
       // Persist the schema regardless of `hasRequiredInputs` so the settings
       // panel can render optional-input editing.
       setInputSchemaState(inputSchema ?? null);
-      if (hasRequiredInputs && !existingConversationId) {
+      if (hasRequiredInputs && (!existingConversationId || isDebugMode)) {
         setAgentNameState(agentName);
         setShowInputPage(true);
       }
@@ -1051,6 +1057,8 @@ export const ConversationalAgentChat = ({
     folderId,
     existingConversationId,
     externalUserId,
+    inputSchemaProp,
+    isDebugMode,
     locale,
     readOnly,
     resolveAgent,
@@ -1305,16 +1313,23 @@ export const ConversationalAgentChat = ({
           agentName={agentNameState}
           inputSchema={inputSchemaState}
           onSubmit={async (data) => {
-            const agent = await resolveAgent();
-            if (!agent) {
-              throw new Error(t("error_missing_conversation_params"));
-            }
             const inputs = data as Record<string, unknown>;
-            const conversation = await agent.conversations.create({
-              ...(jobStartOverrides ? { jobStartOverrides } : {}),
-              agentInput: { inline: inputs as JSONObject },
-            } as ConversationCreateOptionsArg);
-            currentConversation.current = conversation;
+            if (isDebugMode && existingConversationId) {
+              await agentService.current.conversations.updateById(
+                existingConversationId,
+                { agentInput: { inline: inputs as JSONObject } },
+              );
+            } else {
+              const agent = await resolveAgent();
+              if (!agent) {
+                throw new Error(t("error_missing_conversation_params"));
+              }
+              const conversation = await agent.conversations.create({
+                ...(jobStartOverrides ? { jobStartOverrides } : {}),
+                agentInput: { inline: inputs as JSONObject },
+              } as ConversationCreateOptionsArg);
+              currentConversation.current = conversation;
+            }
             storedAgentInputs.current = inputs;
             setShowInputPage(false);
           }}
