@@ -21,7 +21,6 @@ import {
   ExchangeGetResponse,
   ExchangeStream,
   FeedbackRating,
-  InterruptType,
   MessageStream,
   SessionStream,
   SortOrder,
@@ -324,7 +323,7 @@ export const ConversationalAgentChat = ({
             });
           };
 
-          // Shared by both flows — caller supplies the approve/reject channel.
+          // Caller supplies the approve/reject channel.
           const sendToolConfirmationWidget = (params: {
             toolCallId: string;
             toolName: string;
@@ -439,36 +438,6 @@ export const ConversationalAgentChat = ({
               }
               pendingToolCalls.delete(toolCall.toolCallId);
             });
-          });
-
-          // Legacy interrupt-based flow, still used by temporal runtime.
-          message.onInterruptStart(({ interruptId, startEvent }) => {
-            if (startEvent.type === InterruptType.ToolCallConfirmation) {
-              const confirmationData =
-                startEvent.value as ToolCallConfirmationValue;
-              const pending = pendingToolCalls.get(confirmationData.toolCallId);
-              if (pending) pending.spinnerSent = false;
-
-              sendToolConfirmationWidget({
-                toolCallId: confirmationData.toolCallId,
-                toolName: confirmationData.toolName,
-                inputSchema: confirmationData.inputSchema,
-                inputValue: confirmationData.inputValue,
-                onApprove: (input) => {
-                  sendToolCallSpinner(confirmationData.toolCallId);
-                  message.sendInterruptEnd(interruptId, {
-                    type: InterruptType.ToolCallConfirmation,
-                    value: { approved: true, input },
-                  });
-                },
-                onCancel: () => {
-                  message.sendInterruptEnd(interruptId, {
-                    type: InterruptType.ToolCallConfirmation,
-                    value: { approved: false },
-                  });
-                },
-              });
-            }
           });
         }
       });
