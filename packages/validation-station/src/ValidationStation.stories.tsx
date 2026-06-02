@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import type { ContentValidationData } from "@uipath/du-shared-util-mfe";
+import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import { UiPath } from "@uipath/uipath-typescript/core";
 import { useEffect, useState } from "react";
 import { ValidationStation } from "./ValidationStation";
@@ -92,27 +92,22 @@ const ValidationStationWithSdk = ({
   return <ValidationStation sdk={sdk} {...props} />;
 };
 
-const mockData: ContentValidationData = {
+const mockData: DuFramework.ContentValidationData = {
   BucketName: "",
   BucketId: 0,
   FolderId: 0,
   FolderKey: "",
   DocumentId: "",
-  DocumentPath: "",
   EncodedDocumentPath: "",
   TextPath: "",
   DocumentObjectModelPath: "",
   TaxonomyPath: "",
   AutomaticExtractionResultsPath: "",
   ValidatedExtractionResultsPath: "",
-  ExtractorPayloadsPath: "",
-  ShowOnlyRelevantPageRange: "",
-  AdditionalDataPath: "",
-  OriginalDocumentFileName: "",
   CustomizationInfoPath: "",
 };
 
-const meta = {
+const meta: Meta<typeof ValidationStationWithSdk> = {
   title: "Components/ValidationStation",
   component: ValidationStationWithSdk,
   decorators: [
@@ -189,7 +184,7 @@ function App() {
 - React 19.2.0+
 - React DOM 19.2.0+
 - @uipath/du-validation-station-wc
-- @uipath/du-shared-util-mfe`,
+- @uipath/uipath-typescript`,
       },
     },
   },
@@ -222,7 +217,7 @@ function App() {
     },
     folderId: {
       description:
-        "Storage bucket folder ID. Falls back to data.FolderId if not provided.",
+        "Storage bucket folder ID. Falls back to data.folderId if not provided.",
       control: "number",
     },
     theme: {
@@ -270,7 +265,7 @@ function App() {
     isReadonly: false,
     enableSaveAsDraft: false,
   },
-} satisfies Meta<typeof ValidationStationWithSdk>;
+};
 
 export default meta;
 type Story = StoryObj<typeof meta>;

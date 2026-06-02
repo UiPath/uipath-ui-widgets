@@ -719,7 +719,9 @@ export const ConversationalAgentChat = ({
       unsubscribers.forEach((unsub) => unsub());
     };
   }, [
+    agentId,
     chatService,
+    folderId,
     onClickDeleteConversation,
     onClickOpenConversation,
     onFeedback,

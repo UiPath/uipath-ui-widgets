@@ -1,17 +1,20 @@
+import type {
+  DeleteFieldValueByPath,
+  IValidationStationOptions,
+  SelectAndFocusFieldValueByPath,
+  SetFieldValueByPath,
+} from "@uipath/du-validation-station-wc";
+import type { UiPath } from "@uipath/uipath-typescript/core";
+import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
+import type { SaveValidatedDataResult } from "./saveValidatedDataUtil";
+
 export type {
   DeleteFieldValueByPath,
   IValidationStationOptions,
+  SaveValidatedDataResult,
   SelectAndFocusFieldValueByPath,
   SetFieldValueByPath,
-} from "@uipath/du-shared-util-mfe";
-import type {
-  ContentValidationData,
-  DeleteFieldValueByPath,
-  IValidationStationOptions,
-  SelectAndFocusFieldValueByPath,
-  SetFieldValueByPath,
-} from "@uipath/du-shared-util-mfe";
-import type { UiPath } from "@uipath/uipath-typescript/core";
+};
 
 export enum ValidationStationLanguage {
   German = "de",
@@ -41,7 +44,7 @@ export interface BucketArtifacts {
 
 export interface ValidationStationProps {
   sdk: UiPath;
-  data: ContentValidationData;
+  data: DuFramework.ContentValidationData;
   folderId?: number;
   theme?: "light" | "dark" | "light-hc" | "dark-hc";
   language?: ValidationStationLanguage;
@@ -54,12 +57,9 @@ export interface ValidationStationProps {
   selectAndFocusFieldValueByPath?: SelectAndFocusFieldValueByPath;
   deleteFieldValueByPath?: DeleteFieldValueByPath;
   /**
-   * Base URL where the validation station web component assets
-   * (main.js, polyfills.js) are served. Defaults to
-   * "node_modules/@uipath/du-validation-station-wc", which works with Vite's
-   * dev server. For production builds, copy the contents of
-   * node_modules/@uipath/du-validation-station-wc into your public assets and
-   * point this prop at that location.
+   * Fired after the save flow finishes (ProcessExtractedData + bucket upload).
+   * `result.success` is `false` on any failure — the host app decides whether
+   * to retry, complete the task, surface an error, etc.
    */
-  wcAssetsUrl?: string;
+  onSaveComplete?: (result: SaveValidatedDataResult) => void;
 }
