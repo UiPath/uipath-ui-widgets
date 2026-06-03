@@ -4,8 +4,8 @@ import {
   AutopilotChatMessage,
   AutopilotChatRole,
   ContentPart,
-  PdfCitation,
-  UrlCitation,
+  PdfCitation as AutopilotPdfCitation,
+  UrlCitation as AutopilotUrlCitation,
 } from "@uipath/apollo-react/ap-chat";
 import {
   CitationSource,
@@ -108,7 +108,7 @@ const getContentPartData = (
 // broken PDFs, so we emit a discriminated UrlCitation | PdfCitation.
 export const mapCitationSource = (
   source: CitationSource,
-): UrlCitation | PdfCitation => {
+): AutopilotUrlCitation | AutopilotPdfCitation => {
   if (isCitationSourceUrl(source)) {
     return { id: source.number, title: source.title, url: source.url };
   }

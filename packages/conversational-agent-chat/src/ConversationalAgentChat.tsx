@@ -353,17 +353,14 @@ export const ConversationalAgentChat = ({
                   confirmationData,
                   isCompleted,
                   wasRejected,
-                  // No-ops once completed — the form's buttons are gone but meta shape stays stable.
-                  onApprove: isCompleted ? noopApprove : handleApprove,
-                  onCancel: isCompleted ? noop : handleCancel,
+                  // Unreachable once completed (the form's buttons are gone),
+                  // but kept on the meta so its shape stays stable.
+                  onApprove: handleApprove,
+                  onCancel: handleCancel,
                 },
               });
             };
 
-            const noop = () => {};
-            const noopApprove = (endValue: { input?: unknown }) => {
-              void endValue;
-            };
             const handleApprove = (endValue: { input?: unknown }) => {
               sendUpdate(true, false);
               params.onApprove(endValue.input);

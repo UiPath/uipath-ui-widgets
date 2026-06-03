@@ -63,12 +63,13 @@ function App() {
 
 ### Props
 
-| Prop             | Type     | Required | Description                                                                                                                                                                                     |
-| ---------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sdk`            | `UiPath` | Yes      | UiPath SDK instance for API communication                                                                                                                                                       |
-| `agentId`        | `number` | Yes      | The ID of the conversational agent release                                                                                                                                                      |
-| `folderId`       | `number` | Yes      | The folder ID where conversations will be stored                                                                                                                                                |
-| `externalUserId` | `string` | No       | External user identifier sent as `x-uipath-external-user-id` (HTTP header / WebSocket query param). Required when authenticating via an app-scoped external app; omit for standard user tokens. |
+| Prop                     | Type     | Required | Description                                                                                                                                                                                     |
+| ------------------------ | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sdk`                    | `UiPath` | Yes      | UiPath SDK instance for API communication                                                                                                                                                       |
+| `agentId`                | `number` | No       | The ID of the conversational agent release. Required unless `existingConversationId` is provided.                                                                                               |
+| `folderId`               | `number` | No       | The folder ID the agent lives in. When omitted, the widget resolves it by listing agents and matching on `agentId` — prefer passing it when known.                                              |
+| `existingConversationId` | `string` | No       | Load an existing conversation by ID instead of creating a new one on first message.                                                                                                             |
+| `externalUserId`         | `string` | No       | External user identifier sent as `x-uipath-external-user-id` (HTTP header / WebSocket query param). Required when authenticating via an app-scoped external app; omit for standard user tokens. |
 
 ## `ConversationalAgentPickerChat` (agent picker + chat)
 

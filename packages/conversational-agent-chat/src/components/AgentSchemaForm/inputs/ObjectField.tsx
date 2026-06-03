@@ -14,8 +14,7 @@ import type {
   InputSchemaProperty,
 } from "../AgentSchemaField";
 import { AgentSchemaField } from "../AgentSchemaField";
-import { ExpandLessIcon } from "../../../icons/ExpandLessIcon";
-import { ExpandMoreIcon } from "../../../icons/ExpandMoreIcon";
+import { ChevronDown, ChevronRight } from "@uipath/apollo-react/icons";
 import { FieldShell } from "../FieldShell";
 
 const getNestedErrorMap = (
@@ -119,7 +118,7 @@ const NestedObjectField = ({
             className="h-6 w-6 text-muted-foreground"
             disabled={disabled}
           >
-            {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            {expanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
           </Button>
         </CollapsibleTrigger>
         <span className="text-sm font-semibold">{label}</span>

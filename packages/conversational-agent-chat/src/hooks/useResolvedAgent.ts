@@ -10,6 +10,22 @@ import { initI18n } from "../i18n";
 // without first mounting the widget.
 initI18n();
 
+// Stable per-instance id for an sdk so a *different* sdk instance changes
+// `inputsKey` (and fires the reset block). A truthy/falsy flag would collapse
+// every instance to "sdk", leaving stale agent state on the screen after a
+// host swaps the client (e.g. on a token/tenant refresh).
+const sdkIds = new WeakMap<UiPath, number>();
+let nextSdkId = 0;
+const sdkKey = (sdk: UiPath | null | undefined): string => {
+  if (!sdk) return "_";
+  let id = sdkIds.get(sdk);
+  if (id === undefined) {
+    id = ++nextSdkId;
+    sdkIds.set(sdk, id);
+  }
+  return `sdk${id}`;
+};
+
 export interface UseResolvedAgentOptions {
   /** Pass the same `externalUserId` you give the widget so they share one
    * fetch. Omit for first-party hosts that don't use external-user auth. */
@@ -61,7 +77,7 @@ export const useResolvedAgent = (
   const { t } = useTranslation();
 
   const shouldFetch = !!sdk && agentId != null;
-  const inputsKey = `${sdk ? "sdk" : "_"}|${agentId ?? "_"}|${folderId ?? "_"}|${externalUserId ?? "_"}|${surfaceName ?? "_"}|${surfaceVersion ?? "_"}`;
+  const inputsKey = `${sdkKey(sdk)}|${agentId ?? "_"}|${folderId ?? "_"}|${externalUserId ?? "_"}|${surfaceName ?? "_"}|${surfaceVersion ?? "_"}`;
 
   // Reset on input change via the "storing information from previous renders"
   // pattern (https://react.dev/reference/react/useState#storing-information-from-previous-renders)

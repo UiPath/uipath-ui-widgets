@@ -5,8 +5,7 @@ import {
   cn,
 } from "@uipath/apollo-wind";
 
-import { ExpandLessIcon } from "../../icons/ExpandLessIcon";
-import { ExpandMoreIcon } from "../../icons/ExpandMoreIcon";
+import { ChevronDown, ChevronRight } from "@uipath/apollo-react/icons";
 import { useCallback, useImperativeHandle, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -207,7 +206,11 @@ export function AgentSchemaForm({
                   ? t("agent_schema_show_less")
                   : t("agent_schema_show_more")}
               </span>
-              {showOptional ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              {showOptional ? (
+                <ChevronDown size={18} />
+              ) : (
+                <ChevronRight size={18} />
+              )}
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="uipath-cas-schema-grid grid grid-cols-1 gap-4">
