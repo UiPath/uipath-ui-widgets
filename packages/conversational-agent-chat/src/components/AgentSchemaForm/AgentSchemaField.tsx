@@ -12,13 +12,17 @@ import {
 import type { ChangeEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ArrayIcon } from "../../icons/ArrayIcon";
-import { BooleanIcon } from "../../icons/BooleanIcon";
-import { DateIcon } from "../../icons/DateIcon";
-import { DateTimeIcon } from "../../icons/DateTimeIcon";
-import { NumbersIcon } from "../../icons/NumbersIcon";
-import { ObjectIcon } from "../../icons/ObjectIcon";
-import { TextIcon } from "../../icons/TextIcon";
+import {
+  DataTypesArray,
+  DataTypesBoolean,
+  DataTypesDate,
+  DataTypesDatetime,
+  DataTypesInteger,
+  DataTypesObject,
+  DataTypesString,
+} from "@uipath/apollo-react/icons";
+
+// No apollo equivalent for a time-only type, so this one stays hand-rolled.
 import { TimeIcon } from "../../icons/TimeIcon";
 import { FieldShell } from "./FieldShell";
 import { ArrayField } from "./inputs/ArrayField";
@@ -85,14 +89,15 @@ const getFieldIcon = (
   prop: InputSchemaProperty,
   dateFormat: DateFormat | undefined,
 ): ReactNode => {
-  if (prop.type === "boolean") return <BooleanIcon />;
-  if (prop.type === "number" || prop.type === "integer") return <NumbersIcon />;
-  if (dateFormat === "date") return <DateIcon />;
+  if (prop.type === "boolean") return <DataTypesBoolean size={16} />;
+  if (prop.type === "number" || prop.type === "integer")
+    return <DataTypesInteger size={16} />;
+  if (dateFormat === "date") return <DataTypesDate size={16} />;
   if (dateFormat === "time") return <TimeIcon />;
-  if (dateFormat === "datetime-local") return <DateTimeIcon />;
-  if (prop.type === "array") return <ArrayIcon />;
-  if (prop.type === "object") return <ObjectIcon />;
-  return <TextIcon />;
+  if (dateFormat === "datetime-local") return <DataTypesDatetime size={16} />;
+  if (prop.type === "array") return <DataTypesArray size={16} />;
+  if (prop.type === "object") return <DataTypesObject size={16} />;
+  return <DataTypesString size={16} />;
 };
 
 interface FieldLabelProps {
