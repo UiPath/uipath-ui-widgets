@@ -23,6 +23,9 @@ export default defineConfig({
         "**/index.ts",
         "**/*.scss",
         "**/*.stories.tsx",
+        // Type-only declarations — no executable code to cover.
+        "**/types.ts",
+        "**/globals.d.ts",
       ],
       include: ["src/**/*.{ts,tsx}"],
     },
