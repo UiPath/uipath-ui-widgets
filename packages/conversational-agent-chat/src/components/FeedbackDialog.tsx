@@ -7,10 +7,12 @@ import {
   DialogTitle,
   Textarea,
 } from "@uipath/apollo-wind";
-import { useState } from "react";
+import { type ChangeEvent, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface FeedbackDialogProps {
   open: boolean;
+  isPositive: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (comment: string) => void;
   onCancel: () => void;
@@ -18,10 +20,12 @@ interface FeedbackDialogProps {
 
 export const FeedbackDialog = ({
   open,
+  isPositive,
   onOpenChange,
   onSubmit,
   onCancel,
 }: FeedbackDialogProps) => {
+  const { t } = useTranslation();
   const [comment, setComment] = useState("");
 
   const handleSubmit = () => {
@@ -36,20 +40,32 @@ export const FeedbackDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Provide additional feedback (optional)</DialogTitle>
+          <DialogTitle>
+            {isPositive
+              ? t("feedback_title_optional")
+              : t("feedback_title_required")}
+          </DialogTitle>
         </DialogHeader>
         <Textarea
           value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          placeholder="What would you like to share?"
+          onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+            setComment(e.target.value)
+          }
+          placeholder={t("feedback_placeholder")}
+          className="placeholder:text-[var(--color-foreground-de-emp)] placeholder:opacity-100"
         />
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel}>
-            Cancel
+            {t("cancel")}
           </Button>
-          <Button onClick={handleSubmit}>Submit</Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={!isPositive && comment.trim() === ""}
+          >
+            {t("submit")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

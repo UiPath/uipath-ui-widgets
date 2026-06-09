@@ -306,7 +306,10 @@ describe("utils", () => {
         },
       ] as any;
 
-      const result = getConversationHistoryDisplayItems(conversations);
+      const result = getConversationHistoryDisplayItems(
+        conversations,
+        "New chat",
+      );
 
       expect(result).toEqual([
         {
@@ -322,7 +325,7 @@ describe("utils", () => {
       ]);
     });
 
-    it("should use default name when label is missing", () => {
+    it("should use newChatLabel when label is missing", () => {
       const conversations = [
         {
           id: "conv-1",
@@ -336,14 +339,34 @@ describe("utils", () => {
         },
       ] as any;
 
-      const result = getConversationHistoryDisplayItems(conversations);
+      const result = getConversationHistoryDisplayItems(
+        conversations,
+        "New chat",
+      );
 
       expect(result[0].name).toBe("New chat");
       expect(result[1].name).toBe("New chat");
     });
 
+    it("should use translated newChatLabel", () => {
+      const conversations = [
+        {
+          id: "conv-1",
+          label: "",
+          lastActivityTime: "2024-01-01T10:00:00Z",
+        },
+      ] as any;
+
+      const result = getConversationHistoryDisplayItems(
+        conversations,
+        "新しいチャット",
+      );
+
+      expect(result[0].name).toBe("新しいチャット");
+    });
+
     it("should handle empty conversations array", () => {
-      const result = getConversationHistoryDisplayItems([]);
+      const result = getConversationHistoryDisplayItems([], "New chat");
       expect(result).toEqual([]);
     });
 
@@ -356,7 +379,10 @@ describe("utils", () => {
         },
       ] as any;
 
-      const result = getConversationHistoryDisplayItems(conversations);
+      const result = getConversationHistoryDisplayItems(
+        conversations,
+        "New chat",
+      );
       expect(result[0].id).toBe("abc-123");
     });
   });
@@ -655,8 +681,6 @@ describe("utils", () => {
           id: 1,
           title: "Wikipedia",
           url: "https://wikipedia.org",
-          download_url: "",
-          page_number: 0,
         },
       ]);
       expect(result[0].contentParts![2].text).toBe(" for more info.");

@@ -4,14 +4,18 @@ import {
   AutopilotChatMessage,
   AutopilotChatRole,
   ContentPart,
+  PdfCitation as AutopilotPdfCitation,
+  UrlCitation as AutopilotUrlCitation,
 } from "@uipath/apollo-react/ap-chat";
 import {
+  CitationSource,
   CompletedContentPart,
   ContentPartHelper,
   ExchangeGetResponse,
+  isCitationSourceUrl,
   RawConversationGetResponse,
 } from "@uipath/uipath-typescript/conversational-agent";
-import { MessageWidget } from "./types";
+import { EvaluationSet, MessageWidget } from "./types";
 
 export const createFileKey = (attachment: AutopilotChatFileInfo) => {
   const name = attachment.name;
@@ -62,11 +66,12 @@ export const convertAttachmentToFile = (
 
 export const getConversationHistoryDisplayItems = (
   conversations: RawConversationGetResponse[],
+  newChatLabel: string,
 ) => {
   return conversations.map((conversation) => {
     return {
       id: conversation.id,
-      name: conversation.label || `New chat`,
+      name: conversation.label || newChatLabel,
       timestamp: new Date(conversation.lastActivityTime).toISOString(),
     };
   });
@@ -98,13 +103,23 @@ const getContentPartData = (
   return cp.data?.inline || "";
 };
 
-const mapCitationSource = (source: any) => ({
-  id: source.number,
-  title: source.title,
-  url: source.url || "",
-  download_url: source.downloadUrl || "",
-  page_number: source.pageNumber ? parseInt(source.pageNumber) : 0,
-});
+// Apollo discriminates PDF citations by `'download_url' in source` (property
+// presence, not value). Returning a merged shape misrenders URL citations as
+// broken PDFs, so we emit a discriminated UrlCitation | PdfCitation.
+export const mapCitationSource = (
+  source: CitationSource,
+): AutopilotUrlCitation | AutopilotPdfCitation => {
+  if (isCitationSourceUrl(source)) {
+    return { id: source.number, title: source.title, url: source.url };
+  }
+  const parsed = source.pageNumber ? parseInt(source.pageNumber, 10) : 0;
+  return {
+    id: source.number,
+    title: source.title,
+    download_url: source.downloadUrl ?? "",
+    page_number: Number.isNaN(parsed) ? 0 : parsed,
+  };
+};
 
 const mapTextContentPartToChatContentParts = (
   cp: ContentPartHelper | CompletedContentPart,
@@ -235,3 +250,21 @@ export const mapExchangesToChatMessages = (
       return [mainMessage, ...toolCallMessages];
     }),
   );
+
+/**
+ * Sorts evaluation sets: non-disabled first (default first within non-disabled),
+ * then disabled sets in their original order.
+ * @internal
+ */
+export const sortEvaluationSets = (
+  evaluationSets: EvaluationSet[],
+): EvaluationSet[] =>
+  [...evaluationSets].sort((a, b) => {
+    if (!a.isDisabled && b.isDisabled) return -1;
+    if (a.isDisabled && !b.isDisabled) return 1;
+    if (!a.isDisabled && !b.isDisabled) {
+      if (a.isDefault && !b.isDefault) return -1;
+      if (!a.isDefault && b.isDefault) return 1;
+    }
+    return 0;
+  });

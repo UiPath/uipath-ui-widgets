@@ -68,6 +68,7 @@ const AgentCard = ({
           isFavorite ? DEFAULT_REMOVE_FROM_FAVORITES : DEFAULT_ADD_TO_FAVORITES
         }
       >
+        {/* eslint-disable-next-line i18next/no-literal-string */}
         {isFavorite ? "★" : "☆"}
       </button>
     </Card>
