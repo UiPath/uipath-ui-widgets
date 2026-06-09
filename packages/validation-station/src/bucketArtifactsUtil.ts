@@ -1,4 +1,4 @@
-import type { ContentValidationData } from "@uipath/du-shared-util-mfe";
+import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import type { BucketService } from "@uipath/uipath-typescript/buckets";
 import { unzipSync } from "fflate";
 import type { BucketArtifacts } from "./types";
@@ -28,6 +28,32 @@ async function fetchArtifactJson(
   return fetchAndUnzipJson(r.uri);
 }
 
+/**
+ * Fetch the validated extraction result if it exists in the bucket, otherwise
+ * fall back to the automatic extraction result.
+ */
+async function fetchExtractionResult(
+  bucketService: BucketService,
+  bucketId: number,
+  folderId: number,
+  validatedPath: string | null | undefined,
+  automaticPath: string,
+): Promise<unknown> {
+  if (validatedPath) {
+    try {
+      return await fetchArtifactJson(
+        bucketService,
+        bucketId,
+        folderId,
+        validatedPath,
+      );
+    } catch {
+      // Validated result not saved yet — fall through to automatic.
+    }
+  }
+  return fetchArtifactJson(bucketService, bucketId, folderId, automaticPath);
+}
+
 /** Get URI then immediately fetch + unzip as text. */
 async function fetchArtifactText(
   bucketService: BucketService,
@@ -41,39 +67,57 @@ async function fetchArtifactText(
 
 export async function fetchBucketArtifacts(
   bucketService: BucketService,
-  data: ContentValidationData,
+  data: DuFramework.ContentValidationData,
   folderId: number,
 ): Promise<BucketArtifacts> {
-  const { BucketId: bucketId } = data;
+  const {
+    BucketId,
+    TextPath,
+    TaxonomyPath,
+    EncodedDocumentPath,
+    CustomizationInfoPath,
+    DocumentObjectModelPath,
+    AutomaticExtractionResultsPath,
+    ValidatedExtractionResultsPath,
+  } = data;
+  if (
+    !BucketId ||
+    !TextPath ||
+    !TaxonomyPath ||
+    !EncodedDocumentPath ||
+    !CustomizationInfoPath ||
+    !DocumentObjectModelPath ||
+    !AutomaticExtractionResultsPath
+  ) {
+    throw new Error(
+      "ContentValidationData is missing required bucket artifact fields.",
+    );
+  }
 
   const [taxonomy, extractionResult, dom, text, customizationInfo, original] =
     await Promise.all([
-      fetchArtifactJson(bucketService, bucketId, folderId, data.TaxonomyPath),
-      fetchArtifactJson(
+      fetchArtifactJson(bucketService, BucketId, folderId, TaxonomyPath),
+      fetchExtractionResult(
         bucketService,
-        bucketId,
+        BucketId,
         folderId,
-        data.AutomaticExtractionResultsPath,
+        ValidatedExtractionResultsPath,
+        AutomaticExtractionResultsPath,
       ),
       fetchArtifactJson(
         bucketService,
-        bucketId,
+        BucketId,
         folderId,
-        data.DocumentObjectModelPath,
+        DocumentObjectModelPath,
       ),
-      fetchArtifactText(bucketService, bucketId, folderId, data.TextPath),
+      fetchArtifactText(bucketService, BucketId, folderId, TextPath),
       fetchArtifactJson(
         bucketService,
-        bucketId,
+        BucketId,
         folderId,
-        data.CustomizationInfoPath,
+        CustomizationInfoPath,
       ),
-      fetchArtifactText(
-        bucketService,
-        bucketId,
-        folderId,
-        data.EncodedDocumentPath,
-      ),
+      fetchArtifactText(bucketService, BucketId, folderId, EncodedDocumentPath),
     ]);
 
   return { taxonomy, extractionResult, dom, text, customizationInfo, original };

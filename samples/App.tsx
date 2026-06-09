@@ -11,16 +11,14 @@ import {
   Tabs,
   Typography,
 } from "@mui/material";
-import type {
-  ContentValidationData,
-  SelectAndFocusFieldValueByPath,
-} from "@uipath/du-shared-util-mfe";
 import { ConversationalAgentChat } from "@uipath/ui-widgets-conversational-agent-chat";
 import { DataTable } from "@uipath/ui-widgets-datatable";
 import { MultiFileUpload } from "@uipath/ui-widgets-multi-file-upload";
 import "@uipath/ui-widgets-multi-file-upload/MultiFileUpload.css";
 import { ValidationStation } from "@uipath/ui-widgets-validation-station";
+import type { SelectAndFocusFieldValueByPath } from "@uipath/ui-widgets-validation-station";
 import type { UiPath } from "@uipath/uipath-typescript/core";
+import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import { Entities } from "@uipath/uipath-typescript/entities";
 import type {
   RawTaskGetResponse,
@@ -55,6 +53,9 @@ function App({ uipathSdk }: AppProps) {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [selectAndFocusFieldValueByPath, setSelectAndFocusFieldValueByPath] =
     useState<SelectAndFocusFieldValueByPath | undefined>(undefined);
+  const [save, setSave] = useState<{ validate: boolean } | undefined>(
+    undefined,
+  );
   const [selectedTask, setSelectedTask] = useState<TaskGetResponse | null>(
     null,
   );
@@ -322,15 +323,40 @@ function App({ uipathSdk }: AppProps) {
                     >
                       Focus Item Quantity By Path
                     </Button>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      sx={{ ml: 1, mb: 2 }}
+                      onClick={() => setSave({ validate: true })}
+                    >
+                      Save
+                    </Button>
                     <ValidationStation
                       sdk={uipathSdk}
                       data={
-                        selectedTask.data as unknown as ContentValidationData
+                        selectedTask.data as unknown as DuFramework.ContentValidationData
                       }
                       folderId={selectedTask.folderId}
+                      save={save}
                       selectAndFocusFieldValueByPath={
                         selectAndFocusFieldValueByPath
                       }
+                      onSaveComplete={async (result) => {
+                        if (!result.success) return;
+                        try {
+                          await selectedTask.complete({
+                            action: "Completed",
+                            type: TaskType.DocumentValidation,
+                          });
+                          setTaskList((tasks) =>
+                            tasks.filter((t) => t.id !== selectedTask.id),
+                          );
+                          setSelectedTaskId(null);
+                          setSelectedTask(null);
+                        } catch (err) {
+                          console.error(`Failed to complete task: ${err}`);
+                        }
+                      }}
                     />
                   </Box>
                 )
