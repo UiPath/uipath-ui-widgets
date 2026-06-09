@@ -52,4 +52,125 @@ describe("resolveSchema", () => {
     expect(resolved.properties?.first).toEqual({ type: "string" });
     expect(resolved.properties?.last).toEqual({ type: "string" });
   });
+
+  it("returns an empty schema for non-object input", () => {
+    expect(resolveSchema(null)).toEqual({});
+    expect(resolveSchema("nope")).toEqual({});
+    expect(resolveSchema(42)).toEqual({});
+  });
+
+  it("carries over top-level type and required", () => {
+    const resolved = resolveSchema({
+      type: "object",
+      required: ["a"],
+      properties: { a: { type: "string" } },
+    });
+    expect(resolved.type).toBe("object");
+    expect(resolved.required).toEqual(["a"]);
+  });
+
+  it("extracts the non-null type from a nullable anyOf", () => {
+    const resolved = resolveSchema({
+      type: "object",
+      properties: {
+        nickname: { anyOf: [{ type: "string" }, { type: "null" }] },
+      },
+    });
+    expect(resolved.properties?.nickname).toEqual({ type: "string" });
+  });
+
+  it("treats an all-const anyOf as an enum and preserves titles", () => {
+    const resolved = resolveSchema({
+      type: "object",
+      properties: {
+        priority: {
+          title: "Priority",
+          anyOf: [
+            { const: "high", title: "High" },
+            { const: "normal" },
+            { type: "null" },
+          ],
+        },
+      },
+    });
+    expect(resolved.properties?.priority).toEqual({
+      type: "string",
+      enum: ["high", "normal"],
+      oneOf: [{ const: "high", title: "High" }, { const: "normal" }],
+      title: "Priority",
+    });
+  });
+
+  it("carries title/description/default down onto a resolved composite", () => {
+    const resolved = resolveSchema({
+      type: "object",
+      properties: {
+        note: {
+          title: "Note",
+          description: "Optional note",
+          default: "hi",
+          anyOf: [{ type: "string" }, { type: "null" }],
+        },
+      },
+    });
+    expect(resolved.properties?.note).toMatchObject({
+      type: "string",
+      title: "Note",
+      description: "Optional note",
+      default: "hi",
+    });
+  });
+
+  it("resolves a $ref nested inside a nullable anyOf", () => {
+    const resolved = resolveSchema({
+      type: "object",
+      $defs: {
+        Addr: { type: "object", properties: { zip: { type: "string" } } },
+      },
+      properties: {
+        home: { anyOf: [{ $ref: "#/$defs/Addr" }, { type: "null" }] },
+      },
+    });
+    expect(resolved.properties?.home?.properties?.zip).toEqual({
+      type: "string",
+    });
+  });
+
+  it("collapses a self-referential $ref inside anyOf to an opaque object", () => {
+    const resolved = resolveSchema({
+      type: "object",
+      $defs: {
+        Node: {
+          type: "object",
+          properties: {
+            next: { anyOf: [{ $ref: "#/$defs/Node" }, { type: "null" }] },
+          },
+        },
+      },
+      properties: { root: { $ref: "#/$defs/Node" } },
+    });
+    expect(resolved.properties?.root?.properties?.next).toEqual({
+      type: "object",
+    });
+  });
+
+  it("recursively resolves array item schemas via $ref", () => {
+    const resolved = resolveSchema({
+      type: "object",
+      $defs: { Tag: { type: "string" } },
+      properties: {
+        tags: { type: "array", items: { $ref: "#/$defs/Tag" } },
+      },
+    });
+    expect(resolved.properties?.tags?.items).toEqual({ type: "string" });
+  });
+
+  it("supports the `definitions` alias for `$defs`", () => {
+    const resolved = resolveSchema({
+      type: "object",
+      definitions: { Name: { type: "string" } },
+      properties: { first: { $ref: "#/definitions/Name" } },
+    });
+    expect(resolved.properties?.first).toEqual({ type: "string" });
+  });
 });
