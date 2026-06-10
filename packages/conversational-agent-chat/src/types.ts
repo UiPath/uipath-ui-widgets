@@ -50,10 +50,12 @@ export interface ConversationalAgentChatProps {
   /** Allow for loading an existing conversation by ID instead of creating a new one on first message */
   existingConversationId?: string;
   /**
-   * Agent input schema. When provided, takes precedence over the schema derived
-   * from the resolved agent. Use this when the caller has the schema but the
-   * agent can't be resolved from `agentId` or the conversation (e.g. an
-   * in-progress draft). Falls back to the resolved agent's schema when omitted.
+   * @internal
+   * Debug-only override for the agent input schema. Only honored when
+   * `isDebugMode` is true — the debug flow opens an empty conversation up front,
+   * where the agent (and its derived schema) may not be resolvable. Passing it
+   * while `isDebugMode` is false throws. In normal usage the schema is resolved
+   * automatically from the agent release.
    */
   inputSchema?: InputSchema;
   /**

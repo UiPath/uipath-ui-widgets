@@ -109,6 +109,14 @@ export const ConversationalAgentChat = ({
   surfaceName,
   surfaceVersion,
 }: ConversationalAgentChatProps) => {
+  // `inputSchema` is an internal debug-only override. In normal usage the
+  // schema is resolved from the agent release, so accepting it outside debug
+  // mode would only confuse callers — reject the combination loudly.
+  if (inputSchemaProp && !isDebugMode) {
+    throw new Error(
+      "`inputSchema` is only supported when `isDebugMode` is true; the agent's input schema is resolved automatically.",
+    );
+  }
   // must change language before useTranslation is called to avoid stale translations
   if (i18next.language !== locale) {
     i18next.changeLanguage(locale);
@@ -841,15 +849,14 @@ export const ConversationalAgentChat = ({
       agentKeyRef.current = agentRelease?.releaseKey;
       const agentName = agentRelease?.name ?? "";
 
-      // Prefer an explicitly-provided schema over the one derived from the
-      // resolved agent: the agent isn't always resolvable (e.g. the host passes
-      // only existingConversationId and the conversation carries no agentId),
-      // but the caller may still have the schema to display (e.g. an in-progress draft).
+      // In debug mode the agent (and its derived schema) may not be resolvable,
+      // so an explicit `inputSchema` override takes precedence. Normal usage
+      // always derives the schema from the resolved agent release.
       // TODO(sdk-typing): drop the cast once @uipath/uipath-typescript exposes
       // inputSchema on AgentRelease. The API returns it but the SDK type
       // definitions don't include it yet.
       const inputSchema =
-        inputSchemaProp ??
+        (isDebugMode ? inputSchemaProp : undefined) ??
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ((agentRelease as any)?.inputSchema as InputSchema | undefined);
 

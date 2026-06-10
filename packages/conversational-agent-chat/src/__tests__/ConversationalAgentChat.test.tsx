@@ -940,6 +940,24 @@ describe("ConversationalAgentChat", () => {
       expect(screen.queryByTestId("ap-chat")).not.toBeInTheDocument();
     });
 
+    it("throws when inputSchema is passed without isDebugMode", () => {
+      // inputSchema is an internal debug-only override; using it in normal
+      // (public) mode should fail loudly rather than silently take precedence
+      // over the agent-resolved schema.
+      expect(() =>
+        render(
+          <ConversationalAgentChat
+            {...defaultProps}
+            inputSchema={{
+              type: "object",
+              properties: { customerName: { type: "string" } },
+              required: ["customerName"],
+            }}
+          />,
+        ),
+      ).toThrow(/only supported when `isDebugMode` is true/);
+    });
+
     it("InputsPage submit failure surfaces an inline error and keeps form mounted", async () => {
       mockGetById.mockResolvedValueOnce(
         buildInputSchemaAgent(() => Promise.reject(new Error("Network down"))),
