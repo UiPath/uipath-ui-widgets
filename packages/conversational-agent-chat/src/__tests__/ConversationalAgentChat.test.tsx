@@ -23,6 +23,10 @@ const createMockChatService = () => ({
   setTheme: vi.fn(),
   getLocale: vi.fn().mockReturnValue("en"),
   injectMessageRenderer: vi.fn(),
+  sendOutputStreamEvent: vi.fn(),
+  setShowLoading: vi.fn(),
+  setWaiting: vi.fn(),
+  setCustomHeaderActions: vi.fn(),
 });
 
 let mockChatService = createMockChatService();
@@ -45,6 +49,8 @@ vi.mock("@uipath/apollo-react/material/components", () => ({
     HistoryLoadMore: "historyLoadMore",
     HistorySearch: "historySearch",
     Feedback: "feedback",
+    StopResponse: "stopResponse",
+    CustomHeaderActionClicked: "customHeaderActionClicked",
   },
   AutopilotChatService: {
     Instantiate: vi.fn(() => mockChatService),
@@ -60,13 +66,17 @@ vi.mock("../utils/telemetryUtils", () => ({
 // props (e.g. externalUserId) are threaded through to the SDK. Hoisted shared
 // mocks so tests can override per-test (e.g. simulating an inputSchema for the
 // InputsPage flow). beforeEach re-establishes defaults.
-const { capturedAgentConstructorArgs, mockGetById, mockCreate } = vi.hoisted(
-  () => ({
-    capturedAgentConstructorArgs: [] as any[][],
-    mockGetById: vi.fn(),
-    mockCreate: vi.fn(),
-  }),
-);
+const {
+  capturedAgentConstructorArgs,
+  mockGetById,
+  mockCreate,
+  mockUpdateById,
+} = vi.hoisted(() => ({
+  capturedAgentConstructorArgs: [] as any[][],
+  mockGetById: vi.fn(),
+  mockCreate: vi.fn(),
+  mockUpdateById: vi.fn(),
+}));
 
 // Store handlers for testing
 let exchangeErrorHandler: any = null;
@@ -162,6 +172,7 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
 
       conversations = {
         create: mockCreate,
+        updateById: mockUpdateById,
         getAll: vi.fn().mockResolvedValue({
           items: mockConversations,
           nextCursor: { value: "cursor-1" },
@@ -196,6 +207,7 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
                 messageStartHandler = handler;
               }),
               onExchangeEnd: vi.fn(),
+              sendExchangeEnd: vi.fn(),
               startMessage: vi.fn(() => mockMessageBuilder),
             })),
           };
@@ -239,6 +251,7 @@ describe("ConversationalAgentChat", () => {
       label: "",
       lastActivityTime: "2024-01-03T10:00:00Z",
     });
+    mockUpdateById.mockReset().mockResolvedValue(undefined);
     i18next.changeLanguage("en");
     mockSdk = {} as any;
     mockChatService = createMockChatService();
@@ -867,6 +880,91 @@ describe("ConversationalAgentChat", () => {
       });
     });
 
+    it("renders InputsPage in debug mode even when existingConversationId is set", async () => {
+      mockGetById.mockResolvedValue(buildInputSchemaAgent());
+      render(
+        <ConversationalAgentChat
+          {...defaultProps}
+          existingConversationId="conv-existing"
+          isDebugMode
+        />,
+      );
+
+      expect(
+        await screen.findByRole("button", { name: /start conversation/i }),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("ap-chat")).not.toBeInTheDocument();
+    });
+
+    it("submitting InputsPage in debug mode updates the existing conversation instead of creating one", async () => {
+      const agent = buildInputSchemaAgent();
+      mockGetById.mockResolvedValue(agent);
+      render(
+        <ConversationalAgentChat
+          {...defaultProps}
+          existingConversationId="conv-existing"
+          isDebugMode
+        />,
+      );
+
+      const submit = await screen.findByRole("button", {
+        name: /start conversation/i,
+      });
+      const input = await screen.findByPlaceholderText(/enter a value/i);
+      fireEvent.change(input, { target: { value: "Acme Corp" } });
+      fireEvent.click(submit);
+
+      await waitFor(() => {
+        expect(mockUpdateById).toHaveBeenCalledWith("conv-existing", {
+          agentInput: { inline: { customerName: "Acme Corp" } },
+        });
+      });
+      expect(agent.conversations.create).not.toHaveBeenCalled();
+    });
+
+    it("renders InputsPage from the inputSchema prop when the agent can't be resolved (debug, no agentId)", async () => {
+      // Mirrors the agent-builder debug flow: no agentId, and the existing
+      // conversation carries no agentId, so the agent (and any derived schema)
+      // never resolve. The explicit inputSchema prop must drive the page.
+      render(
+        <ConversationalAgentChat
+          sdk={defaultProps.sdk}
+          existingConversationId="conv-existing"
+          isDebugMode
+          inputSchema={{
+            type: "object",
+            properties: {
+              customerName: { type: "string", title: "Customer Name" },
+            },
+            required: ["customerName"],
+          }}
+        />,
+      );
+
+      expect(
+        await screen.findByRole("button", { name: /start conversation/i }),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("ap-chat")).not.toBeInTheDocument();
+    });
+
+    it("throws when inputSchema is passed without isDebugMode", () => {
+      // inputSchema is an internal debug-only override; using it in normal
+      // (public) mode should fail loudly rather than silently take precedence
+      // over the agent-resolved schema.
+      expect(() =>
+        render(
+          <ConversationalAgentChat
+            {...defaultProps}
+            inputSchema={{
+              type: "object",
+              properties: { customerName: { type: "string" } },
+              required: ["customerName"],
+            }}
+          />,
+        ),
+      ).toThrow(/only supported when `isDebugMode` is true/);
+    });
+
     it("InputsPage submit failure surfaces an inline error and keeps form mounted", async () => {
       mockGetById.mockResolvedValueOnce(
         buildInputSchemaAgent(() => Promise.reject(new Error("Network down"))),
@@ -1410,6 +1508,133 @@ describe("ConversationalAgentChat", () => {
         // sendResponse should not be called for non-text content
         expect(mockChatService.sendResponse).not.toHaveBeenCalled();
       }
+    });
+
+    it("renders a confirmation widget and confirms approval for tool calls that require it", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Test", attachments: [] });
+
+      const sendToolCallConfirm = vi.fn();
+      const mockToolCall = {
+        toolCallId: "tool-confirm-1",
+        startEvent: {
+          toolName: "deleteFile",
+          input: { path: "/tmp/x" },
+          inputSchema: {
+            type: "object",
+            properties: { path: { type: "string" } },
+          },
+          requireConfirmation: true,
+        },
+        sendToolCallConfirm,
+        onToolCallEnd: vi.fn((handler: any) => {
+          toolCallEndHandler = handler;
+        }),
+      };
+      const mockMessage = createMockMessage({
+        onToolCallStart: vi.fn((handler: any) => handler(mockToolCall)),
+      });
+      messageStartHandler?.(mockMessage);
+
+      // The widget is sent as a ToolConfirmation message carrying the
+      // approve/reject channel on its meta.
+      const confirmCall = mockChatService.sendResponse.mock.calls.find(
+        ([msg]: any) => msg.meta?.confirmationData,
+      );
+      expect(confirmCall).toBeTruthy();
+      confirmCall[0].meta.onApprove({ input: { path: "/tmp/x" } });
+      expect(sendToolCallConfirm).toHaveBeenCalledWith({
+        approved: true,
+        input: { path: "/tmp/x" },
+      });
+
+      // Tool completes after the spinner was shown.
+      toolCallEndHandler?.({ output: "deleted", isError: false });
+    });
+
+    it("rejects the tool call when the confirmation widget is cancelled", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Test", attachments: [] });
+
+      const sendToolCallConfirm = vi.fn();
+      const mockToolCall = {
+        toolCallId: "tool-confirm-2",
+        startEvent: {
+          toolName: "deleteFile",
+          input: { path: "/tmp/y" },
+          requireConfirmation: true,
+        },
+        sendToolCallConfirm,
+        onToolCallEnd: vi.fn(),
+      };
+      messageStartHandler?.(
+        createMockMessage({
+          onToolCallStart: vi.fn((handler: any) => handler(mockToolCall)),
+        }),
+      );
+
+      const confirmCall = mockChatService.sendResponse.mock.calls.find(
+        ([msg]: any) => msg.meta?.confirmationData,
+      );
+      confirmCall[0].meta.onCancel();
+      expect(sendToolCallConfirm).toHaveBeenCalledWith({ approved: false });
+    });
+
+    it("stops the active response when StopResponse fires", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      // Sets activeExchange so the stop handler exercises the teardown branch.
+      await onSendMessage?.({ content: "Test", attachments: [] });
+
+      const onStopResponse = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "stopResponse",
+      )?.[1];
+      onStopResponse?.();
+
+      expect(mockChatService.sendOutputStreamEvent).toHaveBeenCalledWith({
+        turnComplete: true,
+      });
     });
   });
 
