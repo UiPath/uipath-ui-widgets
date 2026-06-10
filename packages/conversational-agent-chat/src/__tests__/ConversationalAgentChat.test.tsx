@@ -96,7 +96,6 @@ const createMockMessage = (overrides: Record<string, any> = {}) => ({
   startEvent: { role: "assistant", timestamp: "2024-01-01T10:00:00Z" },
   onContentPartStart: vi.fn(),
   onToolCallStart: vi.fn(),
-  onInterruptStart: vi.fn(),
   ...overrides,
 });
 

@@ -21,7 +21,6 @@ import {
   ExchangeGetResponse,
   ExchangeStream,
   FeedbackRating,
-  InterruptType,
   MessageStream,
   SessionStream,
   SortOrder,
@@ -322,7 +321,7 @@ export const ConversationalAgentChat = ({
             });
           };
 
-          // Shared by both flows — caller supplies the approve/reject channel.
+          // Caller supplies the approve/reject channel.
           const sendToolConfirmationWidget = (params: {
             toolCallId: string;
             toolName: string;
@@ -352,17 +351,14 @@ export const ConversationalAgentChat = ({
                   confirmationData,
                   isCompleted,
                   wasRejected,
-                  // No-ops once completed — the form's buttons are gone but meta shape stays stable.
-                  onApprove: isCompleted ? noopApprove : handleApprove,
-                  onCancel: isCompleted ? noop : handleCancel,
+                  // Unreachable once completed (the form's buttons are gone),
+                  // but kept on the meta so its shape stays stable.
+                  onApprove: handleApprove,
+                  onCancel: handleCancel,
                 },
               });
             };
 
-            const noop = () => {};
-            const noopApprove = (endValue: { input?: unknown }) => {
-              void endValue;
-            };
             const handleApprove = (endValue: { input?: unknown }) => {
               sendUpdate(true, false);
               params.onApprove(endValue.input);
@@ -437,36 +433,6 @@ export const ConversationalAgentChat = ({
               }
               pendingToolCalls.delete(toolCall.toolCallId);
             });
-          });
-
-          // Legacy interrupt-based flow, still used by temporal runtime.
-          message.onInterruptStart(({ interruptId, startEvent }) => {
-            if (startEvent.type === InterruptType.ToolCallConfirmation) {
-              const confirmationData =
-                startEvent.value as ToolCallConfirmationValue;
-              const pending = pendingToolCalls.get(confirmationData.toolCallId);
-              if (pending) pending.spinnerSent = false;
-
-              sendToolConfirmationWidget({
-                toolCallId: confirmationData.toolCallId,
-                toolName: confirmationData.toolName,
-                inputSchema: confirmationData.inputSchema,
-                inputValue: confirmationData.inputValue,
-                onApprove: (input) => {
-                  sendToolCallSpinner(confirmationData.toolCallId);
-                  message.sendInterruptEnd(interruptId, {
-                    type: InterruptType.ToolCallConfirmation,
-                    value: { approved: true, input },
-                  });
-                },
-                onCancel: () => {
-                  message.sendInterruptEnd(interruptId, {
-                    type: InterruptType.ToolCallConfirmation,
-                    value: { approved: false },
-                  });
-                },
-              });
-            }
           });
         }
       });
