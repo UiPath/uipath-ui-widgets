@@ -91,7 +91,7 @@ function App() {
 
 - React 19.2.0+
 - React DOM 19.2.0+
-- @uipath/uipath-typescript ^1.3.9
+- @uipath/uipath-typescript ^1.3.10
 - @uipath/apollo-wind
 
 ## License

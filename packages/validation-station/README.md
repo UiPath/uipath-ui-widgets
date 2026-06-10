@@ -13,7 +13,7 @@ npm install @uipath/ui-widgets-validation-station
 ```
 react >= 19.2.0
 react-dom >= 19.2.0
-@uipath/uipath-typescript >= 1.3.9
+@uipath/uipath-typescript >= 1.3.10
 ```
 
 ## Quick start
