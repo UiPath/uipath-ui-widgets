@@ -27,33 +27,18 @@ describe("i18n", () => {
       );
     });
 
-    it("should have shared translations for all locales", () => {
-      const locales = [
-        "en",
-        "es",
-        "de",
-        "fr",
-        "ja",
-        "ko",
-        "pt",
-        "pt-BR",
-        "es-MX",
-        "ru",
-        "tr",
-        "zh-CN",
-        "zh-TW",
-      ];
+    it("should have shared translations bundled for English", () => {
+      // Only `en` (plus the `keys` debug pseudo-locale) ships real resources
+      // today. Asserting other locales here would pass on i18next's English
+      // fallback and give a false sense of coverage — add them back as the
+      // localization team delivers resource files.
+      const t = i18next.getFixedT("en");
       const sharedKeys = ["disclaimer_message", "chat_input_placeholder"];
 
-      for (const locale of locales) {
-        const t = i18next.getFixedT(locale);
-        for (const key of sharedKeys) {
-          const value = t(key);
-          expect(value, `${locale}.${key} should be defined`).toBeTruthy();
-          expect(value, `${locale}.${key} should not return the key`).not.toBe(
-            key,
-          );
-        }
+      for (const key of sharedKeys) {
+        const value = t(key);
+        expect(value, `en.${key} should be defined`).toBeTruthy();
+        expect(value, `en.${key} should not return the key`).not.toBe(key);
       }
     });
 

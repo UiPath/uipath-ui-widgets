@@ -15,6 +15,21 @@ expect.extend({});
 global.confirm = () => true;
 global.alert = () => {};
 
+// jsdom doesn't implement matchMedia; sonner (used by apollo-wind Toaster) calls it on mount.
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }),
+});
+
 // Mock ResizeObserver
 global.ResizeObserver = class ResizeObserver {
   observe() {}

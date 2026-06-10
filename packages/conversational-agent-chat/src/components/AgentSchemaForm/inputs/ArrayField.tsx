@@ -1,4 +1,5 @@
 import { Badge, Input, cn } from "@uipath/apollo-wind";
+import { Close } from "@uipath/apollo-react/icons";
 import { type ChangeEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -61,20 +62,7 @@ export const ArrayField = ({
               onClick={() => onChange(chips.filter((_, idx) => idx !== i))}
               className="rounded px-1 text-muted-foreground hover:text-foreground disabled:pointer-events-none"
             >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 12 12"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M2 2L10 10M10 2L2 10"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <Close size={10} aria-hidden="true" />
             </button>
           </Badge>
         ))}

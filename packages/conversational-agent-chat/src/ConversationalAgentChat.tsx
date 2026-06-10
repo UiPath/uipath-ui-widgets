@@ -74,7 +74,7 @@ import {
 } from "./utils";
 import { trackTelemetry } from "./utils/telemetryUtils";
 import { initI18n } from "./i18n";
-import { resolveAgentCached } from "./utils/agentCache";
+import { resolveAgent as fetchAgentRelease } from "./utils/resolveAgent";
 
 initI18n();
 
@@ -232,6 +232,31 @@ export const ConversationalAgentChat = ({
           const messageTimestamp = message.startEvent.timestamp;
           const exchangeId = exchange.exchangeId;
 
+          // Shared envelope for the assistant stream (text, citation, done);
+          // only the chunk and `done` vary.
+          // stream: true so Apollo's actions row (copy, thumbs) renders —
+          // useIsStreamingMessage only listens to SendChunk events; the
+          // stream: false branch fires Response and leaves isStreaming stuck
+          // at true.
+          const sendAssistantChunk = (
+            contentPartChunk: NonNullable<
+              Parameters<
+                AutopilotChatService["sendResponse"]
+              >[0]["contentPartChunk"]
+            >,
+            done = false,
+          ) => {
+            chatService.sendResponse({
+              id: messageId,
+              contentPartChunk,
+              created_at: messageTimestamp,
+              widget: MessageWidget.AI,
+              stream: true,
+              done,
+              meta: { exchangeId },
+            });
+          };
+
           message.onContentPartStart((contentPart: ContentPartStream) => {
             if (contentPart.startEvent.mimeType.startsWith("text/")) {
               // Apollo dictates citation boundaries by chunk index — text and
@@ -245,30 +270,14 @@ export const ConversationalAgentChat = ({
                 }
 
                 if (chunk.data !== undefined) {
-                  chatService.sendResponse({
-                    id: messageId,
-                    contentPartChunk: { text: chunk.data, index: chunkIndex },
-                    created_at: messageTimestamp,
-                    widget: MessageWidget.AI,
-                    stream: true,
-                    done: false,
-                    meta: { exchangeId },
-                  });
+                  sendAssistantChunk({ text: chunk.data, index: chunkIndex });
                 }
 
                 if (chunk.citation?.endCitation) {
                   for (const source of chunk.citation.endCitation.sources) {
-                    chatService.sendResponse({
-                      id: messageId,
-                      contentPartChunk: {
-                        citation: mapCitationSource(source),
-                        index: chunkIndex,
-                      },
-                      created_at: messageTimestamp,
-                      widget: MessageWidget.AI,
-                      stream: true,
-                      done: false,
-                      meta: { exchangeId },
+                    sendAssistantChunk({
+                      citation: mapCitationSource(source),
+                      index: chunkIndex,
                     });
                   }
                   chunkIndex++;
@@ -278,19 +287,7 @@ export const ConversationalAgentChat = ({
               });
 
               contentPart.onContentPartEnd(() => {
-                // stream: true so Apollo's actions row (copy, thumbs) renders.
-                // useIsStreamingMessage only listens to SendChunk events; the
-                // stream: false branch fires Response and leaves isStreaming
-                // stuck at true.
-                chatService.sendResponse({
-                  id: messageId,
-                  contentPartChunk: { index: chunkIndex },
-                  created_at: messageTimestamp,
-                  widget: MessageWidget.AI,
-                  stream: true,
-                  done: true,
-                  meta: { exchangeId },
-                });
+                sendAssistantChunk({ index: chunkIndex }, true);
               });
             }
           });
@@ -516,9 +513,7 @@ export const ConversationalAgentChat = ({
         return resolvedAgent.current;
       }
     }
-    // Funnel through the shared module-level cache so a `useResolvedAgent`
-    // mounted alongside the widget reuses the same in-flight fetch.
-    const release = await resolveAgentCached(
+    const release = await fetchAgentRelease(
       sdk,
       effectiveAgentId,
       effectiveFolderId,

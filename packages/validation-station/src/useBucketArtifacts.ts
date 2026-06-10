@@ -1,4 +1,4 @@
-import type { ContentValidationData } from "@uipath/du-shared-util-mfe";
+import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import { BucketService } from "@uipath/uipath-typescript/buckets";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import { useEffect, useState, useRef } from "react";
@@ -7,7 +7,7 @@ import type { BucketArtifacts } from "./types";
 
 export function useBucketArtifacts(
   sdk: UiPath,
-  data: ContentValidationData,
+  data: DuFramework.ContentValidationData,
   folderId: number | undefined,
 ) {
   const bucketServiceRef = useRef(new BucketService(sdk));

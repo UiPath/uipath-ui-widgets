@@ -114,6 +114,8 @@ export interface AgentSummary {
   name: string;
   description: string;
   folderId: number;
+  /** Version of the deployed agent (e.g. "1.0.7"). Absent on draft agents. */
+  processVersion?: string;
 }
 
 export interface ConversationalAgentPickerChatProps {

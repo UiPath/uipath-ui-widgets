@@ -11,6 +11,7 @@ on:
           - multi-file-upload
           - datatable
           - conversational-agent-chat
+          - validation-station
       beta:
         description: "Check for prerelease/beta versions"
         required: false
@@ -35,6 +36,14 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Print publish info
+        run: |
+          VERSION=$(node -p "require('./packages/${{ inputs.package }}/package.json').version")
+          TAG=$([ "${{ inputs.beta }}" = "true" ] && echo "beta" || echo "latest")
+          echo "Package: ${{ inputs.package }}"
+          echo "Version: $VERSION"
+          echo "Tag: $TAG"
 
       - name: Setup Node.js for GitHub Packages
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4

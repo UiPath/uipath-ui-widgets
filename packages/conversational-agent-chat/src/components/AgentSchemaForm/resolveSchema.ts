@@ -15,14 +15,20 @@ function getDefs(root: RawSchema): Record<string, RawSchema> {
   return (root.$defs ?? root.definitions ?? {}) as Record<string, RawSchema>;
 }
 
+// Extracts the definition name from a local ref like "#/$defs/TypeName".
+function refName(ref: unknown): string | undefined {
+  if (typeof ref !== "string") return undefined;
+  return ref.match(/^#\/(?:\$defs|definitions)\/(.+)$/)?.[1];
+}
+
 function resolveRef(
   ref: string,
   defs: Record<string, RawSchema>,
 ): RawSchema | undefined {
   // Only handle local refs like "#/$defs/TypeName"
-  const match = ref.match(/^#\/(?:\$defs|definitions)\/(.+)$/);
-  if (!match) return undefined;
-  return defs[match[1]];
+  const name = refName(ref);
+  if (!name) return undefined;
+  return defs[name];
 }
 
 /**
@@ -54,6 +60,7 @@ function inlineRef(
 function resolveComposite(
   composite: RawSchema[],
   defs: Record<string, RawSchema>,
+  visited: ReadonlySet<string>,
 ): InputSchemaProperty | undefined {
   const nonNull = composite.filter((s) => s.type !== "null");
 
@@ -75,10 +82,15 @@ function resolveComposite(
   if (nonNull.length === 1) {
     const schema = nonNull[0];
     if (schema.$ref) {
+      const name = refName(schema.$ref);
+      if (name && visited.has(name)) return { type: "object" };
       const inlined = inlineRef(schema.$ref as string, defs);
-      if (inlined) return resolveProperty(inlined, defs);
+      if (inlined) {
+        const next = name ? new Set(visited).add(name) : visited;
+        return resolveProperty(inlined, defs, next);
+      }
     }
-    return resolveProperty(schema, defs);
+    return resolveProperty(schema, defs, visited);
   }
 
   return undefined;
@@ -87,21 +99,28 @@ function resolveComposite(
 function resolveProperty(
   raw: RawSchema,
   defs: Record<string, RawSchema>,
+  visited: ReadonlySet<string> = new Set(),
 ): InputSchemaProperty {
-  // Resolve $ref at property level — merge sibling properties from the $ref site
+  // Resolve $ref at property level — merge sibling properties from the $ref site.
   if (raw.$ref) {
+    const name = refName(raw.$ref);
+    // Cycle guard: a $ref already in the resolution chain (e.g. a
+    // self-referential `Node.child: $ref Node`) would recurse forever. Treat
+    // it as an opaque object instead of overflowing the stack.
+    if (name && visited.has(name)) return { type: "object" };
     const inlined = inlineRef(raw.$ref as string, defs);
     if (inlined) {
       const rest = { ...raw };
       delete rest.$ref;
-      return resolveProperty({ ...inlined, ...rest }, defs);
+      const next = name ? new Set(visited).add(name) : visited;
+      return resolveProperty({ ...inlined, ...rest }, defs, next);
     }
   }
 
   // Handle anyOf/oneOf nullable and enum patterns
   const compositeArray = (raw.anyOf ?? raw.oneOf) as RawSchema[] | undefined;
   if (Array.isArray(compositeArray)) {
-    const resolved = resolveComposite(compositeArray, defs);
+    const resolved = resolveComposite(compositeArray, defs, visited);
     if (resolved) {
       // Carry over title, description, default from the parent
       const overrides: InputSchemaProperty = {};
@@ -129,13 +148,13 @@ function resolveProperty(
     const props = raw.properties as Record<string, RawSchema>;
     result.properties = {};
     for (const [key, prop] of Object.entries(props)) {
-      result.properties[key] = resolveProperty(prop, defs);
+      result.properties[key] = resolveProperty(prop, defs, visited);
     }
   }
 
   // Recursively resolve array items
   if (raw.items) {
-    result.items = resolveProperty(raw.items as RawSchema, defs);
+    result.items = resolveProperty(raw.items as RawSchema, defs, visited);
   }
 
   return result;

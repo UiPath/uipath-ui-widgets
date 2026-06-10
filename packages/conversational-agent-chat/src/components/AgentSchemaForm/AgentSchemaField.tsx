@@ -12,13 +12,17 @@ import {
 import type { ChangeEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ArrayIcon } from "../../icons/ArrayIcon";
-import { BooleanIcon } from "../../icons/BooleanIcon";
-import { DateIcon } from "../../icons/DateIcon";
-import { DateTimeIcon } from "../../icons/DateTimeIcon";
-import { NumbersIcon } from "../../icons/NumbersIcon";
-import { ObjectIcon } from "../../icons/ObjectIcon";
-import { TextIcon } from "../../icons/TextIcon";
+import {
+  DataTypesArray,
+  DataTypesBoolean,
+  DataTypesDate,
+  DataTypesDatetime,
+  DataTypesInteger,
+  DataTypesObject,
+  DataTypesString,
+} from "@uipath/apollo-react/icons";
+
+// No apollo equivalent for a time-only type, so this one stays hand-rolled.
 import { TimeIcon } from "../../icons/TimeIcon";
 import { FieldShell } from "./FieldShell";
 import { ArrayField } from "./inputs/ArrayField";
@@ -50,7 +54,10 @@ const hasAnyRequiredDescendant = (prop: InputSchemaProperty): boolean => {
   return Object.values(nestedProps).some(hasAnyRequiredDescendant);
 };
 
-type DateFormat = "date" | "time" | "date-time";
+// Values are HTML <input type> strings, used directly as the field's `type`.
+// resolveDateFormat translates the JSON Schema "date-time" format to
+// "datetime-local"; any new option must likewise be a valid <input> type.
+type DateFormat = "date" | "time" | "datetime-local";
 
 // Tool input schemas often arrive as plain `type: "string"` with no format,
 // even when the value is a date. Precedence: schema → value → undefined.
@@ -59,22 +66,21 @@ type DateFormat = "date" | "time" | "date-time";
 // `format: "time"` is intentionally not trusted — calendar-style tool schemas
 // commonly misuse it for timezone identifier strings ("Europe/London"). A
 // genuine time-only value flows through the value check below and renders as
-// text, matching react-sdk's tool-confirmation behavior.
+// text.
 const resolveDateFormat = (
   prop: InputSchemaProperty,
   value: unknown,
 ): DateFormat | undefined => {
-  if (prop.format === "date" || prop.format === "date-time") {
-    return prop.format;
-  }
+  if (prop.format === "date") return "date";
+  if (prop.format === "date-time") return "datetime-local";
   if (prop.type && prop.type !== "string") return undefined;
-  if (value instanceof Date) return "date-time";
+  if (value instanceof Date) return "datetime-local";
   if (
     typeof value === "string" &&
     value.length >= 10 &&
     !isNaN(Date.parse(value))
   ) {
-    return value.includes("T") ? "date-time" : "date";
+    return value.includes("T") ? "datetime-local" : "date";
   }
   return undefined;
 };
@@ -83,14 +89,15 @@ const getFieldIcon = (
   prop: InputSchemaProperty,
   dateFormat: DateFormat | undefined,
 ): ReactNode => {
-  if (prop.type === "boolean") return <BooleanIcon />;
-  if (prop.type === "number" || prop.type === "integer") return <NumbersIcon />;
-  if (dateFormat === "date") return <DateIcon />;
+  if (prop.type === "boolean") return <DataTypesBoolean size={16} />;
+  if (prop.type === "number" || prop.type === "integer")
+    return <DataTypesInteger size={16} />;
+  if (dateFormat === "date") return <DataTypesDate size={16} />;
   if (dateFormat === "time") return <TimeIcon />;
-  if (dateFormat === "date-time") return <DateTimeIcon />;
-  if (prop.type === "array") return <ArrayIcon />;
-  if (prop.type === "object") return <ObjectIcon />;
-  return <TextIcon />;
+  if (dateFormat === "datetime-local") return <DataTypesDatetime size={16} />;
+  if (prop.type === "array") return <DataTypesArray size={16} />;
+  if (prop.type === "object") return <DataTypesObject size={16} />;
+  return <DataTypesString size={16} />;
 };
 
 interface FieldLabelProps {
@@ -177,12 +184,6 @@ export const AgentSchemaField = ({
   }
 
   if (dateFormat) {
-    const inputType =
-      dateFormat === "date"
-        ? "date"
-        : dateFormat === "time"
-          ? "time"
-          : "datetime-local";
     return (
       <FieldShell
         label={label}
@@ -191,7 +192,7 @@ export const AgentSchemaField = ({
         helperText={prop.description}
       >
         <Input
-          type={inputType}
+          type={dateFormat}
           value={(value as string) ?? ""}
           disabled={disabled}
           onChange={(e: ChangeEvent<HTMLInputElement>) =>

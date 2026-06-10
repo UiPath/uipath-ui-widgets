@@ -6,24 +6,7 @@ import {
   type AgentSchemaFormHandle,
 } from "./AgentSchemaForm/AgentSchemaForm";
 import type { InputSchema } from "./AgentSchemaForm/types";
-
-/**
- * Normalizes values by converting Date objects to ISO strings.
- * Callers may pass Date instances through `inputValue` (e.g. from earlier
- * form state); the form fields downstream expect string values.
- */
-function normalizeValue(value: unknown): unknown {
-  if (value instanceof Date) return value.toISOString();
-  if (Array.isArray(value)) return value.map(normalizeValue);
-  if (value && typeof value === "object") {
-    const normalized: Record<string, unknown> = {};
-    for (const [key, val] of Object.entries(value)) {
-      normalized[key] = normalizeValue(val);
-    }
-    return normalized;
-  }
-  return value;
-}
+import { normalizeValue } from "../utils/normalizeValue";
 
 /** Strings for tool confirmation UI; pass from the chat root so parallel React roots stay in sync with locale. */
 export interface ToolConfirmationLabels {

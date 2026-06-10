@@ -3,24 +3,38 @@ import i18next from "i18next";
 import { useTranslation } from "react-i18next";
 import { UiPath } from "@uipath/uipath-typescript/core";
 import type { AgentSummary, Locale } from "../types";
-import { resolveAgentCached } from "../utils/agentCache";
+import { resolveAgent } from "../utils/resolveAgent";
 import { initI18n } from "../i18n";
 
 // Idempotent. Ensures i18next is initialized when the hook is imported
 // without first mounting the widget.
 initI18n();
 
+// Stable per-instance id for an sdk so a *different* sdk instance changes
+// `inputsKey` (and fires the reset block). A truthy/falsy flag would collapse
+// every instance to "sdk", leaving stale agent state on the screen after a
+// host swaps the client (e.g. on a token/tenant refresh).
+const sdkIds = new WeakMap<UiPath, number>();
+let nextSdkId = 0;
+const sdkKey = (sdk: UiPath | null | undefined): string => {
+  if (!sdk) return "_";
+  let id = sdkIds.get(sdk);
+  if (id === undefined) {
+    id = ++nextSdkId;
+    sdkIds.set(sdk, id);
+  }
+  return `sdk${id}`;
+};
+
 export interface UseResolvedAgentOptions {
-  /** Pass the same `externalUserId` you give the widget so they share one
-   * fetch. Omit for first-party hosts that don't use external-user auth. */
+  /** External-user id for the fetch. Omit for first-party hosts that don't
+   * use external-user auth. */
   externalUserId?: string;
   /** Locale used for `displayName`'s loading label. Defaults to the
    * currently active i18next language (set by the widget if mounted). */
   locale?: Locale;
-  /** Pass the same `surfaceName`/`surfaceVersion` you give the widget so the
-   * shared `getById` fetch carries surface telemetry headers. Without these,
-   * a hook caller that wins the cache race poisons the entry with an
-   * unsurfaced fetch and the widget's traces show `unknown`. */
+  /** Surface telemetry headers carried on the `getById` fetch (and on the
+   * resolved agent's `conversations` methods). */
   surfaceName?: string;
   surfaceVersion?: string;
 }
@@ -42,9 +56,7 @@ export interface UseResolvedAgentResult {
  * the fallback `getAll()` listing.
  *
  * Returns `{ agent: null, isLoading: true }` while in flight; subsequent
- * `agentId`/`folderId` changes refetch. Shares an in-flight fetch with the
- * widget when both are mounted with the same `(sdk, externalUserId, agentId,
- * folderId, surfaceName, surfaceVersion)`.
+ * `agentId`/`folderId` changes refetch.
  */
 export const useResolvedAgent = (
   sdk: UiPath | null | undefined,
@@ -61,7 +73,7 @@ export const useResolvedAgent = (
   const { t } = useTranslation();
 
   const shouldFetch = !!sdk && agentId != null;
-  const inputsKey = `${sdk ? "sdk" : "_"}|${agentId ?? "_"}|${folderId ?? "_"}|${externalUserId ?? "_"}|${surfaceName ?? "_"}|${surfaceVersion ?? "_"}`;
+  const inputsKey = `${sdkKey(sdk)}|${agentId ?? "_"}|${folderId ?? "_"}|${externalUserId ?? "_"}|${surfaceName ?? "_"}|${surfaceVersion ?? "_"}`;
 
   // Reset on input change via the "storing information from previous renders"
   // pattern (https://react.dev/reference/react/useState#storing-information-from-previous-renders)
@@ -81,7 +93,7 @@ export const useResolvedAgent = (
     if (!shouldFetch) return;
     let cancelled = false;
 
-    resolveAgentCached(sdk, agentId, folderId, {
+    resolveAgent(sdk, agentId, folderId, {
       externalUserId,
       surfaceName,
       surfaceVersion,
