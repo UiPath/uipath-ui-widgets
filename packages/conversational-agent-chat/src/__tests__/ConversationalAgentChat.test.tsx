@@ -23,6 +23,10 @@ const createMockChatService = () => ({
   setTheme: vi.fn(),
   getLocale: vi.fn().mockReturnValue("en"),
   injectMessageRenderer: vi.fn(),
+  sendOutputStreamEvent: vi.fn(),
+  setShowLoading: vi.fn(),
+  setWaiting: vi.fn(),
+  setCustomHeaderActions: vi.fn(),
 });
 
 let mockChatService = createMockChatService();
@@ -45,6 +49,8 @@ vi.mock("@uipath/apollo-react/material/components", () => ({
     HistoryLoadMore: "historyLoadMore",
     HistorySearch: "historySearch",
     Feedback: "feedback",
+    StopResponse: "stopResponse",
+    CustomHeaderActionClicked: "customHeaderActionClicked",
   },
   AutopilotChatService: {
     Instantiate: vi.fn(() => mockChatService),
@@ -201,6 +207,7 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
                 messageStartHandler = handler;
               }),
               onExchangeEnd: vi.fn(),
+              sendExchangeEnd: vi.fn(),
               startMessage: vi.fn(() => mockMessageBuilder),
             })),
           };
@@ -1501,6 +1508,133 @@ describe("ConversationalAgentChat", () => {
         // sendResponse should not be called for non-text content
         expect(mockChatService.sendResponse).not.toHaveBeenCalled();
       }
+    });
+
+    it("renders a confirmation widget and confirms approval for tool calls that require it", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Test", attachments: [] });
+
+      const sendToolCallConfirm = vi.fn();
+      const mockToolCall = {
+        toolCallId: "tool-confirm-1",
+        startEvent: {
+          toolName: "deleteFile",
+          input: { path: "/tmp/x" },
+          inputSchema: {
+            type: "object",
+            properties: { path: { type: "string" } },
+          },
+          requireConfirmation: true,
+        },
+        sendToolCallConfirm,
+        onToolCallEnd: vi.fn((handler: any) => {
+          toolCallEndHandler = handler;
+        }),
+      };
+      const mockMessage = createMockMessage({
+        onToolCallStart: vi.fn((handler: any) => handler(mockToolCall)),
+      });
+      messageStartHandler?.(mockMessage);
+
+      // The widget is sent as a ToolConfirmation message carrying the
+      // approve/reject channel on its meta.
+      const confirmCall = mockChatService.sendResponse.mock.calls.find(
+        ([msg]: any) => msg.meta?.confirmationData,
+      );
+      expect(confirmCall).toBeTruthy();
+      confirmCall[0].meta.onApprove({ input: { path: "/tmp/x" } });
+      expect(sendToolCallConfirm).toHaveBeenCalledWith({
+        approved: true,
+        input: { path: "/tmp/x" },
+      });
+
+      // Tool completes after the spinner was shown.
+      toolCallEndHandler?.({ output: "deleted", isError: false });
+    });
+
+    it("rejects the tool call when the confirmation widget is cancelled", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Test", attachments: [] });
+
+      const sendToolCallConfirm = vi.fn();
+      const mockToolCall = {
+        toolCallId: "tool-confirm-2",
+        startEvent: {
+          toolName: "deleteFile",
+          input: { path: "/tmp/y" },
+          requireConfirmation: true,
+        },
+        sendToolCallConfirm,
+        onToolCallEnd: vi.fn(),
+      };
+      messageStartHandler?.(
+        createMockMessage({
+          onToolCallStart: vi.fn((handler: any) => handler(mockToolCall)),
+        }),
+      );
+
+      const confirmCall = mockChatService.sendResponse.mock.calls.find(
+        ([msg]: any) => msg.meta?.confirmationData,
+      );
+      confirmCall[0].meta.onCancel();
+      expect(sendToolCallConfirm).toHaveBeenCalledWith({ approved: false });
+    });
+
+    it("stops the active response when StopResponse fires", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      // Sets activeExchange so the stop handler exercises the teardown branch.
+      await onSendMessage?.({ content: "Test", attachments: [] });
+
+      const onStopResponse = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "stopResponse",
+      )?.[1];
+      onStopResponse?.();
+
+      expect(mockChatService.sendOutputStreamEvent).toHaveBeenCalledWith({
+        turnComplete: true,
+      });
     });
   });
 
