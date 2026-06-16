@@ -96,6 +96,7 @@ export const ConversationalAgentChat = ({
   inputSchema: inputSchemaProp,
   locale = "en",
   theme = "light",
+  mode = "embedded",
   readOnly = false,
   overrideLabels,
   firstRunExperience,
@@ -952,7 +953,10 @@ export const ConversationalAgentChat = ({
       const chatServiceInstance = AutopilotChatService.Instantiate({
         instanceName: `agent-${agentId}-${folderId}`,
         config: {
-          mode: AutopilotChatMode.Embedded,
+          mode:
+            mode === "fullscreen"
+              ? AutopilotChatMode.FullScreen
+              : AutopilotChatMode.Embedded,
           locale: toApolloSupportedLocale(locale),
           theme: themeRef.current,
           readOnly,
@@ -1028,6 +1032,7 @@ export const ConversationalAgentChat = ({
     inputSchemaProp,
     isDebugMode,
     locale,
+    mode,
     readOnly,
     resolveAgent,
     getConversation,
@@ -1274,7 +1279,13 @@ export const ConversationalAgentChat = ({
   ]);
 
   return (
-    <div className="uipath-conversational-agent-chat">
+    <div
+      className={`uipath-conversational-agent-chat${
+        mode === "fullscreen"
+          ? " uipath-conversational-agent-chat--fullscreen"
+          : ""
+      }`}
+    >
       {!error && showInputPage && inputSchemaState && (
         <InputsPage
           key={`${agentId}-${inputsInstance}`}

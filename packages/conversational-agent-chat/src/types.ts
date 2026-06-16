@@ -67,6 +67,14 @@ export interface ConversationalAgentChatProps {
   externalUserId?: string;
   locale?: Locale;
   theme?: "light" | "dark" | "light-hc" | "dark-hc";
+  /**
+   * Display mode. `"embedded"` (default) fills the host container and is the
+   * right choice when the widget is placed inside an existing layout.
+   * `"fullscreen"` renders the standalone chat experience that owns the
+   * viewport — including the agent sparkle icon next to the title — and is
+   * intended for hosts that give the widget a full-viewport container.
+   */
+  mode?: "embedded" | "fullscreen";
   readOnly?: boolean;
   overrideLabels?: OverrideLabels;
   /**
