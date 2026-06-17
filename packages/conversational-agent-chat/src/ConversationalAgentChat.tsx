@@ -53,7 +53,7 @@ import {
   createToolConfirmationRenderer,
   type ToolConfirmationRenderer,
 } from "./components/ToolConfirmationRenderer";
-import { ALLOWED_ATTACHMENTS } from "./constants";
+import { ALLOWED_ATTACHMENTS } from "./constants/attachments";
 import "./ConversationalAgentChat.css";
 import {
   AttachFileOutput,
