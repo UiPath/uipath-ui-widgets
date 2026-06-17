@@ -53,6 +53,7 @@ import {
   createToolConfirmationRenderer,
   type ToolConfirmationRenderer,
 } from "./components/ToolConfirmationRenderer";
+import { ALLOWED_ATTACHMENTS } from "./constants";
 import "./ConversationalAgentChat.css";
 import {
   AttachFileOutput,
@@ -1000,6 +1001,10 @@ export const ConversationalAgentChat = ({
       });
 
       chatServiceRef.current = chatServiceInstance;
+
+      if (!disabledFeaturesRef.current?.attachments) {
+        chatServiceInstance.setAllowedAttachments(ALLOWED_ATTACHMENTS);
+      }
 
       if (existingConversationId) {
         const conversation = await getConversation();
