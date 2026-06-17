@@ -1,53 +1,16 @@
-import type { IVsSaveValidatedDataRequest } from "@uipath/du-validation-station-wc";
+import type {
+  IVsSaveValidatedDataAsDraftRequest,
+  IVsSaveValidatedDataRequest,
+} from "@uipath/du-validation-station-wc";
 import { BucketService } from "@uipath/uipath-typescript/buckets";
 import type { UiPath } from "@uipath/uipath-typescript/core";
-import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
+import { type DuFramework } from "@uipath/uipath-typescript/document-understanding";
+import { OrchestratorDuModule } from "@uipath/uipath-typescript/orchestrator-du-module";
 import { strToU8, zipSync } from "fflate";
-
-const FOLDER_ID = "X-UIPATH-OrganizationUnitId";
-const PROCESS_EXTRACTED_DATA_PATH =
-  "orchestrator_/doc-understanding/DocumentModule/ProcessExtractedData";
 
 export interface SaveValidatedDataResult {
   success: boolean;
   error?: string;
-}
-
-function buildServiceUrl(sdk: UiPath, path: string): string {
-  const { baseUrl, orgName, tenantName } = sdk.config;
-  const base = baseUrl.replace(/\/+$/, "");
-  return `${base}/${orgName}/${tenantName}/${path}`;
-}
-
-async function processExtractedData(
-  sdk: UiPath,
-  folderId: number,
-  payload: {
-    AutomaticExtractedResults: unknown;
-    ValidatedExtractedResults: unknown;
-    Taxonomy: unknown;
-  },
-): Promise<unknown> {
-  const url = buildServiceUrl(sdk, PROCESS_EXTRACTED_DATA_PATH);
-  const token = sdk.getToken();
-  const headers = {
-    "Content-Type": "application/json",
-    [FOLDER_ID]: folderId.toString(),
-    Authorization: `Bearer ${token}`,
-  };
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `ProcessExtractedData failed (${response.status}): ${body}`,
-    );
-  }
-  return response.json();
 }
 
 async function uploadResultToBucket(
@@ -67,10 +30,10 @@ async function uploadResultToBucket(
     ? `${documentId}/output_results.json`
     : "output_results.json";
   const basename = path.split("/").pop() ?? "";
-  const innerFileName = basename
+  const fileName = basename
     ? basename.replace(/\.zip$/i, ".json")
     : fallbackFileName;
-  const zipped = zipSync({ [innerFileName]: strToU8(JSON.stringify(data)) });
+  const zipped = zipSync({ [fileName]: strToU8(JSON.stringify(data)) });
   const blob = new Blob([new Uint8Array(zipped)], { type: "application/zip" });
   const result = await bucketService.uploadFile({
     bucketId,
@@ -83,32 +46,70 @@ async function uploadResultToBucket(
   }
 }
 
-export async function saveValidatedData(
+export async function submitValidatedData(
   sdk: UiPath,
   data: DuFramework.ContentValidationData,
   folderId: number,
   request: IVsSaveValidatedDataRequest,
 ): Promise<SaveValidatedDataResult> {
   const { BucketId, ValidatedExtractionResultsPath, DocumentId } = data;
-  if (!BucketId || !folderId || !ValidatedExtractionResultsPath) {
+  if (!BucketId || !ValidatedExtractionResultsPath) {
     return {
       success: false,
       error:
-        "ContentValidationData is missing BucketId, FolderId, or ValidatedExtractionResultsPath.",
+        "ContentValidationData is missing BucketId or ValidatedExtractionResultsPath.",
     };
   }
   try {
-    const processedResult = await processExtractedData(sdk, folderId, {
-      AutomaticExtractedResults: request.automaticExtractionResult,
-      ValidatedExtractedResults: request.validatedData,
-      Taxonomy: request.taxonomy,
-    });
+    const du = new OrchestratorDuModule(sdk);
+    const processedResult = await du.processExtractedData(
+      {
+        AutomaticExtractedResults:
+          request.automaticExtractionResult as DuFramework.ExtractionResult,
+        ValidatedExtractedResults:
+          request.validatedData as DuFramework.ExtractionResult,
+        Taxonomy: request.taxonomy as DuFramework.DocumentTaxonomy,
+      },
+      { folderId },
+    );
     await uploadResultToBucket(
       new BucketService(sdk),
       BucketId,
       folderId,
       ValidatedExtractionResultsPath,
       processedResult,
+      DocumentId,
+    );
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function saveValidatedDataAsDraft(
+  sdk: UiPath,
+  data: DuFramework.ContentValidationData,
+  folderId: number,
+  request: IVsSaveValidatedDataAsDraftRequest,
+): Promise<SaveValidatedDataResult> {
+  const { BucketId, ValidatedExtractionResultsPath, DocumentId } = data;
+  if (!BucketId || !ValidatedExtractionResultsPath) {
+    return {
+      success: false,
+      error:
+        "ContentValidationData is missing BucketId or ValidatedExtractionResultsPath.",
+    };
+  }
+  try {
+    await uploadResultToBucket(
+      new BucketService(sdk),
+      BucketId,
+      folderId,
+      ValidatedExtractionResultsPath,
+      request.validatedData,
       DocumentId,
     );
     return { success: true };

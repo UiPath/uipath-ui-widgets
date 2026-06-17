@@ -6,7 +6,7 @@ import type {
 } from "@uipath/du-validation-station-wc";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
-import type { SaveValidatedDataResult } from "./saveValidatedDataUtil";
+import type { SaveValidatedDataResult } from "./saveValidatedDataUtil.js";
 
 export type {
   DeleteFieldValueByPath,
@@ -49,7 +49,6 @@ export interface ValidationStationProps {
   theme?: "light" | "dark" | "light-hc" | "dark-hc";
   language?: ValidationStationLanguage;
   isReadonly?: boolean;
-  enableSaveAsDraft?: boolean;
   options?: IValidationStationOptions;
   save?: { validate: boolean };
   discardChanges?: { value: boolean };
@@ -57,9 +56,23 @@ export interface ValidationStationProps {
   selectAndFocusFieldValueByPath?: SelectAndFocusFieldValueByPath;
   deleteFieldValueByPath?: DeleteFieldValueByPath;
   /**
-   * Fired after the save flow finishes (ProcessExtractedData + bucket upload).
-   * `result.success` is `false` on any failure — the host app decides whether
-   * to retry, complete the task, surface an error, etc.
+   * Fired after the submit flow (`save={{ validate: true }}`) finishes
+   * (ProcessExtractedData + bucket upload). `result.success` is `false` on
+   * any failure — the host app decides whether to retry, complete the task,
+   * surface an error, etc.
    */
-  onSaveComplete?: (result: SaveValidatedDataResult) => void;
+  onSubmitComplete?: (result: SaveValidatedDataResult) => void;
+  /**
+   * Fired after the save-as-draft flow (`save={{ validate: false }}`)
+   * finishes (uploads `validatedData` straight to the bucket, no
+   * `ProcessExtractedData` call).
+   */
+  onSaveAsDraftComplete?: (result: SaveValidatedDataResult) => void;
+  /**
+   * Fired when the user reports the document as an exception. The widget does
+   * NOT call any API for this flow — the host owns persistence (typically a
+   * `OrchestratorDuModule.submitExceptionReport(taskId, documentId, reason, ...)`
+   * call).
+   */
+  onReportExceptionComplete?: (documentId: string, reason: string) => void;
 }

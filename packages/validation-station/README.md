@@ -13,7 +13,7 @@ npm install @uipath/ui-widgets-validation-station
 ```
 react >= 19.2.0
 react-dom >= 19.2.0
-@uipath/uipath-typescript >= 1.3.10
+@uipath/uipath-typescript >= 1.4.1
 ```
 
 ## Quick start
@@ -23,10 +23,10 @@ react-dom >= 19.2.0
 ```tsx
 import {
   ValidationStation,
-  Language,
+  ValidationStationLanguage,
 } from "@uipath/ui-widgets-validation-station";
-import "@uipath/ui-widgets-validation-station/ValidationStation.css";
 import { UiPath } from "@uipath/uipath-typescript/core";
+import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 
 const sdk = new UiPath({
   baseUrl: "https://cloud.uipath.com",
@@ -41,14 +41,14 @@ function App() {
   return (
     <ValidationStation
       sdk={sdk}
-      data={myContentValidationData}
+      data={selectedTask.data as DuFramework.ContentValidationData}
       folderId={12345}
-      theme="light"
-      language={Language.English}
     />
   );
 }
 ```
+
+> `theme` defaults to `"light"` and `language` defaults to `ValidationStationLanguage.English`, so the minimal mount just needs `sdk`, `data`, and a folder.
 
 > See [Static assets](#static-assets) below — you must copy the WC's
 > `du-assets/` folder into your build output, or PDF rendering and
@@ -56,43 +56,66 @@ function App() {
 
 ## Props
 
-| Prop                             | Type                                           | Required | Default   | Description                                                                               |
-| -------------------------------- | ---------------------------------------------- | -------- | --------- | ----------------------------------------------------------------------------------------- |
-| `sdk`                            | `UiPath`                                       | Yes      | —         | UiPath SDK instance for authentication and API calls                                      |
-| `data`                           | `ContentValidationData`                        | Yes      | —         | Document data containing bucket paths, document ID, and folder references                 |
-| `folderId`                       | `number`                                       | No       | —         | Storage bucket folder ID. Falls back to `data.FolderId` if not provided                   |
-| `theme`                          | `'light' \| 'dark' \| 'light-hc' \| 'dark-hc'` | No       | `'light'` | Visual theme                                                                              |
-| `language`                       | `Language`                                     | No       | —         | UI language (see Language enum below)                                                     |
-| `isReadonly`                     | `boolean`                                      | No       | `false`   | When `true`, renders in read-only mode                                                    |
-| `enableSaveAsDraft`              | `boolean`                                      | No       | `false`   | Enables the "Save as draft" action                                                        |
-| `options`                        | `IValidationStationOptions`                    | No       | —         | Fine-grained UI feature flags                                                             |
-| `save`                           | `{ validate: boolean }`                        | No       | —         | Trigger a save. Set `{ validate: true }` to validate before saving                        |
-| `discardChanges`                 | `{ value: boolean }`                           | No       | —         | Trigger a discard-changes operation                                                       |
-| `setTableCellValue`              | `ISetTableCellValueParameters[]`               | No       | —         | Set one or more table cell values programmatically                                        |
-| `deleteTableCellValue`           | `IDeleteTableCellValueParameters[]`            | No       | —         | Delete one or more table cell values programmatically                                     |
-| `setFieldValueByPath`            | `SetFieldValueByPath`                          | No       | —         | Set a field value addressed by a path of `{ fieldName, valueIndex }` segments             |
-| `selectAndFocusFieldValueByPath` | `SelectAndFocusFieldValueByPath`               | No       | —         | Select and focus a field value addressed by a path; focuses the document reference if any |
-| `deleteFieldValueByPath`         | `DeleteFieldValueByPath`                       | No       | —         | Delete a field value addressed by a path                                                  |
+| Prop                             | Type                                           | Required | Default   | Description                                                                                                                                                                                                                                                                                                                                       |
+| -------------------------------- | ---------------------------------------------- | -------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sdk`                            | `UiPath`                                       | Yes      | —         | UiPath SDK instance for authentication and API calls                                                                                                                                                                                                                                                                                              |
+| `data`                           | `ContentValidationData`                        | Yes      | —         | Document data containing bucket paths, document ID, and folder references                                                                                                                                                                                                                                                                         |
+| `folderId`                       | `number`                                       | No\*     | —         | Storage bucket folder ID. Falls back to `data.FolderId`. **One of the two must resolve to a value** — otherwise the widget show an error.                                                                                                                                                                                                         |
+| `theme`                          | `'light' \| 'dark' \| 'light-hc' \| 'dark-hc'` | No       | `'light'` | Visual theme                                                                                                                                                                                                                                                                                                                                      |
+| `language`                       | `ValidationStationLanguage`                    | No       | `English` | UI language (see enum below)                                                                                                                                                                                                                                                                                                                      |
+| `isReadonly`                     | `boolean`                                      | No       | `false`   | When `true`, renders in read-only mode                                                                                                                                                                                                                                                                                                            |
+| `options`                        | `IValidationStationOptions`                    | No       | —         | Fine-grained UI feature flags                                                                                                                                                                                                                                                                                                                     |
+| `save={{ validate: false }}`     | `{ validate: boolean }`                        | No       | —         | Trigger **save as draft**. ⚠ Requires `options.emitDtoStateChanges: true` — otherwise the WC won't surface the latest in-memory extraction state and the save will be a no-op.                                                                                                                                                                    |
+| `save={{ validate: true }}`      | `{ validate: boolean }`                        | No       | —         | Trigger **submit** — runs validation first, then saves.                                                                                                                                                                                                                                                                                           |
+| `discardChanges`                 | `{ value: boolean }`                           | No       | —         | Trigger a discard-changes operation. Call `setDiscardChanges({ value: true })` (or `false` — the boolean is ignored) every time you want it to fire. Each call creates a brand-new object even if the content looks identical, and that's what the widget watches for — so calling it repeatedly with the same `{ value: true }` works just fine. |
+| `setFieldValueByPath`            | `SetFieldValueByPath`                          | No       | —         | Set a field value addressed by a path of `{ fieldName, valueIndex }` segments                                                                                                                                                                                                                                                                     |
+| `selectAndFocusFieldValueByPath` | `SelectAndFocusFieldValueByPath`               | No       | —         | Select and focus a field value addressed by a path; focuses the document reference if any                                                                                                                                                                                                                                                         |
+| `deleteFieldValueByPath`         | `DeleteFieldValueByPath`                       | No       | —         | Delete a field value addressed by a path                                                                                                                                                                                                                                                                                                          |
 
-### Reacting to save completion
+> Three additional callback props (`onSubmitComplete`, `onSaveAsDraftComplete`, `onReportExceptionComplete`) are documented in the next section.
 
-`onSaveComplete` fires after the save flow finishes (ProcessExtractedData + bucket upload). The callback receives a `SaveValidatedDataResult` — `success: true` on success, or `success: false` with an `error` message string on failure. Use it to complete task, retry, or surface your own error UI.
+### Reacting to save / draft / exception flows
+
+The widget surfaces three user-initiated flows. Submit and draft are owned end-to-end by the widget; exception reporting is forwarded to the host so it can call the SDK directly.
+
+| Callback                    | User action             | Signature                                      | What the widget does                                                                                                                                                        | What the host does                                                                                           |
+| --------------------------- | ----------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `onSubmitComplete`          | **Submit**              | `(result: SaveValidatedDataResult) => void`    | Calls `OrchestratorDuModule.processExtractedData(...)`, then uploads the merged result to `ValidatedExtractionResultsPath`. Fires the callback with the persistence result. | (optional) react to success/failure (complete the task, retry, log, etc.).                                   |
+| `onSaveAsDraftComplete`     | **Save as draft**       | `(result: SaveValidatedDataResult) => void`    | Uploads the in-progress `validatedData` straight to `ValidatedExtractionResultsPath` (no `processExtractedData` call). Fires the callback with the persistence result.      | (optional) react to success/failure.                                                                         |
+| `onReportExceptionComplete` | **Report as exception** | `(documentId: string, reason: string) => void` | Extracts `documentId` and `reason` from the WC's exception DTO and hands them to the host. **No API call.**                                                                 | Required if you want the report persisted — call `OrchestratorDuModule.submitExceptionReport(...)` yourself. |
+
+Submit/draft hand you a `SaveValidatedDataResult` (`{ success, error? }`) — the host owns all UI feedback (toast, retry, etc.); the widget does not surface failures itself. The exception callback hands you `documentId` and `reason` strings ready to forward to the SDK.
 
 ```tsx
 import {
   ValidationStation,
   type SaveValidatedDataResult,
 } from "@uipath/ui-widgets-validation-station";
+import { OrchestratorDuModule } from "@uipath/uipath-typescript/orchestrator-du-module";
 
 function App({ sdk, data, task }) {
-  const handleSaveComplete = async (result: SaveValidatedDataResult) => {
+  const handleSubmitComplete = async (result: SaveValidatedDataResult) => {
     if (!result.success) {
-      // ValidationStation already shows a toast for the failure; add
-      // your own retry / logging / analytics here if needed.
-      console.warn("Save failed:", result.error);
+      console.warn("Submit failed:", result.error);
       return;
     }
     await task.complete({ action: "Completed", type: "DocumentValidation" });
+  };
+
+  const handleDraftComplete = (result: SaveValidatedDataResult) => {
+    if (!result.success) console.warn("Draft save failed:", result.error);
+  };
+
+  const handleReportException = async (documentId: string, reason: string) => {
+    const response = await new OrchestratorDuModule(sdk).submitExceptionReport(
+      task.id,
+      documentId,
+      reason || "Reported via Validation Station",
+      { folderId: task.folderId },
+    );
+    if (!response.IsSuccessful) {
+      console.error("submitExceptionReport failed:", response.ErrorMessage);
+    }
   };
 
   return (
@@ -100,33 +123,37 @@ function App({ sdk, data, task }) {
       sdk={sdk}
       data={data}
       folderId={task.folderId}
-      onSaveComplete={handleSaveComplete}
+      onSubmitComplete={handleSubmitComplete}
+      onSaveAsDraftComplete={handleDraftComplete}
+      onReportExceptionComplete={handleReportException}
     />
   );
 }
 ```
 
+> Submit and draft callbacks are optional, but failures are silent if you skip them — the widget does not surface errors on its own. The exception callback is the only place the report goes; without it the user's "Report as exception" click is a no-op.
+
 ## Language enum
 
-The `Language` enum provides all supported locales:
+`ValidationStationLanguage` provides all supported locales:
 
 ```ts
-import { Language } from "@uipath/ui-widgets-validation-station";
+import { ValidationStationLanguage } from "@uipath/ui-widgets-validation-station";
 
-Language.English; // "en"
-Language.German; // "de"
-Language.Spanish; // "es"
-Language.SpanishMexico; // "es-MX"
-Language.French; // "fr"
-Language.Japanese; // "ja"
-Language.Korean; // "ko"
-Language.Portuguese; // "pt"
-Language.PortugueseBrazil; // "pt-BR"
-Language.Romanian; // "ro"
-Language.Russian; // "ru"
-Language.Turkish; // "tr"
-Language.ChineseSimplified; // "zh-CN"
-Language.ChineseTraditional; // "zh-TW"
+ValidationStationLanguage.English; // "en"
+ValidationStationLanguage.German; // "de"
+ValidationStationLanguage.Spanish; // "es"
+ValidationStationLanguage.SpanishMexico; // "es-MX"
+ValidationStationLanguage.French; // "fr"
+ValidationStationLanguage.Japanese; // "ja"
+ValidationStationLanguage.Korean; // "ko"
+ValidationStationLanguage.Portuguese; // "pt"
+ValidationStationLanguage.PortugueseBrazil; // "pt-BR"
+ValidationStationLanguage.Romanian; // "ro"
+ValidationStationLanguage.Russian; // "ru"
+ValidationStationLanguage.Turkish; // "tr"
+ValidationStationLanguage.ChineseSimplified; // "zh-CN"
+ValidationStationLanguage.ChineseTraditional; // "zh-TW"
 ```
 
 ## Exported types
@@ -134,12 +161,11 @@ Language.ChineseTraditional; // "zh-TW"
 All parameter types are re-exported from the package for convenience:
 
 ```ts
-import { Language } from "@uipath/ui-widgets-validation-station";
+import { ValidationStationLanguage } from "@uipath/ui-widgets-validation-station";
 import type {
   ValidationStationProps,
-  ISetTableCellValueParameters,
-  IDeleteTableCellValueParameters,
   IValidationStationOptions,
+  SaveValidatedDataResult,
   SetFieldValueByPath,
   SelectAndFocusFieldValueByPath,
   DeleteFieldValueByPath,
@@ -300,7 +326,7 @@ export default defineConfig({
 
 ### webpack
 
-Use [`copy-webpack-plugin`](https://github.com/webpack-contrib/copy-webpack-plugin):
+Use [`copy-webpack-plugin`](https://github.com/webpack-contrib/copy-webpack-plugin) **and** opt the WC bundle out of webpack's `new URL(..., import.meta.url)` parsing — the WC uses that pattern to load `du-assets/` at runtime, and webpack will otherwise try to bundle the directory and fail with `Module not found: Error: Can't resolve './du-assets/'`:
 
 ```js
 // webpack.config.js
@@ -308,6 +334,20 @@ const CopyPlugin = require("copy-webpack-plugin");
 const path = require("path");
 
 module.exports = {
+  module: {
+    rules: [
+      // Don't parse runtime URL / dynamic-require expressions inside the WC —
+      // its assets are resolved at runtime from `import.meta.url`.
+      {
+        test: /node_modules[\\/]@uipath[\\/]du-validation-station-wc[\\/].*\.js$/,
+        parser: {
+          url: false,
+          exprContextCritical: false,
+          unknownContextCritical: false,
+        },
+      },
+    ],
+  },
   plugins: [
     new CopyPlugin({
       patterns: [

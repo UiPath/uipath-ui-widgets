@@ -1,7 +1,7 @@
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import type { BucketService } from "@uipath/uipath-typescript/buckets";
 import { unzipSync } from "fflate";
-import type { BucketArtifacts } from "./types";
+import type { BucketArtifacts } from "./types.js";
 
 /** Fetch a URI, unzip the first file in the archive, and return the raw text. */
 async function fetchAndUnzip(uri: string): Promise<string> {

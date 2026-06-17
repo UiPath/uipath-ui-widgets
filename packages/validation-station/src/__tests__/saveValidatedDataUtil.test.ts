@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { saveValidatedData } from "../saveValidatedDataUtil";
+import {
+  saveValidatedDataAsDraft,
+  submitValidatedData,
+} from "../saveValidatedDataUtil";
 
 const mockUploadFile = vi.fn();
 const MockBucketService = vi.fn(() => ({ uploadFile: mockUploadFile }));
@@ -8,6 +11,17 @@ const MockBucketService = vi.fn(() => ({ uploadFile: mockUploadFile }));
 vi.mock("@uipath/uipath-typescript/buckets", () => ({
   BucketService: function (...args: any[]) {
     return MockBucketService(...args);
+  },
+}));
+
+const mockProcessExtractedData = vi.fn();
+const MockOrchestratorDuModule = vi.fn(() => ({
+  processExtractedData: mockProcessExtractedData,
+}));
+
+vi.mock("@uipath/uipath-typescript/orchestrator-du-module", () => ({
+  OrchestratorDuModule: function () {
+    return MockOrchestratorDuModule();
   },
 }));
 
@@ -53,10 +67,10 @@ beforeEach(() => {
   zipCalls.length = 0;
 });
 
-describe("saveValidatedData", () => {
+describe("submitValidatedData", () => {
   describe("validation", () => {
     it("returns error when BucketId is missing", async () => {
-      const result = await saveValidatedData(
+      const result = await submitValidatedData(
         makeSdk(),
         makeData({ BucketId: undefined }),
         42,
@@ -66,19 +80,8 @@ describe("saveValidatedData", () => {
       expect(result.error).toContain("BucketId");
     });
 
-    it("returns error when folderId is 0/missing", async () => {
-      const result = await saveValidatedData(
-        makeSdk(),
-        makeData(),
-        0,
-        makeRequest(),
-      );
-      expect(result.success).toBe(false);
-      expect(result.error).toContain("FolderId");
-    });
-
     it("returns error when ValidatedExtractionResultsPath is missing", async () => {
-      const result = await saveValidatedData(
+      const result = await submitValidatedData(
         makeSdk(),
         makeData({ ValidatedExtractionResultsPath: undefined }),
         42,
@@ -88,80 +91,41 @@ describe("saveValidatedData", () => {
       expect(result.error).toContain("ValidatedExtractionResultsPath");
     });
 
-    it("does not call fetch or upload when validation fails", async () => {
-      const fetchSpy = vi.spyOn(globalThis, "fetch");
-      await saveValidatedData(
+    it("does not call SDK or upload when validation fails", async () => {
+      await submitValidatedData(
         makeSdk(),
         makeData({ BucketId: undefined }),
         42,
         makeRequest(),
       );
-      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(mockProcessExtractedData).not.toHaveBeenCalled();
       expect(mockUploadFile).not.toHaveBeenCalled();
     });
   });
 
   describe("happy path", () => {
-    it("calls ProcessExtractedData with correct URL, headers, and body", async () => {
-      const processed = { processed: true };
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response(JSON.stringify(processed), { status: 200 }),
-      );
+    it("forwards the merged payload to DocumentUnderstanding.processExtractedData", async () => {
+      mockProcessExtractedData.mockResolvedValue({ processed: true });
       mockUploadFile.mockResolvedValue({ success: true });
 
-      await saveValidatedData(makeSdk(), makeData(), 42, makeRequest());
+      await submitValidatedData(makeSdk(), makeData(), 42, makeRequest());
 
-      const fetchCall = (globalThis.fetch as any).mock.calls[0];
-      expect(fetchCall[0]).toBe(
-        "https://cloud.uipath.com/myorg/mytenant/orchestrator_/doc-understanding/DocumentModule/ProcessExtractedData",
-      );
-      expect(fetchCall[1].method).toBe("POST");
-      expect(fetchCall[1].headers).toEqual({
-        "Content-Type": "application/json",
-        "X-UIPATH-OrganizationUnitId": "42",
-        Authorization: "Bearer test-token",
-      });
-      expect(JSON.parse(fetchCall[1].body)).toEqual({
-        AutomaticExtractedResults: { auto: 1 },
-        ValidatedExtractedResults: { validated: 2 },
-        Taxonomy: { tax: 3 },
-      });
-    });
-
-    it("strips trailing slashes from baseUrl when building service URL", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response("{}", { status: 200 }),
-      );
-      mockUploadFile.mockResolvedValue({ success: true });
-
-      await saveValidatedData(
-        makeSdk({
-          config: {
-            baseUrl: "https://cloud.uipath.com///",
-            orgName: "org",
-            tenantName: "tenant",
-          },
-          getToken: () => "tk",
-        }),
-        makeData(),
-        42,
-        makeRequest(),
-      );
-
-      const fetchCall = (globalThis.fetch as any).mock.calls[0];
-      expect(fetchCall[0]).toBe(
-        "https://cloud.uipath.com/org/tenant/orchestrator_/doc-understanding/DocumentModule/ProcessExtractedData",
+      expect(mockProcessExtractedData).toHaveBeenCalledTimes(1);
+      expect(mockProcessExtractedData).toHaveBeenCalledWith(
+        {
+          AutomaticExtractedResults: { auto: 1 },
+          ValidatedExtractedResults: { validated: 2 },
+          Taxonomy: { tax: 3 },
+        },
+        { folderId: 42 },
       );
     });
 
-    it("uploads result to bucket with correct args and returns success", async () => {
-      const processed = { processed: true };
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response(JSON.stringify(processed), { status: 200 }),
-      );
+    it("uploads the SDK's processed result to the bucket and returns success", async () => {
+      mockProcessExtractedData.mockResolvedValue({ processed: true });
       mockUploadFile.mockResolvedValue({ success: true });
 
-      const result = await saveValidatedData(
+      const result = await submitValidatedData(
         makeSdk(),
         makeData(),
         42,
@@ -181,12 +145,10 @@ describe("saveValidatedData", () => {
 
   describe("inner filename inside zip", () => {
     it("derives inner filename from path basename with .json extension", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response("{}", { status: 200 }),
-      );
+      mockProcessExtractedData.mockResolvedValue({});
       mockUploadFile.mockResolvedValue({ success: true });
 
-      await saveValidatedData(
+      await submitValidatedData(
         makeSdk(),
         makeData({ ValidatedExtractionResultsPath: "a/b/c/output.zip" }),
         42,
@@ -197,12 +159,10 @@ describe("saveValidatedData", () => {
     });
 
     it("keeps non-.zip basename as-is", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response("{}", { status: 200 }),
-      );
+      mockProcessExtractedData.mockResolvedValue({});
       mockUploadFile.mockResolvedValue({ success: true });
 
-      await saveValidatedData(
+      await submitValidatedData(
         makeSdk(),
         makeData({ ValidatedExtractionResultsPath: "results/output.bin" }),
         42,
@@ -213,12 +173,10 @@ describe("saveValidatedData", () => {
     });
 
     it("uses documentId-prefixed fallback when path has no basename and DocumentId is set", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response("{}", { status: 200 }),
-      );
+      mockProcessExtractedData.mockResolvedValue({});
       mockUploadFile.mockResolvedValue({ success: true });
 
-      await saveValidatedData(
+      await submitValidatedData(
         makeSdk(),
         makeData({
           ValidatedExtractionResultsPath: "results/",
@@ -232,12 +190,10 @@ describe("saveValidatedData", () => {
     });
 
     it("uses plain default fallback when path has no basename and DocumentId is missing", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response("{}", { status: 200 }),
-      );
+      mockProcessExtractedData.mockResolvedValue({});
       mockUploadFile.mockResolvedValue({ success: true });
 
-      await saveValidatedData(
+      await submitValidatedData(
         makeSdk(),
         makeData({
           ValidatedExtractionResultsPath: "results/",
@@ -252,12 +208,12 @@ describe("saveValidatedData", () => {
   });
 
   describe("error paths", () => {
-    it("returns error when ProcessExtractedData responds non-OK", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response("server boom", { status: 500 }),
+    it("returns error when DocumentUnderstanding.processExtractedData rejects", async () => {
+      mockProcessExtractedData.mockRejectedValue(
+        new Error("ProcessExtractedData failed (500): server boom"),
       );
 
-      const result = await saveValidatedData(
+      const result = await submitValidatedData(
         makeSdk(),
         makeData(),
         42,
@@ -270,29 +226,11 @@ describe("saveValidatedData", () => {
       expect(mockUploadFile).not.toHaveBeenCalled();
     });
 
-    it("returns error when fetch rejects", async () => {
-      vi.spyOn(globalThis, "fetch").mockRejectedValue(
-        new Error("network down"),
-      );
-
-      const result = await saveValidatedData(
-        makeSdk(),
-        makeData(),
-        42,
-        makeRequest(),
-      );
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("network down");
-    });
-
     it("returns error when bucket upload reports failure", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response("{}", { status: 200 }),
-      );
+      mockProcessExtractedData.mockResolvedValue({});
       mockUploadFile.mockResolvedValue({ success: false, statusCode: 403 });
 
-      const result = await saveValidatedData(
+      const result = await submitValidatedData(
         makeSdk(),
         makeData(),
         42,
@@ -304,12 +242,10 @@ describe("saveValidatedData", () => {
     });
 
     it("returns error when bucket upload throws", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response("{}", { status: 200 }),
-      );
+      mockProcessExtractedData.mockResolvedValue({});
       mockUploadFile.mockRejectedValue(new Error("bucket exploded"));
 
-      const result = await saveValidatedData(
+      const result = await submitValidatedData(
         makeSdk(),
         makeData(),
         42,
@@ -321,9 +257,9 @@ describe("saveValidatedData", () => {
     });
 
     it("stringifies non-Error rejections", async () => {
-      vi.spyOn(globalThis, "fetch").mockRejectedValue("string error");
+      mockProcessExtractedData.mockRejectedValue("string error");
 
-      const result = await saveValidatedData(
+      const result = await submitValidatedData(
         makeSdk(),
         makeData(),
         42,
@@ -333,5 +269,99 @@ describe("saveValidatedData", () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe("string error");
     });
+  });
+});
+
+describe("saveValidatedDataAsDraft", () => {
+  const makeDraftRequest = (overrides: Record<string, any> = {}) =>
+    ({
+      documentId: "doc-abc",
+      validatedData: { draft: 1 },
+      ...overrides,
+    }) as any;
+
+  it("returns error when BucketId is missing", async () => {
+    const result = await saveValidatedDataAsDraft(
+      makeSdk(),
+      makeData({ BucketId: undefined }),
+      42,
+      makeDraftRequest(),
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("BucketId");
+  });
+
+  it("returns error when ValidatedExtractionResultsPath is missing", async () => {
+    const result = await saveValidatedDataAsDraft(
+      makeSdk(),
+      makeData({ ValidatedExtractionResultsPath: undefined }),
+      42,
+      makeDraftRequest(),
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("ValidatedExtractionResultsPath");
+  });
+
+  it("does NOT call processExtractedData — draft skips the SDK", async () => {
+    mockUploadFile.mockResolvedValue({ success: true });
+    await saveValidatedDataAsDraft(
+      makeSdk(),
+      makeData(),
+      42,
+      makeDraftRequest(),
+    );
+    expect(mockProcessExtractedData).not.toHaveBeenCalled();
+  });
+
+  it("uploads raw validatedData to the bucket and returns success", async () => {
+    mockUploadFile.mockResolvedValue({ success: true });
+
+    const result = await saveValidatedDataAsDraft(
+      makeSdk(),
+      makeData(),
+      42,
+      makeDraftRequest({ validatedData: { hello: "world" } }),
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(mockUploadFile).toHaveBeenCalledTimes(1);
+    const uploadArg = mockUploadFile.mock.calls[0][0];
+    expect(uploadArg.bucketId).toBe(100);
+    expect(uploadArg.folderId).toBe(42);
+    expect(uploadArg.path).toBe("results/output.zip");
+    expect(uploadArg.content).toBeInstanceOf(Blob);
+    // The raw validatedData should have been the payload that got zipped.
+    const zipped = zipCalls[zipCalls.length - 1];
+    const innerBytes = Object.values(zipped)[0];
+    const innerJson = JSON.parse(new TextDecoder().decode(innerBytes));
+    expect(innerJson).toEqual({ hello: "world" });
+  });
+
+  it("returns error when the bucket upload reports failure", async () => {
+    mockUploadFile.mockResolvedValue({ success: false, statusCode: 403 });
+
+    const result = await saveValidatedDataAsDraft(
+      makeSdk(),
+      makeData(),
+      42,
+      makeDraftRequest(),
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Bucket upload failed with status 403");
+  });
+
+  it("returns error when the bucket upload throws", async () => {
+    mockUploadFile.mockRejectedValue(new Error("boom"));
+
+    const result = await saveValidatedDataAsDraft(
+      makeSdk(),
+      makeData(),
+      42,
+      makeDraftRequest(),
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("boom");
   });
 });

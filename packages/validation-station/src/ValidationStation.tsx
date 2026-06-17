@@ -1,29 +1,38 @@
 import type {
   IValidationStationStandaloneWcElement,
+  IVsSaveExceptionReportRequest,
+  IVsSaveValidatedDataAsDraftRequest,
   IVsSaveValidatedDataRequest,
 } from "@uipath/du-validation-station-wc";
 import { toast, Toaster } from "@uipath/apollo-wind";
 import { useEffect, useState } from "react";
-import { validationStationWcReady } from "./loadValidationStationWc";
-import { saveValidatedData } from "./saveValidatedDataUtil";
-import type { ValidationStationProps } from "./types";
-import { useBucketArtifacts } from "./useBucketArtifacts";
+import { validationStationWcReady } from "./loadValidationStationWc.js";
+import {
+  submitValidatedData,
+  saveValidatedDataAsDraft,
+} from "./saveValidatedDataUtil.js";
+import {
+  ValidationStationLanguage,
+  type ValidationStationProps,
+} from "./types.js";
+import { useBucketArtifacts } from "./useBucketArtifacts.js";
 
 export const ValidationStation: React.FC<ValidationStationProps> = ({
   sdk,
   data,
   folderId,
-  theme,
-  language,
-  isReadonly,
-  enableSaveAsDraft,
+  theme = "light",
+  language = ValidationStationLanguage.English,
+  isReadonly = false,
   options,
   save,
   discardChanges,
   setFieldValueByPath,
   selectAndFocusFieldValueByPath,
   deleteFieldValueByPath,
-  onSaveComplete,
+  onSubmitComplete,
+  onSaveAsDraftComplete,
+  onReportExceptionComplete,
 }) => {
   const { artifacts, error } = useBucketArtifacts(sdk, data, folderId);
   const [wcReady, setWcReady] = useState(false);
@@ -50,27 +59,48 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
 
   const refCallback = (el: IValidationStationStandaloneWcElement | null) => {
     if (!el) return;
-    const onSaveRequest = (event: CustomEvent<IVsSaveValidatedDataRequest>) => {
-      if (!resolvedFolderId) {
-        toast.error(
-          "[ValidationStation] cannot save: folderId is not available",
-        );
-        return;
-      }
-      saveValidatedData(sdk, data, resolvedFolderId, event.detail).then(
-        (result) => {
-          if (!result.success) {
-            toast.error(
-              `[ValidationStation] saveValidatedData failed: ${result.error}`,
-            );
-          }
-          onSaveComplete?.(result);
-        },
+    if (!resolvedFolderId) {
+      toast.error(
+        "folderId of Storage bucket is required. Provide it as a prop or ensure data.FolderId is set.",
       );
+      return;
+    }
+
+    const onSubmitRequest = (event: CustomEvent<IVsSaveValidatedDataRequest>) =>
+      submitValidatedData(sdk, data, resolvedFolderId, event.detail).then(
+        onSubmitComplete,
+      );
+
+    const onSaveAsDraftRequest = (
+      event: CustomEvent<IVsSaveValidatedDataAsDraftRequest>,
+    ) =>
+      saveValidatedDataAsDraft(sdk, data, resolvedFolderId, event.detail).then(
+        onSaveAsDraftComplete,
+      );
+
+    const onExceptionRequest = (
+      event: CustomEvent<IVsSaveExceptionReportRequest>,
+    ) => {
+      const { documentId, exceptionReport } = event.detail;
+      const reason =
+        (exceptionReport as { Reason?: string } | null)?.Reason ?? "";
+      onReportExceptionComplete?.(documentId, reason);
     };
-    el.addEventListener("saveValidatedDataRequest", onSaveRequest);
+
+    el.addEventListener("saveValidatedDataRequest", onSubmitRequest);
+    el.addEventListener(
+      "saveValidatedDataAsDraftRequest",
+      onSaveAsDraftRequest,
+    );
+    el.addEventListener("saveExceptionReportRequest", onExceptionRequest);
+
     return () => {
-      el.removeEventListener("saveValidatedDataRequest", onSaveRequest);
+      el.removeEventListener("saveValidatedDataRequest", onSubmitRequest);
+      el.removeEventListener(
+        "saveValidatedDataAsDraftRequest",
+        onSaveAsDraftRequest,
+      );
+      el.removeEventListener("saveExceptionReportRequest", onExceptionRequest);
     };
   };
 
@@ -83,7 +113,7 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
         theme={theme}
         language={language}
         isReadonly={isReadonly}
-        enableSaveAsDraft={enableSaveAsDraft}
+        enableSaveAsDraft={true}
         documentId={data.DocumentId}
         taxonomy={artifacts.taxonomy}
         extractionResult={artifacts.extractionResult}

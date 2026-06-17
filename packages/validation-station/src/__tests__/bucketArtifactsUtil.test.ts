@@ -138,4 +138,78 @@ describe("fetchBucketArtifacts", () => {
       fetchBucketArtifacts(mockBucketService, mockData, 42),
     ).rejects.toThrow();
   });
+
+  it("throws when ContentValidationData is missing required fields", async () => {
+    await expect(
+      fetchBucketArtifacts(
+        mockBucketService,
+        { ...mockData, TaxonomyPath: undefined },
+        42,
+      ),
+    ).rejects.toThrow(/missing required bucket artifact fields/);
+  });
+
+  it("falls back to automatic extraction when validated path fails", async () => {
+    const automaticResult = { auto: true };
+    const dataWithValidated = {
+      ...mockData,
+      ValidatedExtractionResultsPath: "validated.zip",
+    };
+
+    // getReadUri only fails for the validated extraction path.
+    mockGetReadUri.mockImplementation(({ path }: { path: string }) => {
+      if (path === "validated.zip") return Promise.reject(new Error("404"));
+      return Promise.resolve({ uri: `https://example.com/${path}` });
+    });
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((input: any) => {
+      const url = typeof input === "string" ? input : input.url;
+      return Promise.resolve(
+        new Response(
+          url.endsWith("extraction.zip")
+            ? JSON.stringify(automaticResult)
+            : "{}",
+        ),
+      );
+    });
+
+    const result = await fetchBucketArtifacts(
+      mockBucketService,
+      dataWithValidated,
+      42,
+    );
+
+    expect(result.extractionResult).toEqual(automaticResult);
+  });
+
+  it("uses validated extraction when present", async () => {
+    const validatedResult = { validated: true };
+    const dataWithValidated = {
+      ...mockData,
+      ValidatedExtractionResultsPath: "validated.zip",
+    };
+
+    mockGetReadUri.mockImplementation(({ path }: { path: string }) =>
+      Promise.resolve({ uri: `https://example.com/${path}` }),
+    );
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((input: any) => {
+      const url = typeof input === "string" ? input : input.url;
+      return Promise.resolve(
+        new Response(
+          url.endsWith("validated.zip")
+            ? JSON.stringify(validatedResult)
+            : "{}",
+        ),
+      );
+    });
+
+    const result = await fetchBucketArtifacts(
+      mockBucketService,
+      dataWithValidated,
+      42,
+    );
+
+    expect(result.extractionResult).toEqual(validatedResult);
+  });
 });
