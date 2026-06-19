@@ -2,8 +2,8 @@ import type { DuFramework } from "@uipath/uipath-typescript/document-understandi
 import { BucketService } from "@uipath/uipath-typescript/buckets";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import { useEffect, useState, useRef } from "react";
-import { fetchBucketArtifacts } from "./bucketArtifactsUtil";
-import type { BucketArtifacts } from "./types";
+import { fetchBucketArtifacts } from "./bucketArtifactsUtil.js";
+import type { BucketArtifacts } from "./types.js";
 
 export function useBucketArtifacts(
   sdk: UiPath,

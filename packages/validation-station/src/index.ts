@@ -1,4 +1,4 @@
-export { ValidationStationLanguage } from "./types";
+export { ValidationStationLanguage } from "./types.js";
 export type {
   DeleteFieldValueByPath,
   IValidationStationOptions,
@@ -6,5 +6,5 @@ export type {
   SelectAndFocusFieldValueByPath,
   SetFieldValueByPath,
   ValidationStationProps,
-} from "./types";
-export { ValidationStation } from "./ValidationStation";
+} from "./types.js";
+export { ValidationStation } from "./ValidationStation.js";

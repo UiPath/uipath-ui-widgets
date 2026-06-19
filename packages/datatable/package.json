@@ -42,7 +42,7 @@
     "registry": "https://npm.pkg.github.com"
   },
   "peerDependencies": {
-    "@uipath/uipath-typescript": "^1.3.10",
+    "@uipath/uipath-typescript": "^1.4.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

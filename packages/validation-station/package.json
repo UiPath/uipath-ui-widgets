@@ -10,8 +10,7 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    },
-    "./ValidationStation.css": "./dist/ValidationStation.css"
+    }
   },
   "files": [
     "dist"
@@ -20,7 +19,6 @@
     "prepack": "rimraf *.tgz",
     "build": "npm run clean && tsc",
     "clean": "rimraf dist",
-    "copy-styles": "sass --no-source-map src/ValidationStation.scss | postcss -o dist/ValidationStation.css",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
@@ -43,7 +41,7 @@
     "registry": "https://npm.pkg.github.com"
   },
   "peerDependencies": {
-    "@uipath/uipath-typescript": "^1.3.10",
+    "@uipath/uipath-typescript": "^1.4.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
@@ -60,11 +58,8 @@
     "@vitest/ui": "^4.0.18",
     "jsdom": "^25.0.1",
     "lightningcss": "^1.30.2",
-    "postcss": "^8.5.6",
-    "postcss-cli": "^11.0.1",
     "rimraf": "^6.0.1",
     "rollup": "^4.55.1",
-    "sass": "^1.83.4",
     "typescript": "~5.9.3",
     "vite": "^6.0.3",
     "vitest": "^4.0.18"

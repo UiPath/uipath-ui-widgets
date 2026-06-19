@@ -152,7 +152,6 @@ point \`wcAssetsUrl\` at that location.
 
 \`\`\`tsx
 import { ValidationStation } from '@uipath/ui-widgets-validation-station';
-import "@uipath/ui-widgets-validation-station/ValidationStation.css";
 import { UiPath } from '@uipath/uipath-typescript/core';
 
 const sdk = new UiPath({
@@ -235,10 +234,6 @@ function App() {
       description: "When true, the validation station is in read-only mode",
       control: "boolean",
     },
-    enableSaveAsDraft: {
-      description: "When true, enables the save-as-draft functionality",
-      control: "boolean",
-    },
     options: {
       description:
         "Additional configuration options for the validation station",
@@ -263,7 +258,6 @@ function App() {
     theme: "light",
     language: ValidationStationLanguage.English,
     isReadonly: false,
-    enableSaveAsDraft: false,
   },
 };
 
