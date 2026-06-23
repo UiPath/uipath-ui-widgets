@@ -35,6 +35,7 @@ vi.mock("@uipath/apollo-react/material/components", () => ({
       setLocale: vi.fn(),
       setTheme: vi.fn(),
       getLocale: vi.fn().mockReturnValue("en"),
+      setAllowedAttachments: vi.fn(),
     })),
   },
 }));

@@ -27,6 +27,7 @@ const createMockChatService = () => ({
   setShowLoading: vi.fn(),
   setWaiting: vi.fn(),
   setCustomHeaderActions: vi.fn(),
+  setAllowedAttachments: vi.fn(),
 });
 
 let mockChatService = createMockChatService();
@@ -388,6 +389,44 @@ describe("ConversationalAgentChat", () => {
       },
       { timeout: 3000 },
     );
+  });
+
+  it("should call setAllowedAttachments when attachments are not disabled", async () => {
+    render(<ConversationalAgentChat {...defaultProps} />);
+
+    await waitFor(
+      () => {
+        expect(mockChatService.setAllowedAttachments).toHaveBeenCalledWith(
+          expect.objectContaining({
+            multiple: true,
+            types: expect.objectContaining({
+              "application/pdf": [".pdf"],
+              "image/png": [".png"],
+            }),
+            maxSize: 30 * 1024 * 1024,
+          }),
+        );
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it("should not call setAllowedAttachments when attachments are disabled", async () => {
+    render(
+      <ConversationalAgentChat
+        {...defaultProps}
+        disabledFeatures={{ attachments: true }}
+      />,
+    );
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("ap-chat")).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
+
+    expect(mockChatService.setAllowedAttachments).not.toHaveBeenCalled();
   });
 
   it("should configure override labels", async () => {
