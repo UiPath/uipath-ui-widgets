@@ -1,14 +1,13 @@
+import { Input, RadioGroup, RadioGroupItem, cn } from "@uipath/apollo-wind";
+// Portal-aware Select so the menu opens inside the widget subtree regardless
+// of host surface (see dropdowns/PortalContainerProvider).
 import {
-  Input,
-  RadioGroup,
-  RadioGroupItem,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  cn,
-} from "@uipath/apollo-wind";
+} from "../dropdowns";
 import type { ChangeEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -63,15 +62,15 @@ type DateFormat = "date" | "time" | "datetime-local";
 // even when the value is a date. Precedence: schema → value → undefined.
 // length >= 10 avoids bare years like "2026" matching as parseable dates.
 //
-// `format: "time"` is intentionally not trusted — calendar-style tool schemas
-// commonly misuse it for timezone identifier strings ("Europe/London"). A
-// genuine time-only value flows through the value check below and renders as
-// text.
+// A declared `format` is authoritative: `time` renders a time picker. Only the
+// value-inference fallback below stays conservative (it can't tell a bare time
+// string from an arbitrary label).
 const resolveDateFormat = (
   prop: InputSchemaProperty,
   value: unknown,
 ): DateFormat | undefined => {
   if (prop.format === "date") return "date";
+  if (prop.format === "time") return "time";
   if (prop.format === "date-time") return "datetime-local";
   if (prop.type && prop.type !== "string") return undefined;
   if (value instanceof Date) return "datetime-local";
@@ -296,6 +295,16 @@ export const AgentSchemaField = ({
       <Input
         value={value === undefined ? "" : String(value)}
         type={isNumeric ? "number" : "text"}
+        // integer steps by 1; number accepts decimals ("3.5" would otherwise
+        // trip the browser's default step=1 validation).
+        step={isNumeric ? (prop.type === "integer" ? 1 : "any") : undefined}
+        inputMode={
+          prop.type === "integer"
+            ? "numeric"
+            : prop.type === "number"
+              ? "decimal"
+              : undefined
+        }
         disabled={disabled}
         onChange={(e: ChangeEvent<HTMLInputElement>) => {
           const val = e.target.value;

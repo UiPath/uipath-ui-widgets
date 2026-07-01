@@ -22,6 +22,7 @@
   "agent_schema_select_placeholder": "agent_schema_select_placeholder",
   "agent_schema_number_placeholder": "agent_schema_number_placeholder",
   "agent_schema_text_placeholder": "agent_schema_text_placeholder",
+  "agent_schema_array_placeholder": "agent_schema_array_placeholder",
   "error_missing_conversation_params": "error_missing_conversation_params",
   "error_open_conversation": "error_open_conversation",
   "error_generic": "error_generic",

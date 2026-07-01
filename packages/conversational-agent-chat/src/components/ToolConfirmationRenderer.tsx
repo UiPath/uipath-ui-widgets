@@ -6,6 +6,7 @@ import {
   ToolConfirmation,
   type ToolConfirmationLabels,
 } from "./ToolConfirmation";
+import { PortalContainerProvider } from "./dropdowns";
 
 // Ensure i18next is initialized when this module is imported directly (i.e.
 // without first importing ConversationalAgentChat). Idempotent.
@@ -62,14 +63,16 @@ export function createToolConfirmationRenderer(): ToolConfirmationRenderer {
       const labels = resolveToolConfirmationLabels(labelOverrides);
 
       root.render(
-        <ToolConfirmation
-          confirmationData={meta.confirmationData}
-          isCompleted={meta.isCompleted}
-          wasRejected={meta.wasRejected}
-          labels={labels}
-          onApprove={meta.onApprove}
-          onCancel={meta.onCancel}
-        />,
+        <PortalContainerProvider>
+          <ToolConfirmation
+            confirmationData={meta.confirmationData}
+            isCompleted={meta.isCompleted}
+            wasRejected={meta.wasRejected}
+            labels={labels}
+            onApprove={meta.onApprove}
+            onCancel={meta.onCancel}
+          />
+        </PortalContainerProvider>,
       );
     },
     unmountAll() {

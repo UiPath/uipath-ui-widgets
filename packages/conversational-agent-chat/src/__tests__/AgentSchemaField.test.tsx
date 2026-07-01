@@ -53,6 +53,14 @@ describe("AgentSchemaField — date/time", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders a time input for format: time", () => {
+    renderField({
+      type: "string",
+      format: "time",
+    } as InputSchemaProperty);
+    expect(document.querySelector('input[type="time"]')).toBeInTheDocument();
+  });
+
   it("infers a date input from an ISO date value when no format is given", () => {
     renderField({ type: "string" } as InputSchemaProperty, "2026-06-09");
     expect(document.querySelector('input[type="date"]')).toBeInTheDocument();
@@ -95,6 +103,20 @@ describe("AgentSchemaField — numeric", () => {
     // uncontrolled harness resets value between keystrokes, so type one digit
     await user.type(input, "7");
     expect(onChange).toHaveBeenLastCalledWith(7);
+  });
+
+  it("allows decimals on a number field (step='any')", () => {
+    renderField({ type: "number" } as InputSchemaProperty);
+    const input = screen.getByPlaceholderText("Enter a number...");
+    expect(input).toHaveAttribute("step", "any");
+    expect(input).toHaveAttribute("inputmode", "decimal");
+  });
+
+  it("restricts an integer field to whole numbers (step=1)", () => {
+    renderField({ type: "integer" } as InputSchemaProperty);
+    const input = screen.getByPlaceholderText("Enter a number...");
+    expect(input).toHaveAttribute("step", "1");
+    expect(input).toHaveAttribute("inputmode", "numeric");
   });
 
   it("emits undefined when a numeric field is cleared", async () => {

@@ -70,10 +70,9 @@ export interface ConversationalAgentChatProps {
   readOnly?: boolean;
   overrideLabels?: OverrideLabels;
   /**
-   * Fallback first-run experience. Used only when the agent's appearance
-   * provides no welcome title, description, or starting prompts. When the
-   * agent has any FRE data, this prop is ignored and only the agent's data
-   * is rendered.
+   * Host-provided first-run experience (welcome title/description and starting
+   * prompts). Takes precedence over the agent's own appearance, which is used as
+   * a fallback. Precedence is whole-object.
    */
   firstRunExperience?: FirstRunExperience;
   /** Override which features are disabled. Merged with defaults (fullScreen, preview, close are always disabled). */

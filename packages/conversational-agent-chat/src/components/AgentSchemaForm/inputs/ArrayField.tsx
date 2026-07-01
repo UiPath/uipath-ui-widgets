@@ -74,7 +74,10 @@ export const ArrayField = ({
           onKeyDown={handleKeyDown}
           onBlur={addChip}
           disabled={disabled}
-          className="h-6 min-w-16 flex-1 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+          placeholder={
+            chips.length === 0 ? t("agent_schema_array_placeholder") : undefined
+          }
+          className="h-6 min-w-32 flex-1 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
         />
       </div>
     </FieldShell>
