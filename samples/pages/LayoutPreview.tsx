@@ -257,6 +257,98 @@ function ConversationalAgentPreview() {
   );
 }
 
+function ConnectorsPreview() {
+  return (
+    <svg viewBox="0 0 320 160" preserveAspectRatio="xMidYMid meet">
+      <rect width="320" height="160" fill="#f5f7fa" />
+      {[0, 1, 2, 3, 4, 5].map((i) => {
+        const col = i % 3;
+        const row = Math.floor(i / 3);
+        return (
+          <g key={i}>
+            <rect
+              x={16 + col * 100}
+              y={16 + row * 66}
+              width="88"
+              height="54"
+              rx="8"
+              fill="white"
+              stroke={i === 1 ? FILL_ACCENT : STROKE}
+            />
+            <circle
+              cx={32 + col * 100}
+              cy={34 + row * 66}
+              r="9"
+              fill={FILL_SOFT}
+            />
+            <rect
+              x={48 + col * 100}
+              y={28 + row * 66}
+              width="46"
+              height="6"
+              rx="2"
+              fill={FILL_BAR}
+            />
+            <rect
+              x={24 + col * 100}
+              y={50 + row * 66}
+              width="60"
+              height="5"
+              rx="2"
+              fill={FILL_TEXT}
+            />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function SlackMessagePreview() {
+  return (
+    <svg viewBox="0 0 320 160" preserveAspectRatio="xMidYMid meet">
+      <rect width="320" height="160" fill="#f5f7fa" />
+      <rect
+        x="16"
+        y="16"
+        width="288"
+        height="128"
+        rx="8"
+        fill="white"
+        stroke={STROKE}
+      />
+      {/* recipient field */}
+      <rect x="32" y="32" width="70" height="6" rx="2" fill={FILL_BAR} />
+      <rect
+        x="32"
+        y="42"
+        width="256"
+        height="20"
+        rx="5"
+        fill="white"
+        stroke={STROKE}
+      />
+      <circle cx="46" cy="52" r="5" fill={FILL_ACCENT} />
+      <rect x="58" y="49" width="90" height="6" rx="2" fill={FILL_TEXT} />
+      {/* message field */}
+      <rect x="32" y="74" width="60" height="6" rx="2" fill={FILL_BAR} />
+      <rect
+        x="32"
+        y="84"
+        width="256"
+        height="34"
+        rx="5"
+        fill={FILL_SOFT}
+        stroke={STROKE}
+      />
+      <rect x="40" y="92" width="180" height="6" rx="2" fill={FILL_TEXT} />
+      <rect x="40" y="103" width="120" height="6" rx="2" fill={FILL_TEXT} />
+      {/* send button */}
+      <rect x="226" y="124" width="62" height="14" rx="7" fill={FILL_BAR} />
+    </svg>
+  );
+}
+
 function LayoutPreview({ widgetId }: LayoutPreviewProps) {
   switch (widgetId) {
     case "datatable":
@@ -267,6 +359,10 @@ function LayoutPreview({ widgetId }: LayoutPreviewProps) {
       return <MultiFileUploadPreview />;
     case "conversational-agent-chat":
       return <ConversationalAgentPreview />;
+    case "connectors":
+      return <ConnectorsPreview />;
+    case "slack-message":
+      return <SlackMessagePreview />;
     default:
       return null;
   }

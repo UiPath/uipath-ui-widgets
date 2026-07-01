@@ -1,10 +1,12 @@
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import { useEffect, useState } from "react";
 import "./App.css";
+import ConnectorsPage from "./pages/ConnectorsPage";
 import ConversationalAgentPage from "./pages/ConversationalAgentPage";
 import DataTablePage from "./pages/DataTablePage";
 import HomePage from "./pages/HomePage";
 import MultiFileUploadPage from "./pages/MultiFileUploadPage";
+import SlackMessagePage from "./pages/SlackMessagePage";
 import ValidationStationPage from "./pages/ValidationStationPage";
 
 interface AppProps {
@@ -37,6 +39,12 @@ function App({ uipathSdk }: AppProps) {
       break;
     case "conversational-agent-chat":
       page = <ConversationalAgentPage uipathSdk={uipathSdk} />;
+      break;
+    case "connectors":
+      page = <ConnectorsPage uipathSdk={uipathSdk} />;
+      break;
+    case "slack-message":
+      page = <SlackMessagePage uipathSdk={uipathSdk} />;
       break;
     default:
       page = <HomePage />;

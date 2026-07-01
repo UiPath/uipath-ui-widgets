@@ -29,6 +29,18 @@ export const widgets: Widget[] = [
     description:
       "Embed a chat experience for any UiPath Conversational Agent with streaming responses.",
   },
+  {
+    id: "connectors",
+    title: "Connectors",
+    description:
+      "Browse Integration Service connectors, pick a connection, then build and execute a dynamic form for any connector activity.",
+  },
+  {
+    id: "slack-message",
+    title: "Send Slack Message",
+    description:
+      "Send a direct or channel message through an Integration Service Slack connection.",
+  },
 ];
 
 export function getWidget(id: string): Widget | undefined {
