@@ -67,15 +67,17 @@ function copyDuValidationStationAssets(): Plugin {
       );
     },
     async closeBundle() {
-      await cp(resolve(WC_ROOT, "du-assets"), resolve(assetsDir, "du-assets"), {
-        recursive: true,
-      });
-      await cp(resolve(WC_ROOT, "media"), resolve(assetsDir, "media"), {
-        recursive: true,
-      });
-      for (const css of WC_RUNTIME_CSS) {
-        await cp(resolve(WC_ROOT, css), resolve(assetsDir, css));
-      }
+      await Promise.all([
+        cp(resolve(WC_ROOT, "du-assets"), resolve(assetsDir, "du-assets"), {
+          recursive: true,
+        }),
+        cp(resolve(WC_ROOT, "media"), resolve(assetsDir, "media"), {
+          recursive: true,
+        }),
+        ...WC_RUNTIME_CSS.map((css) =>
+          cp(resolve(WC_ROOT, css), resolve(assetsDir, css)),
+        ),
+      ]);
     },
   };
 }
