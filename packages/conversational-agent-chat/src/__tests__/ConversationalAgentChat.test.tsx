@@ -203,6 +203,9 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
               return () => {};
             }),
             sendSessionEnd: vi.fn(),
+            pauseEmits: vi.fn(),
+            resumeEmits: vi.fn(),
+            isEmitPaused: false,
             startExchange: vi.fn(() => ({
               onErrorStart: vi.fn((handler: any) => {
                 exchangeErrorHandler = handler;
@@ -2244,6 +2247,33 @@ describe("ConversationalAgentChat", () => {
       );
       expect(mockChatService.setError).toHaveBeenCalledWith(
         "Failed to send message: Send failed",
+      );
+    });
+
+    it("buffers outgoing events until the session starts, then flushes", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Hello", attachments: [] });
+
+      // Emits are paused on session creation so the send never blocks on the
+      // sessionStarted round-trip…
+      expect(lastSessionHelper?.pauseEmits).toHaveBeenCalled();
+      // …and flushed once the server signals the session has started.
+      await waitFor(() =>
+        expect(lastSessionHelper?.resumeEmits).toHaveBeenCalled(),
       );
     });
 

@@ -80,10 +80,9 @@ initI18n();
 
 const TOOL_CONFIRMATION_WIDGET_ID_PREFIX = "confirmation-";
 
-// getSessionHelper resolves only when the server echoes `sessionStarted`.
-// Bound that wait so a session that never starts (e.g. a stale one left behind
-// by an in-session conversation switch) fails loudly and can be retried,
-// rather than hanging the send indefinitely.
+// Watchdog for a session that never starts: buffered sends only flush on
+// `sessionStarted`, so if it never arrives, surface an error instead of
+// leaving the send silently pending.
 const SESSION_START_TIMEOUT_MS = 30_000;
 type ConversationCreateOptionsArg = Parameters<
   ConversationalAgent["conversations"]["create"]
@@ -572,33 +571,30 @@ export const ConversationalAgentChat = ({
         ),
       );
     });
-    return new Promise<SessionStream>((resolve, reject) => {
-      let settled = false;
-      const cleanups: Array<() => void> = [];
-      const settle = (action: () => void) => {
-        if (settled) return;
-        settled = true;
-        cleanups.forEach((fn) => fn());
-        action();
-      };
-      const timeout = setTimeout(
-        () => settle(() => reject(new Error(t("error_session_start_timeout")))),
-        SESSION_START_TIMEOUT_MS,
-      );
-      cleanups.push(
-        () => clearTimeout(timeout),
-        sessionHelper.onSessionStarted(() =>
-          settle(() => {
-            session.current = sessionHelper;
-            resolve(sessionHelper);
-          }),
-        ),
-        sessionHelper.onErrorStart((error) =>
-          settle(() => reject(new Error(error.message))),
-        ),
-      );
+    // Buffer outgoing events until the server confirms the session is started,
+    // then flush — so a send never blocks on the sessionStarted round-trip.
+    // Combined with ending the session on switch (see endActiveSession), a
+    // reopened conversation starts fresh and its buffered send flushes as soon
+    // as the fresh sessionStarted arrives.
+    sessionHelper.pauseEmits();
+    const startTimeout = setTimeout(() => {
+      // If the session never starts, nothing flushes the buffer — surface an
+      // error instead of leaving the send silently pending forever.
+      if (sessionHelper.isEmitPaused) {
+        chatService?.setError(t("error_session_start_timeout"));
+      }
+    }, SESSION_START_TIMEOUT_MS);
+    sessionHelper.onSessionStarted(() => {
+      clearTimeout(startTimeout);
+      sessionHelper.resumeEmits();
     });
-  }, [getConversation, setConversationHistory, t]);
+    sessionHelper.onErrorStart((error) => {
+      clearTimeout(startTimeout);
+      chatService?.setError(error.message || t("error_generic"));
+    });
+    session.current = sessionHelper;
+    return sessionHelper;
+  }, [chatService, getConversation, setConversationHistory, t]);
 
   // Cleanly end the active exchange and session before switching conversations
   // or tearing down the widget. Emitting `endSession` lets the SDK release the
