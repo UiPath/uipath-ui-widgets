@@ -79,6 +79,12 @@ import { resolveAgent as fetchAgentRelease } from "./utils/resolveAgent";
 initI18n();
 
 const TOOL_CONFIRMATION_WIDGET_ID_PREFIX = "confirmation-";
+
+// getSessionHelper resolves only when the server echoes `sessionStarted`.
+// Bound that wait so a session that never starts (e.g. a stale one left behind
+// by an in-session conversation switch) fails loudly and can be retried,
+// rather than hanging the send indefinitely.
+const SESSION_START_TIMEOUT_MS = 30_000;
 type ConversationCreateOptionsArg = Parameters<
   ConversationalAgent["conversations"]["create"]
 >[2];
@@ -566,18 +572,57 @@ export const ConversationalAgentChat = ({
         ),
       );
     });
-    return new Promise((resolve) => {
-      sessionHelper.onSessionStarted(() => {
-        session.current = sessionHelper;
-        resolve(sessionHelper);
-      });
+    return new Promise<SessionStream>((resolve, reject) => {
+      let settled = false;
+      const cleanups: Array<() => void> = [];
+      const settle = (action: () => void) => {
+        if (settled) return;
+        settled = true;
+        cleanups.forEach((fn) => fn());
+        action();
+      };
+      const timeout = setTimeout(
+        () => settle(() => reject(new Error(t("error_session_start_timeout")))),
+        SESSION_START_TIMEOUT_MS,
+      );
+      cleanups.push(
+        () => clearTimeout(timeout),
+        sessionHelper.onSessionStarted(() =>
+          settle(() => {
+            session.current = sessionHelper;
+            resolve(sessionHelper);
+          }),
+        ),
+        sessionHelper.onErrorStart((error) =>
+          settle(() => reject(new Error(error.message))),
+        ),
+      );
     });
-  }, [getConversation, setConversationHistory]);
+  }, [getConversation, setConversationHistory, t]);
+
+  // Cleanly end the active exchange and session before switching conversations
+  // or tearing down the widget. Emitting `endSession` lets the SDK release the
+  // socket and the server drop its session state, so a later reopen starts a
+  // fresh session (and receives a fresh `sessionStarted`) instead of reusing a
+  // stale one whose start event never re-fires — which would hang the send.
+  const endActiveSession = useCallback(() => {
+    try {
+      activeExchange.current?.sendExchangeEnd();
+    } catch {
+      /* exchange already ended */
+    }
+    try {
+      session.current?.sendSessionEnd();
+    } catch {
+      /* session already closed */
+    }
+    activeExchange.current = null;
+    session.current = null;
+  }, []);
 
   const onNewChat = useCallback(() => {
+    endActiveSession();
     currentConversation.current = null;
-    session.current = null;
-    activeExchange.current = null;
     storedAgentInputs.current = {};
     setHasMessages(false);
     // Re-show the InputsPage with a cleared form when the agent's schema has
@@ -588,7 +633,7 @@ export const ConversationalAgentChat = ({
       setShowInputPage(true);
     }
     trackTelemetry(TelemetryEvent.NewChat, TelemetryStatus.Success);
-  }, [inputSchemaState]);
+  }, [endActiveSession, inputSchemaState]);
 
   const buildHistoryFilterOptions = useCallback(() => {
     // The SDK's URL builder calls value.toString() without a null check, so
@@ -814,8 +859,8 @@ export const ConversationalAgentChat = ({
         );
         if (!selectedConversation) return;
 
+        endActiveSession();
         currentConversation.current = selectedConversation;
-        session.current = null;
 
         const allExchanges = await fetchExchanges(selectedConversation.id);
         const messages = mapExchangesToChatMessages(allExchanges);
@@ -837,7 +882,7 @@ export const ConversationalAgentChat = ({
         chatService.setError(t("error_open_conversation", { errorMessage }));
       }
     },
-    [chatService, fetchExchanges, t],
+    [chatService, endActiveSession, fetchExchanges, t],
   );
 
   const initChat = useCallback(async () => {
@@ -1143,20 +1188,9 @@ export const ConversationalAgentChat = ({
   // Close the SDK session on unmount so the WebSocket doesn't linger.
   useEffect(() => {
     return () => {
-      try {
-        activeExchange.current?.sendExchangeEnd();
-      } catch {
-        /* exchange already ended */
-      }
-      try {
-        session.current?.sendSessionEnd();
-      } catch {
-        /* session already closed */
-      }
-      activeExchange.current = null;
-      session.current = null;
+      endActiveSession();
     };
-  }, []);
+  }, [endActiveSession]);
 
   // Release React state held by the imperative tool-confirmation roots.
   useEffect(() => {

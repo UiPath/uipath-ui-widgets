@@ -88,6 +88,7 @@ let chunkHandler: any = null;
 let contentPartEndHandler: any = null;
 let toolCallEndHandler: any = null;
 let labelUpdatedHandler: any = null;
+let lastSessionHelper: any = null;
 
 // Prevent lint errors for handler variables that are assigned inside mocks
 void contentPartStartHandler;
@@ -194,12 +195,14 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
           const sessionHelper = {
             onSessionStarted: vi.fn((callback: any) => {
               setTimeout(callback, 0);
-              return sessionHelper;
+              return () => {};
             }),
+            onErrorStart: vi.fn(() => () => {}),
             onLabelUpdated: vi.fn((handler: any) => {
               labelUpdatedHandler = handler;
               return () => {};
             }),
+            sendSessionEnd: vi.fn(),
             startExchange: vi.fn(() => ({
               onErrorStart: vi.fn((handler: any) => {
                 exchangeErrorHandler = handler;
@@ -212,6 +215,7 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
               startMessage: vi.fn(() => mockMessageBuilder),
             })),
           };
+          lastSessionHelper = sessionHelper;
           return sessionHelper;
         }),
       };
@@ -271,6 +275,7 @@ describe("ConversationalAgentChat", () => {
     contentPartEndHandler = null;
     toolCallEndHandler = null;
     labelUpdatedHandler = null;
+    lastSessionHelper = null;
     defaultProps = {
       sdk: mockSdk as UiPath,
       agentId: 1,
@@ -708,6 +713,38 @@ describe("ConversationalAgentChat", () => {
       expect(mockChatService.setConversation).toHaveBeenCalled();
     });
 
+    it("ends the active session before reopening a conversation", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      // Establish a session by sending a message.
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Hello", attachments: [] });
+      const startedSession = lastSessionHelper;
+
+      const onClickOpenConversation = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "openConversation",
+      )?.[1];
+      await onClickOpenConversation?.("conv-1");
+
+      // Switching away ends the outgoing session so the reopened chat does
+      // not send on a stale session whose sessionStarted never re-fires.
+      await waitFor(() =>
+        expect(startedSession?.sendSessionEnd).toHaveBeenCalledTimes(1),
+      );
+    });
+
     it("should call stopResponse and clearError when opening a conversation", async () => {
       render(<ConversationalAgentChat {...defaultProps} />);
 
@@ -841,6 +878,39 @@ describe("ConversationalAgentChat", () => {
 
       // Trigger new chat - should not throw
       onNewChat?.();
+    });
+
+    it("ends the active session before starting a new chat", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      // Establish a session by sending a message.
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Hello", attachments: [] });
+      const startedSession = lastSessionHelper;
+      expect(startedSession?.sendSessionEnd).not.toHaveBeenCalled();
+
+      const onNewChat = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "newChat",
+      )?.[1];
+      onNewChat?.();
+
+      // The outgoing session is ended so reopening it later starts cleanly
+      // and receives a fresh sessionStarted rather than hanging the send.
+      await waitFor(() =>
+        expect(startedSession?.sendSessionEnd).toHaveBeenCalledTimes(1),
+      );
     });
   });
 
