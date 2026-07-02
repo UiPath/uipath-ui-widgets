@@ -38,7 +38,9 @@ jobs:
           scope: "@uipath"
 
       - name: Ensure npm >= 11.5.0 (required for minimum-release-age)
-        run: npm install -g npm@^11.5.0
+        # Deliberate global npm upgrade (enables `minimum-release-age` supply-chain
+        # hardening), not an ad-hoc dependency install — suppress zizmor's heuristic.
+        run: npm install -g npm@^11.5.0 # zizmor: ignore[adhoc-packages]
 
       - name: Install dependencies
         run: npm install --include=optional --legacy-peer-deps
