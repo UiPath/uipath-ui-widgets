@@ -2,6 +2,7 @@
 // inside `main` will not bootstrap. Kept in its own module so import sorters
 // can't reorder the side-effect imports relative to each other.
 import "@uipath/du-validation-station-wc/polyfills";
+import "./promise-try-polyfill.js";
 import "@uipath/du-validation-station-wc/main";
 import "@uipath/du-validation-station-wc/styles.css";
 
