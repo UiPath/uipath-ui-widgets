@@ -2,9 +2,16 @@
 // inside `main` will not bootstrap. Kept in its own module so import sorters
 // can't reorder the side-effect imports relative to each other.
 import "@uipath/du-validation-station-wc/polyfills";
-import "./promise-try-polyfill.js";
 import "@uipath/du-validation-station-wc/main";
 import "@uipath/du-validation-station-wc/styles.css";
+
+// zone.js (loaded above) replaces Promise with ZoneAwarePromise which lacks
+// Promise.try(). The WC calls it at render time, not module init, so restoring
+// it here (after imports) is early enough. Remove when the WC upgrades zone.js.
+if (typeof (Promise as any).try !== "function") {
+  (Promise as any).try = <T>(fn: () => T | PromiseLike<T>): Promise<T> =>
+    new Promise<T>((resolve) => resolve(fn()));
+}
 
 export const VALIDATION_STATION_TAG =
   "ui-du-validation-station-standalone-wc-element";
