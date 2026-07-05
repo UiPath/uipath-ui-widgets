@@ -55,6 +55,25 @@
     }
   }
 
+  // TEMP SHIM — remove once apollo-react ships the loader gradient fix.
+  // Apollo's chat "Generating…" loader sweeps a shimmer gradient across the
+  // text, but its stylesheet builds the gradient as `var(--color-background)20`
+  // — appending a hex-alpha suffix to a var() is invalid CSS, so the whole
+  // background is dropped and the sweep is invisible (loader looks frozen).
+  // The shimmer container is the div directly wrapping the loader's only
+  // aria-live="polite" node; re-apply a valid color-mix gradient to its
+  // ::after. Delete this block after bumping to the fixed apollo-react.
+  div:has(> [aria-live="polite"])::after {
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-background) 12%, transparent) 0%,
+      color-mix(in srgb, var(--color-background) 25%, transparent) 25%,
+      color-mix(in srgb, var(--color-background) 50%, transparent) 50%,
+      color-mix(in srgb, var(--color-background) 25%, transparent) 75%,
+      color-mix(in srgb, var(--color-background) 12%, transparent) 100%
+    );
+  }
+
   // Schema form: flow scalar fields into two columns when the form's own
   // container is wide enough. Object/array fields keep `col-span-2` so their
   // own nested grid uses the full width. Below the breakpoint we stay single
