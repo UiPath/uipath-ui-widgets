@@ -26,6 +26,7 @@ import {
   SortOrder,
   ToolCallEndEvent,
   ToolCallStream,
+  type ExecutingToolCallEvent,
 } from "@uipath/uipath-typescript/conversational-agent";
 import type {
   AgentGetByIdResponse,
@@ -53,6 +54,10 @@ import {
   createToolConfirmationRenderer,
   type ToolConfirmationRenderer,
 } from "./components/ToolConfirmationRenderer";
+import {
+  createClientSideToolRenderer,
+  type ClientSideToolRenderer,
+} from "./components/ClientSideToolRenderer";
 import { ALLOWED_ATTACHMENTS } from "./constants/attachments";
 import "./ConversationalAgentChat.css";
 import {
@@ -143,6 +148,10 @@ export const ConversationalAgentChat = ({
   // Per-instance so unmounting one widget doesn't tear down another's React roots.
   const toolConfirmationRenderer = useMemo<ToolConfirmationRenderer>(
     () => createToolConfirmationRenderer(),
+    [],
+  );
+  const clientSideToolRenderer = useMemo<ClientSideToolRenderer>(
+    () => createClientSideToolRenderer(),
     [],
   );
   // useLayoutEffect is ok here because the work is minimal enough that the cost is essentially zero
@@ -386,6 +395,7 @@ export const ConversationalAgentChat = ({
             const toolInput = startEvent.input
               ? normalizeInput(startEvent.input)
               : {};
+            const { isClientSideTool, outputSchema } = startEvent;
 
             pendingToolCalls.set(toolCall.toolCallId, {
               toolName: startEvent.toolName,
@@ -393,6 +403,107 @@ export const ConversationalAgentChat = ({
               startTimeIso,
               spinnerSent: false,
             });
+
+            const completeToolCallSpinner = (
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              output: any,
+              isError: boolean,
+              cancelled?: boolean,
+            ) => {
+              const pending = pendingToolCalls.get(toolCall.toolCallId);
+              if (pending && !pending.spinnerSent) {
+                sendToolCallSpinner(toolCall.toolCallId);
+              }
+              const endTimeIso = new Date().toISOString();
+              chatService.sendResponse({
+                id: toolCall.toolCallId,
+                content: t("performing_action_message", {
+                  action: startEvent.toolName,
+                }),
+                created_at: endTimeIso,
+                widget: MessageWidget.ApolloAgentsToolCall,
+                meta: {
+                  toolName: startEvent.toolName,
+                  input: toolInput,
+                  startTime: startTimeIso,
+                  output,
+                  endTime: endTimeIso,
+                  isError,
+                  ...(cancelled && { cancelled: true }),
+                },
+              });
+              pendingToolCalls.delete(toolCall.toolCallId);
+            };
+
+            toolCall.onToolCallEnd((endEvent: ToolCallEndEvent) => {
+              completeToolCallSpinner(
+                endEvent.output,
+                endEvent.isError ?? false,
+              );
+            });
+
+            // Handle client-side tool execution
+            toolCall.onExecutingToolCall(
+              (_event: ExecutingToolCallEvent) => {
+                if (!isClientSideTool) return;
+
+                const clientSideWidgetId = `client-side-tool-${toolCall.toolCallId}`;
+
+                // Build default values from output schema properties
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const outputSchemaObj = (outputSchema ?? {
+                  type: "object",
+                  properties: {},
+                }) as any;
+                const outputSchemaProps = outputSchemaObj.properties ?? {};
+                const defaultValues: Record<string, unknown> = {};
+                for (const key of Object.keys(outputSchemaProps)) {
+                  defaultValues[key] = null;
+                }
+
+                chatService.sendResponse({
+                  id: clientSideWidgetId,
+                  content: t("performing_action_message", {
+                    action: startEvent.toolName,
+                  }),
+                  created_at: new Date().toISOString(),
+                  widget: MessageWidget.ClientSideToolInput,
+                  stream: false,
+                  done: true,
+                  meta: {
+                    toolName: startEvent.toolName,
+                    inputSchema: outputSchemaObj,
+                    defaultValues,
+                    isCompleted: false,
+                    onSubmit: (formData: Record<string, unknown>) => {
+                      const conversation = chatService.getConversation();
+                      const messageToUpdate = conversation?.find(
+                        (m) => m.id === clientSideWidgetId,
+                      );
+                      if (messageToUpdate?.meta) {
+                        messageToUpdate.meta.isCompleted = true;
+                      }
+                      completeToolCallSpinner(formData, false);
+                      toolCall.sendToolCallEnd({
+                        output: formData,
+                        isError: false,
+                      });
+                    },
+                    onCancel: () => {
+                      const conversation = chatService.getConversation();
+                      const messageToUpdate = conversation?.find(
+                        (m) => m.id === clientSideWidgetId,
+                      );
+                      if (messageToUpdate?.meta) {
+                        messageToUpdate.meta.isCompleted = true;
+                      }
+                      completeToolCallSpinner(null, false, true);
+                      toolCall.sendToolCallEnd({ cancelled: true });
+                    },
+                  },
+                });
+              },
+            );
 
             // New flow: confirmation is a property of the tool call itself.
             if (startEvent.requireConfirmation) {
@@ -411,6 +522,11 @@ export const ConversationalAgentChat = ({
                   });
                 },
                 onCancel: () => {
+                  // For client-side tools, the server suppresses endToolCall
+                  // so update spinner locally
+                  if (isClientSideTool) {
+                    completeToolCallSpinner(null, false, true);
+                  }
                   toolCall.sendToolCallConfirm({ approved: false });
                 },
               });
@@ -418,30 +534,6 @@ export const ConversationalAgentChat = ({
               // No confirmation needed — show spinner immediately.
               sendToolCallSpinner(toolCall.toolCallId);
             }
-
-            toolCall.onToolCallEnd((endEvent: ToolCallEndEvent) => {
-              const pending = pendingToolCalls.get(toolCall.toolCallId);
-              if (pending?.spinnerSent) {
-                const endTimeIso = new Date().toISOString();
-                chatService.sendResponse({
-                  id: toolCall.toolCallId,
-                  content: t("performing_action_message", {
-                    action: startEvent.toolName,
-                  }),
-                  created_at: endTimeIso,
-                  widget: MessageWidget.ApolloAgentsToolCall,
-                  meta: {
-                    toolName: startEvent.toolName,
-                    input: toolInput,
-                    startTime: startTimeIso,
-                    output: endEvent.output,
-                    endTime: endTimeIso,
-                    isError: endEvent.isError,
-                  },
-                });
-              }
-              pendingToolCalls.delete(toolCall.toolCallId);
-            });
           });
         }
       });
@@ -1158,12 +1250,13 @@ export const ConversationalAgentChat = ({
     };
   }, []);
 
-  // Release React state held by the imperative tool-confirmation roots.
+  // Release React state held by the imperative tool-confirmation and client-side tool roots.
   useEffect(() => {
     return () => {
       toolConfirmationRenderer.unmountAll();
+      clientSideToolRenderer.unmountAll();
     };
-  }, [toolConfirmationRenderer]);
+  }, [toolConfirmationRenderer, clientSideToolRenderer]);
 
   // Register event handlers after chatService is available
   useEffect(() => {
@@ -1205,6 +1298,11 @@ export const ConversationalAgentChat = ({
               toolConfirmationLabelsRef.current ?? undefined,
             ),
         });
+        chatService.injectMessageRenderer({
+          name: MessageWidget.ClientSideToolInput,
+          render: (container, message) =>
+            clientSideToolRenderer.render(container, message),
+        });
       } catch (err) {
         const message =
           err instanceof Error ? err.message : t("error_load_history");
@@ -1234,6 +1332,7 @@ export const ConversationalAgentChat = ({
     onStopResponse,
     t,
     toolConfirmationRenderer,
+    clientSideToolRenderer,
   ]);
 
   useEffect(() => {

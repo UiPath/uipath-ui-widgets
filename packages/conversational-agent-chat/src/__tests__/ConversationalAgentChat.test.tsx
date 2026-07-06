@@ -1427,6 +1427,7 @@ describe("ConversationalAgentChat", () => {
           onToolCallEnd: vi.fn((handler: any) => {
             toolCallEndHandler = handler;
           }),
+          onExecutingToolCall: vi.fn(),
         };
         const mockMessage = createMockMessage({
           onToolCallStart: vi.fn((handler: any) => {
@@ -1470,6 +1471,7 @@ describe("ConversationalAgentChat", () => {
           toolCallId: "tool-2",
           startEvent: { toolName: "ping", input: null },
           onToolCallEnd: vi.fn(),
+          onExecutingToolCall: vi.fn(),
         };
         const mockMessage = createMockMessage({
           onToolCallStart: vi.fn((handler: any) => handler(mockToolCall)),
@@ -1583,6 +1585,7 @@ describe("ConversationalAgentChat", () => {
         onToolCallEnd: vi.fn((handler: any) => {
           toolCallEndHandler = handler;
         }),
+        onExecutingToolCall: vi.fn(),
       };
       const mockMessage = createMockMessage({
         onToolCallStart: vi.fn((handler: any) => handler(mockToolCall)),
@@ -1633,6 +1636,7 @@ describe("ConversationalAgentChat", () => {
         },
         sendToolCallConfirm,
         onToolCallEnd: vi.fn(),
+        onExecutingToolCall: vi.fn(),
       };
       messageStartHandler?.(
         createMockMessage({

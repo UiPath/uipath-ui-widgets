@@ -8,6 +8,8 @@
   "tool_confirmation_confirm": "tool_confirmation_confirm",
   "tool_confirmation_status_cancelled": "tool_confirmation_status_cancelled",
   "tool_confirmation_status_confirmed": "tool_confirmation_status_confirmed",
+  "client_side_tool_submit": "client_side_tool_submit",
+  "client_side_tool_description": "client_side_tool_description",
   "inputs_page_submit_error": "inputs_page_submit_error",
   "inputs_page_intro": "inputs_page_intro",
   "inputs_page_starting": "inputs_page_starting",
