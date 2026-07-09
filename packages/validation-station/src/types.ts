@@ -34,9 +34,9 @@ export enum ValidationStationLanguage {
 }
 
 export interface BucketArtifacts {
-  taxonomy: unknown;
-  extractionResult: unknown;
-  dom: unknown;
+  taxonomy: DuFramework.DocumentTaxonomy;
+  extractionResult: DuFramework.ExtractionResult;
+  dom: DuFramework.DocumentEntity;
   text: string | undefined;
   customizationInfo: unknown;
   original: string | undefined;

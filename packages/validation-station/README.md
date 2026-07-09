@@ -13,7 +13,7 @@ npm install @uipath/ui-widgets-validation-station
 ```
 react >= 19.2.0
 react-dom >= 19.2.0
-@uipath/uipath-typescript >= 1.4.1
+@uipath/uipath-typescript >= 1.4.2
 ```
 
 ## Quick start
@@ -50,9 +50,10 @@ function App() {
 
 > `theme` defaults to `"light"` and `language` defaults to `ValidationStationLanguage.English`, so the minimal mount just needs `sdk`, `data`, and a folder.
 
-> See [Static assets](#static-assets) below — you must copy the WC's
-> `du-assets/` folder into your build output, or PDF rendering and
-> translations will silently 404 in production.
+> See [Static assets & runtime stylesheets](#static-assets--runtime-stylesheets)
+> below — you must copy the web component's `du-assets/` folder **and its stylesheets**
+> into your build output (and serve raw CSS in dev), or PDF rendering,
+> translations, and **icons** will silently break with no build error.
 
 ## Props
 
@@ -65,7 +66,7 @@ function App() {
 | `language`                       | `ValidationStationLanguage`                    | No       | `English` | UI language (see enum below)                                                                                                                                                                                                                                                                                                                      |
 | `isReadonly`                     | `boolean`                                      | No       | `false`   | When `true`, renders in read-only mode                                                                                                                                                                                                                                                                                                            |
 | `options`                        | `IValidationStationOptions`                    | No       | —         | Fine-grained UI feature flags                                                                                                                                                                                                                                                                                                                     |
-| `save={{ validate: false }}`     | `{ validate: boolean }`                        | No       | —         | Trigger **save as draft**. ⚠ Requires `options.emitDtoStateChanges: true` — otherwise the WC won't surface the latest in-memory extraction state and the save will be a no-op.                                                                                                                                                                    |
+| `save={{ validate: false }}`     | `{ validate: boolean }`                        | No       | —         | Trigger **save as draft**. ⚠ Requires `options.emitDtoStateChanges: true` — otherwise the web component won't surface the latest in-memory extraction state and the save will be a no-op.                                                                                                                                                         |
 | `save={{ validate: true }}`      | `{ validate: boolean }`                        | No       | —         | Trigger **submit** — runs validation first, then saves.                                                                                                                                                                                                                                                                                           |
 | `discardChanges`                 | `{ value: boolean }`                           | No       | —         | Trigger a discard-changes operation. Call `setDiscardChanges({ value: true })` (or `false` — the boolean is ignored) every time you want it to fire. Each call creates a brand-new object even if the content looks identical, and that's what the widget watches for — so calling it repeatedly with the same `{ value: true }` works just fine. |
 | `setFieldValueByPath`            | `SetFieldValueByPath`                          | No       | —         | Set a field value addressed by a path of `{ fieldName, valueIndex }` segments                                                                                                                                                                                                                                                                     |
@@ -82,7 +83,7 @@ The widget surfaces three user-initiated flows. Submit and draft are owned end-t
 | --------------------------- | ----------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `onSubmitComplete`          | **Submit**              | `(result: SaveValidatedDataResult) => void`    | Calls `OrchestratorDuModule.processExtractedData(...)`, then uploads the merged result to `ValidatedExtractionResultsPath`. Fires the callback with the persistence result. | (optional) react to success/failure (complete the task, retry, log, etc.).                                   |
 | `onSaveAsDraftComplete`     | **Save as draft**       | `(result: SaveValidatedDataResult) => void`    | Uploads the in-progress `validatedData` straight to `ValidatedExtractionResultsPath` (no `processExtractedData` call). Fires the callback with the persistence result.      | (optional) react to success/failure.                                                                         |
-| `onReportExceptionComplete` | **Report as exception** | `(documentId: string, reason: string) => void` | Extracts `documentId` and `reason` from the WC's exception DTO and hands them to the host. **No API call.**                                                                 | Required if you want the report persisted — call `OrchestratorDuModule.submitExceptionReport(...)` yourself. |
+| `onReportExceptionComplete` | **Report as exception** | `(documentId: string, reason: string) => void` | Extracts `documentId` and `reason` from the web component's exception DTO and hands them to the host. **No API call.**                                                      | Required if you want the report persisted — call `OrchestratorDuModule.submitExceptionReport(...)` yourself. |
 
 Submit/draft hand you a `SaveValidatedDataResult` (`{ success, error? }`) — the host owns all UI feedback (toast, retry, etc.); the widget does not surface failures itself. The exception callback hands you `documentId` and `reason` strings ready to forward to the SDK.
 
@@ -264,80 +265,148 @@ const [save, setSave] = useState<{ validate: boolean } | undefined>(undefined);
 <ValidationStation sdk={sdk} data={data} folderId={1} save={save} />
 ```
 
-## Static assets
+## Static assets & runtime stylesheets
 
-The underlying web component loads runtime assets (PDF.js worker, cmaps,
-wasm, i18n translations) from a sibling `du-assets/` directory, resolved
-relative to where the WC's main bundle is served via `import.meta.url`.
+The underlying web component resolves several files **at runtime**, relative
+to where its main bundle is served (via `import.meta.url`):
 
-**`du-assets/` must be deployed at the same path level as your output
-bundle**, otherwise PDF rendering and translations will silently 404 in
-the browser (no build error). You need to copy
-`node_modules/@uipath/du-validation-station-wc/du-assets/` into your
-build output as a post-build step.
+- **`du-assets/`** — PDF.js worker, cmaps, wasm, and i18n translations.
+- **`styles.css`** — fetched as raw CSS text and adopted into the component's
+  **shadow root**. This is what styles the icons (`<mat-icon>`) and everything
+  else _inside_ the shadow boundary.
+- **`fonts.css`** + **`media/`** — the Apollo / Material Icons `@font-face`
+  declarations and the font files they reference.
+
+> **The React wrapper already imports `styles.css` and `fonts.css` as ES
+> modules for you**, so the _light DOM_ concerns (`@font-face` registration,
+> plus CDK overlays like menus/tooltips that portal to `document.body`) are
+> handled automatically — you do **not** add those imports yourself. What you
+> still have to handle is making the same files reachable by the web component's
+> **runtime `fetch`**, covered below.
+
+**These files must be deployed at the same path level as your output bundle.**
+If they're missing there's no build error — they silently 404 at runtime:
+PDFs fail to render, and because the shadow root never receives `styles.css`,
+**icons fall back to a system font and render as empty boxes or raw text**.
+
+There are two things to get right:
+
+1. **Build** — copy `du-assets/`, `styles.css`, `fonts.css`, and `media/` next
+   to your emitted JS chunks.
+2. **Dev server** — if your dev server rewrites `.css` requests into JS modules
+   (Vite does this), the web component's `fetch("styles.css")` receives JavaScript instead
+   of CSS, `CSSStyleSheet.replaceSync()` parses nothing, and the shadow-root
+   styles never load (→ broken icons). You must serve the **raw CSS** for that
+   fetch. Bundlers that serve copied files verbatim in dev (e.g.
+   webpack-dev-server) don't have this problem — copying alone is enough.
 
 ### Vite
 
-Add a small plugin to `vite.config.ts` that copies `du-assets/` next to
-your emitted JS chunks after each build:
+Two plugins: one copies the runtime files after a build, one serves raw CSS to
+the web component's `fetch` during dev. `optimizeDeps.exclude` is also required — Vite's
+pre-bundler rewrites `import.meta.url`, which breaks the web component's runtime
+resolution.
 
 ```ts
 // vite.config.ts
 import react from "@vitejs/plugin-react";
-import { cp } from "node:fs/promises";
+import { cp, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { defineConfig, type Plugin } from "vite";
 
 const require = createRequire(import.meta.url);
 
+const WC_ROOT = dirname(
+  require.resolve("@uipath/du-validation-station-wc/package.json"),
+);
+
+// Stylesheets the web component fetches (as raw CSS) at runtime to adopt into its
+// shadow root.
+const WC_RUNTIME_CSS = ["styles.css", "fonts.css"];
+
+// BUILD: place the web component's runtime files next to the emitted JS chunks, where
+// `import.meta.url` will resolve them.
 function copyDuValidationStationAssets(): Plugin {
-  let destDir = "";
+  let assetsDir = "";
   return {
     name: "copy-du-validation-station-assets",
     apply: "build",
     configResolved(config) {
-      destDir = resolve(
+      assetsDir = resolve(
         config.root,
         config.build.outDir,
         config.build.assetsDir,
-        "du-assets",
       );
     },
     async closeBundle() {
-      const wcRoot = dirname(
-        require.resolve("@uipath/du-validation-station-wc/package.json"),
-      );
-      await cp(resolve(wcRoot, "du-assets"), destDir, { recursive: true });
+      await cp(resolve(WC_ROOT, "du-assets"), resolve(assetsDir, "du-assets"), {
+        recursive: true,
+      });
+      await cp(resolve(WC_ROOT, "media"), resolve(assetsDir, "media"), {
+        recursive: true,
+      });
+      for (const css of WC_RUNTIME_CSS) {
+        await cp(resolve(WC_ROOT, css), resolve(assetsDir, css));
+      }
+    },
+  };
+}
+
+// DEV: Vite serves any `.css` request as a JS module. Return the real CSS to
+// the web component's raw `fetch` (identified by `Sec-Fetch-Dest: empty`), while letting
+// genuine ES-module imports (`Sec-Fetch-Dest: script`) pass through to Vite.
+function serveDuValidationStationRawCss(): Plugin {
+  const pattern = new RegExp(
+    `/@uipath/du-validation-station-wc/(${WC_RUNTIME_CSS.join("|")})$`,
+  );
+  return {
+    name: "serve-du-validation-station-raw-css",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.headers["sec-fetch-dest"] !== "empty") return next();
+        const match = pattern.exec((req.url ?? "").split("?")[0]);
+        if (!match) return next();
+        readFile(resolve(WC_ROOT, match[1]), "utf8").then((css) => {
+          res.setHeader("Content-Type", "text/css");
+          res.end(css);
+        }, next);
+      });
     },
   };
 }
 
 export default defineConfig({
-  plugins: [react(), copyDuValidationStationAssets()],
+  plugins: [
+    react(),
+    copyDuValidationStationAssets(),
+    serveDuValidationStationRawCss(),
+  ],
   optimizeDeps: {
     exclude: ["@uipath/du-validation-station-wc"],
   },
 });
 ```
 
-`optimizeDeps.exclude` is required — Vite's pre-bundler rewrites
-`import.meta.url`, which breaks the WC's runtime asset resolution.
-
 ### webpack
 
-Use [`copy-webpack-plugin`](https://github.com/webpack-contrib/copy-webpack-plugin) **and** opt the WC bundle out of webpack's `new URL(..., import.meta.url)` parsing — the WC uses that pattern to load `du-assets/` at runtime, and webpack will otherwise try to bundle the directory and fail with `Module not found: Error: Can't resolve './du-assets/'`:
+Use [`copy-webpack-plugin`](https://github.com/webpack-contrib/copy-webpack-plugin) to copy `du-assets/`, the stylesheets, and `media/` next to your bundle, **and** opt the web component bundle out of webpack's `new URL(..., import.meta.url)` parsing — the web component uses that pattern for its runtime resolution, and webpack will otherwise try to bundle the directory and fail with `Module not found: Error: Can't resolve './du-assets/'`. webpack-dev-server serves the copied files verbatim, so no separate raw-CSS handling is needed.
 
 ```js
 // webpack.config.js
 const CopyPlugin = require("copy-webpack-plugin");
 const path = require("path");
 
+const wcRoot = path.dirname(
+  require.resolve("@uipath/du-validation-station-wc/package.json"),
+);
+
 module.exports = {
   module: {
     rules: [
-      // Don't parse runtime URL / dynamic-require expressions inside the WC —
-      // its assets are resolved at runtime from `import.meta.url`.
+      // Don't parse runtime URL / dynamic-require expressions inside the web component —
+      // its assets and stylesheets are resolved at runtime from `import.meta.url`.
       {
         test: /node_modules[\\/]@uipath[\\/]du-validation-station-wc[\\/].*\.js$/,
         parser: {
@@ -351,13 +420,10 @@ module.exports = {
   plugins: [
     new CopyPlugin({
       patterns: [
-        {
-          from:
-            path.dirname(
-              require.resolve("@uipath/du-validation-station-wc/package.json"),
-            ) + "/du-assets",
-          to: "assets/du-assets",
-        },
+        { from: `${wcRoot}/du-assets`, to: "assets/du-assets" },
+        { from: `${wcRoot}/media`, to: "assets/media" },
+        { from: `${wcRoot}/styles.css`, to: "assets/styles.css" },
+        { from: `${wcRoot}/fonts.css`, to: "assets/fonts.css" },
       ],
     }),
   ],
@@ -368,8 +434,10 @@ module.exports = {
 
 Any asset-copy mechanism works — Angular's `assets` array,
 `rollup-plugin-copy`, a `postbuild` npm script with `cp -r`, etc. The
-only requirement is that the final deployed layout has `du-assets/`
-sitting next to the JS chunks that import the WC.
+requirement is the same: the final deployed layout must have `du-assets/`,
+`styles.css`, `fonts.css`, and `media/` sitting next to the JS chunks that
+import the web component. If your dev server transforms `.css` into JS modules, also make
+sure the web component's runtime `fetch` for `styles.css`/`fonts.css` receives raw CSS.
 
 ## Development
 
