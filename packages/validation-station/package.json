@@ -17,8 +17,9 @@
   ],
   "scripts": {
     "prepack": "rimraf *.tgz",
-    "build": "npm run clean && tsc",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
     "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",

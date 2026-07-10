@@ -4,6 +4,7 @@ import "./App.css";
 import ConversationalAgentPage from "./pages/ConversationalAgentPage";
 import DataTablePage from "./pages/DataTablePage";
 import HomePage from "./pages/HomePage";
+import InvoiceReviewWorkspacePage from "./pages/InvoiceReviewWorkspace";
 import MultiFileUploadPage from "./pages/MultiFileUploadPage";
 import ValidationStationPage from "./pages/ValidationStationPage";
 
@@ -31,6 +32,9 @@ function App({ uipathSdk }: AppProps) {
       break;
     case "validation-station":
       page = <ValidationStationPage uipathSdk={uipathSdk} />;
+      break;
+    case "invoice-review-workspace":
+      page = <InvoiceReviewWorkspacePage uipathSdk={uipathSdk} />;
       break;
     case "multi-file-upload":
       page = <MultiFileUploadPage uipathSdk={uipathSdk} />;
