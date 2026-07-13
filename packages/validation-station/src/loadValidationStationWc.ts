@@ -10,6 +10,16 @@ import "@uipath/du-validation-station-wc/styles.css";
 // icon glyphs render as empty boxes.
 import "@uipath/du-validation-station-wc/fonts.css";
 
+// zone.js (loaded above) replaces Promise with ZoneAwarePromise which lacks
+// Promise.try(). The WC calls it at render time, not module init, so restoring
+// it here (after imports) is early enough. Remove when the WC upgrades zone.js.
+if (typeof Promise.try !== "function") {
+  Promise.try = <T, U extends unknown[]>(
+    fn: (...args: U) => T | PromiseLike<T>,
+    ...args: U
+  ) => new Promise<T>((resolve) => resolve(fn(...args))) as Promise<Awaited<T>>;
+}
+
 export const VALIDATION_STATION_TAG =
   "ui-du-validation-station-standalone-wc-element";
 
