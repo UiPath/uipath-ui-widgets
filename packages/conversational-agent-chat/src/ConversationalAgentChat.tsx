@@ -994,7 +994,7 @@ export const ConversationalAgentChat = ({
           firstRunExperience: firstRunExperienceConfig && {
             title: firstRunExperienceConfig.title ?? "",
             description: firstRunExperienceConfig.description ?? "",
-            suggestions: firstRunExperienceConfig.suggestions,
+            suggestions: firstRunExperienceConfig.suggestions ?? [],
           },
           overrideLabels: {
             title: overrideLabelsRef.current?.title ?? agentName,

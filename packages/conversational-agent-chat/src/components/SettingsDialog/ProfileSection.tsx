@@ -294,6 +294,9 @@ export const ProfileSection = ({
             items={countryItems}
             value={countryValue}
             onValueChange={handleCountryChange}
+            placeholder={t("combobox_placeholder")}
+            searchPlaceholder={t("combobox_search_placeholder")}
+            emptyText={t("combobox_empty")}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -304,6 +307,9 @@ export const ProfileSection = ({
             items={timezoneItems}
             value={form.timezone ?? ""}
             onValueChange={handleChange("timezone")}
+            placeholder={t("combobox_placeholder")}
+            searchPlaceholder={t("combobox_search_placeholder")}
+            emptyText={t("combobox_empty")}
           />
         </div>
       </div>
