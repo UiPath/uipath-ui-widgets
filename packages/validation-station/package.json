@@ -1,6 +1,6 @@
 {
   "name": "@uipath/ui-widgets-validation-station",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A React component for UiPath Document Understanding Validation Station.",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
