@@ -6,12 +6,21 @@ import {
   AutopilotChatFileInfo,
   AutopilotChatMessage,
   AutopilotChatMode,
+  AutopilotChatPreHookAction,
   AutopilotChatService,
   type SupportedLocale,
 } from "@uipath/apollo-react/material/components";
 import { FontVariantToken } from "@uipath/apollo-core";
 import i18next from "i18next";
-import { Alert, AlertDescription, Button } from "@uipath/apollo-wind";
+import {
+  Alert,
+  AlertDescription,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@uipath/apollo-wind";
 import {
   ContentPartChunkEvent,
   ContentPartStream,
@@ -75,6 +84,7 @@ import {
 import { trackTelemetry } from "./utils/telemetryUtils";
 import { initI18n } from "./i18n";
 import { resolveAgent as fetchAgentRelease } from "./utils/resolveAgent";
+import FilePreviewer from "./components/FilePreviewer";
 
 initI18n();
 
@@ -101,6 +111,8 @@ export const ConversationalAgentChat = ({
   overrideLabels,
   firstRunExperience,
   disabledFeatures,
+  citationPreview = true,
+  usePdfJsViewer = true,
   jobStartOverrides,
   isDebugMode = false,
   evaluationSets,
@@ -156,6 +168,7 @@ export const ConversationalAgentChat = ({
     folderIdRef.current = folderId;
     onEvaluationSetClickedRef.current = onEvaluationSetClicked;
     onUserMessageSentRef.current = onUserMessageSent;
+    citationPreviewRef.current = citationPreview;
     toolConfirmationLabelsRef.current = {
       cancel: t("cancel"),
       confirm: t("tool_confirmation_confirm"),
@@ -169,6 +182,7 @@ export const ConversationalAgentChat = ({
     firstRunExperience,
     onEvaluationSetClicked,
     onUserMessageSent,
+    citationPreview,
     folderId,
     t,
   ]);
@@ -208,6 +222,13 @@ export const ConversationalAgentChat = ({
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [feedbackIsPositive, setFeedbackIsPositive] = useState(false);
   const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
+  // Citation source-document preview, opened from a citation click.
+  const [citationPreviewData, setCitationPreviewData] = useState<{
+    file: File;
+    title: string;
+    pageNumber: number;
+  } | null>(null);
+  const citationPreviewRef = useRef(citationPreview);
   const [hasMessages, setHasMessages] = useState(false);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
   const onUserMessageSentRef = useRef(onUserMessageSent);
@@ -969,6 +990,41 @@ export const ConversationalAgentChat = ({
           },
           paginatedHistory: true,
           settingsRenderer: renderSettings,
+          preHooks: {
+            [AutopilotChatPreHookAction.CitationClick]: async (
+              citationData,
+            ) => {
+              // When preview is disabled, or the citation is not a
+              // context-grounding citation (no download_url to a source
+              // document), fall through to Apollo's default handling.
+              if (!citationPreviewRef.current) return true;
+
+              const { citation } = citationData;
+              if (!citation?.download_url) return true;
+
+              const pageNumber = Number(citation.page_number) || 1;
+              let file: File;
+              try {
+                const blob = await agentService.current.downloadCitationSource({
+                  title: citation.title,
+                  number: citation.number ?? citation.id ?? 0,
+                  downloadUrl: citation.download_url,
+                  pageNumber: String(pageNumber),
+                });
+                file = new File([blob], citation.title, { type: blob.type });
+              } catch (e) {
+                console.error("Failed to load citation document", e);
+                return true;
+              }
+
+              setCitationPreviewData({
+                file,
+                title: citation.title,
+                pageNumber,
+              });
+              return false;
+            },
+          },
           // Apollo's ApChat defaults message text to fontSizeM (14px); the
           // deprecated portal-shell chat used a larger size, so bump primary
           // text and markdown body tokens to fontSizeL (16px) to match.
@@ -1344,6 +1400,27 @@ export const ConversationalAgentChat = ({
         onSubmit={onFeedbackSubmit}
         onCancel={onFeedbackCancel}
       />
+
+      <Dialog
+        open={!!citationPreviewData}
+        onOpenChange={(open) => {
+          if (!open) setCitationPreviewData(null);
+        }}
+      >
+        {citationPreviewData && (
+          <DialogContent className="sm:max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>{citationPreviewData.title}</DialogTitle>
+            </DialogHeader>
+            <FilePreviewer
+              file={citationPreviewData.file}
+              usePdfJs={usePdfJsViewer}
+              pageNumber={citationPreviewData.pageNumber}
+              iframeParams={`#page=${citationPreviewData.pageNumber}`}
+            />
+          </DialogContent>
+        )}
+      </Dialog>
     </div>
   );
 };

@@ -38,7 +38,7 @@
     "@uipath/ui-widgets-datatable": "file:./packages/datatable/dist",
     "@uipath/ui-widgets-multi-file-upload": "file:./packages/multi-file-upload/dist",
     "@uipath/ui-widgets-validation-station": "file:./packages/validation-station/dist",
-    "@uipath/uipath-typescript": "^1.4.1",
+    "@uipath/uipath-typescript": "^1.5.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "socket.io-client": "^4.8.3"
