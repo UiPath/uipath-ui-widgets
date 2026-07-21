@@ -1,0 +1,99 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { buildOAuthAuthorizeUrl } from "../oauthRedirect";
+import { OAuthRedirectConfig } from "../types";
+
+const googleConfig: OAuthRedirectConfig = {
+  authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+  redirectUri: "https://myapp.com/auth/google/callback",
+  scope: "openid email profile",
+};
+
+describe("buildOAuthAuthorizeUrl", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it("builds an authorization-code URL with the core params", async () => {
+    const url = await buildOAuthAuthorizeUrl("google-client-id", googleConfig);
+    const parsed = new URL(url);
+
+    expect(parsed.origin + parsed.pathname).toBe(
+      "https://accounts.google.com/o/oauth2/v2/auth",
+    );
+    expect(parsed.searchParams.get("client_id")).toBe("google-client-id");
+    expect(parsed.searchParams.get("redirect_uri")).toBe(
+      "https://myapp.com/auth/google/callback",
+    );
+    expect(parsed.searchParams.get("response_type")).toBe("code");
+    expect(parsed.searchParams.get("scope")).toBe("openid email profile");
+    expect(parsed.searchParams.get("state")).toBeTruthy();
+  });
+
+  it("includes a PKCE challenge by default and stores the verifier", async () => {
+    const url = await buildOAuthAuthorizeUrl("google-client-id", googleConfig);
+    const parsed = new URL(url);
+
+    expect(parsed.searchParams.get("code_challenge")).toBeTruthy();
+    expect(parsed.searchParams.get("code_challenge_method")).toBe("S256");
+
+    const stored = JSON.parse(
+      sessionStorage.getItem("uipath-auth-widget:oauth:google-client-id")!,
+    );
+    expect(stored.state).toBe(parsed.searchParams.get("state"));
+    expect(stored.codeVerifier).toBeTruthy();
+  });
+
+  it("omits PKCE when usePkce is false", async () => {
+    const url = await buildOAuthAuthorizeUrl("cid", {
+      ...googleConfig,
+      usePkce: false,
+    });
+    const parsed = new URL(url);
+
+    expect(parsed.searchParams.get("code_challenge")).toBeNull();
+    expect(parsed.searchParams.get("code_challenge_method")).toBeNull();
+
+    const stored = JSON.parse(
+      sessionStorage.getItem("uipath-auth-widget:oauth:cid")!,
+    );
+    expect(stored.codeVerifier).toBeUndefined();
+  });
+
+  it("appends extraParams (e.g. UAE PASS acr_values)", async () => {
+    const url = await buildOAuthAuthorizeUrl("uaepass-client-id", {
+      authorizeUrl: "https://id.uaepass.ae/idshub/authorize",
+      redirectUri: "https://myapp.com/auth/uaepass/callback",
+      scope: "urn:uae:digitalid:profile:general",
+      extraParams: {
+        acr_values: "urn:safelayer:tws:policies:authentication:adaptive",
+      },
+    });
+    const parsed = new URL(url);
+
+    expect(parsed.searchParams.get("acr_values")).toBe(
+      "urn:safelayer:tws:policies:authentication:adaptive",
+    );
+  });
+
+  it("does not let extraParams override the generated core params", async () => {
+    const url = await buildOAuthAuthorizeUrl("cid", {
+      ...googleConfig,
+      extraParams: { state: "consumer-chosen", client_id: "other-id" },
+    });
+    const parsed = new URL(url);
+    const stored = JSON.parse(
+      sessionStorage.getItem("uipath-auth-widget:oauth:cid")!,
+    );
+
+    expect(parsed.searchParams.get("client_id")).toBe("cid");
+    expect(parsed.searchParams.get("state")).toBe(stored.state);
+    expect(parsed.searchParams.get("state")).not.toBe("consumer-chosen");
+  });
+
+  it("generates a fresh state on each call", async () => {
+    const a = new URL(await buildOAuthAuthorizeUrl("cid", googleConfig));
+    const b = new URL(await buildOAuthAuthorizeUrl("cid", googleConfig));
+
+    expect(a.searchParams.get("state")).not.toBe(b.searchParams.get("state"));
+  });
+});
