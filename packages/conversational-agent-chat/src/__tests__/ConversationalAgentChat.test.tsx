@@ -89,6 +89,7 @@ let contentPartEndHandler: any = null;
 let toolCallEndHandler: any = null;
 let labelUpdatedHandler: any = null;
 let lastSessionHelper: any = null;
+let lastExchange: any = null;
 
 // Prevent lint errors for handler variables that are assigned inside mocks
 void contentPartStartHandler;
@@ -206,17 +207,21 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
             pauseEmits: vi.fn(),
             resumeEmits: vi.fn(),
             isEmitPaused: false,
-            startExchange: vi.fn(() => ({
-              onErrorStart: vi.fn((handler: any) => {
-                exchangeErrorHandler = handler;
-              }),
-              onMessageStart: vi.fn((handler: any) => {
-                messageStartHandler = handler;
-              }),
-              onExchangeEnd: vi.fn(),
-              sendExchangeEnd: vi.fn(),
-              startMessage: vi.fn(() => mockMessageBuilder),
-            })),
+            startExchange: vi.fn(() => {
+              const exchange = {
+                onErrorStart: vi.fn((handler: any) => {
+                  exchangeErrorHandler = handler;
+                }),
+                onMessageStart: vi.fn((handler: any) => {
+                  messageStartHandler = handler;
+                }),
+                onExchangeEnd: vi.fn(),
+                sendExchangeEnd: vi.fn(),
+                startMessage: vi.fn(() => mockMessageBuilder),
+              };
+              lastExchange = exchange;
+              return exchange;
+            }),
           };
           lastSessionHelper = sessionHelper;
           return sessionHelper;
@@ -279,6 +284,7 @@ describe("ConversationalAgentChat", () => {
     toolCallEndHandler = null;
     labelUpdatedHandler = null;
     lastSessionHelper = null;
+    lastExchange = null;
     defaultProps = {
       sdk: mockSdk as UiPath,
       agentId: 1,
@@ -735,6 +741,7 @@ describe("ConversationalAgentChat", () => {
       )?.[1];
       await onSendMessage?.({ content: "Hello", attachments: [] });
       const startedSession = lastSessionHelper;
+      const startedExchange = lastExchange;
 
       const onClickOpenConversation = mockChatService.on.mock.calls.find(
         (call: any) => call[0] === "openConversation",
@@ -746,6 +753,9 @@ describe("ConversationalAgentChat", () => {
       await waitFor(() =>
         expect(startedSession?.sendSessionEnd).toHaveBeenCalledTimes(1),
       );
+      // But the in-flight exchange keeps running so reopening resumes its turn;
+      // ending the turn is reserved for Stop.
+      expect(startedExchange?.sendExchangeEnd).not.toHaveBeenCalled();
     });
 
     it("should call stopResponse and clearError when opening a conversation", async () => {

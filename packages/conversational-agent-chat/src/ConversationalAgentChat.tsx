@@ -596,17 +596,11 @@ export const ConversationalAgentChat = ({
     return sessionHelper;
   }, [chatService, getConversation, setConversationHistory, t]);
 
-  // Cleanly end the active exchange and session before switching conversations
-  // or tearing down the widget. Emitting `endSession` lets the SDK release the
-  // socket and the server drop its session state, so a later reopen starts a
-  // fresh session (and receives a fresh `sessionStarted`) instead of reusing a
-  // stale one whose start event never re-fires — which would hang the send.
+  // End the session on conversation switch/unmount so a reopen starts fresh and
+  // gets a new `sessionStarted` — reusing a stale session hangs the send. The
+  // in-flight exchange is left running (ending it is reserved for onStopResponse),
+  // so switching away from a busy conversation and reopening resumes its turn.
   const endActiveSession = useCallback(() => {
-    try {
-      activeExchange.current?.sendExchangeEnd();
-    } catch {
-      /* exchange already ended */
-    }
     try {
       session.current?.sendSessionEnd();
     } catch {
