@@ -62,3 +62,6 @@ Thumbs.db
 
 *storybook.log
 storybook-static
+
+# DU Validation Station WC bundle, provisioned by copy-assets
+public/du-vs-wc

@@ -60,8 +60,8 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
     return <div>Failed to load document artifacts: {error}</div>;
   }
 
-  // The WC-load error message is self-descriptive (points at the plugin / served
-  // path), so surface it as-is rather than spinning on "Loading..." forever.
+  // The WC-load error message is self-descriptive (points at copy-assets / the
+  // served path), so surface it as-is rather than spinning on "Loading..." forever.
   if (wcError) {
     return <div>{wcError}</div>;
   }

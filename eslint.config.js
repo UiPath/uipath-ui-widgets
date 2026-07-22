@@ -17,6 +17,9 @@ export default defineConfig([
     "storybook-static",
     "coverage",
     "**/coverage",
+    // DU Validation Station WC bundle, provisioned by `uipath-vs-wc copy-assets`.
+    // Third-party build output (ships stray .ts files) — never lint it.
+    "**/public/du-vs-wc",
   ]),
   {
     files: ["**/*.{ts,tsx}"],

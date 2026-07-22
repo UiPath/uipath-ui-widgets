@@ -14,10 +14,11 @@
 // out of the consumer's build graph and makes it a type-only dependency of this
 // package (only `import type` references remain).
 //
-// The consumer serves the bundle; by default the widget loads it from
-// `DU_VS_WC_BASE` (the same path the `validationStationAssets()` Vite plugin
-// serves it under), so no configuration is needed for the common setup. Call
-// `configureValidationStationWc({ baseUrl })` only to override that path.
+// The consumer serves the bundle under `DU_VS_WC_BASE` (provision it there with
+// the `uipath-vs-wc copy-assets` CLI, or `copyValidationStationWcAssets` from
+// the `/assets` entry). That's the default, so no configuration is needed for
+// the common setup. Call `configureValidationStationWc({ baseUrl })` only to
+// override that path.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { DU_VS_WC_BASE } from "./constants.js";
@@ -51,8 +52,8 @@ export interface ValidationStationWcConfig {
    * Where the WC bundle is served from, resolved against `document.baseURI`.
    * `main.js`, `polyfills.js`, `styles.css`, `fonts.css`, `du-assets/` and
    * `media/` must all sit directly under this path. Defaults to
-   * {@link DU_VS_WC_BASE} — the path the `validationStationAssets()` Vite plugin
-   * serves under — so you only need to set it to use a different path.
+   * {@link DU_VS_WC_BASE} — the path `uipath-vs-wc copy-assets` provisions — so
+   * you only need to set it to serve the bundle from a different path.
    */
   baseUrl?: string;
   /**
@@ -63,8 +64,8 @@ export interface ValidationStationWcConfig {
   loadFonts?: boolean;
 }
 
-// Defaults to DU_VS_WC_BASE so the common setup (validationStationAssets() Vite
-// plugin with its default path) needs no configuration at all.
+// Defaults to DU_VS_WC_BASE so the common setup (copy-assets into a folder
+// served at that path) needs no configuration at all.
 let config: { baseUrl: string; loadFonts: boolean } = {
   baseUrl: DU_VS_WC_BASE,
   loadFonts: true,
@@ -74,7 +75,7 @@ let config: { baseUrl: string; loadFonts: boolean } = {
  * Override where the WC bundle is served from (defaults to {@link DU_VS_WC_BASE})
  * or opt out of font injection. Optional — call once, before the first
  * `<ValidationStation>` / subcomponent mounts, only if you serve the bundle
- * somewhere other than the `validationStationAssets()` Vite plugin's default path.
+ * somewhere other than the {@link DU_VS_WC_BASE} default path.
  */
 export function configureValidationStationWc(
   next: ValidationStationWcConfig,
@@ -120,9 +121,9 @@ export function ensureValidationStationWcLoaded(): Promise<void> {
       // package targets ES2020, whose Error type has no `cause` constructor arg.
       const error = new Error(
         `Validation Station: failed to load the WC bundle from "${base.href}". ` +
-          "Make sure the bundle is served there — add the validationStationAssets() " +
-          'Vite plugin (or run "uipath-vs-wc copy-assets"), and if you serve it under ' +
-          "a different path, pass a matching baseUrl to configureValidationStationWc().",
+          'Make sure the bundle is served there — run "uipath-vs-wc copy-assets" ' +
+          "into a folder your app serves at that path, and if you serve it under a " +
+          "different path, pass a matching baseUrl to configureValidationStationWc().",
       );
       (error as Error & { cause?: unknown }).cause = cause;
       throw error;

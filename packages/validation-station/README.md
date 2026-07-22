@@ -18,20 +18,21 @@ react-dom >= 19.2.0
 
 ## Hello world
 
-Two steps: serve the web component, mount a component.
+The widget loads the DU web component **at runtime** from a URL your app serves — it is never bundled into your app. So there are two steps: serve the web component's files, then mount a component.
 
-**1. Add the bundled Vite plugin.** It serves the web component in dev and copies it into your build output, under `/du-vs-wc/`.
+**1. Serve the web component.** The bundled `uipath-vs-wc` CLI copies the WC bundle out of `node_modules` into a static folder your app serves. Wire it as `predev`/`prebuild` so it runs for both dev and build:
 
-```ts
-// vite.config.ts
-import { validationStationAssets } from "@uipath/ui-widgets-validation-station/vite";
-import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
-
-export default defineConfig({
-  plugins: [react(), validationStationAssets()], // serves + emits under /du-vs-wc/
-});
+```jsonc
+// package.json — gitignore the destination (public/du-vs-wc)
+"scripts": {
+  "predev":   "uipath-vs-wc copy-assets public/du-vs-wc",
+  "prebuild": "uipath-vs-wc copy-assets public/du-vs-wc"
+}
 ```
+
+`public/` is dev-served **and** emitted into the build output at the site root by Vite, Next, CRA, Astro, etc., so this one command covers dev + prod on any bundler — no plugin. Copying into `public/du-vs-wc` serves it at `/du-vs-wc/`, which is the widget's default, so **no `configureValidationStationWc()` call is needed**. (The copy is idempotent — a `.wc-version` marker skips it when already up to date.)
+
+> The copied bundle is third-party build output (it ships some `.ts` files). Besides gitignoring `public/du-vs-wc`, exclude it from your linter and `tsconfig` (e.g. ESLint `ignores`, `tsconfig` `exclude`) so a repo-wide `eslint .` / `tsc` doesn't try to check it.
 
 **2. Mount a component.**
 
@@ -43,32 +44,20 @@ export function App({ sdk, data, folderId }) {
 }
 ```
 
-That's it — no wiring in between. The widget loads the web component from `/du-vs-wc/` at runtime (the plugin's default path), so nothing heavy is bundled into your app.
+That's it. The web component is loaded from `/du-vs-wc/` at runtime, so nothing heavy is bundled into your app.
 
-> Serving the bundle somewhere other than the default path? Call `configureValidationStationWc({ baseUrl })` once before anything mounts, passing the same path you gave the plugin's `basePath`.
+> If your framework serves static files from elsewhere (Angular `src/assets`, SvelteKit `static`) or you copy to a different folder, call `configureValidationStationWc({ baseUrl })` once before anything mounts, with the matching URL path.
 
 Other components you can mount the same way — `DocumentViewer`, `CompactFieldsForm`, `CompactTableEditor`, `CompactBusinessRules`, `CompactDocTypeField`. Give several the same `instanceId` to compose them around one shared document.
 
-### Using a bundler other than Vite
+### Provisioning inside your build instead of a script
 
-`validationStationAssets()` is Vite-specific sugar. The web component and the loader work with **any** bundler — only step 1 (getting the WC files served) differs. On webpack, rspack, Next, Angular, SvelteKit, Astro, etc., copy the bundle into a static folder your app serves, with the bundled CLI:
-
-```jsonc
-// package.json — runs before dev and build; gitignore the destination
-"scripts": {
-  "predev":   "uipath-vs-wc copy-assets public/du-vs-wc",
-  "prebuild": "uipath-vs-wc copy-assets public/du-vs-wc"
-}
-```
-
-That static folder is dev-served **and** emitted to the build output by every one of those frameworks, so this one command covers dev + prod without a bundler plugin. Copying into `public/du-vs-wc` serves it at `/du-vs-wc/` — the widget's default — so no `configureValidationStationWc()` call is needed. If your framework serves static files from elsewhere (Angular `src/assets`, SvelteKit `static`) or you use a different folder, call `configureValidationStationWc({ baseUrl })` with the matching URL path. Add the destination to `.gitignore`.
-
-Prefer to run it inside your build rather than a script? Import the same copy step and call it wherever your bundler lets you run Node (a webpack/rspack plugin hook, a Rollup plugin, a build script):
+Prefer to run the copy from your bundler config rather than an npm script? Import the same step and call it wherever your bundler lets you run Node (a webpack/rspack plugin hook, a Rollup plugin, a Vite config, a build script):
 
 ```ts
 import { copyValidationStationWcAssets } from "@uipath/ui-widgets-validation-station/assets";
 
-await copyValidationStationWcAssets("dist/du-vs-wc");
+await copyValidationStationWcAssets("public/du-vs-wc");
 ```
 
 ## Quick start
@@ -105,11 +94,7 @@ function App() {
 
 > `theme` defaults to `"light"` and `language` defaults to `ValidationStationLanguage.English`, so the minimal mount just needs `sdk`, `data`, and a folder.
 
-> This assumes the [Hello world](#hello-world) setup is done — the
-> `validationStationAssets()` plugin (or `uipath-vs-wc copy-assets` on other
-> bundlers) serving the bundle. Without it, PDF rendering, translations, and
-> icons silently break at runtime. See
-> [How the web component is served](#how-the-web-component-is-served).
+> This assumes the [Hello world](#hello-world) setup is done — `uipath-vs-wc copy-assets` serving the bundle. Without it, PDF rendering, translations, and icons silently break at runtime. See [How the web component is served](#how-the-web-component-is-served).
 
 ## Props
 
@@ -338,20 +323,17 @@ You don't wire any of this by hand. The loader injects `styles.css` and
 `fonts.css` as light-DOM `<link>`s from `baseUrl` for you, and the component
 resolves `du-assets/` and `media/` as siblings of its main bundle. **Your only
 job is to make the bundle reachable at `baseUrl`** — which is what the
-[Hello world](#hello-world) setup already does:
-
-- **Vite** — the `validationStationAssets()` plugin serves the files in dev and
-  copies them into the build output.
-- **Any other bundler** — `uipath-vs-wc copy-assets <static-dir>`, or import
-  `copyValidationStationWcAssets` from
-  `@uipath/ui-widgets-validation-station/assets` and call it in your build. See
-  [Using a bundler other than Vite](#using-a-bundler-other-than-vite).
+[Hello world](#hello-world) setup already does: `uipath-vs-wc copy-assets`
+copies the bundle into a static folder your app serves (or call
+`copyValidationStationWcAssets` from `@uipath/ui-widgets-validation-station/assets`
+inside your build). Because `public/` is served in dev and emitted into the build
+by every bundler, that one command covers both.
 
 If the bundle isn't reachable at `baseUrl` there's no build error, but the loader
 throws a descriptive error at runtime when `main.js` fails to load, pointing you
-back at the plugin / `copy-assets` setup. (If only some sibling files are
-missing — e.g. `styles.css` — the element may still upgrade but render
-degraded: PDFs fail and shadow-root icons fall back to a system font.)
+back at the `copy-assets` setup. (If only some sibling files are missing — e.g.
+`styles.css` — the element may still upgrade but render degraded: PDFs fail and
+shadow-root icons fall back to a system font.)
 
 ## Development
 
