@@ -124,6 +124,19 @@ describe("loadValidationStationWc", () => {
   });
 
   describe("configureValidationStationWc", () => {
+    it("ignores undefined fields so the default baseUrl is not clobbered", async () => {
+      const mod = await freshLoader();
+      const fromEnv: string | undefined = undefined;
+      mod.configureValidationStationWc({ baseUrl: fromEnv });
+      // baseUrl must still be the default — no crash on `config.baseUrl.endsWith`.
+      const err = await mod.ensureValidationStationWcLoaded().then(
+        () => null,
+        (e: unknown) => e as Error,
+      );
+      expect(err?.message).toMatch(/failed to load the WC bundle/i);
+      expect(err?.message).toMatch(/du-vs-wc/);
+    });
+
     it("loads from a custom baseUrl once configured", async () => {
       const mod = await freshLoader();
       mod.configureValidationStationWc({ baseUrl: "/custom-wc/" });

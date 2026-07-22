@@ -66,7 +66,7 @@ export interface ValidationStationWcConfig {
 
 // Defaults to DU_VS_WC_BASE so the common setup (copy-assets into a folder
 // served at that path) needs no configuration at all.
-let config: { baseUrl: string; loadFonts: boolean } = {
+const config: { baseUrl: string; loadFonts: boolean } = {
   baseUrl: DU_VS_WC_BASE,
   loadFonts: true,
 };
@@ -80,7 +80,10 @@ let config: { baseUrl: string; loadFonts: boolean } = {
 export function configureValidationStationWc(
   next: ValidationStationWcConfig,
 ): void {
-  config = { ...config, ...next };
+  // Merge only defined fields: passing `{ baseUrl: undefined }` (e.g. from an
+  // unset env var) must not clobber the default and crash the loader later.
+  if (next.baseUrl !== undefined) config.baseUrl = next.baseUrl;
+  if (next.loadFonts !== undefined) config.loadFonts = next.loadFonts;
 }
 
 // ─── Loader ──────────────────────────────────────────────────────────────────

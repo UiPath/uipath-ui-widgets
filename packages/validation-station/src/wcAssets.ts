@@ -4,9 +4,9 @@
 // The widget loads the WC at runtime from a served URL (see loadValidationStationWc).
 // This module is the single, bundler-agnostic way to get the WC's files to that
 // served location: it copies the bundle out of node_modules into a folder your
-// host serves. The `uipath-vs-wc` CLI and the bundler plugins are thin wrappers
-// over it, and you can call it directly from any bundler config that lets you run
-// Node code (webpack/rspack plugin hook, a build script, a Rollup plugin, etc.).
+// host serves. The `uipath-vs-wc` CLI is a thin wrapper over it, and you can call
+// it directly from any bundler config that lets you run Node code (a webpack/rspack
+// plugin hook, a build script, a Rollup plugin, a Vite config, etc.).
 //
 // Node-only (uses `node:fs`); never imported by the browser entry.
 // ─────────────────────────────────────────────────────────────────────────────
