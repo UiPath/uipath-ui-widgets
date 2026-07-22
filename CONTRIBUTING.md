@@ -39,6 +39,7 @@ packages/
   datatable/                 # DataTable component
   multi-file-upload/         # Multi-file upload component
   conversational-agent-chat/ # Conversational agent chat component
+  external-auth/             # Provider-agnostic sign-in widget
 ```
 
 ## Available Scripts

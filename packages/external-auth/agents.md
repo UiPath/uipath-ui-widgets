@@ -1,4 +1,4 @@
-# Auth-Widget - Architecture
+# External-Auth - Architecture
 
 ## Overview
 
@@ -46,12 +46,24 @@ There is no internal state. The widget never inspects or interprets `clientId` �
 
 `renderIcon()` in `ExternalAuth.tsx`:
 
-- `undefined`/`null` → no icon rendered
+- `undefined`/`null`/`""` → no icon rendered
 - `string` → treated as an image URL, rendered as `<img>` with `{displayName} icon` alt text
 - anything else (e.g. inline SVG element) → rendered inside a fixed-size `<span>` wrapper
+- both branches are `aria-hidden` — the icon is decorative; the button text carries the provider name
 
 ## Styling
 
+- Built from `@uipath/apollo-wind` design-system components: `Card`/`CardHeader`/`CardTitle`/`CardContent` for the container (de-emphasized border + shadow by default) and `Button variant="outline"` for the provider buttons — no hand-rolled chrome, no UiPath logo (the widget is provider-agnostic)
 - Tailwind utility classes via `@uipath/apollo-wind` (see `ExternalAuth.scss`)
 - `ExternalAuth.css` in `src/` is a stub for tests; the real stylesheet is compiled from `ExternalAuth.scss` into `dist/` by the `copy-styles` script
 - Root element carries the `uipath-external-auth` class for consumer overrides
+
+## Telemetry
+
+Product telemetry via the shared `trackEvent` SDK (`src/utils/telemetryUtils.ts`), stamped with `ApplicationName: "Widget.ExternalAuth"` + `WidgetVersion`:
+
+- `AUTH.SignIn` — provider button clicked (`Provider`, `Method: customHandler | oauthRedirect`); `Error` status for misconfigured providers or failed `onSignIn` handlers
+- `AUTH.OAuthRedirect` — built-in redirect succeeded/failed (`UsePkce`, `ResponseType` / `Error`)
+- `AUTH.PersistState` — `Error` only, when persisting state/PKCE to sessionStorage fails
+
+No secrets or PII are logged — provider labels, booleans, enums, and error reasons only.

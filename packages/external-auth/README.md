@@ -81,7 +81,7 @@ function App() {
 | -------------- | ------------------------ | -------- | ------------------------------------------------------------- |
 | `authorizeUrl` | `string`                 | Yes      | Provider authorize endpoint                                   |
 | `redirectUri`  | `string`                 | Yes      | Registered redirect URI                                       |
-| `scope`        | `string`                 | Yes      | Space-separated scopes, e.g. `openid email profile`           |
+| `scopes`       | `string`                 | Yes      | Space-separated scopes, e.g. `openid email profile`           |
 | `responseType` | `string`                 | No       | OAuth response_type; defaults to `code`                       |
 | `usePkce`      | `boolean`                | No       | Generate a PKCE challenge/verifier; defaults to `true`        |
 | `extraParams`  | `Record<string, string>` | No       | Extra query params, e.g. `{ acr_values: "..." }` for UAE PASS |
