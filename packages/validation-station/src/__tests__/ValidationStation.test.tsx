@@ -4,7 +4,7 @@ import { act, render, waitFor } from "@testing-library/react";
 import { ValidationStation } from "../ValidationStation";
 
 vi.mock("../loadValidationStationWc", () => ({
-  validationStationWcReady: Promise.resolve(),
+  waitForWcElementReady: () => Promise.resolve(),
   VALIDATION_STATION_TAG: "ui-du-validation-station-standalone-wc-element",
 }));
 

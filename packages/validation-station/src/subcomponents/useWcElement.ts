@@ -58,7 +58,7 @@ export function useWcElement(params: {
   const { artifacts, error, documentId, canPersist, resolvedFolderId } =
     useSubcomponentArtifacts(dataSource);
   // Gate on the tag actually rendered, not always the base tag.
-  const wcReady = useWcReady(tag);
+  const { ready: wcReady, error: wcError } = useWcReady(tag);
 
   const commonProps: WcCommonProps = {
     className: common.className,
@@ -72,7 +72,9 @@ export function useWcElement(params: {
 
   return {
     artifacts,
-    error,
+    // A WC-load failure gates rendering just like an artifacts-fetch failure, so
+    // fold it into the same `error` channel the wrappers already surface.
+    error: error ?? wcError,
     documentId,
     canPersist,
     resolvedFolderId,

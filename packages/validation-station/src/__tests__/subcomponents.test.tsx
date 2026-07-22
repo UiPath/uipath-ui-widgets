@@ -25,7 +25,7 @@ vi.mock("../useSubcomponentArtifacts", () => ({
 }));
 
 vi.mock("../useWcReady", () => ({
-  useWcReady: () => true,
+  useWcReady: () => ({ ready: true, error: null }),
 }));
 
 const mockSubmitValidatedData = vi.fn();

@@ -6,7 +6,10 @@ import type {
 } from "@uipath/du-validation-station-wc";
 import { toast, Toaster } from "@uipath/apollo-wind";
 import { useEffect, useState } from "react";
-import { validationStationWcReady } from "./loadValidationStationWc.js";
+import {
+  VALIDATION_STATION_TAG,
+  waitForWcElementReady,
+} from "./loadValidationStationWc.js";
 import {
   submitValidatedData,
   saveValidatedDataAsDraft,
@@ -36,12 +39,18 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
 }) => {
   const { artifacts, error } = useBucketArtifacts(sdk, data, folderId);
   const [wcReady, setWcReady] = useState(false);
+  const [wcError, setWcError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    validationStationWcReady.then(() => {
-      if (!cancelled) setWcReady(true);
-    });
+    waitForWcElementReady(VALIDATION_STATION_TAG).then(
+      () => {
+        if (!cancelled) setWcReady(true);
+      },
+      (e: unknown) => {
+        if (!cancelled) setWcError(e instanceof Error ? e.message : String(e));
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -49,6 +58,12 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
 
   if (error) {
     return <div>Failed to load document artifacts: {error}</div>;
+  }
+
+  // The WC-load error message is self-descriptive (points at the plugin / served
+  // path), so surface it as-is rather than spinning on "Loading..." forever.
+  if (wcError) {
+    return <div>{wcError}</div>;
   }
 
   if (!artifacts || !wcReady) {

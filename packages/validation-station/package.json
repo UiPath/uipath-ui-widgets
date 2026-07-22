@@ -10,7 +10,18 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./vite": {
+      "import": "./dist/vite.js",
+      "types": "./dist/vite.d.ts"
+    },
+    "./assets": {
+      "import": "./dist/wcAssets.js",
+      "types": "./dist/wcAssets.d.ts"
     }
+  },
+  "bin": {
+    "uipath-vs-wc": "./dist/cli.js"
   },
   "files": [
     "dist"
@@ -44,7 +55,13 @@
   "peerDependencies": {
     "@uipath/uipath-typescript": "^1.4.2",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "vite": "^6 || ^7 || ^8"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@tailwindcss/oxide": "^4.1.18",
@@ -62,7 +79,7 @@
     "rimraf": "^6.0.1",
     "rollup": "^4.55.1",
     "typescript": "~5.9.3",
-    "vite": "^6.0.3",
+    "vite": "^7.3.1",
     "vitest": "^4.0.18"
   },
   "dependencies": {

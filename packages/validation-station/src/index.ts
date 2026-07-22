@@ -9,6 +9,12 @@ export type {
   ValidationStationProps,
 } from "./types.js";
 export { ValidationStation } from "./ValidationStation.js";
+export { DU_VS_WC_BASE } from "./constants.js";
+export {
+  configureValidationStationWc,
+  ensureValidationStationWcLoaded,
+  type ValidationStationWcConfig,
+} from "./loadValidationStationWc.js";
 export { useBucketArtifacts } from "./useBucketArtifacts.js";
 
 // ─── Subcomponents ────────────────────────────────────────────────────────────

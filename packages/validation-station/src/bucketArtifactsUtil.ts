@@ -85,7 +85,6 @@ export async function fetchBucketArtifacts(
     !TextPath ||
     !TaxonomyPath ||
     !EncodedDocumentPath ||
-    !CustomizationInfoPath ||
     !DocumentObjectModelPath ||
     !AutomaticExtractionResultsPath
   ) {
@@ -111,12 +110,14 @@ export async function fetchBucketArtifacts(
         DocumentObjectModelPath,
       ),
       fetchArtifactText(bucketService, BucketId, folderId, TextPath),
-      fetchArtifactJson(
-        bucketService,
-        BucketId,
-        folderId,
-        CustomizationInfoPath,
-      ),
+      CustomizationInfoPath
+        ? fetchArtifactJson(
+            bucketService,
+            BucketId,
+            folderId,
+            CustomizationInfoPath,
+          )
+        : Promise.resolve(undefined),
       fetchArtifactText(bucketService, BucketId, folderId, EncodedDocumentPath),
     ]);
 
