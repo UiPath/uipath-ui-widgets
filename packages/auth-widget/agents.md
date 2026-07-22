@@ -20,13 +20,13 @@ A provider-agnostic React sign-in widget. It renders a card with a heading and o
 
 ### AuthProvider
 
-| Field         | Type                         | Required | Description                                                                                   |
-| ------------- | ---------------------------- | -------- | --------------------------------------------------------------------------------------------- |
-| `displayName` | `string`                     | Yes      | Button label ("Continue with {displayName}"); list key is `displayName:clientId`              |
-| `displayIcon` | `ReactNode`                  | No       | String → rendered as `<img src>`; anything else rendered as-is                                |
-| `clientId`    | `string`                     | Yes      | Passed to `onSignIn` on click and used by the `oauth` default; opaque to the widget           |
-| `onSignIn`    | `(clientId: string) => void` | No\*     | Click handler — always wins over `oauth`; required for non-OIDC providers (SAML 2.0)          |
-| `oauth`       | `OAuthRedirectConfig`        | No\*     | Enables the built-in default sign-in: a direct OIDC authorize redirect to this provider's IdP |
+| Field         | Type                         | Required | Description                                                                                                                    |
+| ------------- | ---------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `displayName` | `string`                     | Yes      | Button label ("Continue with {displayName}"); the list key is a random id assigned per provider object (stable across renders) |
+| `displayIcon` | `ReactNode`                  | No       | String → rendered as `<img src>`; anything else rendered as-is                                                                 |
+| `clientId`    | `string`                     | Yes      | Passed to `onSignIn` on click and used by the `oauth` default; opaque to the widget                                            |
+| `onSignIn`    | `(clientId: string) => void` | No\*     | Click handler — always wins over `oauth`; required for non-OIDC providers (SAML 2.0)                                           |
+| `oauth`       | `OAuthRedirectConfig`        | No\*     | Enables the built-in default sign-in: a direct OIDC authorize redirect to this provider's IdP                                  |
 
 \* Provide `onSignIn` or `oauth` (or both — `onSignIn` wins). With neither, a click logs a warning and does nothing.
 

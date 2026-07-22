@@ -86,15 +86,17 @@ export async function buildOAuthAuthorizeUrl(
   try {
     sessionStorage.setItem(STORAGE_PREFIX + clientId, JSON.stringify(stored));
   } catch {
-    // sessionStorage may be unavailable (e.g. SSR, privacy mode); the redirect
-    // can still proceed, but the callback won't be able to verify state/PKCE —
-    // leave a trace so the dead-end is diagnosable at click time.
+    // sessionStorage may be unavailable (e.g. SSR, privacy mode). Fail closed:
+    // without the persisted state/verifier the callback could never verify
+    // CSRF/PKCE, so redirecting anyway would be a guaranteed dead-end (or an
+    // invitation to skip verification). Aborting lets the caller surface it.
     trackTelemetry(TelemetryEvent.PersistState, TelemetryStatus.Error, {
       Error: "sessionStorage_unavailable",
     });
-    console.warn(
+    throw new Error(
       "AuthWidget: could not persist the OAuth state/PKCE verifier to " +
-        "sessionStorage; the callback will not be able to verify this login.",
+        "sessionStorage; aborting the sign-in redirect because the callback " +
+        "would not be able to verify this login.",
     );
   }
 

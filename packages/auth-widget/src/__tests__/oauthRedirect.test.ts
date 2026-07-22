@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildOAuthAuthorizeUrl } from "../oauthRedirect";
 import { OAuthRedirectConfig } from "../types";
 
@@ -95,5 +95,20 @@ describe("buildOAuthAuthorizeUrl", () => {
     const b = new URL(await buildOAuthAuthorizeUrl("cid", googleConfig));
 
     expect(a.searchParams.get("state")).not.toBe(b.searchParams.get("state"));
+  });
+
+  it("fails closed when sessionStorage is unavailable", async () => {
+    const spy = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new Error("storage denied");
+      });
+    try {
+      await expect(buildOAuthAuthorizeUrl("cid", googleConfig)).rejects.toThrow(
+        /could not persist the OAuth state/,
+      );
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
