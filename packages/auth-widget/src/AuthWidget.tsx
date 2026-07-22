@@ -12,9 +12,6 @@ import { trackTelemetry } from "./utils/telemetryUtils";
 
 const renderIcon = (icon: ReactNode, displayName: string) => {
   if (icon == null || icon === "") return null;
-  // The icon is decorative — the button text already names the provider — so
-  // both branches are hidden from the accessibility tree to avoid screen
-  // readers announcing it twice.
   if (typeof icon === "string") {
     return (
       <img
@@ -33,21 +30,6 @@ const renderIcon = (icon: ReactNode, displayName: string) => {
       {icon}
     </span>
   );
-};
-
-// React needs a stable, unique key per provider, but no provider field is
-// guaranteed unique on its own (two providers may share a displayName) and the
-// clientId is deliberately kept out of DOM concerns. Each provider object is
-// lazily assigned a random id instead, kept stable across renders through the
-// WeakMap (keyed by object identity), so React never remounts the buttons.
-const providerKeys = new WeakMap<AuthProvider, string>();
-const getProviderKey = (provider: AuthProvider): string => {
-  let key = providerKeys.get(provider);
-  if (key === undefined) {
-    key = crypto.randomUUID();
-    providerKeys.set(provider, key);
-  }
-  return key;
 };
 
 export const AuthWidget: FC<AuthWidgetProps> = ({
@@ -97,7 +79,7 @@ export const AuthWidget: FC<AuthWidgetProps> = ({
       <div className="flex flex-col gap-4">
         {authProviders.map((provider) => (
           <Button
-            key={getProviderKey(provider)}
+            key={provider.displayName}
             type="button"
             variant="outline"
             className="h-auto w-full gap-3 px-4 py-3 text-base font-semibold"

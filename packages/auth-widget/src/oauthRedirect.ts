@@ -42,6 +42,30 @@ async function sha256Base64Url(input: string): Promise<string> {
 }
 
 /**
+ * Parse and validate the provider's authorize endpoint. It must be an
+ * absolute http(s) URL: this URL ends up in `window.location.assign(...)`,
+ * so if provider configuration were ever influenced by untrusted input, a
+ * non-http(s) scheme (e.g. `javascript:`) would otherwise become an XSS
+ * vector.
+ */
+function parseAuthorizeUrl(authorizeUrl: string): URL {
+  let url: URL;
+  try {
+    url = new URL(authorizeUrl);
+  } catch {
+    throw new Error(
+      `AuthWidget: authorizeUrl must be an absolute http(s) URL; got "${authorizeUrl}".`,
+    );
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error(
+      `AuthWidget: authorizeUrl must use the http(s) scheme; got "${url.protocol}".`,
+    );
+  }
+  return url;
+}
+
+/**
  * Build the full authorize URL for an OIDC provider, generating and persisting
  * a CSRF `state` (and, unless disabled, a PKCE verifier/challenge pair) so the
  * consumer's callback route can verify them.
@@ -58,6 +82,10 @@ export async function buildOAuthAuthorizeUrl(
     usePkce = true,
     extraParams = {},
   } = config;
+
+  // Validate the endpoint before any side effect (state generation,
+  // sessionStorage write) so a bad config fails cleanly.
+  const url = parseAuthorizeUrl(authorizeUrl);
 
   const state = randomString();
   // extraParams is spread first so the core OAuth params always win — a
@@ -100,8 +128,14 @@ export async function buildOAuthAuthorizeUrl(
     );
   }
 
-  const separator = authorizeUrl.includes("?") ? "&" : "?";
-  return `${authorizeUrl}${separator}${params.toString()}`;
+  // Merge via the URL API so a query string already present on authorizeUrl
+  // is preserved and everything stays correctly encoded. `set` (not `append`)
+  // guarantees our OAuth params win over any same-named param embedded in the
+  // configured endpoint.
+  for (const [key, value] of params) {
+    url.searchParams.set(key, value);
+  }
+  return url.toString();
 }
 
 /**

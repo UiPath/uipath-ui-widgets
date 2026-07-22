@@ -97,6 +97,52 @@ describe("buildOAuthAuthorizeUrl", () => {
     expect(a.searchParams.get("state")).not.toBe(b.searchParams.get("state"));
   });
 
+  it("rejects a non-http(s) authorizeUrl (e.g. javascript:)", async () => {
+    await expect(
+      buildOAuthAuthorizeUrl("cid", {
+        ...googleConfig,
+        // eslint-disable-next-line no-script-url
+        authorizeUrl: "javascript:alert(1)",
+      }),
+    ).rejects.toThrow(/must use the http\(s\) scheme/);
+  });
+
+  it("rejects a relative authorizeUrl", async () => {
+    await expect(
+      buildOAuthAuthorizeUrl("cid", {
+        ...googleConfig,
+        authorizeUrl: "/oauth/authorize",
+      }),
+    ).rejects.toThrow(/must be an absolute http\(s\) URL/);
+  });
+
+  it("preserves a query string already present on authorizeUrl", async () => {
+    const url = await buildOAuthAuthorizeUrl("cid", {
+      ...googleConfig,
+      authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth?audience=api",
+    });
+    const parsed = new URL(url);
+
+    expect(parsed.searchParams.get("audience")).toBe("api");
+    expect(parsed.searchParams.get("client_id")).toBe("cid");
+    // exactly one "?" — params were merged, not naively concatenated
+    expect(url.indexOf("?")).toBe(url.lastIndexOf("?"));
+  });
+
+  it("overrides same-named params embedded in authorizeUrl with the generated ones", async () => {
+    const url = await buildOAuthAuthorizeUrl("cid", {
+      ...googleConfig,
+      authorizeUrl:
+        "https://accounts.google.com/o/oauth2/v2/auth?state=attacker-pinned",
+    });
+    const parsed = new URL(url);
+    const stored = JSON.parse(
+      sessionStorage.getItem("uipath-auth-widget:oauth:cid")!,
+    );
+
+    expect(parsed.searchParams.getAll("state")).toEqual([stored.state]);
+  });
+
   it("fails closed when sessionStorage is unavailable", async () => {
     const spy = vi
       .spyOn(Storage.prototype, "setItem")
