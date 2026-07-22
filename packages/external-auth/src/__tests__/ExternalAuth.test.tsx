@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AuthWidget } from "../AuthWidget";
+import { ExternalAuth } from "../ExternalAuth";
 import { AuthProvider } from "../types";
 
 const createProvider = (
@@ -13,9 +13,9 @@ const createProvider = (
   ...overrides,
 });
 
-describe("AuthWidget", () => {
+describe("ExternalAuth", () => {
   it("renders the default title", () => {
-    render(<AuthWidget authProviders={[createProvider()]} />);
+    render(<ExternalAuth authProviders={[createProvider()]} />);
 
     expect(
       screen.getByRole("heading", { name: "Sign in to your account" }),
@@ -24,7 +24,7 @@ describe("AuthWidget", () => {
 
   it("renders a custom title", () => {
     render(
-      <AuthWidget authProviders={[createProvider()]} title="Welcome back" />,
+      <ExternalAuth authProviders={[createProvider()]} title="Welcome back" />,
     );
 
     expect(
@@ -39,7 +39,7 @@ describe("AuthWidget", () => {
       createProvider({ displayName: "LinkedIn", clientId: "linkedin-id" }),
     ];
 
-    render(<AuthWidget authProviders={providers} />);
+    render(<ExternalAuth authProviders={providers} />);
 
     expect(screen.getAllByRole("button")).toHaveLength(3);
     expect(
@@ -70,7 +70,7 @@ describe("AuthWidget", () => {
       }),
     ];
 
-    render(<AuthWidget authProviders={providers} />);
+    render(<ExternalAuth authProviders={providers} />);
 
     await user.click(
       screen.getByRole("button", { name: /Continue with Microsoft/ }),
@@ -83,7 +83,7 @@ describe("AuthWidget", () => {
 
   it("renders a string displayIcon as an image", () => {
     render(
-      <AuthWidget
+      <ExternalAuth
         authProviders={[
           createProvider({
             displayName: "Google",
@@ -100,7 +100,7 @@ describe("AuthWidget", () => {
 
   it("renders a React node displayIcon as-is", () => {
     render(
-      <AuthWidget
+      <ExternalAuth
         authProviders={[
           createProvider({
             displayIcon: <svg data-testid="custom-icon" />,
@@ -113,13 +113,13 @@ describe("AuthWidget", () => {
   });
 
   it("renders no icon when displayIcon is omitted", () => {
-    render(<AuthWidget authProviders={[createProvider()]} />);
+    render(<ExternalAuth authProviders={[createProvider()]} />);
 
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
   it("renders no buttons for an empty provider list", () => {
-    render(<AuthWidget authProviders={[]} />);
+    render(<ExternalAuth authProviders={[]} />);
 
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(
@@ -131,7 +131,7 @@ describe("AuthWidget", () => {
     const googleOauth = {
       authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
       redirectUri: "https://myapp.com/auth/google/callback",
-      scope: "openid email profile",
+      scopes: "openid email profile",
     };
 
     const originalLocation = window.location;
@@ -157,7 +157,7 @@ describe("AuthWidget", () => {
       const assign = mockLocationAssign();
 
       render(
-        <AuthWidget
+        <ExternalAuth
           authProviders={[
             {
               displayName: "Google",
@@ -182,7 +182,7 @@ describe("AuthWidget", () => {
       const assign = mockLocationAssign();
 
       render(
-        <AuthWidget
+        <ExternalAuth
           authProviders={[
             {
               displayName: "Google",
@@ -211,7 +211,7 @@ describe("AuthWidget", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       render(
-        <AuthWidget
+        <ExternalAuth
           authProviders={[
             { displayName: "Google", clientId: "google-client-id" },
           ]}

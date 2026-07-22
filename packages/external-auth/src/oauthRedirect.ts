@@ -19,16 +19,17 @@ import { trackTelemetry } from "./utils/telemetryUtils";
  * still owns the callback route that verifies `state`, exchanges the code,
  * validates the tokens, and creates a session. The `state` and PKCE `codeVerifier`
  * generated here are stored in `sessionStorage` under
- * `uipath-auth-widget:oauth:<clientId>` for the callback to read and verify.
+ * `uipath-external-auth:oauth:<clientId>` for the callback to read and verify.
  */
 
-const STORAGE_PREFIX = "uipath-auth-widget:oauth:";
+const STORAGE_PREFIX = "uipath-external-auth:oauth:";
 
 function base64UrlEncode(bytes: Uint8Array): string {
   let str = "";
   for (const b of bytes) str += String.fromCharCode(b);
   return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
+
 function randomString(byteLength = 32): string {
   const arr = new Uint8Array(byteLength);
   crypto.getRandomValues(arr);
@@ -54,12 +55,12 @@ function parseAuthorizeUrl(authorizeUrl: string): URL {
     url = new URL(authorizeUrl);
   } catch {
     throw new Error(
-      `AuthWidget: authorizeUrl must be an absolute http(s) URL; got "${authorizeUrl}".`,
+      `ExternalAuth: authorizeUrl must be an absolute http(s) URL; got "${authorizeUrl}".`,
     );
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new Error(
-      `AuthWidget: authorizeUrl must use the http(s) scheme; got "${url.protocol}".`,
+      `ExternalAuth: authorizeUrl must use the http(s) scheme; got "${url.protocol}".`,
     );
   }
   return url;
@@ -77,7 +78,7 @@ export async function buildOAuthAuthorizeUrl(
   const {
     authorizeUrl,
     redirectUri,
-    scope,
+    scopes,
     responseType = "code",
     usePkce = true,
     extraParams = {},
@@ -97,7 +98,8 @@ export async function buildOAuthAuthorizeUrl(
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: responseType,
-    scope,
+    // `scope` (singular) is the OAuth 2.0 spec's parameter name
+    scope: scopes,
     state,
   });
 
@@ -122,7 +124,7 @@ export async function buildOAuthAuthorizeUrl(
       Error: "sessionStorage_unavailable",
     });
     throw new Error(
-      "AuthWidget: could not persist the OAuth state/PKCE verifier to " +
+      "ExternalAuth: could not persist the OAuth state/PKCE verifier to " +
         "sessionStorage; aborting the sign-in redirect because the callback " +
         "would not be able to verify this login.",
     );
@@ -150,7 +152,7 @@ export function createDefaultSignIn(
     void buildOAuthAuthorizeUrl(clientId, config)
       .then((url) => {
         // Only booleans/enums about the flow shape are logged — never the
-        // authorize URL, clientId, redirectUri, scope, state or PKCE verifier.
+        // authorize URL, clientId, redirectUri, scopes, state or PKCE verifier.
         trackTelemetry(TelemetryEvent.OAuthRedirect, TelemetryStatus.Success, {
           UsePkce: config.usePkce !== false,
           ResponseType: config.responseType ?? "code",
@@ -164,7 +166,7 @@ export function createDefaultSignIn(
         // Without this, a rejection (e.g. crypto.subtle missing on insecure
         // origins) would make the button a silent no-op.
         console.error(
-          "AuthWidget: failed to start the sign-in redirect.",
+          "ExternalAuth: failed to start the sign-in redirect.",
           error,
         );
       });

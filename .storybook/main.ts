@@ -18,7 +18,7 @@ const config: StorybookConfig = {
     "../packages/conversational-agent-chat/src/*.stories.tsx",
     "../packages/datatable/src/*.stories.tsx",
     "../packages/validation-station/src/*.stories.tsx",
-    "../packages/auth-widget/src/*.stories.tsx",
+    "../packages/external-auth/src/*.stories.tsx",
   ],
   addons: [getAbsolutePath("@storybook/addon-docs")],
   framework: getAbsolutePath("@storybook/react-vite"),

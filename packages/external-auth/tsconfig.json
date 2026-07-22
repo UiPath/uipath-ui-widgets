@@ -18,7 +18,7 @@
     "noEmit": false,
     "sourceMap": true,
     "paths": {
-      "@uipath/auth-widget/*": ["./src/*"]
+      "@uipath/external-auth/*": ["./src/*"]
     }
   },
   "include": ["src"],

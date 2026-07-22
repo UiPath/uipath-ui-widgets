@@ -11,7 +11,7 @@
     "packages/datatable",
     "packages/conversational-agent-chat",
     "packages/validation-station",
-    "packages/auth-widget"
+    "packages/external-auth"
   ],
   "scripts": {
     "dev": "vite",
@@ -35,7 +35,7 @@
     "@emotion/styled": "^11.14.1",
     "@fontsource/roboto": "^5.2.9",
     "@mui/material": "^7.3.5",
-    "@uipath/ui-widgets-auth-widget": "file:./packages/auth-widget/dist",
+    "@uipath/ui-widgets-external-auth": "file:./packages/external-auth/dist",
     "@uipath/ui-widgets-conversational-agent-chat": "file:./packages/conversational-agent-chat/dist",
     "@uipath/ui-widgets-datatable": "file:./packages/datatable/dist",
     "@uipath/ui-widgets-multi-file-upload": "file:./packages/multi-file-upload/dist",

@@ -13,7 +13,7 @@ export interface OAuthRedirectConfig {
   /** Registered redirect URI the provider returns the user to after login */
   redirectUri: string;
   /** Space-separated scopes, e.g. "openid email profile" */
-  scope: string;
+  scopes: string;
   /** OAuth response_type; defaults to "code" (authorization-code flow) */
   responseType?: string;
   /** Generate a PKCE challenge/verifier pair; defaults to true */
@@ -55,7 +55,7 @@ export interface AuthProvider {
   oauth?: OAuthRedirectConfig;
 }
 
-export interface AuthWidgetProps {
+export interface ExternalAuthProps {
   /** Providers to render, in order, one button each */
   authProviders: AuthProvider[];
   /** Heading shown at the top of the widget */

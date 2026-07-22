@@ -29,7 +29,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@uipath/ui-widgets-auth-widget": path.resolve(__dirname, "./src"),
+      "@uipath/ui-widgets-external-auth": path.resolve(__dirname, "./src"),
     },
   },
   css: {

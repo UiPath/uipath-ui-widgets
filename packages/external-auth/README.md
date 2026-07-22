@@ -1,11 +1,11 @@
-# @uipath/ui-widgets-auth-widget
+# @uipath/ui-widgets-external-auth
 
 A provider-agnostic React sign-in widget. It renders one button per configured authentication provider and starts the login **directly at that provider's IdP**. For OIDC providers (Google, UAE PASS, or any other) it ships a built-in default sign-in — a standard authorization-code redirect with CSRF `state` and PKCE — enabled per provider via an `oauth` config. A per-provider `onSignIn` handler always wins over the default; everything after the redirect (callback validation, token exchange, session creation) is the consumer's responsibility.
 
 ## Installation
 
 ```bash
-npm install @uipath/ui-widgets-auth-widget
+npm install @uipath/ui-widgets-external-auth
 ```
 
 ## Features
@@ -22,12 +22,12 @@ npm install @uipath/ui-widgets-auth-widget
 > **Note:** Add either `light` or `dark` class to your HTML `<body>` element to enable proper theming.
 
 ```tsx
-import { AuthWidget } from "@uipath/ui-widgets-auth-widget";
-import "@uipath/ui-widgets-auth-widget/AuthWidget.css";
+import { ExternalAuth } from "@uipath/ui-widgets-external-auth";
+import "@uipath/ui-widgets-external-auth/ExternalAuth.css";
 
 function App() {
   return (
-    <AuthWidget
+    <ExternalAuth
       authProviders={[
         {
           displayName: "Google",
@@ -37,7 +37,7 @@ function App() {
           oauth: {
             authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
             redirectUri: "https://myapp.com/auth/google/callback",
-            scope: "openid email profile",
+            scopes: "openid email profile",
           },
         },
         {
@@ -56,7 +56,7 @@ function App() {
 
 ## Props
 
-### AuthWidget
+### ExternalAuth
 
 | Prop            | Type             | Required | Description                                                                 |
 | --------------- | ---------------- | -------- | --------------------------------------------------------------------------- |
@@ -92,10 +92,10 @@ When a user clicks a provider button, the widget calls that provider's `onSignIn
 
 ### Built-in default sign-in (optional)
 
-If you don't want to write `onSignIn` for a standard OIDC provider, supply an `oauth` config instead and the widget will start the login for you — it builds a standard OAuth 2.0 / OpenID Connect authorization-code redirect (with CSRF `state` and PKCE) and navigates the browser to the provider. The generated `state` and PKCE `codeVerifier` are stored in `sessionStorage` under `uipath-auth-widget:oauth:<clientId>` for your callback route to read and verify.
+If you don't want to write `onSignIn` for a standard OIDC provider, supply an `oauth` config instead and the widget will start the login for you — it builds a standard OAuth 2.0 / OpenID Connect authorization-code redirect (with CSRF `state` and PKCE) and navigates the browser to the provider. The generated `state` and PKCE `codeVerifier` are stored in `sessionStorage` under `uipath-external-auth:oauth:<clientId>` for your callback route to read and verify.
 
 ```tsx
-<AuthWidget
+<ExternalAuth
   authProviders={[
     {
       displayName: "Google",
@@ -104,7 +104,7 @@ If you don't want to write `onSignIn` for a standard OIDC provider, supply an `o
       oauth: {
         authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
         redirectUri: "https://myapp.com/auth/google/callback",
-        scope: "openid email profile",
+        scopes: "openid email profile",
       },
     },
   ]}

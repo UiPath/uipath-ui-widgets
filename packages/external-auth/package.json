@@ -1,6 +1,6 @@
 {
-  "name": "@uipath/ui-widgets-auth-widget",
-  "version": "1.0.0",
+  "name": "@uipath/ui-widgets-external-auth",
+  "version": "1.0.0-beta.1",
   "description": "A provider-agnostic React sign-in widget that renders a list of configurable authentication providers",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -11,7 +11,7 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./AuthWidget.css": "./dist/AuthWidget.css"
+    "./ExternalAuth.css": "./dist/ExternalAuth.css"
   },
   "files": [
     "dist"
@@ -19,7 +19,7 @@
   "scripts": {
     "build": "npm run clean && tsc && npm run copy-styles",
     "clean": "rimraf dist",
-    "copy-styles": "sass --no-source-map src/AuthWidget.scss | postcss -o dist/AuthWidget.css",
+    "copy-styles": "sass --no-source-map src/ExternalAuth.scss | postcss -o dist/ExternalAuth.css",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
@@ -40,7 +40,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/UiPath/uipath-ui-widgets.git",
-    "directory": "packages/auth-widget"
+    "directory": "packages/external-auth"
   },
   "publishConfig": {
     "access": "public",
@@ -49,7 +49,7 @@
   "bugs": {
     "url": "https://github.com/UiPath/uipath-ui-widgets/issues"
   },
-  "homepage": "https://uipath.github.io/uipath-ui-widgets/?path=/docs/components-authwidget--docs",
+  "homepage": "https://uipath.github.io/uipath-ui-widgets/?path=/docs/components-externalauth--docs",
   "peerDependencies": {
     "@uipath/uipath-typescript": "^1.4.1",
     "react": "^19.2.0",

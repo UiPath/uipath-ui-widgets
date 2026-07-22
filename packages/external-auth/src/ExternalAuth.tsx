@@ -1,9 +1,9 @@
 import { FC, ReactNode } from "react";
 import { Button } from "@uipath/apollo-wind";
-import "./AuthWidget.css";
+import "./ExternalAuth.css";
 import {
   AuthProvider,
-  AuthWidgetProps,
+  ExternalAuthProps,
   TelemetryEvent,
   TelemetryStatus,
 } from "./types";
@@ -32,7 +32,7 @@ const renderIcon = (icon: ReactNode, displayName: string) => {
   );
 };
 
-export const AuthWidget: FC<AuthWidgetProps> = ({
+export const ExternalAuth: FC<ExternalAuthProps> = ({
   authProviders,
   title = "Sign in to your account",
 }) => {
@@ -66,13 +66,13 @@ export const AuthWidget: FC<AuthWidgetProps> = ({
       Error: "no_handler",
     });
     console.warn(
-      `AuthWidget: provider "${provider.displayName}" has neither an ` +
+      `ExternalAuth: provider "${provider.displayName}" has neither an ` +
         `onSignIn handler nor an oauth config; its button click does nothing.`,
     );
   };
 
   return (
-    <div className="uipath-auth-widget w-[400px] rounded-lg border border-border bg-card px-8 py-10 shadow-sm">
+    <div className="uipath-external-auth w-[400px] rounded-lg border border-border bg-card px-8 py-10 shadow-sm">
       <h1 className="mb-8 text-center text-2xl font-bold text-card-foreground">
         {title}
       </h1>

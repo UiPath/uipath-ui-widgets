@@ -5,7 +5,7 @@ import { OAuthRedirectConfig } from "../types";
 const googleConfig: OAuthRedirectConfig = {
   authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
   redirectUri: "https://myapp.com/auth/google/callback",
-  scope: "openid email profile",
+  scopes: "openid email profile",
 };
 
 describe("buildOAuthAuthorizeUrl", () => {
@@ -37,7 +37,7 @@ describe("buildOAuthAuthorizeUrl", () => {
     expect(parsed.searchParams.get("code_challenge_method")).toBe("S256");
 
     const stored = JSON.parse(
-      sessionStorage.getItem("uipath-auth-widget:oauth:google-client-id")!,
+      sessionStorage.getItem("uipath-external-auth:oauth:google-client-id")!,
     );
     expect(stored.state).toBe(parsed.searchParams.get("state"));
     expect(stored.codeVerifier).toBeTruthy();
@@ -54,7 +54,7 @@ describe("buildOAuthAuthorizeUrl", () => {
     expect(parsed.searchParams.get("code_challenge_method")).toBeNull();
 
     const stored = JSON.parse(
-      sessionStorage.getItem("uipath-auth-widget:oauth:cid")!,
+      sessionStorage.getItem("uipath-external-auth:oauth:cid")!,
     );
     expect(stored.codeVerifier).toBeUndefined();
   });
@@ -63,7 +63,7 @@ describe("buildOAuthAuthorizeUrl", () => {
     const url = await buildOAuthAuthorizeUrl("uaepass-client-id", {
       authorizeUrl: "https://id.uaepass.ae/idshub/authorize",
       redirectUri: "https://myapp.com/auth/uaepass/callback",
-      scope: "urn:uae:digitalid:profile:general",
+      scopes: "urn:uae:digitalid:profile:general",
       extraParams: {
         acr_values: "urn:safelayer:tws:policies:authentication:adaptive",
       },
@@ -82,7 +82,7 @@ describe("buildOAuthAuthorizeUrl", () => {
     });
     const parsed = new URL(url);
     const stored = JSON.parse(
-      sessionStorage.getItem("uipath-auth-widget:oauth:cid")!,
+      sessionStorage.getItem("uipath-external-auth:oauth:cid")!,
     );
 
     expect(parsed.searchParams.get("client_id")).toBe("cid");
@@ -137,7 +137,7 @@ describe("buildOAuthAuthorizeUrl", () => {
     });
     const parsed = new URL(url);
     const stored = JSON.parse(
-      sessionStorage.getItem("uipath-auth-widget:oauth:cid")!,
+      sessionStorage.getItem("uipath-external-auth:oauth:cid")!,
     );
 
     expect(parsed.searchParams.getAll("state")).toEqual([stored.state]);

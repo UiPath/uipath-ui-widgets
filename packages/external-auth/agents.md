@@ -8,8 +8,8 @@ A provider-agnostic React sign-in widget. It renders a card with a heading and o
 
 ### Main Component
 
-- **AuthWidget** (`AuthWidget.tsx`) - Single functional component. No state, no custom hooks, no services — purely presentational plus click dispatch.
-- **oauthRedirect** (`oauthRedirect.ts`) - The built-in default sign-in: builds a standard OIDC authorization-code URL (CSRF `state` + PKCE, secrets stored in `sessionStorage` under `uipath-auth-widget:oauth:<clientId>`) and navigates the browser to the provider. `buildOAuthAuthorizeUrl` and `createDefaultSignIn` are exported for composing custom handlers.
+- **ExternalAuth** (`ExternalAuth.tsx`) - Single functional component. No state, no custom hooks, no services — purely presentational plus click dispatch.
+- **oauthRedirect** (`oauthRedirect.ts`) - The built-in default sign-in: builds a standard OIDC authorization-code URL (CSRF `state` + PKCE, secrets stored in `sessionStorage` under `uipath-external-auth:oauth:<clientId>`) and navigates the browser to the provider. `buildOAuthAuthorizeUrl` and `createDefaultSignIn` are exported for composing custom handlers.
 
 ### Props
 
@@ -44,7 +44,7 @@ There is no internal state. The widget never inspects or interprets `clientId` �
 
 ## Icon Rendering
 
-`renderIcon()` in `AuthWidget.tsx`:
+`renderIcon()` in `ExternalAuth.tsx`:
 
 - `undefined`/`null` → no icon rendered
 - `string` → treated as an image URL, rendered as `<img>` with `{displayName} icon` alt text
@@ -52,6 +52,6 @@ There is no internal state. The widget never inspects or interprets `clientId` �
 
 ## Styling
 
-- Tailwind utility classes via `@uipath/apollo-wind` (see `AuthWidget.scss`)
-- `AuthWidget.css` in `src/` is a stub for tests; the real stylesheet is compiled from `AuthWidget.scss` into `dist/` by the `copy-styles` script
-- Root element carries the `uipath-auth-widget` class for consumer overrides
+- Tailwind utility classes via `@uipath/apollo-wind` (see `ExternalAuth.scss`)
+- `ExternalAuth.css` in `src/` is a stub for tests; the real stylesheet is compiled from `ExternalAuth.scss` into `dist/` by the `copy-styles` script
+- Root element carries the `uipath-external-auth` class for consumer overrides

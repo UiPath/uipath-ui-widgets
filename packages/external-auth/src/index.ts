@@ -1,6 +1,6 @@
-export { AuthWidget } from "./AuthWidget";
+export { ExternalAuth } from "./ExternalAuth";
 export type {
-  AuthWidgetProps,
+  ExternalAuthProps,
   AuthProvider,
   OAuthRedirectConfig,
 } from "./types";

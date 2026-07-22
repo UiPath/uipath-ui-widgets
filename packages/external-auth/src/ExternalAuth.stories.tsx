@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import "./AuthWidget.scss";
-import { AuthWidget } from "./AuthWidget";
+import "./ExternalAuth.scss";
+import { ExternalAuth } from "./ExternalAuth";
 
 const GoogleIcon = (
   <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -75,8 +75,8 @@ const sampleProviders = [
 ];
 
 const meta = {
-  title: "Components/AuthWidget",
-  component: AuthWidget,
+  title: "Components/ExternalAuth",
+  component: ExternalAuth,
   parameters: {
     layout: "centered",
     docs: {
@@ -96,7 +96,7 @@ A provider-agnostic React sign-in widget. It renders one button per configured a
 ## Installation
 
 \`\`\`bash
-npm install @uipath/ui-widgets-auth-widget
+npm install @uipath/ui-widgets-external-auth
 \`\`\`
 
 ## Usage
@@ -104,12 +104,12 @@ npm install @uipath/ui-widgets-auth-widget
 > **Note:** Add either \`light\` or \`dark\` class to your HTML \`<body>\` element to enable proper theming.
 
 \`\`\`tsx
-import { AuthWidget } from '@uipath/ui-widgets-auth-widget';
-import "@uipath/ui-widgets-auth-widget/AuthWidget.css";
+import { ExternalAuth } from '@uipath/ui-widgets-external-auth';
+import "@uipath/ui-widgets-external-auth/ExternalAuth.css";
 
 function App() {
   return (
-    <AuthWidget
+    <ExternalAuth
       authProviders={[
         {
           displayName: "Google",
@@ -119,7 +119,7 @@ function App() {
           oauth: {
             authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
             redirectUri: "https://myapp.com/auth/google/callback",
-            scope: "openid email profile",
+            scopes: "openid email profile",
           },
         },
         {
@@ -155,7 +155,7 @@ function App() {
       control: "text",
     },
   },
-} satisfies Meta<typeof AuthWidget>;
+} satisfies Meta<typeof ExternalAuth>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -226,7 +226,7 @@ export const BuiltInOidcDefault: Story = {
         oauth: {
           authorizeUrl: "https://idp.example.com/google/authorize",
           redirectUri: "https://myapp.example.com/auth/google/callback",
-          scope: "openid email profile",
+          scopes: "openid email profile",
         },
       },
       {
@@ -239,7 +239,7 @@ export const BuiltInOidcDefault: Story = {
         oauth: {
           authorizeUrl: "https://idp.example.com/uaepass/authorize",
           redirectUri: "https://myapp.example.com/auth/uaepass/callback",
-          scope: "urn:uae:digitalid:profile:general",
+          scopes: "urn:uae:digitalid:profile:general",
           extraParams: {
             acr_values: "urn:safelayer:tws:policies:authentication:adaptive",
           },

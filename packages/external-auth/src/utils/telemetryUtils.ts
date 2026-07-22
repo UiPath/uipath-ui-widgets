@@ -8,7 +8,7 @@ export const trackTelemetry = (
   properties?: Record<string, string | number | boolean>,
 ) => {
   trackEvent(event, status, {
-    ApplicationName: "Widget.AuthWidget",
+    ApplicationName: "Widget.ExternalAuth",
     WidgetVersion: version,
     ...properties,
   });

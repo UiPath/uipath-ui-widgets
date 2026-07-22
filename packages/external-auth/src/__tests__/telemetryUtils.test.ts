@@ -22,7 +22,7 @@ describe("telemetryUtils", () => {
         TelemetryEvent.SignIn,
         TelemetryStatus.Success,
         {
-          ApplicationName: "Widget.AuthWidget",
+          ApplicationName: "Widget.ExternalAuth",
           WidgetVersion: version,
         },
       );
@@ -38,7 +38,7 @@ describe("telemetryUtils", () => {
         TelemetryEvent.OAuthRedirect,
         TelemetryStatus.Error,
         {
-          ApplicationName: "Widget.AuthWidget",
+          ApplicationName: "Widget.ExternalAuth",
           WidgetVersion: version,
           Error: "E_TIMEOUT",
           UsePkce: true,
@@ -53,7 +53,7 @@ describe("telemetryUtils", () => {
         TelemetryEvent.PersistState,
         TelemetryStatus.Error,
         {
-          ApplicationName: "Widget.AuthWidget",
+          ApplicationName: "Widget.ExternalAuth",
           WidgetVersion: version,
         },
       );
