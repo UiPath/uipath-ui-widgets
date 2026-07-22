@@ -161,7 +161,7 @@ export function createDefaultSignIn(
       })
       .catch((error: unknown) => {
         trackTelemetry(TelemetryEvent.OAuthRedirect, TelemetryStatus.Error, {
-          Error: error instanceof Error ? error.message : "redirect failed",
+          Error: "redirect failed",
         });
         // Without this, a rejection (e.g. crypto.subtle missing on insecure
         // origins) would make the button a silent no-op.

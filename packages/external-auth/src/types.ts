@@ -44,8 +44,12 @@ export interface AuthProvider {
    * app's backend Service Provider, so the handler typically navigates to a
    * backend login endpoint. For a custom OIDC redirect, compose the exported
    * helper: `onSignIn: createDefaultSignIn(config)`.
+   *
+   * May be async (e.g. fetch a login URL from a backend before navigating).
+   * Sync throws and async rejections are caught by the widget and reported
+   * via telemetry instead of surfacing as unhandled errors.
    */
-  onSignIn?: (clientId: string) => void;
+  onSignIn?: (clientId: string) => void | Promise<void>;
   /**
    * Config for the built-in default sign-in: a direct OIDC authorization-code
    * redirect to this provider's IdP, with CSRF `state` and (by default) PKCE.

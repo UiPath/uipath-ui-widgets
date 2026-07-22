@@ -177,6 +177,64 @@ describe("ExternalAuth", () => {
       expect(assign).not.toHaveBeenCalled();
     });
 
+    it("supports an async onSignIn and reports its rejection instead of crashing", async () => {
+      const user = userEvent.setup();
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const onSignIn = vi.fn().mockRejectedValue(new Error("backend down"));
+
+      render(
+        <ExternalAuth
+          authProviders={[
+            {
+              displayName: "SAML",
+              clientId: "saml-connection-id",
+              onSignIn,
+            },
+          ]}
+        />,
+      );
+
+      await user.click(
+        screen.getByRole("button", { name: /Continue with SAML/ }),
+      );
+
+      expect(onSignIn).toHaveBeenCalledWith("saml-connection-id");
+      await vi.waitFor(() =>
+        expect(error).toHaveBeenCalledWith(
+          expect.stringContaining('onSignIn handler for provider "SAML"'),
+          expect.any(Error),
+        ),
+      );
+      error.mockRestore();
+    });
+
+    it("catches a synchronously throwing onSignIn", async () => {
+      const user = userEvent.setup();
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const onSignIn = vi.fn(() => {
+        throw new Error("sync boom");
+      });
+
+      render(
+        <ExternalAuth
+          authProviders={[
+            {
+              displayName: "Google",
+              clientId: "google-client-id",
+              onSignIn,
+            },
+          ]}
+        />,
+      );
+
+      await user.click(
+        screen.getByRole("button", { name: /Continue with Google/ }),
+      );
+
+      await vi.waitFor(() => expect(error).toHaveBeenCalled());
+      error.mockRestore();
+    });
+
     it("redirects straight to the provider's IdP when only oauth is given", async () => {
       const user = userEvent.setup();
       const assign = mockLocationAssign();

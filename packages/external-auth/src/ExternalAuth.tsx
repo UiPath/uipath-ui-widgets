@@ -1,5 +1,11 @@
 import { FC, ReactNode } from "react";
-import { Button } from "@uipath/apollo-wind";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@uipath/apollo-wind";
 import "./ExternalAuth.css";
 import {
   AuthProvider,
@@ -37,7 +43,8 @@ export const ExternalAuth: FC<ExternalAuthProps> = ({
   title = "Sign in to your account",
 }) => {
   const handleSignIn = (provider: AuthProvider) => {
-    if (provider.onSignIn) {
+    const { onSignIn } = provider;
+    if (onSignIn) {
       // A consumer-supplied handler always wins over the built-in default.
       // `Provider` is the human label (e.g. "Google", "SAML SSO") — safe to
       // log and exactly the adoption-per-provider signal we want; we never
@@ -46,7 +53,22 @@ export const ExternalAuth: FC<ExternalAuthProps> = ({
         Provider: provider.displayName,
         Method: "customHandler",
       });
-      provider.onSignIn(provider.clientId);
+      // The handler may be sync or async. Route both through a promise so a
+      // sync throw and an async rejection are handled identically — otherwise
+      // a failed handler would be an unhandled error with no telemetry trace.
+      void Promise.resolve()
+        .then(() => onSignIn(provider.clientId))
+        .catch((error: unknown) => {
+          trackTelemetry(TelemetryEvent.SignIn, TelemetryStatus.Error, {
+            Provider: provider.displayName,
+            Error: "onSignIn failed",
+          });
+          console.error(
+            `ExternalAuth: the onSignIn handler for provider ` +
+              `"${provider.displayName}" failed.`,
+            error,
+          );
+        });
       return;
     }
     if (provider.oauth) {
@@ -72,11 +94,13 @@ export const ExternalAuth: FC<ExternalAuthProps> = ({
   };
 
   return (
-    <div className="uipath-external-auth w-[400px] rounded-lg border border-border bg-card px-8 py-10 shadow-sm">
-      <h1 className="mb-8 text-center text-2xl font-bold text-card-foreground">
-        {title}
-      </h1>
-      <div className="flex flex-col gap-4">
+    <Card className="uipath-external-auth w-[400px]">
+      <CardHeader>
+        <CardTitle role="heading" aria-level={1} className="text-center">
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
         {authProviders.map((provider) => (
           <Button
             key={provider.displayName}
@@ -89,7 +113,7 @@ export const ExternalAuth: FC<ExternalAuthProps> = ({
             <span>Continue with {provider.displayName}</span>
           </Button>
         ))}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };
