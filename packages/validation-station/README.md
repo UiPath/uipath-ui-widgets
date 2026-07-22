@@ -60,6 +60,8 @@ import { copyValidationStationWcAssets } from "@uipath/ui-widgets-validation-sta
 await copyValidationStationWcAssets("public/du-vs-wc");
 ```
 
+> This package is ESM-only. From a CommonJS config (e.g. a `webpack.config.js` written with `require`), don't `require()` it — use a dynamic import: `const { copyValidationStationWcAssets } = await import("@uipath/ui-widgets-validation-station/assets");`.
+
 ## Quick start
 
 > **Note:** Add either `light` or `dark` class to your HTML `<body>` element to enable proper theming.
