@@ -1542,54 +1542,6 @@
 }
 
 /* ========================================
-   TOKEN GATE
-   ======================================== */
-
-.token-gate {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-}
-
-.token-gate-card {
-  width: 100%;
-  max-width: 400px;
-  background: var(--surface-color);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  box-shadow: var(--shadow-lg);
-  padding: 32px;
-  display: flex;
-  flex-direction: column;
-}
-
-.token-gate-title {
-  font-size: 1.4rem;
-  font-weight: 600;
-  color: var(--teal-800);
-  margin: 0 0 4px;
-}
-
-.token-gate-subtitle {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin: 0 0 20px;
-}
-
-.token-gate-error {
-  color: var(--pumpkin-800);
-  background: var(--pumpkin-50);
-  border: 1px solid var(--pumpkin-300);
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin-bottom: 12px;
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-/* ========================================
    CONNECTORS PAGE
    ======================================== */
 
