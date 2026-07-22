@@ -11,9 +11,9 @@
 // Node-only (uses `node:fs`); never imported by the browser entry.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, parse, relative, resolve } from "node:path";
 
 const require = createRequire(import.meta.url);
 
@@ -32,10 +32,41 @@ const SKIP = new Set([
   "types.d.ts",
 ]);
 
+// Name of the version marker written into `dest`; also the signal that a
+// directory was created by this tool and is therefore ours to clear.
+const MARKER = ".wc-version";
+
+// This function does `rm -rf dest`, so a bad `dest` (".", "/", "~", the project
+// root) could delete much more than intended. Reject destinations that would be
+// catastrophic before touching the filesystem.
+function assertSafeDest(absDest: string): void {
+  if (absDest === parse(absDest).root) {
+    throw new Error(
+      `[validation-station] refusing to write WC assets to the filesystem root "${absDest}".`,
+    );
+  }
+  // `dest` must not be the current working directory or an ancestor of it —
+  // clearing such a path would wipe the project (or more). `relative(dest, cwd)`
+  // is "" when equal and has no leading ".." when cwd sits inside dest.
+  const toCwd = relative(absDest, process.cwd());
+  if (toCwd === "" || (!toCwd.startsWith("..") && !isAbsolute(toCwd))) {
+    throw new Error(
+      `[validation-station] refusing to write WC assets to "${absDest}": it is the ` +
+        `current directory or a parent of it, and clearing it would delete your project. ` +
+        `Point copy-assets at a dedicated subfolder like public/du-vs-wc.`,
+    );
+  }
+}
+
 /**
  * Copy the WC bundle (main.js + chunks + du-assets/ + media/ + stylesheets) into
  * `dest`. Idempotent: it records the WC version in `dest/.wc-version` and copies
  * again only when that changes, so it's cheap to run on every `predev`/`prebuild`.
+ *
+ * `dest` is resolved to an absolute path and guarded: it refuses catastrophic
+ * targets (filesystem root, the cwd, an ancestor of the cwd) and refuses to
+ * clear a non-empty directory it did not create (one without a `.wc-version`
+ * marker), so it never deletes files that aren't its own.
  *
  * @returns `true` if it copied, `false` if `dest` was already up to date.
  */
@@ -47,17 +78,37 @@ export async function copyValidationStationWcAssets(
     await readFile(resolve(root, "package.json"), "utf8"),
   ) as { version: string };
 
-  const marker = resolve(dest, ".wc-version");
+  const absDest = resolve(dest);
+  assertSafeDest(absDest);
+
+  const marker = resolve(absDest, MARKER);
   try {
     if ((await readFile(marker, "utf8")).trim() === version) return false;
   } catch {
     // no marker (or unreadable) → (re)copy
   }
 
+  // Only clear a directory we own. If `dest` exists, is non-empty, and has no
+  // marker, it wasn't created by this tool (e.g. a shared `public/`) — refuse
+  // rather than `rm -rf` someone else's files.
+  let existing: string[] = [];
+  try {
+    existing = await readdir(absDest);
+  } catch {
+    // dest doesn't exist yet → nothing to clear
+  }
+  if (existing.length > 0 && !existing.includes(MARKER)) {
+    throw new Error(
+      `[validation-station] refusing to overwrite "${absDest}": it is non-empty and was ` +
+        `not created by this tool (no ${MARKER} marker). Point copy-assets at a dedicated ` +
+        `folder like public/du-vs-wc.`,
+    );
+  }
+
   // Clear stale files (content-hashed chunks from an older version) before copying.
-  await rm(dest, { recursive: true, force: true });
-  await mkdir(dest, { recursive: true });
-  await cp(root, dest, {
+  await rm(absDest, { recursive: true, force: true });
+  await mkdir(absDest, { recursive: true });
+  await cp(root, absDest, {
     recursive: true,
     filter: (src) => {
       const rel = src.slice(root.length + 1);
