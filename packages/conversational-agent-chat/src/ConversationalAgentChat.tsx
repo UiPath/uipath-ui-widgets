@@ -942,6 +942,8 @@ export const ConversationalAgentChat = ({
             profileResetKey={profileResetKey}
             conversationalAgent={agentService.current}
             onClose={() => chatServiceRef.current?.toggleSettings(false)}
+            agentId={agentId ?? undefined}
+            folderId={folderId ?? undefined}
             inputSchema={inputSchemaStateRef.current}
             initialInputs={storedAgentInputs.current}
             onApplyInputs={handleApplySettingsInputs}

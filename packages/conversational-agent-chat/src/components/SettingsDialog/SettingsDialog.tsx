@@ -7,6 +7,7 @@ import {
 import type { ConversationalAgent } from "@uipath/uipath-typescript/conversational-agent";
 import { useTranslation } from "react-i18next";
 import type { InputSchema } from "../AgentSchemaForm/types";
+import { ConnectionsSection } from "./ConnectionsSection";
 import { InputsSection } from "./InputsSection";
 import { ProfileSection } from "./ProfileSection";
 
@@ -18,6 +19,10 @@ export interface SettingsDialogProps {
    * user switches agent (or folder) without relying on `ConversationalAgent` reference.
    */
   profileResetKey: string;
+  /** ID of the current agent release. Required for the connections section. */
+  agentId?: number;
+  /** ID of the folder containing the current agent. Required for the connections section. */
+  folderId?: number;
   /**
    * Agent's input schema. When present (and non-empty), an `Inputs` section
    * appears alongside profile so users can edit/re-apply agent inputs on the
@@ -44,6 +49,8 @@ export const SettingsDialog = ({
   conversationalAgent,
   onClose,
   profileResetKey,
+  agentId,
+  folderId,
   inputSchema,
   initialInputs,
   onApplyInputs,
@@ -54,6 +61,7 @@ export const SettingsDialog = ({
     inputSchema != null &&
     onApplyInputs != null &&
     Object.keys(inputSchema.properties ?? {}).length > 0;
+  const showConnections = agentId != null && folderId != null;
   return (
     <div className="p-4">
       <Accordion
@@ -76,6 +84,24 @@ export const SettingsDialog = ({
                 initialValues={initialInputs}
                 onApplyInputs={onApplyInputs}
                 onApplied={onClose}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        )}
+        {showConnections && (
+          <AccordionItem
+            value="connections"
+            className="rounded-md border-b-0 bg-accent"
+          >
+            <AccordionTrigger className="px-4 hover:no-underline">
+              {t("connections_title")}
+            </AccordionTrigger>
+            <AccordionContent className="px-4">
+              <ConnectionsSection
+                key={`${agentId}-${folderId}`}
+                conversationalAgent={conversationalAgent}
+                agentId={agentId}
+                folderId={folderId}
               />
             </AccordionContent>
           </AccordionItem>
