@@ -578,18 +578,25 @@ export const ConversationalAgentChat = ({
     // as the fresh sessionStarted arrives.
     sessionHelper.pauseEmits();
     const startTimeout = setTimeout(() => {
-      // If the session never starts, nothing flushes the buffer — surface an
-      // error instead of leaving the send silently pending forever.
+      // Ignore a session abandoned by a switch/unmount so it can't error on the
+      // now-active conversation. If the active session never started, nothing
+      // flushes the buffer — surface an error and clear it so a retry can build
+      // a fresh session rather than reusing this permanently-paused one.
+      if (session.current !== sessionHelper) return;
       if (sessionHelper.isEmitPaused) {
+        session.current = null;
         chatService?.setError(t("error_session_start_timeout"));
       }
     }, SESSION_START_TIMEOUT_MS);
     sessionHelper.onSessionStarted(() => {
       clearTimeout(startTimeout);
+      if (session.current !== sessionHelper) return;
       sessionHelper.resumeEmits();
     });
     sessionHelper.onErrorStart((error) => {
       clearTimeout(startTimeout);
+      if (session.current !== sessionHelper) return;
+      session.current = null;
       chatService?.setError(error.message || t("error_generic"));
     });
     session.current = sessionHelper;
