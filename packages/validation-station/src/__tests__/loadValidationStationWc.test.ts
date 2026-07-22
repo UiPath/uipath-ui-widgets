@@ -92,6 +92,35 @@ describe("loadValidationStationWc", () => {
         vi.unstubAllGlobals();
       }
     });
+
+    it("normalizes a baseUrl without a trailing slash", async () => {
+      const mod = await freshLoader();
+      mod.configureValidationStationWc({ baseUrl: "/du-vs-wc-noslash" });
+      const err = await mod.ensureValidationStationWcLoaded().then(
+        () => null,
+        (e: unknown) => e as Error,
+      );
+      // Base is treated as a directory, so files resolve *under* it (trailing
+      // slash) rather than replacing the last segment.
+      expect(err?.message).toMatch(/du-vs-wc-noslash\//);
+    });
+
+    it("does not memoize a failed load — a later call retries", async () => {
+      const mod = await freshLoader();
+      const p1 = mod.ensureValidationStationWcLoaded();
+      await p1.then(
+        () => null,
+        () => null,
+      ); // let it reject
+      await Promise.resolve(); // flush the reset .catch
+      const p2 = mod.ensureValidationStationWcLoaded();
+      // A fresh attempt, not the previously-rejected promise replayed.
+      expect(p2).not.toBe(p1);
+      await p2.then(
+        () => null,
+        () => null,
+      );
+    });
   });
 
   describe("configureValidationStationWc", () => {

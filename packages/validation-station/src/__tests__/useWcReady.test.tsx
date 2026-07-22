@@ -76,6 +76,27 @@ describe("useWcReady", () => {
     expect(mockWaitForWcElementReady).toHaveBeenCalledTimes(1);
   });
 
+  it("resets to not-ready when the tag changes, until the new tag settles", async () => {
+    let resolveB!: () => void;
+    mockWaitForWcElementReady
+      .mockResolvedValueOnce(undefined) // tag-a resolves
+      .mockReturnValueOnce(
+        new Promise<void>((r) => {
+          resolveB = r;
+        }),
+      ); // tag-b stays pending
+
+    const { getByTestId, rerender } = render(<Harness tag="tag-a" />);
+    await waitFor(() => expect(getByTestId("state").textContent).toBe("ready"));
+
+    rerender(<Harness tag="tag-b" />);
+    // Must not still report tag-a's readiness while tag-b is pending.
+    expect(getByTestId("state").textContent).toBe("waiting");
+
+    resolveB();
+    await waitFor(() => expect(getByTestId("state").textContent).toBe("ready"));
+  });
+
   it("re-waits when the tag changes", async () => {
     mockWaitForWcElementReady.mockResolvedValue(undefined);
     const { rerender } = render(<Harness tag="tag-a" />);

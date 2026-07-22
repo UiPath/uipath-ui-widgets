@@ -18,17 +18,28 @@ export interface WcReadyState {
  * fails to load, `error` holds the reason so the caller can show it.
  */
 export function useWcReady(tag: string): WcReadyState {
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // State is stamped with the tag it describes, so a tag change is detected in
+  // render (below) rather than via a synchronous reset in the effect.
+  const [state, setState] = useState<WcReadyState & { tag: string }>({
+    tag,
+    ready: false,
+    error: null,
+  });
 
   useEffect(() => {
     let cancelled = false;
     waitForWcElementReady(tag).then(
       () => {
-        if (!cancelled) setReady(true);
+        if (!cancelled) setState({ tag, ready: true, error: null });
       },
       (e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (!cancelled) {
+          setState({
+            tag,
+            ready: false,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
       },
     );
     return () => {
@@ -36,5 +47,10 @@ export function useWcReady(tag: string): WcReadyState {
     };
   }, [tag]);
 
-  return { ready, error };
+  // If `tag` changed since the last settled result, that result is stale — report
+  // pending until the new tag's load settles, so we never show the old readiness.
+  if (state.tag !== tag) {
+    return { ready: false, error: null };
+  }
+  return { ready: state.ready, error: state.error };
 }

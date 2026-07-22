@@ -98,10 +98,16 @@ export function ensureValidationStationWcLoaded(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   if (loadPromise) return loadPromise;
 
-  const base = new URL(config.baseUrl, document.baseURI);
+  // Normalize to a trailing slash: `new URL("main.js", ".../du-vs-wc")` would
+  // resolve to `.../main.js` (the parent), so a baseUrl without a trailing slash
+  // must be treated as a directory or the files load from the wrong path.
+  const rawBase = config.baseUrl.endsWith("/")
+    ? config.baseUrl
+    : `${config.baseUrl}/`;
+  const base = new URL(rawBase, document.baseURI);
   const url = (file: string): string => new URL(file, base).href;
 
-  loadPromise = (async () => {
+  const promise = (async () => {
     // Stylesheets as light-DOM <link>s (must precede the element so first paint
     // is styled; @font-face only takes effect in the light DOM).
     injectStylesheetOnce(url("styles.css"), "du-vs-wc-styles");
@@ -143,7 +149,15 @@ export function ensureValidationStationWcLoaded(): Promise<void> {
     }
   })();
 
-  return loadPromise;
+  loadPromise = promise;
+  // Don't let a failed load poison the singleton: clear the memo on rejection so
+  // a later mount (e.g. once the bundle is reachable) can retry instead of
+  // replaying the same rejected promise forever.
+  promise.catch(() => {
+    if (loadPromise === promise) loadPromise = undefined;
+  });
+
+  return promise;
 }
 
 /**
