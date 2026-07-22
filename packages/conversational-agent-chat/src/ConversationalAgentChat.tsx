@@ -1155,9 +1155,6 @@ export const ConversationalAgentChat = ({
   useEffect(() => {
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
     if (initializedFor.current !== initKey) {
-      // initChat is async; its setStates run after awaits, not synchronously
-      // inside the effect body. The lint rule can't see that.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       initChat();
     }
   }, [agentId, folderId, existingConversationId, externalUserId, initChat]);
