@@ -97,14 +97,14 @@ describe("buildOAuthAuthorizeUrl", () => {
     expect(a.searchParams.get("state")).not.toBe(b.searchParams.get("state"));
   });
 
-  it("rejects a non-http(s) authorizeUrl (e.g. javascript:)", async () => {
+  it("rejects a non-https authorizeUrl scheme (e.g. javascript:)", async () => {
     await expect(
       buildOAuthAuthorizeUrl("cid", {
         ...googleConfig,
         // eslint-disable-next-line no-script-url
         authorizeUrl: "javascript:alert(1)",
       }),
-    ).rejects.toThrow(/must use the http\(s\) scheme/);
+    ).rejects.toThrow(/must use https/);
   });
 
   it("rejects a relative authorizeUrl", async () => {
@@ -113,7 +113,22 @@ describe("buildOAuthAuthorizeUrl", () => {
         ...googleConfig,
         authorizeUrl: "/oauth/authorize",
       }),
-    ).rejects.toThrow(/must be an absolute http\(s\) URL/);
+    ).rejects.toThrow(/must be an absolute URL/);
+  });
+
+  it("rejects plain http (https is required, even for localhost)", async () => {
+    await expect(
+      buildOAuthAuthorizeUrl("cid", {
+        ...googleConfig,
+        authorizeUrl: "http://idp.example.com/authorize",
+      }),
+    ).rejects.toThrow(/must use https/);
+    await expect(
+      buildOAuthAuthorizeUrl("cid", {
+        ...googleConfig,
+        authorizeUrl: "http://localhost:8080/authorize",
+      }),
+    ).rejects.toThrow(/must use https/);
   });
 
   it("preserves a query string already present on authorizeUrl", async () => {

@@ -44,7 +44,7 @@ async function sha256Base64Url(input: string): Promise<string> {
 
 /**
  * Parse and validate the provider's authorize endpoint. It must be an
- * absolute http(s) URL: this URL ends up in `window.location.assign(...)`,
+ * absolute `https:` URL: this URL ends up in `window.location.assign(...)`,
  * so if provider configuration were ever influenced by untrusted input, a
  * non-http(s) scheme (e.g. `javascript:`) would otherwise become an XSS
  * vector.
@@ -55,12 +55,12 @@ function parseAuthorizeUrl(authorizeUrl: string): URL {
     url = new URL(authorizeUrl);
   } catch {
     throw new Error(
-      `ExternalAuth: authorizeUrl must be an absolute http(s) URL; got "${authorizeUrl}".`,
+      `ExternalAuth: authorizeUrl must be an absolute URL; got "${authorizeUrl}".`,
     );
   }
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
+  if (url.protocol !== "https:") {
     throw new Error(
-      `ExternalAuth: authorizeUrl must use the http(s) scheme; got "${url.protocol}".`,
+      `ExternalAuth: authorizeUrl must use https; got "${authorizeUrl}".`,
     );
   }
   return url;
