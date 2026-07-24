@@ -35,27 +35,15 @@ const FilePreviewer = ({
   pageNumber,
   iframeParams,
 }: FilePreviewerProps) => {
-  const [hasImageError, setHasImageError] = useState(false);
+  // Track the file whose image failed to load so the error is scoped to that
+  // file — a new file previews normally instead of inheriting a stale failure.
+  const [erroredFile, setErroredFile] = useState<File | null>(null);
   const [textContent, setTextContent] = useState<string | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
   const copyBlobUrl = useRef<string | null>(null);
   const { t } = useTranslation();
 
   // ── Effects ──
-
-  // Block external link navigation from iframe preview (e.g. clicking links in PDF)
-  useEffect(() => {
-    const beforeUnloadHandler = (event: BeforeUnloadEvent) => {
-      if (document.activeElement === iframeRef.current) {
-        event.preventDefault();
-        event.returnValue = true;
-      }
-    };
-    window.addEventListener("beforeunload", beforeUnloadHandler);
-    return () =>
-      window.removeEventListener("beforeunload", beforeUnloadHandler);
-  }, []);
 
   // Create blob URL for:
   // - Images (always need a blob URL for <img src>)
@@ -164,7 +152,6 @@ const FilePreviewer = ({
         return (
           <iframe
             key={iframeParams}
-            ref={iframeRef}
             src={fileUrl + (iframeParams || "")}
             title={t("file_content_title")}
             style={{ width: "100%", height: "100%", border: "none" }}
@@ -198,7 +185,6 @@ const FilePreviewer = ({
         return (
           <iframe
             key={iframeParams}
-            ref={iframeRef}
             src={fileUrl + (iframeParams || "")}
             title={t("file_content_title")}
             style={{ width: "100%", height: "100%", border: "none" }}
@@ -208,12 +194,12 @@ const FilePreviewer = ({
     }
 
     // Image (same behavior regardless of usePdfJs)
-    if (!hasImageError && isImage(file) && fileUrl) {
+    if (erroredFile !== file && isImage(file) && fileUrl) {
       return (
         <img
           src={fileUrl}
           alt={t("file_preview_alt_text")}
-          onError={() => setHasImageError(true)}
+          onError={() => setErroredFile(file)}
           style={{ maxWidth: "100%", height: "auto" }}
         />
       );
@@ -230,7 +216,7 @@ const FilePreviewer = ({
     usePdfJs,
     pageNumber,
     iframeParams,
-    hasImageError,
+    erroredFile,
     fileUrl,
     textContent,
     t,
