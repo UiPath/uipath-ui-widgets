@@ -6,7 +6,7 @@ import {
   ToolConfirmation,
   type ToolConfirmationLabels,
 } from "./ToolConfirmation";
-import { PortalContainerProvider } from "./dropdowns";
+import { PortalContainerProvider } from "@uipath/apollo-wind";
 
 // Ensure i18next is initialized when this module is imported directly (i.e.
 // without first importing ConversationalAgentChat). Idempotent.

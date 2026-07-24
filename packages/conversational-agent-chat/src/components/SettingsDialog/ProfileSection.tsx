@@ -2,14 +2,12 @@ import {
   Alert,
   AlertDescription,
   Button,
+  Combobox,
   Input,
   Label,
   Spinner,
   cn,
 } from "@uipath/apollo-wind";
-// Portal-aware Combobox so the menu opens inside the widget subtree regardless
-// of host surface (see dropdowns/PortalContainerProvider).
-import { Combobox } from "../dropdowns";
 import type {
   ConversationalAgent,
   UserSettingsGetResponse,

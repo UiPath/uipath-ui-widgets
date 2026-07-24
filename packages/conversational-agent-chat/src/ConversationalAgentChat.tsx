@@ -11,7 +11,12 @@ import {
 } from "@uipath/apollo-react/material/components";
 import { FontVariantToken } from "@uipath/apollo-core";
 import i18next from "i18next";
-import { Alert, AlertDescription, Button } from "@uipath/apollo-wind";
+import {
+  Alert,
+  AlertDescription,
+  Button,
+  PortalContainerProvider,
+} from "@uipath/apollo-wind";
 import {
   ContentPartChunkEvent,
   ContentPartStream,
@@ -44,7 +49,6 @@ import {
 import { createRoot, type Root } from "react-dom/client";
 import { useTranslation } from "react-i18next";
 import { InputsPage } from "./components/InputsPage";
-import { PortalContainerProvider } from "./components/dropdowns";
 import type { InputSchema } from "./components/AgentSchemaForm/types";
 import { FeedbackDialog } from "./components/FeedbackDialog";
 import { Loader } from "./components/Loader";

@@ -1,13 +1,14 @@
-import { Input, RadioGroup, RadioGroupItem, cn } from "@uipath/apollo-wind";
-// Portal-aware Select so the menu opens inside the widget subtree regardless
-// of host surface (see dropdowns/PortalContainerProvider).
 import {
+  Input,
+  RadioGroup,
+  RadioGroupItem,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../dropdowns";
+  cn,
+} from "@uipath/apollo-wind";
 import type { ChangeEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
