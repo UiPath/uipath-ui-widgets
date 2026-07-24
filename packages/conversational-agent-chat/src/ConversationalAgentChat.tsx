@@ -79,6 +79,11 @@ import { resolveAgent as fetchAgentRelease } from "./utils/resolveAgent";
 initI18n();
 
 const TOOL_CONFIRMATION_WIDGET_ID_PREFIX = "confirmation-";
+
+// Watchdog for a session that never starts: buffered sends only flush on
+// `sessionStarted`, so if it never arrives, surface an error instead of
+// leaving the send silently pending.
+const SESSION_START_TIMEOUT_MS = 30_000;
 type ConversationCreateOptionsArg = Parameters<
   ConversationalAgent["conversations"]["create"]
 >[2];
@@ -556,6 +561,9 @@ export const ConversationalAgentChat = ({
       conversation.id,
       { echo: false },
     );
+    // Mark active before registering handlers so a synchronous sessionStarted
+    // can't lose the `session.current === sessionHelper` guard race below.
+    session.current = sessionHelper;
     // Refresh the sidebar label when the service auto-generates one (or the
     // label is updated via the API). Bind to this session's conversation id
     // so a stale event from an orphaned session can't mislabel the active one.
@@ -566,18 +574,54 @@ export const ConversationalAgentChat = ({
         ),
       );
     });
-    return new Promise((resolve) => {
-      sessionHelper.onSessionStarted(() => {
-        session.current = sessionHelper;
-        resolve(sessionHelper);
-      });
+    // Buffer outgoing events until the server confirms the session is started,
+    // then flush — so a send never blocks on the sessionStarted round-trip.
+    // Combined with ending the session on switch (see endActiveSession), a
+    // reopened conversation starts fresh and its buffered send flushes as soon
+    // as the fresh sessionStarted arrives.
+    sessionHelper.pauseEmits();
+    const startTimeout = setTimeout(() => {
+      // Ignore a session abandoned by a switch/unmount so it can't error on the
+      // now-active conversation. If the active session never started, nothing
+      // flushes the buffer — surface an error and clear it so a retry can build
+      // a fresh session rather than reusing this permanently-paused one.
+      if (session.current !== sessionHelper) return;
+      if (sessionHelper.isEmitPaused) {
+        session.current = null;
+        chatService?.setError(t("error_session_start_timeout"));
+      }
+    }, SESSION_START_TIMEOUT_MS);
+    sessionHelper.onSessionStarted(() => {
+      clearTimeout(startTimeout);
+      if (session.current !== sessionHelper) return;
+      sessionHelper.resumeEmits();
     });
-  }, [getConversation, setConversationHistory]);
+    sessionHelper.onErrorStart((error) => {
+      clearTimeout(startTimeout);
+      if (session.current !== sessionHelper) return;
+      session.current = null;
+      chatService?.setError(error.message || t("error_generic"));
+    });
+    return sessionHelper;
+  }, [chatService, getConversation, setConversationHistory, t]);
+
+  // End the session on conversation switch/unmount so a reopen starts fresh and
+  // gets a new `sessionStarted` — reusing a stale session hangs the send. The
+  // in-flight exchange is left running (ending it is reserved for onStopResponse),
+  // so switching away from a busy conversation and reopening resumes its turn.
+  const endActiveSession = useCallback(() => {
+    try {
+      session.current?.sendSessionEnd();
+    } catch {
+      /* session already closed */
+    }
+    activeExchange.current = null;
+    session.current = null;
+  }, []);
 
   const onNewChat = useCallback(() => {
+    endActiveSession();
     currentConversation.current = null;
-    session.current = null;
-    activeExchange.current = null;
     storedAgentInputs.current = {};
     setHasMessages(false);
     // Re-show the InputsPage with a cleared form when the agent's schema has
@@ -588,7 +632,7 @@ export const ConversationalAgentChat = ({
       setShowInputPage(true);
     }
     trackTelemetry(TelemetryEvent.NewChat, TelemetryStatus.Success);
-  }, [inputSchemaState]);
+  }, [endActiveSession, inputSchemaState]);
 
   const buildHistoryFilterOptions = useCallback(() => {
     // The SDK's URL builder calls value.toString() without a null check, so
@@ -814,8 +858,8 @@ export const ConversationalAgentChat = ({
         );
         if (!selectedConversation) return;
 
+        endActiveSession();
         currentConversation.current = selectedConversation;
-        session.current = null;
 
         const allExchanges = await fetchExchanges(selectedConversation.id);
         const messages = mapExchangesToChatMessages(allExchanges);
@@ -837,7 +881,7 @@ export const ConversationalAgentChat = ({
         chatService.setError(t("error_open_conversation", { errorMessage }));
       }
     },
-    [chatService, fetchExchanges, t],
+    [chatService, endActiveSession, fetchExchanges, t],
   );
 
   const initChat = useCallback(async () => {
@@ -1120,9 +1164,6 @@ export const ConversationalAgentChat = ({
   useEffect(() => {
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
     if (initializedFor.current !== initKey) {
-      // initChat is async; its setStates run after awaits, not synchronously
-      // inside the effect body. The lint rule can't see that.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       initChat();
     }
   }, [agentId, folderId, existingConversationId, externalUserId, initChat]);
@@ -1143,20 +1184,9 @@ export const ConversationalAgentChat = ({
   // Close the SDK session on unmount so the WebSocket doesn't linger.
   useEffect(() => {
     return () => {
-      try {
-        activeExchange.current?.sendExchangeEnd();
-      } catch {
-        /* exchange already ended */
-      }
-      try {
-        session.current?.sendSessionEnd();
-      } catch {
-        /* session already closed */
-      }
-      activeExchange.current = null;
-      session.current = null;
+      endActiveSession();
     };
-  }, []);
+  }, [endActiveSession]);
 
   // Release React state held by the imperative tool-confirmation roots.
   useEffect(() => {
