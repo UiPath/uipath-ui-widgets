@@ -47,6 +47,7 @@ describe("i18n", () => {
       const newKeys = [
         "error_generic",
         "error_send_message",
+        "error_session_start_timeout",
         "error_upload_attachments",
         "error_initialize_chat",
         "error_load_history",

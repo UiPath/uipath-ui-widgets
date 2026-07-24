@@ -40,6 +40,17 @@ A multi-file upload component that allows users to select and upload multiple fi
 - 📏 File size limits
 - 📂 Custom path support
 
+### [@uipath/ui-widgets-external-auth](./packages/external-auth)
+
+A provider-agnostic sign-in widget that renders one button per configured authentication provider and starts login directly at that provider's IdP.
+
+**Features:**
+
+- 🔑 Built-in OIDC authorization-code redirect (CSRF `state` + PKCE) for providers like Google and UAE PASS
+- 🔧 Per-provider `onSignIn` override (sync or async) — required for SAML 2.0 backend-initiated flows
+- 🎨 apollo-wind design-system styling, custom icons per provider
+- 📊 Product telemetry for sign-in attempts and redirect outcomes
+
 ## 🚀 Getting Started
 
 ### Installation

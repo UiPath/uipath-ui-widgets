@@ -102,12 +102,16 @@ const {
   mockCreate,
   mockUpdateById,
   mockDownloadCitationSource,
+  sessionControl,
 } = vi.hoisted(() => ({
   capturedAgentConstructorArgs: [] as any[][],
   mockGetById: vi.fn(),
   mockCreate: vi.fn(),
   mockUpdateById: vi.fn(),
   mockDownloadCitationSource: vi.fn(),
+  // When neverStarts is true, startSession returns a session that never fires
+  // sessionStarted and keeps emits paused — exercises the start-timeout path.
+  sessionControl: { neverStarts: false },
 }));
 
 // Store handlers for testing
@@ -119,6 +123,8 @@ let chunkHandler: any = null;
 let contentPartEndHandler: any = null;
 let toolCallEndHandler: any = null;
 let labelUpdatedHandler: any = null;
+let lastSessionHelper: any = null;
+let lastExchange: any = null;
 
 // Prevent lint errors for handler variables that are assigned inside mocks
 void contentPartStartHandler;
@@ -225,25 +231,39 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
         startSession: vi.fn().mockImplementation(() => {
           const sessionHelper = {
             onSessionStarted: vi.fn((callback: any) => {
-              setTimeout(callback, 0);
-              return sessionHelper;
+              if (!sessionControl.neverStarts) setTimeout(callback, 0);
+              return () => {};
             }),
+            onErrorStart: vi.fn(() => () => {}),
             onLabelUpdated: vi.fn((handler: any) => {
               labelUpdatedHandler = handler;
               return () => {};
             }),
-            startExchange: vi.fn(() => ({
-              onErrorStart: vi.fn((handler: any) => {
-                exchangeErrorHandler = handler;
-              }),
-              onMessageStart: vi.fn((handler: any) => {
-                messageStartHandler = handler;
-              }),
-              onExchangeEnd: vi.fn(),
-              sendExchangeEnd: vi.fn(),
-              startMessage: vi.fn(() => mockMessageBuilder),
-            })),
+            sendSessionEnd: vi.fn(),
+            pauseEmits: vi.fn(function (this: any) {
+              this.isEmitPaused = true;
+            }),
+            resumeEmits: vi.fn(function (this: any) {
+              this.isEmitPaused = false;
+            }),
+            isEmitPaused: false,
+            startExchange: vi.fn(() => {
+              const exchange = {
+                onErrorStart: vi.fn((handler: any) => {
+                  exchangeErrorHandler = handler;
+                }),
+                onMessageStart: vi.fn((handler: any) => {
+                  messageStartHandler = handler;
+                }),
+                onExchangeEnd: vi.fn(),
+                sendExchangeEnd: vi.fn(),
+                startMessage: vi.fn(() => mockMessageBuilder),
+              };
+              lastExchange = exchange;
+              return exchange;
+            }),
           };
+          lastSessionHelper = sessionHelper;
           return sessionHelper;
         }),
       };
@@ -303,6 +323,9 @@ describe("ConversationalAgentChat", () => {
     contentPartEndHandler = null;
     toolCallEndHandler = null;
     labelUpdatedHandler = null;
+    lastSessionHelper = null;
+    lastExchange = null;
+    sessionControl.neverStarts = false;
     defaultProps = {
       sdk: mockSdk as UiPath,
       agentId: 1,
@@ -740,6 +763,42 @@ describe("ConversationalAgentChat", () => {
       expect(mockChatService.setConversation).toHaveBeenCalled();
     });
 
+    it("ends the active session before reopening a conversation", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      // Establish a session by sending a message.
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Hello", attachments: [] });
+      const startedSession = lastSessionHelper;
+      const startedExchange = lastExchange;
+
+      const onClickOpenConversation = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "openConversation",
+      )?.[1];
+      await onClickOpenConversation?.("conv-1");
+
+      // Switching away ends the outgoing session so the reopened chat does
+      // not send on a stale session whose sessionStarted never re-fires.
+      await waitFor(() =>
+        expect(startedSession?.sendSessionEnd).toHaveBeenCalledTimes(1),
+      );
+      // But the in-flight exchange keeps running so reopening resumes its turn;
+      // ending the turn is reserved for Stop.
+      expect(startedExchange?.sendExchangeEnd).not.toHaveBeenCalled();
+    });
+
     it("should call stopResponse and clearError when opening a conversation", async () => {
       render(<ConversationalAgentChat {...defaultProps} />);
 
@@ -873,6 +932,39 @@ describe("ConversationalAgentChat", () => {
 
       // Trigger new chat - should not throw
       onNewChat?.();
+    });
+
+    it("ends the active session before starting a new chat", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      // Establish a session by sending a message.
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Hello", attachments: [] });
+      const startedSession = lastSessionHelper;
+      expect(startedSession?.sendSessionEnd).not.toHaveBeenCalled();
+
+      const onNewChat = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "newChat",
+      )?.[1];
+      onNewChat?.();
+
+      // The outgoing session is ended so reopening it later starts cleanly
+      // and receives a fresh sessionStarted rather than hanging the send.
+      await waitFor(() =>
+        expect(startedSession?.sendSessionEnd).toHaveBeenCalledTimes(1),
+      );
     });
   });
 
@@ -2207,6 +2299,79 @@ describe("ConversationalAgentChat", () => {
       expect(mockChatService.setError).toHaveBeenCalledWith(
         "Failed to send message: Send failed",
       );
+    });
+
+    it("buffers outgoing events until the session starts, then flushes", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Hello", attachments: [] });
+
+      // Emits are paused on session creation so the send never blocks on the
+      // sessionStarted round-trip…
+      expect(lastSessionHelper?.pauseEmits).toHaveBeenCalled();
+      // …and flushed once the server signals the session has started.
+      await waitFor(() =>
+        expect(lastSessionHelper?.resumeEmits).toHaveBeenCalled(),
+      );
+    });
+
+    it("surfaces an error and clears the session if it never starts", async () => {
+      vi.useFakeTimers();
+      try {
+        sessionControl.neverStarts = true;
+        render(<ConversationalAgentChat {...defaultProps} />);
+
+        // Flush the async agent/service setup so the request handler registers.
+        await vi.waitFor(() =>
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          ),
+        );
+        const onSendMessage = mockChatService.on.mock.calls.find(
+          (call: any) => call[0] === "request",
+        )?.[1];
+
+        await act(async () => {
+          await onSendMessage?.({ content: "Hello", attachments: [] });
+        });
+        // The session is created and emits paused (never resumed here).
+        expect(lastSessionHelper?.pauseEmits).toHaveBeenCalled();
+        expect(mockChatService.setError).not.toHaveBeenCalled();
+        const abandonedSession = lastSessionHelper;
+
+        // The watchdog fires after the start timeout, surfacing the error.
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(30_000);
+        });
+        expect(mockChatService.setError).toHaveBeenCalledWith(
+          "Timed out starting a session for the conversation. Please try again.",
+        );
+
+        // A subsequent send builds a fresh session rather than reusing the
+        // permanently-paused one that was cleared by the watchdog.
+        sessionControl.neverStarts = false;
+        await act(async () => {
+          await onSendMessage?.({ content: "Retry", attachments: [] });
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(lastSessionHelper).not.toBe(abandonedSession);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("should track OpenConversation success telemetry", async () => {
