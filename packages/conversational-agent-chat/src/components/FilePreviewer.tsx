@@ -38,7 +38,12 @@ const FilePreviewer = ({
   // Track the file whose image failed to load so the error is scoped to that
   // file — a new file previews normally instead of inheriting a stale failure.
   const [erroredFile, setErroredFile] = useState<File | null>(null);
-  const [textContent, setTextContent] = useState<string | null>(null);
+  // Text is stored with the file it belongs to so a stale read from a previous
+  // file is never shown while the current file's read is still in flight.
+  const [textContent, setTextContent] = useState<{
+    file: File;
+    text: string;
+  } | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const copyBlobUrl = useRef<string | null>(null);
   const { t } = useTranslation();
@@ -71,10 +76,10 @@ const FilePreviewer = ({
     file
       .text()
       .then((txt) => {
-        if (!cancelled) setTextContent(txt);
+        if (!cancelled) setTextContent({ file, text: txt });
       })
       .catch(() => {
-        if (!cancelled) setTextContent(null);
+        if (!cancelled) setTextContent({ file, text: "" });
       });
     return () => {
       cancelled = true;
@@ -162,7 +167,7 @@ const FilePreviewer = ({
 
     // Text / JSON
     if (isText(file)) {
-      if (usePdfJs && textContent !== null) {
+      if (usePdfJs) {
         return (
           <pre
             style={{
@@ -177,7 +182,7 @@ const FilePreviewer = ({
               fontSize: "14px",
             }}
           >
-            {textContent}
+            {textContent?.file === file ? textContent.text : ""}
           </pre>
         );
       }
