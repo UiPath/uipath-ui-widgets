@@ -1,6 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import i18next from "i18next";
 import { ConversationalAgentChat } from "../ConversationalAgentChat";
 import { UiPath } from "@uipath/uipath-typescript/core";
@@ -72,11 +78,15 @@ const {
   mockGetById,
   mockCreate,
   mockUpdateById,
+  sessionControl,
 } = vi.hoisted(() => ({
   capturedAgentConstructorArgs: [] as any[][],
   mockGetById: vi.fn(),
   mockCreate: vi.fn(),
   mockUpdateById: vi.fn(),
+  // When neverStarts is true, startSession returns a session that never fires
+  // sessionStarted and keeps emits paused — exercises the start-timeout path.
+  sessionControl: { neverStarts: false },
 }));
 
 // Store handlers for testing
@@ -195,7 +205,7 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
         startSession: vi.fn().mockImplementation(() => {
           const sessionHelper = {
             onSessionStarted: vi.fn((callback: any) => {
-              setTimeout(callback, 0);
+              if (!sessionControl.neverStarts) setTimeout(callback, 0);
               return () => {};
             }),
             onErrorStart: vi.fn(() => () => {}),
@@ -204,8 +214,12 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
               return () => {};
             }),
             sendSessionEnd: vi.fn(),
-            pauseEmits: vi.fn(),
-            resumeEmits: vi.fn(),
+            pauseEmits: vi.fn(function (this: any) {
+              this.isEmitPaused = true;
+            }),
+            resumeEmits: vi.fn(function (this: any) {
+              this.isEmitPaused = false;
+            }),
             isEmitPaused: false,
             startExchange: vi.fn(() => {
               const exchange = {
@@ -285,6 +299,7 @@ describe("ConversationalAgentChat", () => {
     labelUpdatedHandler = null;
     lastSessionHelper = null;
     lastExchange = null;
+    sessionControl.neverStarts = false;
     defaultProps = {
       sdk: mockSdk as UiPath,
       agentId: 1,
@@ -2285,6 +2300,52 @@ describe("ConversationalAgentChat", () => {
       await waitFor(() =>
         expect(lastSessionHelper?.resumeEmits).toHaveBeenCalled(),
       );
+    });
+
+    it("surfaces an error and clears the session if it never starts", async () => {
+      vi.useFakeTimers();
+      try {
+        sessionControl.neverStarts = true;
+        render(<ConversationalAgentChat {...defaultProps} />);
+
+        // Flush the async agent/service setup so the request handler registers.
+        await vi.waitFor(() =>
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          ),
+        );
+        const onSendMessage = mockChatService.on.mock.calls.find(
+          (call: any) => call[0] === "request",
+        )?.[1];
+
+        await act(async () => {
+          await onSendMessage?.({ content: "Hello", attachments: [] });
+        });
+        // The session is created and emits paused (never resumed here).
+        expect(lastSessionHelper?.pauseEmits).toHaveBeenCalled();
+        expect(mockChatService.setError).not.toHaveBeenCalled();
+        const abandonedSession = lastSessionHelper;
+
+        // The watchdog fires after the start timeout, surfacing the error.
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(30_000);
+        });
+        expect(mockChatService.setError).toHaveBeenCalledWith(
+          "Timed out starting a session for the conversation. Please try again.",
+        );
+
+        // A subsequent send builds a fresh session rather than reusing the
+        // permanently-paused one that was cleared by the watchdog.
+        sessionControl.neverStarts = false;
+        await act(async () => {
+          await onSendMessage?.({ content: "Retry", attachments: [] });
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(lastSessionHelper).not.toBe(abandonedSession);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("should track OpenConversation success telemetry", async () => {

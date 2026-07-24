@@ -561,6 +561,9 @@ export const ConversationalAgentChat = ({
       conversation.id,
       { echo: false },
     );
+    // Mark active before registering handlers so a synchronous sessionStarted
+    // can't lose the `session.current === sessionHelper` guard race below.
+    session.current = sessionHelper;
     // Refresh the sidebar label when the service auto-generates one (or the
     // label is updated via the API). Bind to this session's conversation id
     // so a stale event from an orphaned session can't mislabel the active one.
@@ -599,7 +602,6 @@ export const ConversationalAgentChat = ({
       session.current = null;
       chatService?.setError(error.message || t("error_generic"));
     });
-    session.current = sessionHelper;
     return sessionHelper;
   }, [chatService, getConversation, setConversationHistory, t]);
 
