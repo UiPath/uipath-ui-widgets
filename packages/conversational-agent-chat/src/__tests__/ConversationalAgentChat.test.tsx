@@ -17,6 +17,7 @@ vi.mock("@uipath/apollo-react/core/fonts/font.css", () => ({}));
 const createMockChatService = () => ({
   on: vi.fn(() => vi.fn()),
   open: vi.fn(),
+  getConversation: vi.fn().mockReturnValue([]),
   sendResponse: vi.fn(),
   setAttachmentsLoading: vi.fn(),
   setError: vi.fn(),
@@ -97,9 +98,11 @@ let toolCallStartHandler: any = null;
 let chunkHandler: any = null;
 let contentPartEndHandler: any = null;
 let toolCallEndHandler: any = null;
-let labelUpdatedHandler: any = null;
+let anyEventHandler: any = null;
+let exchangeEndHandler: any = null;
 let lastSessionHelper: any = null;
 let lastExchange: any = null;
+let sessionStartedCallback: any = null;
 
 // Prevent lint errors for handler variables that are assigned inside mocks
 void contentPartStartHandler;
@@ -186,12 +189,19 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
       conversations = {
         create: mockCreate,
         updateById: mockUpdateById,
+        events: {
+          onAny: vi.fn((cb: any) => {
+            anyEventHandler = cb;
+            return () => {};
+          }),
+        },
         getAll: vi.fn().mockResolvedValue({
           items: mockConversations,
           nextCursor: { value: "cursor-1" },
           hasNextPage: true,
         }),
         getById: vi.fn().mockResolvedValue({
+          label: "Generated Title",
           exchanges: {
             getAll: vi.fn().mockResolvedValue({ items: mockExch }),
           },
@@ -202,18 +212,21 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
           mimeType: "text/plain",
         }),
         deleteById: vi.fn().mockResolvedValue(undefined),
-        startSession: vi.fn().mockImplementation(() => {
-          const sessionHelper = {
+        startSession: vi.fn().mockImplementation((conversationId: string) => {
+          const sessionHelper: any = {
+            conversationId,
+            ended: false,
             onSessionStarted: vi.fn((callback: any) => {
+              sessionStartedCallback = callback;
               if (!sessionControl.neverStarts) setTimeout(callback, 0);
               return () => {};
             }),
             onErrorStart: vi.fn(() => () => {}),
-            onLabelUpdated: vi.fn((handler: any) => {
-              labelUpdatedHandler = handler;
-              return () => {};
+            onExchangeStart: vi.fn(() => () => {}),
+            onLabelUpdated: vi.fn(() => () => {}),
+            sendSessionEnd: vi.fn(function (this: any) {
+              this.ended = true;
             }),
-            sendSessionEnd: vi.fn(),
             pauseEmits: vi.fn(function (this: any) {
               this.isEmitPaused = true;
             }),
@@ -229,7 +242,9 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
                 onMessageStart: vi.fn((handler: any) => {
                   messageStartHandler = handler;
                 }),
-                onExchangeEnd: vi.fn(),
+                onExchangeEnd: vi.fn((handler: any) => {
+                  exchangeEndHandler = handler;
+                }),
                 sendExchangeEnd: vi.fn(),
                 startMessage: vi.fn(() => mockMessageBuilder),
               };
@@ -296,9 +311,11 @@ describe("ConversationalAgentChat", () => {
     chunkHandler = null;
     contentPartEndHandler = null;
     toolCallEndHandler = null;
-    labelUpdatedHandler = null;
+    anyEventHandler = null;
+    exchangeEndHandler = null;
     lastSessionHelper = null;
     lastExchange = null;
+    sessionStartedCallback = null;
     sessionControl.neverStarts = false;
     defaultProps = {
       sdk: mockSdk as UiPath,
@@ -773,7 +790,7 @@ describe("ConversationalAgentChat", () => {
       expect(startedExchange?.sendExchangeEnd).not.toHaveBeenCalled();
     });
 
-    it("should call stopResponse and clearError when opening a conversation", async () => {
+    it("clears streaming state without publishing StopResponse when opening a conversation", async () => {
       render(<ConversationalAgentChat {...defaultProps} />);
 
       await waitFor(
@@ -786,6 +803,14 @@ describe("ConversationalAgentChat", () => {
         { timeout: 3000 },
       );
 
+      const streamingMessage = {
+        id: "msg-streaming",
+        content: "partial",
+        stream: true,
+        done: false,
+      };
+      mockChatService.getConversation.mockReturnValue([streamingMessage]);
+
       const openConversationCall = mockChatService.on.mock.calls.find(
         (call: any) => call[0] === "openConversation",
       );
@@ -793,8 +818,46 @@ describe("ConversationalAgentChat", () => {
 
       await onClickOpenConversation?.("conv-1");
 
-      expect(mockChatService.stopResponse).toHaveBeenCalled();
+      // stopResponse would publish StopResponse and abort the in-flight
+      // exchange; the switch must finalize the stream UI state directly.
+      expect(mockChatService.stopResponse).not.toHaveBeenCalled();
+      expect(mockChatService.sendResponse).toHaveBeenCalledWith({
+        ...streamingMessage,
+        content: "",
+        done: true,
+      });
+      expect(mockChatService.setShowLoading).toHaveBeenCalledWith(false);
+      expect(mockChatService.setWaiting).toHaveBeenCalledWith(false);
       expect(mockChatService.clearError).toHaveBeenCalled();
+    });
+
+    it("warms a session for the opened conversation without attaching a live resume", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "openConversation",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const onClickOpenConversation = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "openConversation",
+      )?.[1];
+      await onClickOpenConversation?.("conv-1");
+
+      // A session is established for the opened conversation so its first send
+      // is snappy...
+      await waitFor(() => {
+        expect(lastSessionHelper?.conversationId).toBe("conv-1");
+      });
+      // ...but we do NOT subscribe to server-initiated exchanges: switching is
+      // end-on-switch, so an in-flight turn is not resumed as a live stream
+      // (it loads from history instead).
+      expect(lastSessionHelper?.onExchangeStart).not.toHaveBeenCalled();
     });
 
     it("should set conversation messages after fetching exchanges", async () => {
@@ -939,6 +1002,123 @@ describe("ConversationalAgentChat", () => {
       await waitFor(() =>
         expect(startedSession?.sendSessionEnd).toHaveBeenCalledTimes(1),
       );
+    });
+  });
+
+  describe("conversation switching", () => {
+    const getHandler = (event: string) =>
+      mockChatService.on.mock.calls.find((call: any) => call[0] === event)?.[1];
+
+    it("abandons a send when the user switches before its session is established", async () => {
+      // The new conversation's create resolves only after the user has already
+      // switched to another conversation.
+      let resolveCreate: (value: any) => void = () => {};
+      mockGetById.mockResolvedValue({
+        id: 12345,
+        releaseKey: "11111111-2222-3333-4444-555555555555",
+        name: "Test Agent",
+        folderId: 100,
+        appearance: {},
+        conversations: {
+          create: vi.fn(
+            () => new Promise((resolve) => (resolveCreate = resolve)),
+          ),
+        },
+      });
+
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+      // history must be loaded so conv-1 is openable
+      await waitFor(() =>
+        expect(mockChatService.setHistory).toHaveBeenCalled(),
+      );
+
+      const sendPromise = getHandler("request")?.({
+        content: "Hello",
+        attachments: [],
+      });
+      await getHandler("openConversation")?.("conv-1");
+
+      resolveCreate({
+        id: "conv-raced",
+        label: "",
+        lastActivityTime: "2024-01-03T10:00:00Z",
+      });
+      await sendPromise;
+
+      // The raced send's session isn't the one on screen, so it's abandoned
+      // before wiring a turn — no exchange started, no message committed — so
+      // nothing can stream into the now-open conversation.
+      expect(lastExchange).toBeNull();
+      expect(mockMessageBuilder.sendMessageEnd).not.toHaveBeenCalled();
+    });
+
+    it("flushes and ends a pending session abandoned by a switch once it starts", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      await getHandler("request")?.({ content: "Hello", attachments: [] });
+      const startedSession = lastSessionHelper;
+      const startedCallback = sessionStartedCallback;
+
+      // Simulate sessionStarted not yet received when the user switches away.
+      startedSession.isEmitPaused = true;
+      startedSession.sendSessionEnd.mockClear();
+      startedSession.resumeEmits.mockClear();
+
+      getHandler("newChat")?.();
+
+      // Ending now would buffer the end event and drop the pending send.
+      expect(startedSession.sendSessionEnd).not.toHaveBeenCalled();
+
+      // Once the server confirms the session, the buffered send flushes so the
+      // turn still runs on its own conversation, then the orphan ends.
+      startedCallback?.();
+      expect(startedSession.resumeEmits).toHaveBeenCalled();
+      expect(startedSession.sendSessionEnd).toHaveBeenCalledTimes(1);
+    });
+
+    it("eagerly warms a session on New Chat so the first send reuses it", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+      await waitFor(
+        () =>
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          ),
+        { timeout: 3000 },
+      );
+
+      lastSessionHelper = null;
+      getHandler("newChat")?.();
+
+      // New Chat eagerly establishes the conversation + session.
+      await waitFor(() => expect(lastSessionHelper).toBeTruthy());
+      const warmed = lastSessionHelper;
+
+      // The subsequent send reuses that session instead of creating one — with
+      // no create/await inside the send path, a later switch can't interleave
+      // between picking the session and wiring the turn.
+      await getHandler("request")?.({ content: "hi", attachments: [] });
+      expect(lastSessionHelper).toBe(warmed);
     });
   });
 
@@ -1941,7 +2121,7 @@ describe("ConversationalAgentChat", () => {
       await onSendMessage?.({ content: "Hi", attachments: [] });
 
       await waitFor(() => {
-        expect(labelUpdatedHandler).toBeTruthy();
+        expect(anyEventHandler).toBeTruthy();
       });
 
       mockChatService.setHistory.mockClear();
@@ -1950,7 +2130,11 @@ describe("ConversationalAgentChat", () => {
     it("should update sidebar label when service emits a label update", async () => {
       await setupSessionForConv1();
 
-      labelUpdatedHandler({ label: "Renamed Chat", autogenerated: true });
+      // Delivered globally via events.onAny, not a per-session listener.
+      anyEventHandler({
+        conversationId: "conv-1",
+        labelUpdated: { label: "Renamed Chat", autogenerated: true },
+      });
 
       expect(mockChatService.setHistory).toHaveBeenCalledTimes(1);
       const [items] = mockChatService.setHistory.mock.calls[0];
@@ -2001,15 +2185,109 @@ describe("ConversationalAgentChat", () => {
       await sendFirstMessage();
 
       await waitFor(() => {
-        expect(labelUpdatedHandler).toBeTruthy();
+        expect(anyEventHandler).toBeTruthy();
       });
 
       mockChatService.setHistory.mockClear();
-      labelUpdatedHandler({ label: "Auto title", autogenerated: true });
+      anyEventHandler({
+        conversationId: "conv-123",
+        labelUpdated: { label: "Auto title", autogenerated: true },
+      });
       expect(mockChatService.setHistory).toHaveBeenCalledTimes(1);
       const afterLabel = mockChatService.setHistory.mock.calls[0][0];
       const labelled = afterLabel.find((i: any) => i.id === "conv-123");
       expect(labelled?.name).toBe("Auto title");
+    });
+
+    it("applies a label update for a backgrounded conversation whose session ended", async () => {
+      // The gap-closer: after switching away, the old session (and its
+      // per-session listener) is gone, but events.onAny still delivers the
+      // label so the sidebar entry stops showing "New chat".
+      await sendFirstMessage();
+      await waitFor(() => expect(anyEventHandler).toBeTruthy());
+
+      // Switch away — ends conv-123's session.
+      const onNewChat = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "newChat",
+      )?.[1];
+      onNewChat?.();
+
+      mockChatService.setHistory.mockClear();
+      anyEventHandler({
+        conversationId: "conv-123",
+        labelUpdated: { label: "Backgrounded Title", autogenerated: true },
+      });
+
+      const items = mockChatService.setHistory.mock.calls.at(-1)?.[0];
+      const entry = items?.find((i: any) => i.id === "conv-123");
+      expect(entry?.name).toBe("Backgrounded Title");
+    });
+
+    it("pulls the auto-generated label after the first exchange when not pushed live", async () => {
+      // The service generates a title after the first exchange but only pushes
+      // `labelUpdated` on later activity, so exchange-end fetches it directly.
+      await sendFirstMessage();
+
+      await waitFor(() => {
+        expect(exchangeEndHandler).toBeTruthy();
+      });
+
+      mockChatService.setHistory.mockClear();
+      exchangeEndHandler();
+
+      await waitFor(() => {
+        const call = mockChatService.setHistory.mock.calls.at(-1);
+        const entry = call?.[0].find((i: any) => i.id === "conv-123");
+        expect(entry?.name).toBe("Generated Title");
+      });
+    });
+
+    it("labels a new conversation with the first user message until the real title arrives", async () => {
+      await sendFirstMessage(); // sends "Hi", creating conv-123
+
+      // Optimistic label shows immediately.
+      await waitFor(() => {
+        const entry = mockChatService.setHistory.mock.calls
+          .at(-1)?.[0]
+          .find((i: any) => i.id === "conv-123");
+        expect(entry?.name).toBe("Hi");
+      });
+
+      // The generated label supersedes it.
+      anyEventHandler({
+        conversationId: "conv-123",
+        labelUpdated: { label: "Real Title", autogenerated: true },
+      });
+      const items = mockChatService.setHistory.mock.calls.at(-1)?.[0];
+      expect(items.find((i: any) => i.id === "conv-123")?.name).toBe(
+        "Real Title",
+      );
+    });
+
+    it("truncates a long first message to 150 chars for the optimistic label", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+          expect(mockChatService.setHistory).toHaveBeenCalled();
+        },
+        { timeout: 3000 },
+      );
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+
+      mockChatService.setHistory.mockClear();
+      await onSendMessage?.({ content: "a".repeat(200), attachments: [] });
+
+      const entry = mockChatService.setHistory.mock.calls
+        .at(-1)?.[0]
+        .find((i: any) => i.id === "conv-123");
+      expect(entry?.name).toHaveLength(151); // 150 chars + ellipsis
+      expect(entry?.name.endsWith("…")).toBe(true);
     });
   });
 

@@ -84,9 +84,20 @@ const TOOL_CONFIRMATION_WIDGET_ID_PREFIX = "confirmation-";
 // `sessionStarted`, so if it never arrives, surface an error instead of
 // leaving the send silently pending.
 const SESSION_START_TIMEOUT_MS = 30_000;
+const OPTIMISTIC_LABEL_MAX_CHARS = 150;
 type ConversationCreateOptionsArg = Parameters<
   ConversationalAgent["conversations"]["create"]
 >[2];
+
+function toOptimisticLabel(
+  text: string,
+  max = OPTIMISTIC_LABEL_MAX_CHARS,
+): string {
+  const collapsed = text.replace(/\s+/g, " ").trim();
+  return collapsed.length > max
+    ? `${collapsed.slice(0, max).trimEnd()}…`
+    : collapsed;
+}
 
 // Map widget Locale to Apollo supported locale to allow for locales not supported by Apollo
 function toApolloSupportedLocale(widgetLocale: Locale): SupportedLocale {
@@ -193,7 +204,13 @@ export const ConversationalAgentChat = ({
     );
   }, [sdk, externalUserId]);
   const session = useRef<SessionStream | null>(null);
+  // In-flight session creation, so a send racing the eager warm-up reuses it
+  // rather than creating a second conversation.
+  const sessionPromiseRef = useRef<Promise<SessionStream> | null>(null);
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
+  // Kept out of `pastConversations` so the getById fallbacks still treat these
+  // conversations as label-less.
+  const optimisticLabels = useRef(new Map<string, string>());
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
   const conversationsCursor = useRef<{ value: string } | undefined>(undefined);
   const agentIdRef = useRef<number | undefined>(undefined);
@@ -227,6 +244,9 @@ export const ConversationalAgentChat = ({
   useLayoutEffect(() => {
     inputSchemaStateRef.current = inputSchemaState;
   }, [inputSchemaState]);
+  // Lets onExchangeEnd (defined above setConversationHistory) trigger a label
+  // refresh without a declaration-order cycle.
+  const refreshConversationLabelRef = useRef<(id: string) => void>(() => {});
 
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
@@ -452,11 +472,22 @@ export const ConversationalAgentChat = ({
       });
 
       exchange.onExchangeEnd(() => {
-        activeExchange.current = null;
+        if (activeExchange.current === exchange) {
+          activeExchange.current = null;
+        }
         chatService.sendOutputStreamEvent({ turnComplete: true });
         chatService.setShowLoading(false);
         chatService.setWaiting(false);
         setHasMessages(true);
+        // The generated title may not be pushed until later activity; pull it
+        // now so the chat doesn't sit as "New chat" until the next message.
+        const convId = currentConversation.current?.id;
+        const entry = convId
+          ? pastConversations.current.find((c) => c.id === convId)
+          : undefined;
+        if (convId && entry && !entry.label) {
+          refreshConversationLabelRef.current(convId);
+        }
       });
     },
     [chatService, t],
@@ -509,13 +540,51 @@ export const ConversationalAgentChat = ({
     (next: ConversationCreateResponse[], allLoaded?: boolean) => {
       pastConversations.current = next;
       if (!chatService) return;
+      // Overlay optimistic labels for display only; `pastConversations` keeps
+      // the real (possibly empty) label so refetch guards still fire.
+      const forDisplay = next.map((c) =>
+        c.label ? c : { ...c, label: optimisticLabels.current.get(c.id) ?? "" },
+      );
       chatService.setHistory(
-        getConversationHistoryDisplayItems(next, t("new_chat")),
+        getConversationHistoryDisplayItems(forDisplay, t("new_chat")),
         allLoaded,
       );
     },
     [chatService, t],
   );
+
+  // Never clears an existing label, so a stale empty read can't revert a good
+  // title.
+  const applyConversationLabel = useCallback(
+    (conversationId: string, label: string) => {
+      if (!label) return;
+      optimisticLabels.current.delete(conversationId); // real label wins
+      setConversationHistory(
+        pastConversations.current.map((c) =>
+          c.id === conversationId ? { ...c, label } : c,
+        ),
+      );
+    },
+    [setConversationHistory],
+  );
+
+  // Fallback for when the live label event isn't delivered: pull it from the
+  // server (after the first exchange, and when reopening a conversation).
+  const refreshConversationLabel = useCallback(
+    async (conversationId: string) => {
+      try {
+        const conversation =
+          await agentService.current.conversations.getById(conversationId);
+        applyConversationLabel(conversationId, conversation?.label ?? "");
+      } catch {
+        /* best effort — label stays until the next refresh */
+      }
+    },
+    [applyConversationLabel],
+  );
+  useLayoutEffect(() => {
+    refreshConversationLabelRef.current = refreshConversationLabel;
+  }, [refreshConversationLabel]);
 
   const getConversation =
     useCallback(async (): Promise<ConversationCreateResponse> => {
@@ -527,8 +596,12 @@ export const ConversationalAgentChat = ({
         const existing = await agentService.current.conversations.getById(
           existingConversationId,
         );
-        currentConversation.current = existing;
         initialConversationConsumed.current = true;
+        // Adopt only if the user hasn't selected another conversation while we
+        // were loading.
+        if (!currentConversation.current) {
+          currentConversation.current = existing;
+        }
         return existing;
       }
       const agent = await resolveAgent();
@@ -538,11 +611,12 @@ export const ConversationalAgentChat = ({
       const newConversation = await agent.conversations.create(
         jobStartOverrides ? { jobStartOverrides } : undefined,
       );
-      currentConversation.current = newConversation;
-      // Show the new conversation in the sidebar immediately so its label
-      // (auto-generated by the service after the first exchange) can refresh
-      // in place via onLabelUpdated rather than waiting for a history reload.
-      setConversationHistory([newConversation, ...pastConversations.current]);
+      // Adopt (and list it) only if the user hasn't switched away while it was
+      // being created.
+      if (!currentConversation.current) {
+        currentConversation.current = newConversation;
+        setConversationHistory([newConversation, ...pastConversations.current]);
+      }
       return newConversation;
     }, [
       existingConversationId,
@@ -552,72 +626,113 @@ export const ConversationalAgentChat = ({
       t,
     ]);
 
-  const getSessionHelper = useCallback(async (): Promise<SessionStream> => {
+  const getSessionHelper = useCallback((): Promise<SessionStream> => {
     if (session.current) {
-      return session.current;
+      return Promise.resolve(session.current);
     }
-    const conversation = await getConversation();
-    const sessionHelper = agentService.current.conversations.startSession(
-      conversation.id,
-      { echo: false },
-    );
-    // Mark active before registering handlers so a synchronous sessionStarted
-    // can't lose the `session.current === sessionHelper` guard race below.
-    session.current = sessionHelper;
-    // Refresh the sidebar label when the service auto-generates one (or the
-    // label is updated via the API). Bind to this session's conversation id
-    // so a stale event from an orphaned session can't mislabel the active one.
-    sessionHelper.onLabelUpdated(({ label }) => {
-      setConversationHistory(
-        pastConversations.current.map((c) =>
-          c.id === conversation.id ? { ...c, label } : c,
-        ),
-      );
-    });
-    // Buffer outgoing events until the server confirms the session is started,
-    // then flush — so a send never blocks on the sessionStarted round-trip.
-    // Combined with ending the session on switch (see endActiveSession), a
-    // reopened conversation starts fresh and its buffered send flushes as soon
-    // as the fresh sessionStarted arrives.
-    sessionHelper.pauseEmits();
-    const startTimeout = setTimeout(() => {
-      // Ignore a session abandoned by a switch/unmount so it can't error on the
-      // now-active conversation. If the active session never started, nothing
-      // flushes the buffer — surface an error and clear it so a retry can build
-      // a fresh session rather than reusing this permanently-paused one.
-      if (session.current !== sessionHelper) return;
-      if (sessionHelper.isEmitPaused) {
-        session.current = null;
-        chatService?.setError(t("error_session_start_timeout"));
-      }
-    }, SESSION_START_TIMEOUT_MS);
-    sessionHelper.onSessionStarted(() => {
-      clearTimeout(startTimeout);
-      if (session.current !== sessionHelper) return;
-      sessionHelper.resumeEmits();
-    });
-    sessionHelper.onErrorStart((error) => {
-      clearTimeout(startTimeout);
-      if (session.current !== sessionHelper) return;
-      session.current = null;
-      chatService?.setError(error.message || t("error_generic"));
-    });
-    return sessionHelper;
-  }, [chatService, getConversation, setConversationHistory, t]);
+    if (sessionPromiseRef.current) {
+      return sessionPromiseRef.current;
+    }
+    const promise = createSession();
+    sessionPromiseRef.current = promise;
+    void promise
+      .finally(() => {
+        if (sessionPromiseRef.current === promise) {
+          sessionPromiseRef.current = null;
+        }
+      })
+      .catch(() => {
+        /* the rejection is surfaced to the awaiting caller */
+      });
+    return promise;
 
-  // End the session on conversation switch/unmount so a reopen starts fresh and
-  // gets a new `sessionStarted` — reusing a stale session hangs the send. The
-  // in-flight exchange is left running (ending it is reserved for onStopResponse),
-  // so switching away from a busy conversation and reopening resumes its turn.
+    async function createSession(): Promise<SessionStream> {
+      const conversation = await getConversation();
+      const sessionHelper = agentService.current.conversations.startSession(
+        conversation.id,
+        { echo: false },
+      );
+      // Adopt only if this conversation is still on screen and nothing else
+      // claimed the slot. Otherwise it's orphaned; onSessionStarted flushes any
+      // buffered send, then ends it.
+      if (
+        !session.current &&
+        currentConversation.current?.id === conversation.id
+      ) {
+        session.current = sessionHelper;
+      }
+      // Buffer sends until sessionStarted so a send never blocks on that
+      // round-trip. (Label updates arrive globally via events.onAny, below.)
+      sessionHelper.pauseEmits();
+      const startTimeout = setTimeout(() => {
+        if (!sessionHelper.isEmitPaused) return;
+        // Never started. End the helper either way — while paused this only
+        // buffers the event, but still detaches it from the SDK's routing.
+        if (session.current === sessionHelper) {
+          session.current = null;
+          chatService?.setError(t("error_session_start_timeout"));
+        }
+        try {
+          sessionHelper.sendSessionEnd();
+        } catch {
+          /* session already closed */
+        }
+      }, SESSION_START_TIMEOUT_MS);
+      sessionHelper.onSessionStarted(() => {
+        clearTimeout(startTimeout);
+        if (sessionHelper.ended) return;
+        // Flush even when abandoned by a switch, so the buffered send still runs
+        // on its own conversation instead of being dropped; then end the orphan.
+        sessionHelper.resumeEmits();
+        if (session.current !== sessionHelper) {
+          try {
+            sessionHelper.sendSessionEnd();
+          } catch {
+            /* session already closed */
+          }
+        }
+      });
+      sessionHelper.onErrorStart((error) => {
+        clearTimeout(startTimeout);
+        if (session.current !== sessionHelper) return;
+        session.current = null;
+        chatService?.setError(error.message || t("error_generic"));
+      });
+      return sessionHelper;
+    }
+  }, [chatService, getConversation, t]);
+
+  // End the session on conversation switch/unmount. This detaches the old
+  // conversation's event handlers, so its (still running server-side) turn
+  // stops streaming into the shared chat surface — preventing a response from
+  // rendering on whichever chat is now open. A reopened conversation loads its
+  // latest state from history.
   const endActiveSession = useCallback(() => {
+    const sessionHelper = session.current;
+    activeExchange.current = null;
+    session.current = null;
+    // Detach any in-flight creation so the next conversation builds a fresh one.
+    sessionPromiseRef.current = null;
+    if (!sessionHelper) return;
+    if (sessionHelper.isEmitPaused) {
+      // Ending now would buffer the endSession and drop the pending send with
+      // it; onSessionStarted flushes then ends the session once it starts.
+      return;
+    }
     try {
-      session.current?.sendSessionEnd();
+      sessionHelper.sendSessionEnd();
     } catch {
       /* session already closed */
     }
-    activeExchange.current = null;
-    session.current = null;
   }, []);
+
+  // Eagerly create the conversation + session so the first send is instant and
+  // wires synchronously — before any later switch can interleave.
+  const warmSession = useCallback(() => {
+    void getSessionHelper().catch(() => {
+      /* best-effort; the next send re-creates the session */
+    });
+  }, [getSessionHelper]);
 
   const onNewChat = useCallback(() => {
     endActiveSession();
@@ -630,9 +745,11 @@ export const ConversationalAgentChat = ({
     if ((inputSchemaState?.required?.length ?? 0) > 0) {
       setInputsInstance((n) => n + 1);
       setShowInputPage(true);
+    } else {
+      warmSession();
     }
     trackTelemetry(TelemetryEvent.NewChat, TelemetryStatus.Success);
-  }, [endActiveSession, inputSchemaState]);
+  }, [endActiveSession, inputSchemaState, warmSession]);
 
   const buildHistoryFilterOptions = useCallback(() => {
     // The SDK's URL builder calls value.toString() without a null check, so
@@ -707,6 +824,17 @@ export const ConversationalAgentChat = ({
         // required for debug-mode hosts that need to gate agent execution on the first user message
         onUserMessageSentRef.current?.({ content: data.content });
         const sessionHelper = await getSessionHelper();
+        // Switched away mid-setup — abandon rather than wire a background turn
+        // into the displayed chat. onSessionStarted flushes/ends the orphan.
+        if (session.current !== sessionHelper) return;
+        // Title a still-unlabeled conversation with the first user message so
+        // the sidebar updates immediately.
+        const convId = sessionHelper.conversationId;
+        const entry = pastConversations.current.find((c) => c.id === convId);
+        if (entry && !entry.label && !optimisticLabels.current.has(convId)) {
+          optimisticLabels.current.set(convId, toOptimisticLabel(data.content));
+          setConversationHistory([...pastConversations.current]);
+        }
         const exchange = sessionHelper.startExchange();
         activeExchange.current = exchange;
         setupExchangeHandlers(exchange);
@@ -739,7 +867,13 @@ export const ConversationalAgentChat = ({
         chatService?.setError(t("error_send_message", { errorMessage }));
       }
     },
-    [chatService, getSessionHelper, setupExchangeHandlers, t],
+    [
+      chatService,
+      getSessionHelper,
+      setConversationHistory,
+      setupExchangeHandlers,
+      t,
+    ],
   );
 
   const processAttachmentsInBatch = useCallback(
@@ -846,12 +980,25 @@ export const ConversationalAgentChat = ({
     [],
   );
 
+  // Finalize the in-flight stream without Apollo's stopResponse(), which
+  // publishes StopResponse and would end the turn server-side.
+  const stopStreamingRender = useCallback(() => {
+    if (!chatService) return;
+    const messages = chatService.getConversation();
+    const last = messages[messages.length - 1];
+    if (last?.stream && !last.done) {
+      chatService.sendResponse({ ...last, content: "", done: true });
+    }
+    chatService.setShowLoading(false);
+    chatService.setWaiting(false);
+  }, [chatService]);
+
   const onClickOpenConversation = useCallback(
     async (id: string) => {
       if (!chatService) return;
 
       try {
-        chatService.stopResponse();
+        stopStreamingRender();
         chatService.clearError();
         const selectedConversation = pastConversations.current.find(
           (c) => c.id === id,
@@ -862,9 +1009,18 @@ export const ConversationalAgentChat = ({
         currentConversation.current = selectedConversation;
 
         const allExchanges = await fetchExchanges(selectedConversation.id);
+        // Bail if the user switched again while exchanges were loading.
+        if (currentConversation.current?.id !== selectedConversation.id) {
+          return;
+        }
         const messages = mapExchangesToChatMessages(allExchanges);
         chatService.setConversation(messages);
         setHasMessages(messages.length > 0);
+        // The listed label may predate the generated title; refresh from server.
+        if (!selectedConversation.label) {
+          refreshConversationLabel(selectedConversation.id);
+        }
+        warmSession();
         trackTelemetry(
           TelemetryEvent.OpenConversation,
           TelemetryStatus.Success,
@@ -881,7 +1037,15 @@ export const ConversationalAgentChat = ({
         chatService.setError(t("error_open_conversation", { errorMessage }));
       }
     },
-    [chatService, endActiveSession, fetchExchanges, t],
+    [
+      chatService,
+      endActiveSession,
+      fetchExchanges,
+      refreshConversationLabel,
+      stopStreamingRender,
+      t,
+      warmSession,
+    ],
   );
 
   const initChat = useCallback(async () => {
@@ -1181,6 +1345,21 @@ export const ConversationalAgentChat = ({
     chatService?.setTheme(theme);
   }, [chatService, theme]);
 
+  // Eagerly warm a fresh new chat on launch so its first send is instant and
+  // can't race a later switch.
+  useEffect(() => {
+    if (!chatService || !agentId) return;
+    if (existingConversationId || showInputPage) return;
+    if (currentConversation.current || session.current) return;
+    warmSession();
+  }, [
+    chatService,
+    agentId,
+    existingConversationId,
+    showInputPage,
+    warmSession,
+  ]);
+
   // Close the SDK session on unmount so the WebSocket doesn't linger.
   useEffect(() => {
     return () => {
@@ -1194,6 +1373,18 @@ export const ConversationalAgentChat = ({
       toolConfirmationRenderer.unmountAll();
     };
   }, [toolConfirmationRenderer]);
+
+  // Apply generated titles from the event manager (not a per-conversation
+  // session), so a label lands even for a backgrounded conversation whose
+  // session ended on switch — which a session-scoped listener would miss.
+  useEffect(() => {
+    if (!chatService) return;
+    return agentService.current.conversations.events.onAny((event) => {
+      if (event.labelUpdated?.label) {
+        applyConversationLabel(event.conversationId, event.labelUpdated.label);
+      }
+    });
+  }, [chatService, applyConversationLabel]);
 
   // Register event handlers after chatService is available
   useEffect(() => {
@@ -1335,6 +1526,7 @@ export const ConversationalAgentChat = ({
             }
             storedAgentInputs.current = inputs;
             setShowInputPage(false);
+            warmSession();
           }}
         />
       )}
