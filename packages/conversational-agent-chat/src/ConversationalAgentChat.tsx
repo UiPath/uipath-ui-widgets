@@ -198,6 +198,7 @@ export const ConversationalAgentChat = ({
   const conversationsCursor = useRef<{ value: string } | undefined>(undefined);
   const agentIdRef = useRef<number | undefined>(undefined);
   const agentKeyRef = useRef<string | undefined>(undefined);
+  const toolDisplayModeRef = useRef<string | undefined>(undefined);
   const searchTextRef = useRef<string>("");
 
   const [chatService, setChatService] = useState<AutopilotChatService>();
@@ -331,6 +332,7 @@ export const ConversationalAgentChat = ({
                 toolName: pending.toolName,
                 input: pending.toolInput,
                 startTime: pending.startTimeIso,
+                displayMode: toolDisplayModeRef.current,
               },
             });
           };
@@ -442,6 +444,7 @@ export const ConversationalAgentChat = ({
                     output: endEvent.output,
                     endTime: endTimeIso,
                     isError: endEvent.isError,
+                    displayMode: toolDisplayModeRef.current,
                   },
                 });
               }
@@ -892,6 +895,9 @@ export const ConversationalAgentChat = ({
       const agentRelease = await resolveAgent();
       agentIdRef.current = agentRelease?.id;
       agentKeyRef.current = agentRelease?.releaseKey;
+      toolDisplayModeRef.current = (
+        agentRelease?.appearance as { displayMode?: string } | undefined
+      )?.displayMode;
       const agentName = agentRelease?.name ?? "";
 
       // In debug mode the agent (and its derived schema) may not be resolvable,
