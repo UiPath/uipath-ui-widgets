@@ -23,6 +23,13 @@
     min-height: 0;
   }
 
+  // Fullscreen mode: Apollo's own chat container draws the border and owns the
+  // viewport-height chrome, so drop our wrapper border to avoid a double frame.
+  // The host is expected to give the widget a full-viewport container.
+  &--fullscreen {
+    border: none;
+  }
+
   // apollo-wind references --muted-foreground for placeholder text but never
   // assigns it, so it falls back to the browser default. Apply Apollo's
   // de-emphasized foreground token so placeholders read as secondary text.

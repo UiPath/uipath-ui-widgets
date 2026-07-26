@@ -233,6 +233,12 @@ function App() {
       control: "select",
       options: ["light", "dark", "light-hc", "dark-hc"],
     },
+    mode: {
+      description:
+        "Display mode. 'embedded' fills the host container; 'fullscreen' renders the standalone experience (with the agent sparkle icon) and expects a full-viewport container.",
+      control: "select",
+      options: ["embedded", "fullscreen"],
+    },
     readOnly: {
       description: "When true, disables user input",
       control: "boolean",
@@ -272,6 +278,7 @@ function App() {
     folderId: 0,
     locale: "en",
     theme: "light",
+    mode: "embedded",
     readOnly: false,
     overrideLabels: undefined,
     existingConversationId: undefined,
@@ -303,6 +310,29 @@ export const DarkTheme: Story = {
     docs: {
       description: {
         story: "Chat widget using the dark theme.",
+      },
+    },
+  },
+};
+
+export const Fullscreen: Story = {
+  args: {
+    mode: "fullscreen",
+  },
+  // Fullscreen owns the viewport, so override the default 600px decorator
+  // with a full-height container that mirrors how a host would mount it.
+  decorators: [
+    (Story) => (
+      <div style={{ height: "100vh" }}>
+        <Story />
+      </div>
+    ),
+  ],
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Standalone fullscreen experience. Renders the agent sparkle icon next to the title and expects a full-viewport container.",
       },
     },
   },

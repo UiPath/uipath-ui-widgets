@@ -46,6 +46,7 @@ vi.mock("@uipath/apollo-react/material/components", () => ({
   ),
   AutopilotChatMode: {
     Embedded: "embedded",
+    FullScreen: "fullScreen",
   },
   AutopilotChatEvent: {
     NewChat: "newChat",
@@ -360,6 +361,44 @@ describe("ConversationalAgentChat", () => {
       },
       { timeout: 3000 },
     );
+  });
+
+  it("should default to embedded mode and omit the fullscreen modifier class", async () => {
+    const { container } = render(<ConversationalAgentChat {...defaultProps} />);
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("ap-chat")).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
+
+    expect(
+      container.querySelector(".uipath-conversational-agent-chat--fullscreen"),
+    ).toBeNull();
+  });
+
+  it("should instantiate in fullscreen mode and apply the modifier class", async () => {
+    const { AutopilotChatService } =
+      await import("@uipath/apollo-react/material/components");
+    const { container } = render(
+      <ConversationalAgentChat {...defaultProps} mode="fullscreen" />,
+    );
+
+    await waitFor(
+      () => {
+        expect(AutopilotChatService.Instantiate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            config: expect.objectContaining({ mode: "fullScreen" }),
+          }),
+        );
+      },
+      { timeout: 3000 },
+    );
+
+    expect(
+      container.querySelector(".uipath-conversational-agent-chat--fullscreen"),
+    ).not.toBeNull();
   });
 
   it("should handle agent without custom appearance", async () => {
