@@ -32,6 +32,7 @@ const loadPdfJs = async () => {
 
 const PAGE_GAP = 8;
 const RENDER_BUFFER = 2; // render this many pages above/below the visible area
+const MIN_PAGE_WIDTH = 200; // floor so a collapsed container can't yield a non-positive scale
 
 interface PdfJsViewerProps {
   file: File;
@@ -122,7 +123,12 @@ const PdfJsViewer = ({ file, pageNumber = 1 }: PdfJsViewerProps) => {
         const container = containerRef.current;
         if (!container) return;
 
-        const containerWidth = container.clientWidth - 32; // account for padding
+        // Clamp width so a zero/narrow container (e.g. during first layout)
+        // can't produce a non-positive scale and an invalid canvas.
+        const containerWidth = Math.max(
+          container.clientWidth - 32,
+          MIN_PAGE_WIDTH,
+        );
         const unscaledViewport = page.getViewport({ scale: 1 });
         const scale = containerWidth / unscaledViewport.width;
         const viewport = page.getViewport({ scale });
@@ -167,7 +173,11 @@ const PdfJsViewer = ({ file, pageNumber = 1 }: PdfJsViewerProps) => {
       const bufferTop = visibleTop - clientHeight * RENDER_BUFFER;
       const bufferBottom = visibleBottom + clientHeight * RENDER_BUFFER;
 
-      if (pageBottom >= bufferTop && pageTop <= bufferBottom) {
+      // Pages are stacked top-to-bottom; once we're past the buffer, so is
+      // everything below — stop scanning instead of walking all numPages.
+      if (pageTop > bufferBottom) break;
+
+      if (pageBottom >= bufferTop) {
         renderPage(i);
       }
     }

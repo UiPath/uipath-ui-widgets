@@ -16,6 +16,7 @@ import {
   Alert,
   AlertDescription,
   Button,
+  Column,
   Dialog,
   DialogContent,
   DialogHeader,
@@ -229,9 +230,10 @@ export const ConversationalAgentChat = ({
   const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
   // Citation source-document preview, opened from a citation click.
   const [citationPreviewData, setCitationPreviewData] = useState<{
-    file: File;
+    file?: File;
     title: string;
     pageNumber: number;
+    error?: boolean;
   } | null>(null);
   const citationPreviewRef = useRef(citationPreview);
   const [hasMessages, setHasMessages] = useState(false);
@@ -1047,7 +1049,6 @@ export const ConversationalAgentChat = ({
               if (!citation?.download_url) return true;
 
               const pageNumber = Number(citation.page_number) || 1;
-              let file: File;
               try {
                 const blob = await agentService.current.downloadCitationSource({
                   title: citation.title,
@@ -1055,17 +1056,26 @@ export const ConversationalAgentChat = ({
                   downloadUrl: citation.download_url,
                   pageNumber: String(pageNumber),
                 });
-                file = new File([blob], citation.title, { type: blob.type });
+                const file = new File([blob], citation.title, {
+                  type: blob.type,
+                });
+                setCitationPreviewData({
+                  file,
+                  title: citation.title,
+                  pageNumber,
+                });
               } catch (e) {
+                // Consume the click and surface the error in-dialog. Falling
+                // through to Apollo's default would re-open the auth-gated
+                // download_url in a new tab, which is exactly the 401 this
+                // preview replaces.
                 console.error("Failed to load citation document", e);
-                return true;
+                setCitationPreviewData({
+                  title: citation.title,
+                  pageNumber,
+                  error: true,
+                });
               }
-
-              setCitationPreviewData({
-                file,
-                title: citation.title,
-                pageNumber,
-              });
               return false;
             },
           },
@@ -1442,12 +1452,23 @@ export const ConversationalAgentChat = ({
             <DialogHeader>
               <DialogTitle>{citationPreviewData.title}</DialogTitle>
             </DialogHeader>
-            <FilePreviewer
-              file={citationPreviewData.file}
-              usePdfJs={usePdfJsViewer}
-              pageNumber={citationPreviewData.pageNumber}
-              iframeParams={`#page=${citationPreviewData.pageNumber}`}
-            />
+            {citationPreviewData.error ? (
+              <Column
+                w="full"
+                align="center"
+                justify="center"
+                style={{ height: "60vh", maxHeight: "600px" }}
+              >
+                {t("file_preview_error")}
+              </Column>
+            ) : (
+              <FilePreviewer
+                file={citationPreviewData.file}
+                usePdfJs={usePdfJsViewer}
+                pageNumber={citationPreviewData.pageNumber}
+                iframeParams={`#page=${citationPreviewData.pageNumber}`}
+              />
+            )}
           </DialogContent>
         )}
       </Dialog>

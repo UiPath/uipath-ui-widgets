@@ -2732,7 +2732,7 @@ describe("ConversationalAgentChat", () => {
       expect(screen.queryByTestId("file-previewer")).not.toBeInTheDocument();
     });
 
-    it("falls through when the source document fails to download", async () => {
+    it("consumes the click and shows an error when the source fails to download", async () => {
       mockDownloadCitationSource.mockRejectedValue(new Error("401"));
       vi.spyOn(console, "error").mockImplementation(() => {});
       render(<ConversationalAgentChat {...defaultProps} />);
@@ -2743,8 +2743,13 @@ describe("ConversationalAgentChat", () => {
         result = await handler({ citation: pdfCitation });
       });
 
-      expect(result).toBe(true);
+      // Consume the click (return false) instead of falling through to
+      // Apollo's default, which would re-open the auth-gated URL and 401.
+      expect(result).toBe(false);
       expect(screen.queryByTestId("file-previewer")).not.toBeInTheDocument();
+      expect(
+        await screen.findByText("Failed to load file preview."),
+      ).toBeInTheDocument();
     });
   });
 });

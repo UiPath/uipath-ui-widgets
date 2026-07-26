@@ -186,7 +186,8 @@ const FilePreviewer = ({
           </pre>
         );
       }
-      if (!usePdfJs && fileUrl) {
+      // usePdfJs is always false here (the branch above returns when true)
+      if (fileUrl) {
         return (
           <iframe
             key={iframeParams}
