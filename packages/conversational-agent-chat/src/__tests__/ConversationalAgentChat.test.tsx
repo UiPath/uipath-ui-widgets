@@ -25,6 +25,7 @@ const createMockChatService = () => ({
   stopResponse: vi.fn(),
   clearError: vi.fn(),
   appendOlderHistoryItems: vi.fn(),
+  prependOlderMessages: vi.fn(),
   setLocale: vi.fn(),
   setTheme: vi.fn(),
   getLocale: vi.fn().mockReturnValue("en"),
@@ -54,6 +55,7 @@ vi.mock("@uipath/apollo-react/material/components", () => ({
     OpenConversation: "openConversation",
     DeleteConversation: "deleteConversation",
     HistoryLoadMore: "historyLoadMore",
+    ConversationLoadMore: "conversationLoadMore",
     HistorySearch: "historySearch",
     Feedback: "feedback",
     StopResponse: "stopResponse",
@@ -78,12 +80,14 @@ const {
   mockGetById,
   mockCreate,
   mockUpdateById,
+  mockExchangesGetAll,
   sessionControl,
 } = vi.hoisted(() => ({
   capturedAgentConstructorArgs: [] as any[][],
   mockGetById: vi.fn(),
   mockCreate: vi.fn(),
   mockUpdateById: vi.fn(),
+  mockExchangesGetAll: vi.fn(),
   // When neverStarts is true, startSession returns a session that never fires
   // sessionStarted and keeps emits paused — exercises the start-timeout path.
   sessionControl: { neverStarts: false },
@@ -161,6 +165,14 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
     },
   ];
 
+  // Default: one page of exchanges with an older page still available, so
+  // infinite-scroll tests can exercise the ConversationLoadMore path.
+  mockExchangesGetAll.mockResolvedValue({
+    items: mockExch,
+    nextCursor: { value: "exch-cursor-1" },
+    hasNextPage: true,
+  });
+
   return {
     ConversationalAgent: class {
       constructor(...args: any[]) {
@@ -193,7 +205,7 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
         }),
         getById: vi.fn().mockResolvedValue({
           exchanges: {
-            getAll: vi.fn().mockResolvedValue({ items: mockExch }),
+            getAll: mockExchangesGetAll,
           },
         }),
         uploadAttachment: vi.fn().mockResolvedValue({
@@ -496,6 +508,62 @@ describe("ConversationalAgentChat", () => {
             config: expect.objectContaining({
               firstRunExperience: expect.objectContaining({
                 suggestions: [{ label: "Test Prompt", prompt: "test" }],
+              }),
+            }),
+          }),
+        );
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it("should let host firstRunExperience override agent appearance", async () => {
+    const { AutopilotChatService } =
+      await import("@uipath/apollo-react/material/components");
+
+    render(
+      <ConversationalAgentChat
+        {...defaultProps}
+        firstRunExperience={{
+          title: "Host Title",
+          description: "Host Description",
+          suggestions: [{ label: "Host Prompt", prompt: "host" }],
+        }}
+      />,
+    );
+
+    await waitFor(
+      () => {
+        expect(AutopilotChatService.Instantiate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            config: expect.objectContaining({
+              firstRunExperience: {
+                title: "Host Title",
+                description: "Host Description",
+                suggestions: [{ label: "Host Prompt", prompt: "host" }],
+              },
+            }),
+          }),
+        );
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it("should fall back to agent appearance when no host firstRunExperience is provided", async () => {
+    const { AutopilotChatService } =
+      await import("@uipath/apollo-react/material/components");
+
+    render(<ConversationalAgentChat {...defaultProps} />);
+
+    await waitFor(
+      () => {
+        expect(AutopilotChatService.Instantiate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            config: expect.objectContaining({
+              firstRunExperience: expect.objectContaining({
+                title: "Welcome to Test Agent",
+                description: "This is a test agent",
               }),
             }),
           }),
@@ -843,6 +911,76 @@ describe("ConversationalAgentChat", () => {
       await onClickOpenConversation?.("non-existent-conv");
 
       expect(mockChatService.setConversation).not.toHaveBeenCalled();
+    });
+
+    it("should prepend older messages when scrolling to the top", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "conversationLoadMore",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const openConversation = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "openConversation",
+      )?.[1];
+      const onConversationLoadMore = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "conversationLoadMore",
+      )?.[1];
+
+      // Open a conversation so there is an active conversation + exchange cursor.
+      await openConversation?.("conv-1");
+
+      mockChatService.prependOlderMessages.mockClear();
+      await onConversationLoadMore?.();
+
+      // hasNextPage is true, so the older page is prepended with done=false.
+      expect(mockChatService.prependOlderMessages).toHaveBeenCalledWith(
+        expect.any(Array),
+        false,
+      );
+    });
+
+    it("should signal done to prependOlderMessages when no older pages remain", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "conversationLoadMore",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const openConversation = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "openConversation",
+      )?.[1];
+      const onConversationLoadMore = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "conversationLoadMore",
+      )?.[1];
+
+      // First (and only) page reports no further pages, so the cursor clears.
+      mockExchangesGetAll.mockResolvedValueOnce({
+        items: [],
+        nextCursor: undefined,
+        hasNextPage: false,
+      });
+      await openConversation?.("conv-1");
+
+      mockChatService.prependOlderMessages.mockClear();
+      await onConversationLoadMore?.();
+
+      expect(mockChatService.prependOlderMessages).toHaveBeenCalledWith(
+        [],
+        true,
+      );
     });
 
     it("should load conversation history on init", async () => {

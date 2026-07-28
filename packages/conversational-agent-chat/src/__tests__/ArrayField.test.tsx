@@ -46,6 +46,18 @@ describe("ArrayField", () => {
     expect(screen.getByText("Tags to attach")).toBeInTheDocument();
   });
 
+  it("shows an add-entry hint while empty and hides it once chips exist", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    expect(
+      screen.getByPlaceholderText("Type and press Enter to add"),
+    ).toBeInTheDocument();
+    await user.type(screen.getByRole("textbox"), "alpha{Enter}");
+    expect(
+      screen.queryByPlaceholderText("Type and press Enter to add"),
+    ).not.toBeInTheDocument();
+  });
+
   it("adds a chip on Enter and clears the input", async () => {
     const user = userEvent.setup();
     render(<Harness />);
