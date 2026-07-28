@@ -3,7 +3,12 @@ import type { UiPath } from "@uipath/uipath-typescript/core";
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import { useEffect, useRef, useState } from "react";
 import { fetchBucketArtifacts } from "./bucketArtifactsUtil.js";
-import type { BucketArtifacts } from "./types.js";
+import {
+  type BucketArtifacts,
+  TelemetryEvent,
+  TelemetryStatus,
+} from "./types.js";
+import { trackTelemetry } from "./utils/telemetryUtils.js";
 
 /**
  * Data source shared by every subcomponent wrapper. Two mutually-exclusive
@@ -83,12 +88,17 @@ export function useSubcomponentArtifacts({
         if (!cancelled) {
           setFetched(result);
           setError(null);
+          trackTelemetry(TelemetryEvent.Load, TelemetryStatus.Success);
         }
       })
       .catch((er) => {
         if (!cancelled) {
+          const message = er instanceof Error ? er.message : String(er);
           setFetched(null);
-          setError(er instanceof Error ? er.message : String(er));
+          setError(message);
+          trackTelemetry(TelemetryEvent.Load, TelemetryStatus.Error, {
+            error: message,
+          });
         }
       });
 

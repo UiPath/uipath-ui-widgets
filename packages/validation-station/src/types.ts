@@ -16,6 +16,17 @@ export type {
   SetFieldValueByPath,
 };
 
+export enum TelemetryEvent {
+  Load = "ValidationStation.Load",
+  Submit = "ValidationStation.Submit",
+  ExceptionRequest = "ValidationStation.ExceptionRequest",
+}
+
+export enum TelemetryStatus {
+  Success = "ValidationStation.Success",
+  Error = "ValidationStation.Error",
+}
+
 export enum ValidationStationLanguage {
   German = "de",
   English = "en",

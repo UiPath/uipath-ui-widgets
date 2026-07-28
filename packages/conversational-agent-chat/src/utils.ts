@@ -8,6 +8,7 @@ import {
   UrlCitation as AutopilotUrlCitation,
 } from "@uipath/apollo-react/ap-chat";
 import {
+  AgentGetByIdResponse,
   CitationSource,
   CompletedContentPart,
   ContentPartHelper,
@@ -15,7 +16,34 @@ import {
   isCitationSourceUrl,
   RawConversationGetResponse,
 } from "@uipath/uipath-typescript/conversational-agent";
-import { EvaluationSet, MessageWidget } from "./types";
+import { EvaluationSet, FirstRunExperience, MessageWidget } from "./types";
+
+/**
+ * Resolves the first-run experience shown before the first message, reconciling
+ * the host-provided config against the agent's own appearance.
+ *
+ * The widget is always a chat dedicated to a single agent, so the host config
+ * takes precedence — callers can override the welcome copy and starting prompts,
+ * and the agent's appearance is the fallback. Precedence is whole-object:
+ * whichever source is used supplies every field.
+ */
+export const getFirstRunExperience = (
+  config: FirstRunExperience | undefined,
+  appearance: AgentGetByIdResponse["appearance"],
+): FirstRunExperience | undefined => {
+  const mappedAppearance: FirstRunExperience | undefined = appearance
+    ? {
+        title: appearance.welcomeTitle ?? "",
+        description: appearance.welcomeDescription ?? "",
+        suggestions: appearance.startingPrompts?.map((prompt) => ({
+          label: prompt.displayPrompt,
+          prompt: prompt.actualPrompt,
+        })),
+      }
+    : undefined;
+
+  return config ?? mappedAppearance;
+};
 
 export const createFileKey = (attachment: AutopilotChatFileInfo) => {
   const name = attachment.name;
@@ -239,7 +267,9 @@ export const mapExchangesToChatMessages = (
         meta: {
           toolName: toolCall.name,
           input: toolCall.input,
-          startTime: toolCall.createdTime,
+          // `timestamp` (when the call was initiated) is the true start time;
+          // fall back to `createdTime` for legacy conversations that only set that.
+          startTime: toolCall.timestamp ?? toolCall.createdTime,
           output: toolCall.result?.output,
           endTime: toolCall.result?.timestamp,
           isError: toolCall.result?.isError,

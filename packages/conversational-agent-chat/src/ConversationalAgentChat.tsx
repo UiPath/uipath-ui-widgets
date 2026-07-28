@@ -21,6 +21,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  PortalContainerProvider,
 } from "@uipath/apollo-wind";
 import {
   ContentPartChunkEvent,
@@ -77,6 +78,7 @@ import {
   convertAttachmentToFile,
   createFileKey,
   getConversationHistoryDisplayItems,
+  getFirstRunExperience,
   mapCitationSource,
   mapExchangesToChatMessages,
   normalizeInput,
@@ -90,6 +92,9 @@ import FilePreviewer from "./components/FilePreviewer";
 initI18n();
 
 const TOOL_CONFIRMATION_WIDGET_ID_PREFIX = "confirmation-";
+// Exchanges per page when lazily loading a conversation's history. Pages are
+// fetched newest-first and prepended as the user scrolls toward the top.
+const EXCHANGES_PAGE_SIZE = 15;
 
 // Watchdog for a session that never starts: buffered sends only flush on
 // `sessionStarted`, so if it never arrives, surface an error instead of
@@ -211,6 +216,9 @@ export const ConversationalAgentChat = ({
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
   const conversationsCursor = useRef<{ value: string } | undefined>(undefined);
+  // Cursor for the active conversation's exchange history. Reset whenever a
+  // conversation is opened/started; undefined means no older pages remain.
+  const exchangesCursor = useRef<{ value: string } | undefined>(undefined);
   const agentIdRef = useRef<number | undefined>(undefined);
   const agentKeyRef = useRef<string | undefined>(undefined);
   const searchTextRef = useRef<string>("");
@@ -645,6 +653,9 @@ export const ConversationalAgentChat = ({
   const onNewChat = useCallback(() => {
     endActiveSession();
     currentConversation.current = null;
+    session.current = null;
+    activeExchange.current = null;
+    exchangesCursor.current = undefined;
     storedAgentInputs.current = {};
     setHasMessages(false);
     // Re-show the InputsPage with a cleared form when the agent's schema has
@@ -855,16 +866,29 @@ export const ConversationalAgentChat = ({
     [chatService, processAttachmentsInBatch, t],
   );
 
+  // Fetch one page of a conversation's exchanges, newest-first, advancing
+  // `exchangesCursor` so the next call returns the chunk immediately older.
+  // The returned page is sorted chronologically (ascending) so messages render
+  // top-to-bottom; callers prepend each older page above the existing ones.
   const fetchExchanges = useCallback(
-    async (conversationId: string): Promise<ExchangeGetResponse[]> => {
+    async (
+      conversationId: string,
+      cursor?: { value: string },
+    ): Promise<{ exchanges: ExchangeGetResponse[]; hasNextPage: boolean }> => {
       const conversation =
         await agentService.current.conversations.getById(conversationId);
-      const allExchanges = (await conversation.exchanges.getAll()).items;
-      allExchanges.sort(
+      const result = await conversation.exchanges.getAll({
+        pageSize: EXCHANGES_PAGE_SIZE,
+        exchangeSort: SortOrder.Descending,
+        messageSort: SortOrder.Ascending,
+        ...(cursor ? { cursor } : {}),
+      });
+      exchangesCursor.current = result.nextCursor;
+      const exchanges = [...result.items].sort(
         (a: ExchangeGetResponse, b: ExchangeGetResponse) =>
           new Date(a.createdTime).getTime() - new Date(b.createdTime).getTime(),
       );
-      return allExchanges;
+      return { exchanges, hasNextPage: result.hasNextPage };
     },
     [],
   );
@@ -883,9 +907,11 @@ export const ConversationalAgentChat = ({
 
         endActiveSession();
         currentConversation.current = selectedConversation;
+        session.current = null;
+        exchangesCursor.current = undefined;
 
-        const allExchanges = await fetchExchanges(selectedConversation.id);
-        const messages = mapExchangesToChatMessages(allExchanges);
+        const { exchanges } = await fetchExchanges(selectedConversation.id);
+        const messages = mapExchangesToChatMessages(exchanges);
         chatService.setConversation(messages);
         setHasMessages(messages.length > 0);
         trackTelemetry(
@@ -906,6 +932,35 @@ export const ConversationalAgentChat = ({
     },
     [chatService, endActiveSession, fetchExchanges, t],
   );
+
+  // Apollo fires this when the user scrolls to the top of the message list.
+  // Prepend the next older page; signal `done` (no more pages) so Apollo stops
+  // requesting once the cursor is exhausted.
+  const onConversationLoadMore = useCallback(async () => {
+    if (!chatService) return;
+    const conversationId = currentConversation.current?.id;
+    if (!conversationId || !exchangesCursor.current) {
+      chatService.prependOlderMessages([], true);
+      return;
+    }
+    try {
+      const { exchanges, hasNextPage } = await fetchExchanges(
+        conversationId,
+        exchangesCursor.current,
+      );
+      chatService.prependOlderMessages(
+        mapExchangesToChatMessages(exchanges),
+        !hasNextPage,
+      );
+    } catch (err) {
+      chatService.prependOlderMessages([], true);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      trackTelemetry(TelemetryEvent.OpenConversation, TelemetryStatus.Error, {
+        conversationId,
+        error: errorMessage,
+      });
+    }
+  }, [chatService, fetchExchanges]);
 
   const initChat = useCallback(async () => {
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
@@ -942,33 +997,13 @@ export const ConversationalAgentChat = ({
         setShowInputPage(true);
       }
 
-      // If the agent provides any first-run appearance data, show only what
-      // the agent provides. The `firstRunExperience` prop is a fallback used
-      // when the agent has no welcome title, description, or starting
-      // prompts at all — it must not be mixed with partial agent data.
-      const appearance = agentRelease?.appearance;
-      const agentSuggestions = (appearance?.startingPrompts ?? []).map(
-        (prompt) => ({
-          label: prompt.displayPrompt,
-          prompt: prompt.actualPrompt,
-        }),
+      // Resolve the first-run experience: the host-provided config wins so
+      // callers can override the welcome copy and starting prompts, falling
+      // back to the agent's own appearance.
+      const firstRunExperienceConfig = getFirstRunExperience(
+        firstRunExperienceRef.current,
+        agentRelease?.appearance,
       );
-      const agentHasFre =
-        !!appearance?.welcomeTitle ||
-        !!appearance?.welcomeDescription ||
-        agentSuggestions.length > 0;
-      const hostFallback = firstRunExperienceRef.current;
-      const firstRunExperienceConfig = agentHasFre
-        ? {
-            title: appearance?.welcomeTitle ?? "",
-            description: appearance?.welcomeDescription ?? "",
-            suggestions: agentSuggestions,
-          }
-        : {
-            title: hostFallback?.title ?? "",
-            description: hostFallback?.description ?? "",
-            suggestions: hostFallback?.suggestions ?? [],
-          };
 
       // Persists agent inputs against the active conversation via
       // updateConversation. Server-side this applies to all subsequent
@@ -1005,15 +1040,17 @@ export const ConversationalAgentChat = ({
         const conversationId = currentConversation.current?.id ?? "no-conv";
         const inputsResetKey = `${profileResetKey}-${conversationId}`;
         root.render(
-          <SettingsDialog
-            profileResetKey={profileResetKey}
-            conversationalAgent={agentService.current}
-            onClose={() => chatServiceRef.current?.toggleSettings(false)}
-            inputSchema={inputSchemaStateRef.current}
-            initialInputs={storedAgentInputs.current}
-            onApplyInputs={handleApplySettingsInputs}
-            inputsResetKey={inputsResetKey}
-          />,
+          <PortalContainerProvider>
+            <SettingsDialog
+              profileResetKey={profileResetKey}
+              conversationalAgent={agentService.current}
+              onClose={() => chatServiceRef.current?.toggleSettings(false)}
+              inputSchema={inputSchemaStateRef.current}
+              initialInputs={storedAgentInputs.current}
+              onApplyInputs={handleApplySettingsInputs}
+              inputsResetKey={inputsResetKey}
+            />
+          </PortalContainerProvider>,
         );
       };
 
@@ -1024,7 +1061,11 @@ export const ConversationalAgentChat = ({
           locale: toApolloSupportedLocale(locale),
           theme: themeRef.current,
           readOnly,
-          firstRunExperience: firstRunExperienceConfig,
+          firstRunExperience: firstRunExperienceConfig && {
+            title: firstRunExperienceConfig.title ?? "",
+            description: firstRunExperienceConfig.description ?? "",
+            suggestions: firstRunExperienceConfig.suggestions ?? [],
+          },
           overrideLabels: {
             title: overrideLabelsRef.current?.title ?? agentName,
             footerDisclaimer:
@@ -1035,6 +1076,7 @@ export const ConversationalAgentChat = ({
               t("chat_input_placeholder"),
           },
           paginatedHistory: true,
+          paginatedMessages: true,
           settingsRenderer: renderSettings,
           preHooks: {
             [AutopilotChatPreHookAction.CitationClick]: async (
@@ -1118,9 +1160,10 @@ export const ConversationalAgentChat = ({
 
       if (existingConversationId) {
         const conversation = await getConversation();
-        const allExchanges = await fetchExchanges(conversation.id);
+        exchangesCursor.current = undefined;
+        const { exchanges } = await fetchExchanges(conversation.id);
         chatServiceInstance.setConversation(
-          mapExchangesToChatMessages(allExchanges),
+          mapExchangesToChatMessages(exchanges),
         );
       } else {
         // AutopilotChatService is a singleton, so it may still hold the
@@ -1288,6 +1331,10 @@ export const ConversationalAgentChat = ({
             onClickDeleteConversation,
           ),
           chatService.on(AutopilotChatEvent.HistoryLoadMore, onHistoryLoadMore),
+          chatService.on(
+            AutopilotChatEvent.ConversationLoadMore,
+            onConversationLoadMore,
+          ),
           chatService.on(AutopilotChatEvent.HistorySearch, onHistorySearch),
           chatService.on(AutopilotChatEvent.Feedback, onFeedback),
           chatService.on(AutopilotChatEvent.StopResponse, onStopResponse),
@@ -1321,6 +1368,7 @@ export const ConversationalAgentChat = ({
     folderId,
     onClickDeleteConversation,
     onClickOpenConversation,
+    onConversationLoadMore,
     onFeedback,
     onHistoryLoadMore,
     onHistorySearch,
@@ -1376,102 +1424,103 @@ export const ConversationalAgentChat = ({
 
   return (
     <div className="uipath-conversational-agent-chat">
-      {!error && showInputPage && inputSchemaState && (
-        <InputsPage
-          key={`${agentId}-${inputsInstance}`}
-          agentName={agentNameState}
-          inputSchema={inputSchemaState}
-          onSubmit={async (data) => {
-            const inputs = data as Record<string, unknown>;
-            if (isDebugMode && existingConversationId) {
-              await agentService.current.conversations.updateById(
-                existingConversationId,
-                { agentInput: { inline: inputs as JSONObject } },
-              );
-            } else {
-              const agent = await resolveAgent();
-              if (!agent) {
-                throw new Error(t("error_missing_conversation_params"));
+      <PortalContainerProvider>
+        {!error && showInputPage && inputSchemaState && (
+          <InputsPage
+            key={`${agentId}-${inputsInstance}`}
+            agentName={agentNameState}
+            inputSchema={inputSchemaState}
+            onSubmit={async (data) => {
+              const inputs = data as Record<string, unknown>;
+              if (isDebugMode && existingConversationId) {
+                await agentService.current.conversations.updateById(
+                  existingConversationId,
+                  { agentInput: { inline: inputs as JSONObject } },
+                );
+              } else {
+                const agent = await resolveAgent();
+                if (!agent) {
+                  throw new Error(t("error_missing_conversation_params"));
+                }
+                const conversation = await agent.conversations.create({
+                  ...(jobStartOverrides ? { jobStartOverrides } : {}),
+                  agentInput: { inline: inputs as JSONObject },
+                } as ConversationCreateOptionsArg);
+                currentConversation.current = conversation;
               }
-              const conversation = await agent.conversations.create({
-                ...(jobStartOverrides ? { jobStartOverrides } : {}),
-                agentInput: { inline: inputs as JSONObject },
-              } as ConversationCreateOptionsArg);
-              currentConversation.current = conversation;
-            }
-            storedAgentInputs.current = inputs;
-            setShowInputPage(false);
-          }}
-        />
-      )}
-
-      {error && (
-        <div className="info-container">
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-          <Button variant={"outline"} onClick={handleReload}>
-            {t("reload")}
-          </Button>
-        </div>
-      )}
-
-      {!error && !chatService && (
-        <div className="info-container">
-          <div>{t("loading")}</div>
-          <Loader />
-        </div>
-      )}
-
-      {!error && chatService && !showInputPage && (
-        <ApChat
-          key={locale}
-          chatServiceInstance={chatService}
-          locale={toApolloSupportedLocale(locale)}
-          theme={theme}
-          enableInternalThemeProvider
-        />
-      )}
-
-      <FeedbackDialog
-        open={feedbackDialogOpen}
-        isPositive={feedbackIsPositive}
-        onOpenChange={setFeedbackDialogOpen}
-        onSubmit={onFeedbackSubmit}
-        onCancel={onFeedbackCancel}
-      />
-
-      <Dialog
-        open={!!citationPreviewData}
-        onOpenChange={(open) => {
-          if (!open) setCitationPreviewData(null);
-        }}
-      >
-        {citationPreviewData && (
-          <DialogContent className="sm:max-w-4xl">
-            <DialogHeader>
-              <DialogTitle>{citationPreviewData.title}</DialogTitle>
-            </DialogHeader>
-            {citationPreviewData.error ? (
-              <Column
-                w="full"
-                align="center"
-                justify="center"
-                style={{ height: "60vh", maxHeight: "600px" }}
-              >
-                {t("file_preview_error")}
-              </Column>
-            ) : (
-              <FilePreviewer
-                file={citationPreviewData.file}
-                usePdfJs={usePdfJsViewer}
-                pageNumber={citationPreviewData.pageNumber}
-                iframeParams={`#page=${citationPreviewData.pageNumber}`}
-              />
-            )}
-          </DialogContent>
+              storedAgentInputs.current = inputs;
+              setShowInputPage(false);
+            }}
+          />
         )}
-      </Dialog>
+
+        {error && (
+          <div className="info-container">
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+            <Button variant={"outline"} onClick={handleReload}>
+              {t("reload")}
+            </Button>
+          </div>
+        )}
+
+        {!error && !chatService && (
+          <div className="info-container">
+            <div>{t("loading")}</div>
+            <Loader />
+          </div>
+        )}
+
+        {!error && chatService && !showInputPage && (
+          <ApChat
+            key={locale}
+            chatServiceInstance={chatService}
+            locale={toApolloSupportedLocale(locale)}
+            theme={theme}
+            enableInternalThemeProvider
+          />
+        )}
+
+        <FeedbackDialog
+          open={feedbackDialogOpen}
+          isPositive={feedbackIsPositive}
+          onOpenChange={setFeedbackDialogOpen}
+          onSubmit={onFeedbackSubmit}
+          onCancel={onFeedbackCancel}
+        />
+        <Dialog
+          open={!!citationPreviewData}
+          onOpenChange={(open) => {
+            if (!open) setCitationPreviewData(null);
+          }}
+        >
+          {citationPreviewData && (
+            <DialogContent className="sm:max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>{citationPreviewData.title}</DialogTitle>
+              </DialogHeader>
+              {citationPreviewData.error ? (
+                <Column
+                  w="full"
+                  align="center"
+                  justify="center"
+                  style={{ height: "60vh", maxHeight: "600px" }}
+                >
+                  {t("file_preview_error")}
+                </Column>
+              ) : (
+                <FilePreviewer
+                  file={citationPreviewData.file}
+                  usePdfJs={usePdfJsViewer}
+                  pageNumber={citationPreviewData.pageNumber}
+                  iframeParams={`#page=${citationPreviewData.pageNumber}`}
+                />
+              )}
+            </DialogContent>
+          )}
+        </Dialog>
+      </PortalContainerProvider>
     </div>
   );
 };
