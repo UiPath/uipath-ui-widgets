@@ -146,6 +146,107 @@ function ValidationStationPreview() {
   );
 }
 
+function InvoiceReviewWorkspacePreview() {
+  return (
+    <svg viewBox="0 0 320 160" preserveAspectRatio="xMidYMid meet">
+      <rect width="320" height="160" fill="#f5f7fa" />
+      {/* Document viewer — left column, spans both rows */}
+      <rect
+        x="12"
+        y="12"
+        width="150"
+        height="94"
+        rx="6"
+        fill={FILL_SOFT}
+        stroke={STROKE}
+      />
+      <rect x="24" y="24" width="90" height="6" rx="2" fill={FILL_TEXT} />
+      <rect x="24" y="36" width="120" height="6" rx="2" fill={FILL_ACCENT} />
+      <rect x="24" y="48" width="110" height="6" rx="2" fill={FILL_TEXT} />
+      <rect x="24" y="60" width="100" height="6" rx="2" fill={FILL_TEXT} />
+      {/* Line-items table editor — left column, bottom */}
+      <rect
+        x="12"
+        y="112"
+        width="150"
+        height="36"
+        rx="6"
+        fill="white"
+        stroke={STROKE}
+      />
+      <rect x="12" y="112" width="150" height="12" rx="6" fill={FILL_BAR} />
+      {[0, 1].map((i) => (
+        <rect
+          key={i}
+          x="20"
+          y={130 + i * 9}
+          width="134"
+          height="5"
+          rx="2"
+          fill={FILL_TEXT}
+        />
+      ))}
+      {/* Doc-type field — right column, top strip */}
+      <rect
+        x="170"
+        y="12"
+        width="138"
+        height="18"
+        rx="6"
+        fill="white"
+        stroke={STROKE}
+      />
+      <rect x="178" y="18" width="70" height="6" rx="2" fill={FILL_BAR} />
+      <path d="M 292 19 L 300 19 L 296 24 Z" fill={FILL_BAR} />
+      {/* Fields form — right column, middle */}
+      <rect
+        x="170"
+        y="36"
+        width="138"
+        height="70"
+        rx="6"
+        fill="white"
+        stroke={STROKE}
+      />
+      {[0, 1, 2].map((i) => (
+        <g key={i}>
+          <rect
+            x="178"
+            y={44 + i * 20}
+            width="40"
+            height="6"
+            rx="2"
+            fill={FILL_TEXT}
+          />
+          <rect
+            x="178"
+            y={52 + i * 20}
+            width="122"
+            height="12"
+            rx="3"
+            fill="white"
+            stroke={i === 1 ? FILL_ACCENT : STROKE}
+          />
+        </g>
+      ))}
+      {/* Business rules — right column, bottom */}
+      <rect
+        x="170"
+        y="112"
+        width="138"
+        height="36"
+        rx="6"
+        fill="#fff3e0"
+        stroke={FILL_ACCENT}
+      />
+      <circle cx="180" cy="124" r="4" fill={FILL_ACCENT} />
+      <rect x="190" y="121" width="100" height="6" rx="2" fill={FILL_TEXT} />
+      <circle cx="180" cy="138" r="4" fill={FILL_ACCENT} />
+      <rect x="190" y="135" width="80" height="6" rx="2" fill={FILL_TEXT} />
+    </svg>
+  );
+}
+
 function MultiFileUploadPreview() {
   return (
     <svg viewBox="0 0 320 160" preserveAspectRatio="xMidYMid meet">
@@ -263,6 +364,8 @@ function LayoutPreview({ widgetId }: LayoutPreviewProps) {
       return <DataTablePreview />;
     case "validation-station":
       return <ValidationStationPreview />;
+    case "invoice-review-workspace":
+      return <InvoiceReviewWorkspacePreview />;
     case "multi-file-upload":
       return <MultiFileUploadPreview />;
     case "conversational-agent-chat":

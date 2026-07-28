@@ -2,12 +2,12 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "ESNext",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": ["ES2020", "ESNext.Promise", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "declaration": true,
     "declarationMap": true,
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
     "strict": true,
     "moduleResolution": "bundler",
     "esModuleInterop": true,
@@ -15,19 +15,12 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": false,
+    "noEmit": true,
     "sourceMap": true,
     "paths": {
       "@uipath/validation-station/*": ["./src/*"]
     }
   },
-  "include": ["src"],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "**/__tests__/**",
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "test"
-  ]
+  "include": ["src", "test"],
+  "exclude": ["node_modules", "dist"]
 }

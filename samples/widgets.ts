@@ -18,6 +18,12 @@ export const widgets: Widget[] = [
       "Review document understanding tasks side-by-side with the source document and apply field-level corrections.",
   },
   {
+    id: "invoice-review-workspace",
+    title: "Invoice Review Workspace",
+    description:
+      "A custom human-in-the-loop review screen composed from the Validation Station compact subcomponents — document viewer, doc-type field, fields form, business rules, and line-items table editor — all linked by a shared instance-id so they mirror one store.",
+  },
+  {
     id: "multi-file-upload",
     title: "Multi File Upload",
     description:

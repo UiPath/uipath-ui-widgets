@@ -9,8 +9,10 @@ const mockUploadFile = vi.fn();
 const MockBucketService = vi.fn(() => ({ uploadFile: mockUploadFile }));
 
 vi.mock("@uipath/uipath-typescript/buckets", () => ({
-  BucketService: function (...args: any[]) {
-    return MockBucketService(...args);
+  // The SUT constructs `new BucketService(sdk)`; the constructor args are not
+  // asserted, so the mock ignores them and just yields the uploadFile spy.
+  BucketService: function () {
+    return MockBucketService();
   },
 }));
 
