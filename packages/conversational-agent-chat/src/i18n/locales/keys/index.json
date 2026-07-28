@@ -1,4 +1,10 @@
 {
+  "download_file_button_text": "download_file_button_text",
+  "copy_link_button_text": "copy_link_button_text",
+  "preview_not_supported_message": "preview_not_supported_message",
+  "file_content_title": "file_content_title",
+  "file_preview_error": "file_preview_error",
+  "file_preview_alt_text": "file_preview_alt_text",
   "chat_input_placeholder": "chat_input_placeholder",
   "disclaimer_message": "disclaimer_message",
   "performing_action_message": "performing_action_message",

@@ -14,6 +14,19 @@ import { UiPath } from "@uipath/uipath-typescript/core";
 // Mock @uipath/apollo-react
 vi.mock("@uipath/apollo-react/core/fonts/font.css", () => ({}));
 
+// Stub FilePreviewer so citation-preview tests stay off the pdfjs stack.
+vi.mock("../components/FilePreviewer", () => ({
+  default: (props: any) => (
+    <div
+      data-testid="file-previewer"
+      data-usepdfjs={String(props.usePdfJs)}
+      data-page={String(props.pageNumber)}
+      data-iframeparams={props.iframeParams}
+      data-filename={props.file?.name}
+    />
+  ),
+}));
+
 const createMockChatService = () => ({
   on: vi.fn(() => vi.fn()),
   open: vi.fn(),
@@ -61,6 +74,16 @@ vi.mock("@uipath/apollo-react/material/components", () => ({
     StopResponse: "stopResponse",
     CustomHeaderActionClicked: "customHeaderActionClicked",
   },
+  AutopilotChatPreHookAction: {
+    NewChat: "new-chat",
+    ToggleHistory: "toggle-history",
+    ToggleSettings: "toggle-settings",
+    ToggleChat: "toggle-chat",
+    CloseChat: "close-chat",
+    CitationClick: "citation-click",
+    Feedback: "feedback",
+    DeleteConversation: "delete-conversation",
+  },
   AutopilotChatService: {
     Instantiate: vi.fn(() => mockChatService),
   },
@@ -80,6 +103,7 @@ const {
   mockGetById,
   mockCreate,
   mockUpdateById,
+  mockDownloadCitationSource,
   mockExchangesGetAll,
   sessionControl,
 } = vi.hoisted(() => ({
@@ -87,6 +111,7 @@ const {
   mockGetById: vi.fn(),
   mockCreate: vi.fn(),
   mockUpdateById: vi.fn(),
+  mockDownloadCitationSource: vi.fn(),
   mockExchangesGetAll: vi.fn(),
   // When neverStarts is true, startSession returns a session that never fires
   // sessionStarted and keeps emits paused — exercises the start-timeout path.
@@ -179,6 +204,7 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
         capturedAgentConstructorArgs.push(args);
       }
       getById = mockGetById;
+      downloadCitationSource = mockDownloadCitationSource;
 
       getAll = vi.fn().mockResolvedValue([
         {
@@ -2734,6 +2760,134 @@ describe("ConversationalAgentChat", () => {
 
       const [, options] = capturedAgentConstructorArgs[0];
       expect(options?.externalUserId).toBeUndefined();
+    });
+  });
+
+  describe("citation preview", () => {
+    const pdfCitation = {
+      number: 1,
+      title: "Doc.pdf",
+      download_url: "https://example.com/doc",
+      page_number: 2,
+    };
+
+    const getCitationClickHandler = async () => {
+      const { AutopilotChatService } =
+        await import("@uipath/apollo-react/material/components");
+      let handler: any;
+      await waitFor(() => {
+        const call = (AutopilotChatService.Instantiate as any).mock.calls.at(
+          -1,
+        );
+        handler = call?.[0]?.config?.preHooks?.["citation-click"];
+        expect(handler).toBeTypeOf("function");
+      });
+      return handler;
+    };
+
+    it("opens a preview dialog for a context-grounding citation by default", async () => {
+      mockDownloadCitationSource.mockResolvedValue(
+        new Blob(["pdf"], { type: "application/pdf" }),
+      );
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      const handler = await getCitationClickHandler();
+      let result: boolean | undefined;
+      await act(async () => {
+        result = await handler({ citation: pdfCitation });
+      });
+
+      // Consumed the click so Apollo does not also handle it.
+      expect(result).toBe(false);
+      // Citation is mapped to the SDK's CitationSourceMedia shape (camelCase).
+      expect(mockDownloadCitationSource).toHaveBeenCalledWith({
+        title: "Doc.pdf",
+        number: 1,
+        downloadUrl: "https://example.com/doc",
+        pageNumber: "2",
+      });
+
+      const previewer = await screen.findByTestId("file-previewer");
+      expect(previewer).toBeInTheDocument();
+      // Defaults to the pdfjs viewer and forwards the cited page.
+      expect(previewer).toHaveAttribute("data-usepdfjs", "true");
+      expect(previewer).toHaveAttribute("data-page", "2");
+      expect(screen.getByText("Doc.pdf")).toBeInTheDocument();
+    });
+
+    it("renders the preview with usePdfJs=false when usePdfJsViewer is false", async () => {
+      mockDownloadCitationSource.mockResolvedValue(
+        new Blob(["pdf"], { type: "application/pdf" }),
+      );
+      render(
+        <ConversationalAgentChat {...defaultProps} usePdfJsViewer={false} />,
+      );
+
+      const handler = await getCitationClickHandler();
+      await act(async () => {
+        await handler({ citation: pdfCitation });
+      });
+
+      const previewer = await screen.findByTestId("file-previewer");
+      expect(previewer).toHaveAttribute("data-usepdfjs", "false");
+      // Native viewer navigates to the cited page via the #page anchor.
+      expect(previewer).toHaveAttribute("data-iframeparams", "#page=2");
+    });
+
+    it("falls through without opening a preview when citationPreview is false", async () => {
+      render(
+        <ConversationalAgentChat {...defaultProps} citationPreview={false} />,
+      );
+
+      const handler = await getCitationClickHandler();
+      let result: boolean | undefined;
+      await act(async () => {
+        result = await handler({ citation: pdfCitation });
+      });
+
+      expect(result).toBe(true);
+      expect(mockDownloadCitationSource).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("file-previewer")).not.toBeInTheDocument();
+    });
+
+    it("falls through for citations without a download_url", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      const handler = await getCitationClickHandler();
+      let result: boolean | undefined;
+      await act(async () => {
+        result = await handler({
+          citation: {
+            number: 1,
+            title: "External",
+            url: "https://example.com",
+          },
+        });
+      });
+
+      expect(result).toBe(true);
+      expect(mockDownloadCitationSource).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("file-previewer")).not.toBeInTheDocument();
+    });
+
+    it("consumes the click and shows an error when the source fails to download", async () => {
+      mockDownloadCitationSource.mockRejectedValue(new Error("401"));
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      const handler = await getCitationClickHandler();
+      let result: boolean | undefined;
+      await act(async () => {
+        result = await handler({ citation: pdfCitation });
+      });
+
+      // Consume the click (return false) instead of falling through to
+      // Apollo's default, which would re-open the auth-gated URL and 401.
+      expect(result).toBe(false);
+      expect(screen.queryByTestId("file-previewer")).not.toBeInTheDocument();
+      expect(
+        await screen.findByText("Failed to load file preview."),
+      ).toBeInTheDocument();
     });
   });
 });
