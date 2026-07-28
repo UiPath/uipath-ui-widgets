@@ -11,6 +11,8 @@ import {
   saveValidatedDataAsDraft,
   submitValidatedData,
 } from "../saveValidatedDataUtil.js";
+import { TelemetryEvent, TelemetryStatus } from "../types.js";
+import { trackTelemetry } from "../utils/telemetryUtils.js";
 import { renderWcElement, resolveArtifacts } from "./shared.js";
 import type { CompactFieldsFormProps } from "./types.js";
 import { useWcElement } from "./useWcElement.js";
@@ -94,7 +96,13 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
     onSaveValidatedDataRequest?.(request);
     if (canPersist) {
       submitValidatedData(sdk!, data!, resolvedFolderId!, request).then(
-        onSubmitComplete,
+        (result) => {
+          trackTelemetry(
+            TelemetryEvent.Submit,
+            result.success ? TelemetryStatus.Success : TelemetryStatus.Error,
+          );
+          onSubmitComplete?.(result);
+        },
       );
     }
   };
@@ -112,6 +120,7 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
     onSaveExceptionReportRequest?.(request);
     const reason =
       (request.exceptionReport as { Reason?: string } | null)?.Reason ?? "";
+    trackTelemetry(TelemetryEvent.ExceptionRequest, TelemetryStatus.Success);
     onReportExceptionComplete?.(request.documentId, reason);
   };
 
