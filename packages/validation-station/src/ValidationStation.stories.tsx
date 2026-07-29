@@ -142,17 +142,22 @@ npm install @uipath/ui-widgets-validation-station
 
 > **Note:** Add either \`light\` or \`dark\` class to your HTML \`<body>\` element to enable proper theming.
 
-The component loads the underlying Validation Station web component on mount —
-consumers do not need to call \`loadValidationStationWebComponent\` themselves.
-By default it expects the web component assets to be served at
-\`node_modules/@uipath/du-validation-station-wc\` (which works with Vite's
-dev server). For production, copy the contents of
-\`node_modules/@uipath/du-validation-station-wc\` into your public assets and
-point \`wcAssetsUrl\` at that location.
+The underlying Validation Station web component is loaded at runtime from a URL
+you host — serve the contents of \`node_modules/@uipath/du-validation-station-wc\`
+as static files, then call \`configureValidationStationWc\` once at app startup.
+There is no bundler configuration to write.
 
 \`\`\`tsx
-import { ValidationStation } from '@uipath/ui-widgets-validation-station';
+import {
+  configureValidationStationWc,
+  ValidationStation,
+} from '@uipath/ui-widgets-validation-station';
 import { UiPath } from '@uipath/uipath-typescript/core';
+
+configureValidationStationWc({
+  deploymentUrl: '/du-vs-wc',
+  includeFonts: true,
+});
 
 const sdk = new UiPath({
   baseUrl: 'https://cloud.uipath.com',
@@ -172,7 +177,6 @@ function App() {
       theme="light"
       language="en"
       save={{ validate: true }}
-      // wcAssetsUrl="/assets/du-validation-station-wc"
     />
   );
 }
@@ -182,8 +186,9 @@ function App() {
 
 - React 19.2.0+
 - React DOM 19.2.0+
-- @uipath/du-validation-station-wc
-- @uipath/uipath-typescript`,
+- @uipath/uipath-typescript
+- The web component's files (from \`@uipath/du-validation-station-wc\`) served at
+  the \`deploymentUrl\` you configure`,
       },
     },
   },

@@ -14,6 +14,8 @@
     "packages/external-auth"
   ],
   "scripts": {
+    "stage-du-wc": "node scripts/copy-du-wc-assets.mjs",
+    "predev": "npm run stage-du-wc",
     "dev": "vite",
     "build": "node scripts/build-workspaces.mjs",
     "lint": "eslint . && npm run check-i18n",
@@ -23,7 +25,9 @@
     "test:watch": "npm run test:watch --workspaces --if-present",
     "test:ui": "npm run test:ui --workspaces --if-present",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "prestorybook": "npm run stage-du-wc",
     "storybook": "npx storybook dev -p 6006 --config-dir .storybook",
+    "prebuild-storybook": "npm run stage-du-wc",
     "build-storybook": "npx storybook build --config-dir .storybook",
     "prepare": "husky",
     "changeset": "changeset",

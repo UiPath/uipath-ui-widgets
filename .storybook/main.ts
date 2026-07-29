@@ -22,6 +22,9 @@ const config: StorybookConfig = {
   ],
   addons: [getAbsolutePath("@storybook/addon-docs")],
   framework: getAbsolutePath("@storybook/react-vite"),
+  // Serves `public/du-vs-wc` (the staged Validation Station web component) at
+  // the same `/du-vs-wc` path the samples app uses.
+  staticDirs: ["../public"],
   viteFinal(config) {
     config.css = {
       ...config.css,

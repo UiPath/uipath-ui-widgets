@@ -5,8 +5,8 @@ import type {
   IVsSaveValidatedDataRequest,
 } from "@uipath/du-validation-station-wc";
 import { toast, Toaster } from "@uipath/apollo-wind";
-import { useEffect, useState } from "react";
-import { validationStationWcReady } from "./loadValidationStationWc.js";
+import { VALIDATION_STATION_TAG } from "./loadValidationStationWc.js";
+import { useWcReady } from "./useWcReady.js";
 import {
   submitValidatedData,
   saveValidatedDataAsDraft,
@@ -38,17 +38,7 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
   onReportExceptionComplete,
 }) => {
   const { artifacts, error } = useBucketArtifacts(sdk, data, folderId);
-  const [wcReady, setWcReady] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    validationStationWcReady.then(() => {
-      if (!cancelled) setWcReady(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const wcReady = useWcReady(VALIDATION_STATION_TAG);
 
   if (error) {
     return <div>Failed to load document artifacts: {error}</div>;

@@ -17,6 +17,9 @@ export default defineConfig([
     "storybook-static",
     "coverage",
     "**/coverage",
+    // Third-party bundle staged from node_modules by `npm run stage-du-wc`;
+    // its du-assets/ ship .ts sources that are not ours to lint.
+    "public/du-vs-wc",
   ]),
   {
     files: ["**/*.{ts,tsx}"],
