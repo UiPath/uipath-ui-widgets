@@ -73,29 +73,51 @@ function App() {
 | `selectAndFocusFieldValueByPath` | `SelectAndFocusFieldValueByPath`               | No       | —         | Select and focus a field value addressed by a path; focuses the document reference if any                                                                                                                                                                                                                                                         |
 | `deleteFieldValueByPath`         | `DeleteFieldValueByPath`                       | No       | —         | Delete a field value addressed by a path                                                                                                                                                                                                                                                                                                          |
 
-> Three additional callback props (`onSubmitComplete`, `onSaveAsDraftComplete`, `onReportExceptionComplete`) are documented in the next section.
+> Three additional callback props (`onSaveValidatedDataRequest`, `onSaveValidatedDataAsDraftRequest`, `onReportExceptionComplete`) are documented in the next section.
 
 ### Reacting to save / draft / exception flows
 
-The widget surfaces three user-initiated flows. Submit and draft are owned end-to-end by the widget; exception reporting is forwarded to the host so it can call the SDK directly.
+The widget surfaces three user-initiated flows and **makes no API call for any of them**. It hands you the payload; the host owns persistence, task completion, and all UI feedback.
 
-| Callback                    | User action             | Signature                                      | What the widget does                                                                                                                                                        | What the host does                                                                                           |
-| --------------------------- | ----------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `onSubmitComplete`          | **Submit**              | `(result: SaveValidatedDataResult) => void`    | Calls `OrchestratorDuModule.processExtractedData(...)`, then uploads the merged result to `ValidatedExtractionResultsPath`. Fires the callback with the persistence result. | (optional) react to success/failure (complete the task, retry, log, etc.).                                   |
-| `onSaveAsDraftComplete`     | **Save as draft**       | `(result: SaveValidatedDataResult) => void`    | Uploads the in-progress `validatedData` straight to `ValidatedExtractionResultsPath` (no `processExtractedData` call). Fires the callback with the persistence result.      | (optional) react to success/failure.                                                                         |
-| `onReportExceptionComplete` | **Report as exception** | `(documentId: string, reason: string) => void` | Extracts `documentId` and `reason` from the web component's exception DTO and hands them to the host. **No API call.**                                                      | Required if you want the report persisted — call `OrchestratorDuModule.submitExceptionReport(...)` yourself. |
+| Callback                            | User action             | Signature                                               | What the widget does                                                                                                   | What the host does                                                                                                                       |
+| ----------------------------------- | ----------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `onSaveValidatedDataRequest`        | **Submit**              | `(request: IVsSaveValidatedDataRequest) => void`        | Emits `{ documentId, validatedData, automaticExtractionResult, taxonomy }`. **No API call.**                           | Persist it — e.g. with the exported [`submitValidatedDataToOrchestrator`](#persistence-helpers-opt-in) helper — then complete the task.  |
+| `onSaveValidatedDataAsDraftRequest` | **Save as draft**       | `(request: IVsSaveValidatedDataAsDraftRequest) => void` | Emits `{ documentId, validatedData }`. **No API call.**                                                                | Persist it — e.g. with the exported [`saveValidatedDataAsDraftToOrchestrator`](#persistence-helpers-opt-in) helper. Leave the task open. |
+| `onReportExceptionComplete`         | **Report as exception** | `(documentId: string, reason: string) => void`          | Extracts `documentId` and `reason` from the web component's exception DTO and hands them to the host. **No API call.** | Required if you want the report persisted — call `OrchestratorDuModule.submitExceptionReport(...)` yourself.                             |
 
-Submit/draft hand you a `SaveValidatedDataResult` (`{ success, error? }`) — the host owns all UI feedback (toast, retry, etc.); the widget does not surface failures itself. The exception callback hands you `documentId` and `reason` strings ready to forward to the SDK.
+Without these callbacks the user's Submit / Save-draft / Report-exception clicks are no-ops: nothing is written and no error is shown. The widget renders no feedback of its own.
+
+### Persistence helpers (opt-in)
+
+Two helpers implement the standard Orchestrator write so you don't have to reimplement it. They are **never called by the widget** — you call them from the request callbacks. Both end by writing to the **Orchestrator storage bucket** addressed by `data.BucketId` + `data.ValidatedExtractionResultsPath`; submit additionally calls the Orchestrator DU module first.
+
+| Helper                                   | Signature                                                            | Orchestrator calls                                                                                                                                        |
+| ---------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `submitValidatedDataToOrchestrator`      | `(sdk, data, folderId, request) => Promise<SaveValidatedDataResult>` | 1. `OrchestratorDuModule.processExtractedData(...)` to merge automatic + validated results. 2. Uploads that merged result, zipped, to the storage bucket. |
+| `saveValidatedDataAsDraftToOrchestrator` | `(sdk, data, folderId, request) => Promise<SaveValidatedDataResult>` | Uploads `request.validatedData`, zipped, straight to the storage bucket — **no** `processExtractedData` call.                                             |
+
+The bucket object is a `.zip` holding a single JSON file whose name is derived from the basename of `ValidatedExtractionResultsPath` — that layout is what the downstream DU activities expect, which is the main reason to use these instead of rolling your own upload.
+
+Both resolve to `SaveValidatedDataResult` (`{ success, error? }`) and never throw — an unchecked failure is silent. Ignore them entirely if your backend expects a different write.
 
 ```tsx
 import {
+  saveValidatedDataAsDraftToOrchestrator,
+  submitValidatedDataToOrchestrator,
   ValidationStation,
-  type SaveValidatedDataResult,
+  type IVsSaveValidatedDataAsDraftRequest,
+  type IVsSaveValidatedDataRequest,
 } from "@uipath/ui-widgets-validation-station";
 import { OrchestratorDuModule } from "@uipath/uipath-typescript/orchestrator-du-module";
 
 function App({ sdk, data, task }) {
-  const handleSubmitComplete = async (result: SaveValidatedDataResult) => {
+  const handleSubmit = async (request: IVsSaveValidatedDataRequest) => {
+    const result = await submitValidatedDataToOrchestrator(
+      sdk,
+      data,
+      task.folderId,
+      request,
+    );
     if (!result.success) {
       console.warn("Submit failed:", result.error);
       return;
@@ -103,7 +125,13 @@ function App({ sdk, data, task }) {
     await task.complete({ action: "Completed", type: "DocumentValidation" });
   };
 
-  const handleDraftComplete = (result: SaveValidatedDataResult) => {
+  const handleDraft = async (request: IVsSaveValidatedDataAsDraftRequest) => {
+    const result = await saveValidatedDataAsDraftToOrchestrator(
+      sdk,
+      data,
+      task.folderId,
+      request,
+    );
     if (!result.success) console.warn("Draft save failed:", result.error);
   };
 
@@ -124,15 +152,15 @@ function App({ sdk, data, task }) {
       sdk={sdk}
       data={data}
       folderId={task.folderId}
-      onSubmitComplete={handleSubmitComplete}
-      onSaveAsDraftComplete={handleDraftComplete}
+      onSaveValidatedDataRequest={handleSubmit}
+      onSaveValidatedDataAsDraftRequest={handleDraft}
       onReportExceptionComplete={handleReportException}
     />
   );
 }
 ```
 
-> Submit and draft callbacks are optional, but failures are silent if you skip them — the widget does not surface errors on its own. The exception callback is the only place the report goes; without it the user's "Report as exception" click is a no-op.
+> All three callbacks are optional in the type, but skipping one makes that action a no-op — the widget writes nothing on its own.
 
 ## Language enum
 
@@ -162,10 +190,16 @@ ValidationStationLanguage.ChineseTraditional; // "zh-TW"
 All parameter types are re-exported from the package for convenience:
 
 ```ts
-import { ValidationStationLanguage } from "@uipath/ui-widgets-validation-station";
+import {
+  saveValidatedDataAsDraftToOrchestrator,
+  submitValidatedDataToOrchestrator,
+  ValidationStationLanguage,
+} from "@uipath/ui-widgets-validation-station";
 import type {
   ValidationStationProps,
   IValidationStationOptions,
+  IVsSaveValidatedDataRequest,
+  IVsSaveValidatedDataAsDraftRequest,
   SaveValidatedDataResult,
   SetFieldValueByPath,
   SelectAndFocusFieldValueByPath,

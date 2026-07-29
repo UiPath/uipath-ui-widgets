@@ -14,13 +14,22 @@ vi.mock("../useBucketArtifacts", () => ({
   useBucketArtifacts: (...args: any[]) => mockUseBucketArtifacts(...args),
 }));
 
-const mockSubmitValidatedData = vi.fn();
-const mockSaveValidatedDataAsDraft = vi.fn();
+// Mocked so the tests can assert the widget never persists — the helpers stay
+// in the package as opt-in host API, but the widget must not call them.
+const mockSubmitToOrchestrator = vi.fn();
+const mockSaveDraftToOrchestrator = vi.fn();
 
-vi.mock("../saveValidatedDataUtil", () => ({
-  submitValidatedData: (...args: any[]) => mockSubmitValidatedData(...args),
-  saveValidatedDataAsDraft: (...args: any[]) =>
-    mockSaveValidatedDataAsDraft(...args),
+vi.mock("../orchestratorPersistence", () => ({
+  submitValidatedDataToOrchestrator: (...args: any[]) =>
+    mockSubmitToOrchestrator(...args),
+  saveValidatedDataAsDraftToOrchestrator: (...args: any[]) =>
+    mockSaveDraftToOrchestrator(...args),
+}));
+
+const mockTrackTelemetry = vi.fn();
+
+vi.mock("../utils/telemetryUtils", () => ({
+  trackTelemetry: (...args: any[]) => mockTrackTelemetry(...args),
 }));
 
 const mockArtifacts = {
@@ -117,15 +126,12 @@ describe("ValidationStation", () => {
         if (!el) throw new Error("WC element not mounted");
         return el;
       });
-
-    it("forwards saveValidatedDataRequest to submitValidatedData and onSubmitComplete", async () => {
-      mockSubmitValidatedData.mockResolvedValue({ success: true });
-      const onSubmitComplete = vi.fn();
+    it("forwards saveValidatedDataRequest to the host and tracks the emit", async () => {
+      const onSaveValidatedDataRequest = vi.fn();
       const { container } = render(
         <ValidationStation
           {...baseProps}
-          folderId={42}
-          onSubmitComplete={onSubmitComplete}
+          onSaveValidatedDataRequest={onSaveValidatedDataRequest}
         />,
       );
       const el = await waitForWc(container);
@@ -133,27 +139,22 @@ describe("ValidationStation", () => {
       const detail = { documentId: "doc-123", validatedData: { v: 1 } };
       el.dispatchEvent(new CustomEvent("saveValidatedDataRequest", { detail }));
 
-      await waitFor(() => {
-        expect(mockSubmitValidatedData).toHaveBeenCalledWith(
-          baseProps.sdk,
-          baseProps.data,
-          42,
-          detail,
-        );
-      });
-      await waitFor(() => {
-        expect(onSubmitComplete).toHaveBeenCalledWith({ success: true });
-      });
+      expect(onSaveValidatedDataRequest).toHaveBeenCalledWith(detail);
+      // The widget persists nothing — the host owns the write.
+      expect(mockSubmitToOrchestrator).not.toHaveBeenCalled();
+      // Telemetry marks the emit, not an outcome the widget cannot know.
+      expect(mockTrackTelemetry).toHaveBeenCalledWith(
+        "ValidationStation.Submit",
+        "ValidationStation.Success",
+      );
     });
 
-    it("forwards saveValidatedDataAsDraftRequest to saveValidatedDataAsDraft and onSaveAsDraftComplete", async () => {
-      mockSaveValidatedDataAsDraft.mockResolvedValue({ success: true });
-      const onSaveAsDraftComplete = vi.fn();
+    it("forwards saveValidatedDataAsDraftRequest to the host", async () => {
+      const onSaveValidatedDataAsDraftRequest = vi.fn();
       const { container } = render(
         <ValidationStation
           {...baseProps}
-          folderId={42}
-          onSaveAsDraftComplete={onSaveAsDraftComplete}
+          onSaveValidatedDataAsDraftRequest={onSaveValidatedDataAsDraftRequest}
         />,
       );
       const el = await waitForWc(container);
@@ -163,17 +164,8 @@ describe("ValidationStation", () => {
         new CustomEvent("saveValidatedDataAsDraftRequest", { detail }),
       );
 
-      await waitFor(() => {
-        expect(mockSaveValidatedDataAsDraft).toHaveBeenCalledWith(
-          baseProps.sdk,
-          baseProps.data,
-          42,
-          detail,
-        );
-      });
-      await waitFor(() => {
-        expect(onSaveAsDraftComplete).toHaveBeenCalledWith({ success: true });
-      });
+      expect(onSaveValidatedDataAsDraftRequest).toHaveBeenCalledWith(detail);
+      expect(mockSaveDraftToOrchestrator).not.toHaveBeenCalled();
     });
 
     it("extracts documentId + reason from saveExceptionReportRequest and calls onReportExceptionComplete", async () => {
@@ -181,7 +173,6 @@ describe("ValidationStation", () => {
       const { container } = render(
         <ValidationStation
           {...baseProps}
-          folderId={42}
           onReportExceptionComplete={onReportExceptionComplete}
         />,
       );
@@ -207,7 +198,6 @@ describe("ValidationStation", () => {
       const { container } = render(
         <ValidationStation
           {...baseProps}
-          folderId={42}
           onReportExceptionComplete={onReportExceptionComplete}
         />,
       );
@@ -223,35 +213,26 @@ describe("ValidationStation", () => {
     });
 
     it("does not throw when callbacks are not provided", async () => {
-      mockSubmitValidatedData.mockResolvedValue({ success: true });
-      mockSaveValidatedDataAsDraft.mockResolvedValue({ success: true });
-
-      const { container } = render(
-        <ValidationStation {...baseProps} folderId={42} />,
-      );
+      const { container } = render(<ValidationStation {...baseProps} />);
       const el = await waitForWc(container);
 
-      // None of these should throw despite no callbacks being wired.
-      el.dispatchEvent(
-        new CustomEvent("saveValidatedDataRequest", {
-          detail: { documentId: "d", validatedData: {} },
-        }),
-      );
-      el.dispatchEvent(
-        new CustomEvent("saveValidatedDataAsDraftRequest", {
-          detail: { documentId: "d", validatedData: {} },
-        }),
-      );
-      el.dispatchEvent(
-        new CustomEvent("saveExceptionReportRequest", {
-          detail: { documentId: "d", exceptionReport: {} },
-        }),
-      );
-
-      await waitFor(() => {
-        expect(mockSubmitValidatedData).toHaveBeenCalled();
-        expect(mockSaveValidatedDataAsDraft).toHaveBeenCalled();
-      });
+      expect(() => {
+        el.dispatchEvent(
+          new CustomEvent("saveValidatedDataRequest", {
+            detail: { documentId: "d", validatedData: {} },
+          }),
+        );
+        el.dispatchEvent(
+          new CustomEvent("saveValidatedDataAsDraftRequest", {
+            detail: { documentId: "d", validatedData: {} },
+          }),
+        );
+        el.dispatchEvent(
+          new CustomEvent("saveExceptionReportRequest", {
+            detail: { documentId: "d", exceptionReport: {} },
+          }),
+        );
+      }).not.toThrow();
     });
   });
 });

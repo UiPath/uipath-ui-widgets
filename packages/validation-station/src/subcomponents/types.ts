@@ -19,7 +19,6 @@ import type {
 } from "@uipath/du-validation-station-wc";
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import type { CSSProperties } from "react";
-import type { SaveValidatedDataResult } from "../saveValidatedDataUtil.js";
 import type { SubcomponentDataSource } from "../useSubcomponentArtifacts.js";
 import type { ValidationStationLanguage } from "../types.js";
 
@@ -94,19 +93,19 @@ export interface CompactFieldsFormProps
   enableSaveAsDraft?: boolean;
   /** Result of a `save` command. */
   onSaveResult?: (result: ISaveResult) => void;
-  /**
-   * Fired after the submit flow completes. Only auto-wired when the wrapper has
-   * an `sdk` + `data` + resolved `folderId`; otherwise handle the raw
-   * `onSaveValidatedDataRequest` event yourself.
-   */
-  onSubmitComplete?: (result: SaveValidatedDataResult) => void;
-  /** Fired after the save-as-draft flow completes (self-fetching mode only). */
-  onSaveAsDraftComplete?: (result: SaveValidatedDataResult) => void;
   /** Fired when the user reports the document as an exception. */
   onReportExceptionComplete?: (documentId: string, reason: string) => void;
-  /** Raw save-request event — use when driving persistence yourself. */
+  /**
+   * Fired when the user submits. The wrapper makes **no** API call — persist the
+   * payload yourself, typically via the exported `submitValidatedDataToOrchestrator` helper
+   * (ProcessExtractedData + bucket upload).
+   */
   onSaveValidatedDataRequest?: (request: IVsSaveValidatedDataRequest) => void;
-  /** Raw save-as-draft-request event. */
+  /**
+   * Fired when the user saves as draft. No API call — persist
+   * `request.validatedData` yourself, typically via the exported
+   * `saveValidatedDataAsDraftToOrchestrator` helper.
+   */
   onSaveValidatedDataAsDraftRequest?: (
     request: IVsSaveValidatedDataAsDraftRequest,
   ) => void;

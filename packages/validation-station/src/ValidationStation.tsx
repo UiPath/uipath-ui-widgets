@@ -4,13 +4,8 @@ import type {
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveValidatedDataRequest,
 } from "@uipath/du-validation-station-wc";
-import { toast, Toaster } from "@uipath/apollo-wind";
 import { useEffect, useState } from "react";
 import { validationStationWcReady } from "./loadValidationStationWc.js";
-import {
-  submitValidatedData,
-  saveValidatedDataAsDraft,
-} from "./saveValidatedDataUtil.js";
 import {
   TelemetryEvent,
   TelemetryStatus,
@@ -33,8 +28,8 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
   setFieldValueByPath,
   selectAndFocusFieldValueByPath,
   deleteFieldValueByPath,
-  onSubmitComplete,
-  onSaveAsDraftComplete,
+  onSaveValidatedDataRequest,
+  onSaveValidatedDataAsDraftRequest,
   onReportExceptionComplete,
 }) => {
   const { artifacts, error } = useBucketArtifacts(sdk, data, folderId);
@@ -58,34 +53,23 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
     return <div>Loading...</div>;
   }
 
-  const resolvedFolderId = folderId ?? data.FolderId;
-
   const refCallback = (el: IValidationStationStandaloneWcElement | null) => {
     if (!el) return;
-    if (!resolvedFolderId) {
-      toast.error(
-        "folderId of Storage bucket is required. Provide it as a prop or ensure data.FolderId is set.",
-      );
-      return;
-    }
 
-    const onSubmitRequest = (event: CustomEvent<IVsSaveValidatedDataRequest>) =>
-      submitValidatedData(sdk, data, resolvedFolderId, event.detail).then(
-        (result) => {
-          trackTelemetry(
-            TelemetryEvent.Submit,
-            result.success ? TelemetryStatus.Success : TelemetryStatus.Error,
-          );
-          onSubmitComplete?.(result);
-        },
-      );
+    // The widget performs no persistence: it emits the save payloads and the
+    // host writes them back (see the exported submitValidatedDataToOrchestrator /
+    // saveValidatedDataAsDraftToOrchestrator helpers). Telemetry marks the emit, not the
+    // outcome — the host owns the API calls and their success/failure.
+    const onSubmitRequest = (
+      event: CustomEvent<IVsSaveValidatedDataRequest>,
+    ) => {
+      trackTelemetry(TelemetryEvent.Submit, TelemetryStatus.Success);
+      onSaveValidatedDataRequest?.(event.detail);
+    };
 
     const onSaveAsDraftRequest = (
       event: CustomEvent<IVsSaveValidatedDataAsDraftRequest>,
-    ) =>
-      saveValidatedDataAsDraft(sdk, data, resolvedFolderId, event.detail).then(
-        onSaveAsDraftComplete,
-      );
+    ) => onSaveValidatedDataAsDraftRequest?.(event.detail);
 
     const onExceptionRequest = (
       event: CustomEvent<IVsSaveExceptionReportRequest>,
@@ -115,30 +99,27 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
   };
 
   return (
-    <>
-      <ui-du-validation-station-standalone-wc-element
-        {...({ ref: refCallback } as {
-          ref: React.Ref<IValidationStationStandaloneWcElement>;
-        })}
-        theme={theme}
-        language={language}
-        isReadonly={isReadonly}
-        enableSaveAsDraft={true}
-        documentId={data.DocumentId}
-        taxonomy={artifacts.taxonomy}
-        extractionResult={artifacts.extractionResult}
-        dom={artifacts.dom}
-        text={artifacts.text}
-        customizationInfo={artifacts.customizationInfo}
-        original={artifacts.original}
-        options={options}
-        save={save}
-        discardChanges={discardChanges}
-        setFieldValueByPath={setFieldValueByPath}
-        selectAndFocusFieldValueByPath={selectAndFocusFieldValueByPath}
-        deleteFieldValueByPath={deleteFieldValueByPath}
-      />
-      <Toaster position="top-right" />
-    </>
+    <ui-du-validation-station-standalone-wc-element
+      {...({ ref: refCallback } as {
+        ref: React.Ref<IValidationStationStandaloneWcElement>;
+      })}
+      theme={theme}
+      language={language}
+      isReadonly={isReadonly}
+      enableSaveAsDraft={true}
+      documentId={data.DocumentId}
+      taxonomy={artifacts.taxonomy}
+      extractionResult={artifacts.extractionResult}
+      dom={artifacts.dom}
+      text={artifacts.text}
+      customizationInfo={artifacts.customizationInfo}
+      original={artifacts.original}
+      options={options}
+      save={save}
+      discardChanges={discardChanges}
+      setFieldValueByPath={setFieldValueByPath}
+      selectAndFocusFieldValueByPath={selectAndFocusFieldValueByPath}
+      deleteFieldValueByPath={deleteFieldValueByPath}
+    />
   );
 };

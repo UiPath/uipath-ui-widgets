@@ -1,10 +1,22 @@
-import type { SaveValidatedDataResult } from "@uipath/ui-widgets-validation-station";
+import {
+  saveValidatedDataAsDraftToOrchestrator,
+  submitValidatedDataToOrchestrator,
+  type IVsSaveValidatedDataAsDraftRequest,
+  type IVsSaveValidatedDataRequest,
+} from "@uipath/ui-widgets-validation-station";
 import type { UiPath } from "@uipath/uipath-typescript/core";
+import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import { OrchestratorDuModule } from "@uipath/uipath-typescript/orchestrator-du-module";
 import type { TaskGetResponse } from "@uipath/uipath-typescript/tasks";
 import { TaskType } from "@uipath/uipath-typescript/tasks";
 import { useCallback } from "react";
 import type { Notification } from "./useNotification";
+
+/** The task row carries the folder; fall back to the payload's own FolderId. */
+function resolveFolderId(task: TaskGetResponse): number | undefined {
+  const data = task.data as DuFramework.ContentValidationData | undefined;
+  return task.folderId ?? data?.FolderId;
+}
 
 interface TaskMutationsParams {
   uipathSdk: UiPath;
@@ -17,9 +29,11 @@ interface TaskMutationsParams {
 }
 
 /**
- * The three save outcomes wired into `CompactFieldsForm`. The widget renders no
- * feedback of its own, so each handler reports via `notify`; submit and
- * report-exception also clear the selection and refresh the list. Save-as-draft
+ * The three save flows wired into `CompactFieldsForm`. The widget performs no
+ * persistence and renders no feedback: it emits the payloads, this hook writes
+ * them back (via the package's opt-in `submitValidatedDataToOrchestrator` /
+ * `saveValidatedDataAsDraftToOrchestrator` helpers) and reports via `notify`. Submit and
+ * report-exception also clear the selection and refresh the list; save-as-draft
  * persists edits without completing the task, so it leaves the selection open.
  */
 export function useTaskMutations({
@@ -29,14 +43,25 @@ export function useTaskMutations({
   refetch,
   notify,
 }: TaskMutationsParams) {
-  const handleSubmitComplete = useCallback(
-    async (result: SaveValidatedDataResult) => {
+  const handleSaveValidatedDataRequest = useCallback(
+    async (request: IVsSaveValidatedDataRequest) => {
+      if (!selectedTask) return;
+      const folderId = resolveFolderId(selectedTask);
+      if (!folderId) {
+        notify("Submit failed: no folder id", "error");
+        return;
+      }
+      const result = await submitValidatedDataToOrchestrator(
+        uipathSdk,
+        selectedTask.data as DuFramework.ContentValidationData,
+        folderId,
+        request,
+      );
       if (!result.success) {
         console.error("Submit failed:", result.error);
         notify("Submit failed", "error");
         return;
       }
-      if (!selectedTask) return;
       try {
         await selectedTask.complete({
           type: TaskType.DocumentValidation,
@@ -50,11 +75,23 @@ export function useTaskMutations({
         notify("Failed to complete task", "error");
       }
     },
-    [selectedTask, clearSelection, refetch, notify],
+    [uipathSdk, selectedTask, clearSelection, refetch, notify],
   );
 
-  const handleSaveAsDraftComplete = useCallback(
-    (result: SaveValidatedDataResult) => {
+  const handleSaveValidatedDataAsDraftRequest = useCallback(
+    async (request: IVsSaveValidatedDataAsDraftRequest) => {
+      if (!selectedTask) return;
+      const folderId = resolveFolderId(selectedTask);
+      if (!folderId) {
+        notify("Failed to save draft: no folder id", "error");
+        return;
+      }
+      const result = await saveValidatedDataAsDraftToOrchestrator(
+        uipathSdk,
+        selectedTask.data as DuFramework.ContentValidationData,
+        folderId,
+        request,
+      );
       if (!result.success) {
         console.error("Save draft failed:", result.error);
         notify("Failed to save draft", "error");
@@ -62,7 +99,7 @@ export function useTaskMutations({
       }
       notify("Draft saved", "success");
     },
-    [notify],
+    [uipathSdk, selectedTask, notify],
   );
 
   const handleReportException = useCallback(
@@ -94,8 +131,8 @@ export function useTaskMutations({
   );
 
   return {
-    handleSubmitComplete,
-    handleSaveAsDraftComplete,
+    handleSaveValidatedDataRequest,
+    handleSaveValidatedDataAsDraftRequest,
     handleReportException,
   };
 }

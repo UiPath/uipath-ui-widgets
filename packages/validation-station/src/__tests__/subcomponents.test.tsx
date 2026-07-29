@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, waitFor } from "@testing-library/react";
+import { render } from "@testing-library/react";
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 // Avoid the heavy Angular-bundle side effects of the real module; keep the tag
@@ -28,12 +28,13 @@ vi.mock("../useWcReady", () => ({
   useWcReady: () => true,
 }));
 
-const mockSubmitValidatedData = vi.fn();
-const mockSaveValidatedDataAsDraft = vi.fn();
-vi.mock("../saveValidatedDataUtil", () => ({
-  submitValidatedData: (...args: any[]) => mockSubmitValidatedData(...args),
-  saveValidatedDataAsDraft: (...args: any[]) =>
-    mockSaveValidatedDataAsDraft(...args),
+const mockSubmitToOrchestrator = vi.fn();
+const mockSaveDraftToOrchestrator = vi.fn();
+vi.mock("../orchestratorPersistence", () => ({
+  submitValidatedDataToOrchestrator: (...args: any[]) =>
+    mockSubmitToOrchestrator(...args),
+  saveValidatedDataAsDraftToOrchestrator: (...args: any[]) =>
+    mockSaveDraftToOrchestrator(...args),
 }));
 
 import { CompactBusinessRules } from "../subcomponents/CompactBusinessRules";
@@ -56,8 +57,6 @@ function readyState(overrides: Record<string, any> = {}) {
     artifacts: mockArtifacts,
     error: null,
     documentId: "doc-123",
-    canPersist: false,
-    resolvedFolderId: undefined,
     ...overrides,
   };
 }
@@ -146,123 +145,43 @@ describe("CompactFieldsForm save wiring", () => {
   const sdk = {} as any;
   const data = { DocumentId: "doc-123", FolderId: 42 } as any;
 
-  beforeEach(() => {
-    mockUseSubcomponentArtifacts.mockReturnValue(
-      readyState({ canPersist: true, resolvedFolderId: 42 }),
-    );
-  });
-
-  it("forwards saveValidatedDataRequest to submitValidatedData and onSubmitComplete", async () => {
-    mockSubmitValidatedData.mockResolvedValue({ success: true });
-    const onSubmitComplete = vi.fn();
-    const onSaveValidatedDataRequest = vi.fn();
+  const renderForm = (props: Record<string, unknown>) => {
     const { container } = render(
-      <CompactFieldsForm
-        sdk={sdk}
-        data={data}
-        folderId={42}
-        onSubmitComplete={onSubmitComplete}
-        onSaveValidatedDataRequest={onSaveValidatedDataRequest}
-      />,
+      <CompactFieldsForm sdk={sdk} data={data} {...props} />,
     );
-    const el = container.querySelector(
+    return container.querySelector(
       "ui-du-compact-fields-form-standalone-wc-element",
     )!;
+  };
+
+  it("forwards saveValidatedDataRequest to the host without persisting", () => {
+    const onSaveValidatedDataRequest = vi.fn();
+    const el = renderForm({ onSaveValidatedDataRequest });
 
     const detail = { documentId: "doc-123", validatedData: { v: 1 } };
     el.dispatchEvent(new CustomEvent("saveValidatedDataRequest", { detail }));
 
     expect(onSaveValidatedDataRequest).toHaveBeenCalledWith(detail);
-    await waitFor(() =>
-      expect(mockSubmitValidatedData).toHaveBeenCalledWith(
-        sdk,
-        data,
-        42,
-        detail,
-      ),
-    );
-    await waitFor(() =>
-      expect(onSubmitComplete).toHaveBeenCalledWith({ success: true }),
-    );
+    // The wrapper owns no persistence — the host decides what to write.
+    expect(mockSubmitToOrchestrator).not.toHaveBeenCalled();
   });
 
-  it("forwards a failed submit result verbatim to onSubmitComplete", async () => {
-    // The wrapper must surface failures too — it resolves with the result
-    // object, it does not swallow or reinterpret a { success: false }.
-    const failure = { success: false, error: "save rejected" };
-    mockSubmitValidatedData.mockResolvedValue(failure);
-    const onSubmitComplete = vi.fn();
-    const { container } = render(
-      <CompactFieldsForm
-        sdk={sdk}
-        data={data}
-        folderId={42}
-        onSubmitComplete={onSubmitComplete}
-      />,
-    );
-    const el = container.querySelector(
-      "ui-du-compact-fields-form-standalone-wc-element",
-    )!;
-
-    el.dispatchEvent(
-      new CustomEvent("saveValidatedDataRequest", {
-        detail: { documentId: "doc-123", validatedData: {} },
-      }),
-    );
-
-    await waitFor(() => expect(onSubmitComplete).toHaveBeenCalledWith(failure));
-  });
-
-  it("forwards saveValidatedDataAsDraftRequest to saveValidatedDataAsDraft", async () => {
-    mockSaveValidatedDataAsDraft.mockResolvedValue({ success: true });
-    const onSaveAsDraftComplete = vi.fn();
+  it("forwards saveValidatedDataAsDraftRequest to the host without persisting", () => {
     const onSaveValidatedDataAsDraftRequest = vi.fn();
-    const { container } = render(
-      <CompactFieldsForm
-        sdk={sdk}
-        data={data}
-        folderId={42}
-        onSaveAsDraftComplete={onSaveAsDraftComplete}
-        onSaveValidatedDataAsDraftRequest={onSaveValidatedDataAsDraftRequest}
-      />,
-    );
-    const el = container.querySelector(
-      "ui-du-compact-fields-form-standalone-wc-element",
-    )!;
+    const el = renderForm({ onSaveValidatedDataAsDraftRequest });
 
     const detail = { documentId: "doc-123", validatedData: { d: 2 } };
     el.dispatchEvent(
       new CustomEvent("saveValidatedDataAsDraftRequest", { detail }),
     );
 
-    // Raw request callback fires synchronously before the SDK round-trip.
     expect(onSaveValidatedDataAsDraftRequest).toHaveBeenCalledWith(detail);
-    await waitFor(() =>
-      expect(mockSaveValidatedDataAsDraft).toHaveBeenCalledWith(
-        sdk,
-        data,
-        42,
-        detail,
-      ),
-    );
-    await waitFor(() =>
-      expect(onSaveAsDraftComplete).toHaveBeenCalledWith({ success: true }),
-    );
+    expect(mockSaveDraftToOrchestrator).not.toHaveBeenCalled();
   });
 
   it("extracts documentId + reason from saveExceptionReportRequest", () => {
     const onReportExceptionComplete = vi.fn();
-    const { container } = render(
-      <CompactFieldsForm
-        sdk={sdk}
-        data={data}
-        folderId={42}
-        onReportExceptionComplete={onReportExceptionComplete}
-      />,
-    );
-    const el = container.querySelector(
-      "ui-du-compact-fields-form-standalone-wc-element",
-    )!;
+    const el = renderForm({ onReportExceptionComplete });
 
     el.dispatchEvent(
       new CustomEvent("saveExceptionReportRequest", {
@@ -281,17 +200,7 @@ describe("CompactFieldsForm save wiring", () => {
 
   it("falls back to empty reason when the exception DTO has no Reason", () => {
     const onReportExceptionComplete = vi.fn();
-    const { container } = render(
-      <CompactFieldsForm
-        sdk={sdk}
-        data={data}
-        folderId={42}
-        onReportExceptionComplete={onReportExceptionComplete}
-      />,
-    );
-    const el = container.querySelector(
-      "ui-du-compact-fields-form-standalone-wc-element",
-    )!;
+    const el = renderForm({ onReportExceptionComplete });
 
     el.dispatchEvent(
       new CustomEvent("saveExceptionReportRequest", {
@@ -302,39 +211,25 @@ describe("CompactFieldsForm save wiring", () => {
     expect(onReportExceptionComplete).toHaveBeenCalledWith("doc-abc", "");
   });
 
-  it("does not persist when canPersist is false, but still fires the raw request callbacks", () => {
-    mockUseSubcomponentArtifacts.mockReturnValue(
-      readyState({ canPersist: false, resolvedFolderId: undefined }),
-    );
-    const onSaveValidatedDataRequest = vi.fn();
-    const onSaveValidatedDataAsDraftRequest = vi.fn();
-    const { container } = render(
-      <CompactFieldsForm
-        instanceId="i1"
-        onSaveValidatedDataRequest={onSaveValidatedDataRequest}
-        onSaveValidatedDataAsDraftRequest={onSaveValidatedDataAsDraftRequest}
-      />,
-    );
-    const el = container.querySelector(
-      "ui-du-compact-fields-form-standalone-wc-element",
-    )!;
+  it("does not throw when no save callbacks are wired", () => {
+    const el = renderForm({});
 
-    const submitDetail = { documentId: "d", validatedData: { s: 1 } };
-    const draftDetail = { documentId: "d", validatedData: { d: 1 } };
-    el.dispatchEvent(
-      new CustomEvent("saveValidatedDataRequest", { detail: submitDetail }),
-    );
-    el.dispatchEvent(
-      new CustomEvent("saveValidatedDataAsDraftRequest", {
-        detail: draftDetail,
-      }),
-    );
-
-    // No SDK round-trip without a persist context...
-    expect(mockSubmitValidatedData).not.toHaveBeenCalled();
-    expect(mockSaveValidatedDataAsDraft).not.toHaveBeenCalled();
-    // ...but the raw events are forwarded so the host can drive persistence itself.
-    expect(onSaveValidatedDataRequest).toHaveBeenCalledWith(submitDetail);
-    expect(onSaveValidatedDataAsDraftRequest).toHaveBeenCalledWith(draftDetail);
+    expect(() => {
+      el.dispatchEvent(
+        new CustomEvent("saveValidatedDataRequest", {
+          detail: { documentId: "d", validatedData: {} },
+        }),
+      );
+      el.dispatchEvent(
+        new CustomEvent("saveValidatedDataAsDraftRequest", {
+          detail: { documentId: "d", validatedData: {} },
+        }),
+      );
+      el.dispatchEvent(
+        new CustomEvent("saveExceptionReportRequest", {
+          detail: { documentId: "d", exceptionReport: {} },
+        }),
+      );
+    }).not.toThrow();
   });
 });

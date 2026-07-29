@@ -17,9 +17,9 @@ If the user just wants the standard, self-contained review screen, use the monol
 1. **Fetch artifacts once, in the parent — never per subcomponent.** Call `useBucketArtifacts(sdk, data, folderId)` once and pass the resulting `artifacts` to every panel. Each subcomponent _can_ self-fetch if given `sdk` + `data`, but composing N self-fetching panels hits the bucket N times for the same document. Pre-fetch, then hand down `artifacts`.
 2. **Give every subcomponent the same `instanceId`.** That is what makes them share one store and mirror each other's selection/edits/document-type. Different (or missing) `instanceId` → isolated stores → no cross-linking. It is immutable once mounted — set it before render, don't change it.
 3. **Set `persistent={false}` for a static layout.** The panels live in a fixed grid and are never re-parented, so they don't need the portal-survival path. Leaving `persistent` on makes React StrictMode's throwaway unmount call `forceDestroy()`, tearing down the Angular element so it never re-renders (blank panel). Only set `persistent={true}` if a panel is genuinely moved across the DOM (e.g. into a portal / tab that unmounts).
-4. **Only `CompactFieldsForm` persists.** Other panels may still be _editable_ — `CompactTableEditor` edits cells/rows, `CompactDocTypeField` changes the type — but none write to Orchestrator. Those edits land in the shared store and are committed when the user saves through the form. Submit / save-as-draft / report-exception all flow through `CompactFieldsForm` — it is the only panel that takes `sdk` + `data` + `folderId`.
+4. **No panel writes to Orchestrator — the host does.** `CompactFieldsForm` is the only panel that _exposes_ the save actions (submit / save-as-draft / report-exception), but it performs no persistence: it emits the payloads and you write them back, e.g. with the package's opt-in `submitValidatedDataToOrchestrator` / `saveValidatedDataAsDraftToOrchestrator` helpers. Other panels are still _editable_ — `CompactTableEditor` edits cells/rows, `CompactDocTypeField` changes the type — and those edits land in the shared store, committed when the user saves through the form.
 5. **Avoid duplicate surfaces.** If you render standalone `CompactBusinessRules` and/or `CompactDocTypeField` panels, tell the form to drop its built-in ones via `options={{ hideBusinessRules: true, hideDocumentTypeField: true }}` — otherwise the field appears twice.
-6. **Save-as-draft needs a flag.** Set `options={{ emitDtoStateChanges: true }}` on `CompactFieldsForm` or the save-as-draft flow (and `onSaveAsDraftComplete`) never fires.
+6. **Save-as-draft needs a flag.** Set `options={{ emitDtoStateChanges: true }}` on `CompactFieldsForm` or the save-as-draft flow (and `onSaveValidatedDataAsDraftRequest`) never fires.
 
 ## Install
 
@@ -29,15 +29,15 @@ npm install @uipath/ui-widgets-validation-station
 
 ## The Subcomponents
 
-| Component              | Purpose                                 | Editable?         | Owns save flow? | Key extra props                                                                                                |
-| ---------------------- | --------------------------------------- | ----------------- | --------------- | -------------------------------------------------------------------------------------------------------------- |
-| `DocumentViewer`       | PDF/text viewer with bounding boxes     | No (read-only)    | No              | `onTokensSelect`, `onCurrentPageChange`, `goToPage`                                                            |
-| `CompactFieldsForm`    | Extraction-fields editor + save actions | Yes (fields)      | **Yes**         | `sdk`, `data`, `folderId`, `options`, `onSubmitComplete`, `onSaveAsDraftComplete`, `onReportExceptionComplete` |
-| `CompactTableEditor`   | Line-items / table-field editor         | Yes (cells, rows) | No              | `onClosed`, `isTableSelectionEnabled`                                                                          |
-| `CompactBusinessRules` | Evaluated business-rules panel          | No (read-only)    | No              | `onBusinessRuleClick`, `onBusinessRulesToggle`                                                                 |
-| `CompactDocTypeField`  | Document-type selector                  | Yes (doc-type)    | No              | `onDocumentTypeChanged`, `onPanelOpenChange`                                                                   |
+| Component              | Purpose                                 | Editable?         | Emits save events? | Key extra props                                                                                           |
+| ---------------------- | --------------------------------------- | ----------------- | ------------------ | --------------------------------------------------------------------------------------------------------- |
+| `DocumentViewer`       | PDF/text viewer with bounding boxes     | No (read-only)    | No                 | `onTokensSelect`, `onCurrentPageChange`, `goToPage`                                                       |
+| `CompactFieldsForm`    | Extraction-fields editor + save actions | Yes (fields)      | **Yes**            | `options`, `onSaveValidatedDataRequest`, `onSaveValidatedDataAsDraftRequest`, `onReportExceptionComplete` |
+| `CompactTableEditor`   | Line-items / table-field editor         | Yes (cells, rows) | No                 | `onClosed`, `isTableSelectionEnabled`                                                                     |
+| `CompactBusinessRules` | Evaluated business-rules panel          | No (read-only)    | No                 | `onBusinessRuleClick`, `onBusinessRulesToggle`                                                            |
+| `CompactDocTypeField`  | Document-type selector                  | Yes (doc-type)    | No                 | `onDocumentTypeChanged`, `onPanelOpenChange`                                                              |
 
-> **"Editable?" vs "Owns save flow?" — they are different questions.** _Editable_ means the panel lets the user change data in place (edit fields, edit table cells/rows, pick a document type). _Owns save flow_ means the panel writes back to Orchestrator — it takes `sdk` + `data` + `folderId` and exposes submit / save-as-draft / report-exception. Only `CompactFieldsForm` does the latter. Every panel sharing the same `instanceId` mutates **one shared store**, so edits made in `CompactTableEditor` (or `CompactDocTypeField`) are committed when the user saves **through `CompactFieldsForm`** — the table editor deliberately has no save button of its own. It signals its changes via `onDirtyChange` / `onFieldValueChanged` / `onExtractionResultChanged`.
+> **"Editable?" vs "Emits save events?" — they are different questions.** _Editable_ means the panel lets the user change data in place (edit fields, edit table cells/rows, pick a document type). _Emits save events_ means the panel renders the submit / save-as-draft / report-exception actions and hands their payloads to the host; only `CompactFieldsForm` does that, and **no panel writes to Orchestrator itself**. Every panel sharing the same `instanceId` mutates **one shared store**, so edits made in `CompactTableEditor` (or `CompactDocTypeField`) are committed when the user saves **through `CompactFieldsForm`** — the table editor deliberately has no save button of its own. It signals its changes via `onDirtyChange` / `onFieldValueChanged` / `onExtractionResultChanged`.
 
 **Shared props** (every subcomponent — `SubcomponentCommonProps`):
 
@@ -61,8 +61,14 @@ A web app that lists DU validation tasks and opens each one in a custom five-pan
 ```tsx
 // useReviewTasks.ts
 import { useCallback, useEffect, useState } from "react";
-import type { SaveValidatedDataResult } from "@uipath/ui-widgets-validation-station";
+import {
+  saveValidatedDataAsDraftToOrchestrator,
+  submitValidatedDataToOrchestrator,
+  type IVsSaveValidatedDataAsDraftRequest,
+  type IVsSaveValidatedDataRequest,
+} from "@uipath/ui-widgets-validation-station";
 import type { UiPath } from "@uipath/uipath-typescript/core";
+import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import { OrchestratorDuModule } from "@uipath/uipath-typescript/orchestrator-du-module";
 import { Tasks, TaskType } from "@uipath/uipath-typescript/tasks";
 import type { TaskGetResponse } from "@uipath/uipath-typescript/tasks";
@@ -89,12 +95,21 @@ export function useReviewTasks(sdk: UiPath) {
     [sdk],
   );
 
-  // Submit succeeded → complete the task. The widget renders NO error UI — surface it here.
-  const handleSubmitComplete = useCallback(
-    async (result: SaveValidatedDataResult) => {
+  // The form emits the payload; the HOST writes it, then completes the task.
+  // `submitValidatedDataToOrchestrator` is the package's opt-in helper for the standard DU
+  // write (ProcessExtractedData + zipped bucket upload) — swap in your own call
+  // if your backend expects something else.
+  const handleSaveValidatedDataRequest = useCallback(
+    async (request: IVsSaveValidatedDataRequest) => {
+      if (!selectedTask) return;
+      const result = await submitValidatedDataToOrchestrator(
+        sdk,
+        selectedTask.data as DuFramework.ContentValidationData,
+        selectedTask.folderId,
+        request,
+      );
       if (!result.success)
         return setNotification({ message: "Submit failed", severity: "error" });
-      if (!selectedTask) return;
       await selectedTask.complete({
         type: TaskType.DocumentValidation,
         action: "Completed",
@@ -102,19 +117,26 @@ export function useReviewTasks(sdk: UiPath) {
       setSelectedTask(null);
       setNotification({ message: "Document submitted", severity: "success" });
     },
-    [selectedTask],
+    [sdk, selectedTask],
   );
 
   // Save-as-draft persists edits WITHOUT completing the task — leave the selection in place.
-  const handleSaveAsDraftComplete = useCallback(
-    (result: SaveValidatedDataResult) => {
+  const handleSaveValidatedDataAsDraftRequest = useCallback(
+    async (request: IVsSaveValidatedDataAsDraftRequest) => {
+      if (!selectedTask) return;
+      const result = await saveValidatedDataAsDraftToOrchestrator(
+        sdk,
+        selectedTask.data as DuFramework.ContentValidationData,
+        selectedTask.folderId,
+        request,
+      );
       setNotification(
         result.success
           ? { message: "Draft saved", severity: "success" }
           : { message: "Failed to save draft", severity: "error" },
       );
     },
-    [],
+    [sdk, selectedTask],
   );
 
   // Report-as-exception makes NO API call in the widget — the host must persist it.
@@ -142,8 +164,8 @@ export function useReviewTasks(sdk: UiPath) {
     selectedTask,
     openTask,
     notification,
-    handleSubmitComplete,
-    handleSaveAsDraftComplete,
+    handleSaveValidatedDataRequest,
+    handleSaveValidatedDataAsDraftRequest,
     handleReportException,
   };
 }
@@ -161,7 +183,8 @@ import {
   DocumentViewer,
   useBucketArtifacts,
   ValidationStationLanguage,
-  type SaveValidatedDataResult,
+  type IVsSaveValidatedDataAsDraftRequest,
+  type IVsSaveValidatedDataRequest,
 } from "@uipath/ui-widgets-validation-station";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
@@ -170,14 +193,16 @@ import type { TaskGetResponse } from "@uipath/uipath-typescript/tasks";
 export function ReviewWorkspace({
   sdk,
   task,
-  onSubmitComplete,
-  onSaveAsDraftComplete,
+  onSaveValidatedDataRequest,
+  onSaveValidatedDataAsDraftRequest,
   onReportException,
 }: {
   sdk: UiPath;
   task: TaskGetResponse;
-  onSubmitComplete: (r: SaveValidatedDataResult) => void;
-  onSaveAsDraftComplete: (r: SaveValidatedDataResult) => void;
+  onSaveValidatedDataRequest: (r: IVsSaveValidatedDataRequest) => void;
+  onSaveValidatedDataAsDraftRequest: (
+    r: IVsSaveValidatedDataAsDraftRequest,
+  ) => void;
   onReportException: (documentId: string, reason: string) => void;
 }) {
   const data = task.data as DuFramework.ContentValidationData;
@@ -229,8 +254,8 @@ export function ReviewWorkspace({
             hideDocumentTypeField: true,
             emitDtoStateChanges: true,
           }}
-          onSubmitComplete={onSubmitComplete}
-          onSaveAsDraftComplete={onSaveAsDraftComplete}
+          onSaveValidatedDataRequest={onSaveValidatedDataRequest}
+          onSaveValidatedDataAsDraftRequest={onSaveValidatedDataAsDraftRequest}
           onReportExceptionComplete={onReportException}
         />
       </div>
@@ -261,8 +286,10 @@ return (
       <ReviewWorkspace
         sdk={sdk}
         task={t.selectedTask}
-        onSubmitComplete={t.handleSubmitComplete}
-        onSaveAsDraftComplete={t.handleSaveAsDraftComplete}
+        onSaveValidatedDataRequest={t.handleSaveValidatedDataRequest}
+        onSaveValidatedDataAsDraftRequest={
+          t.handleSaveValidatedDataAsDraftRequest
+        }
         onReportException={t.handleReportException}
       />
     )}
@@ -290,5 +317,5 @@ The `on*` callbacks (`onFieldValueSelected`, `onBusinessRuleClick`, `onDocumentT
 - **Do not render duplicate surfaces.** Standalone `CompactBusinessRules`/`CompactDocTypeField` + a form that still shows its own = the field twice. Set `hideBusinessRules`/`hideDocumentTypeField`.
 - **Do not compose the subcomponents to rebuild the standard station.** If the layout is just "the normal Validation Station," use `ValidationStation`.
 - **Do not pass a `tasks.getAll()` row into the workspace.** Its `data` is undefined — hydrate with `tasks.getById(id, { taskType: TaskType.DocumentValidation }, folderId)` first.
-- **Do not assume any panel shows an error on failure.** Submit/draft return `{ success: false, error }` with no UI; report-exception persists nothing. The host owns all feedback and the exception API call (`OrchestratorDuModule.submitExceptionReport`).
+- **Do not assume any panel persists or reports.** Submit / save-as-draft / report-exception only emit payloads — nothing is written and no error is shown unless the host does it. The `submitValidatedDataToOrchestrator` / `saveValidatedDataAsDraftToOrchestrator` helpers return `{ success: false, error }` rather than throwing, so a failure you don't check is silent.
 - **Do not construct a second `UiPath` SDK** for the widgets. Reuse the app's authenticated instance.

@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
-  saveValidatedDataAsDraft,
-  submitValidatedData,
-} from "../saveValidatedDataUtil";
+  saveValidatedDataAsDraftToOrchestrator,
+  submitValidatedDataToOrchestrator,
+} from "../orchestratorPersistence";
 
 const mockUploadFile = vi.fn();
 const MockBucketService = vi.fn(() => ({ uploadFile: mockUploadFile }));
@@ -69,10 +69,10 @@ beforeEach(() => {
   zipCalls.length = 0;
 });
 
-describe("submitValidatedData", () => {
+describe("submitValidatedDataToOrchestrator", () => {
   describe("validation", () => {
     it("returns error when BucketId is missing", async () => {
-      const result = await submitValidatedData(
+      const result = await submitValidatedDataToOrchestrator(
         makeSdk(),
         makeData({ BucketId: undefined }),
         42,
@@ -83,7 +83,7 @@ describe("submitValidatedData", () => {
     });
 
     it("returns error when ValidatedExtractionResultsPath is missing", async () => {
-      const result = await submitValidatedData(
+      const result = await submitValidatedDataToOrchestrator(
         makeSdk(),
         makeData({ ValidatedExtractionResultsPath: undefined }),
         42,
@@ -94,7 +94,7 @@ describe("submitValidatedData", () => {
     });
 
     it("does not call SDK or upload when validation fails", async () => {
-      await submitValidatedData(
+      await submitValidatedDataToOrchestrator(
         makeSdk(),
         makeData({ BucketId: undefined }),
         42,
@@ -110,7 +110,12 @@ describe("submitValidatedData", () => {
       mockProcessExtractedData.mockResolvedValue({ processed: true });
       mockUploadFile.mockResolvedValue({ success: true });
 
-      await submitValidatedData(makeSdk(), makeData(), 42, makeRequest());
+      await submitValidatedDataToOrchestrator(
+        makeSdk(),
+        makeData(),
+        42,
+        makeRequest(),
+      );
 
       expect(mockProcessExtractedData).toHaveBeenCalledTimes(1);
       expect(mockProcessExtractedData).toHaveBeenCalledWith(
@@ -127,7 +132,7 @@ describe("submitValidatedData", () => {
       mockProcessExtractedData.mockResolvedValue({ processed: true });
       mockUploadFile.mockResolvedValue({ success: true });
 
-      const result = await submitValidatedData(
+      const result = await submitValidatedDataToOrchestrator(
         makeSdk(),
         makeData(),
         42,
@@ -150,7 +155,7 @@ describe("submitValidatedData", () => {
       mockProcessExtractedData.mockResolvedValue({});
       mockUploadFile.mockResolvedValue({ success: true });
 
-      await submitValidatedData(
+      await submitValidatedDataToOrchestrator(
         makeSdk(),
         makeData({ ValidatedExtractionResultsPath: "a/b/c/output.zip" }),
         42,
@@ -164,7 +169,7 @@ describe("submitValidatedData", () => {
       mockProcessExtractedData.mockResolvedValue({});
       mockUploadFile.mockResolvedValue({ success: true });
 
-      await submitValidatedData(
+      await submitValidatedDataToOrchestrator(
         makeSdk(),
         makeData({ ValidatedExtractionResultsPath: "results/output.bin" }),
         42,
@@ -178,7 +183,7 @@ describe("submitValidatedData", () => {
       mockProcessExtractedData.mockResolvedValue({});
       mockUploadFile.mockResolvedValue({ success: true });
 
-      await submitValidatedData(
+      await submitValidatedDataToOrchestrator(
         makeSdk(),
         makeData({
           ValidatedExtractionResultsPath: "results/",
@@ -195,7 +200,7 @@ describe("submitValidatedData", () => {
       mockProcessExtractedData.mockResolvedValue({});
       mockUploadFile.mockResolvedValue({ success: true });
 
-      await submitValidatedData(
+      await submitValidatedDataToOrchestrator(
         makeSdk(),
         makeData({
           ValidatedExtractionResultsPath: "results/",
@@ -215,7 +220,7 @@ describe("submitValidatedData", () => {
         new Error("ProcessExtractedData failed (500): server boom"),
       );
 
-      const result = await submitValidatedData(
+      const result = await submitValidatedDataToOrchestrator(
         makeSdk(),
         makeData(),
         42,
@@ -232,7 +237,7 @@ describe("submitValidatedData", () => {
       mockProcessExtractedData.mockResolvedValue({});
       mockUploadFile.mockResolvedValue({ success: false, statusCode: 403 });
 
-      const result = await submitValidatedData(
+      const result = await submitValidatedDataToOrchestrator(
         makeSdk(),
         makeData(),
         42,
@@ -247,7 +252,7 @@ describe("submitValidatedData", () => {
       mockProcessExtractedData.mockResolvedValue({});
       mockUploadFile.mockRejectedValue(new Error("bucket exploded"));
 
-      const result = await submitValidatedData(
+      const result = await submitValidatedDataToOrchestrator(
         makeSdk(),
         makeData(),
         42,
@@ -261,7 +266,7 @@ describe("submitValidatedData", () => {
     it("stringifies non-Error rejections", async () => {
       mockProcessExtractedData.mockRejectedValue("string error");
 
-      const result = await submitValidatedData(
+      const result = await submitValidatedDataToOrchestrator(
         makeSdk(),
         makeData(),
         42,
@@ -274,7 +279,7 @@ describe("submitValidatedData", () => {
   });
 });
 
-describe("saveValidatedDataAsDraft", () => {
+describe("saveValidatedDataAsDraftToOrchestrator", () => {
   const makeDraftRequest = (overrides: Record<string, any> = {}) =>
     ({
       documentId: "doc-abc",
@@ -283,7 +288,7 @@ describe("saveValidatedDataAsDraft", () => {
     }) as any;
 
   it("returns error when BucketId is missing", async () => {
-    const result = await saveValidatedDataAsDraft(
+    const result = await saveValidatedDataAsDraftToOrchestrator(
       makeSdk(),
       makeData({ BucketId: undefined }),
       42,
@@ -294,7 +299,7 @@ describe("saveValidatedDataAsDraft", () => {
   });
 
   it("returns error when ValidatedExtractionResultsPath is missing", async () => {
-    const result = await saveValidatedDataAsDraft(
+    const result = await saveValidatedDataAsDraftToOrchestrator(
       makeSdk(),
       makeData({ ValidatedExtractionResultsPath: undefined }),
       42,
@@ -306,7 +311,7 @@ describe("saveValidatedDataAsDraft", () => {
 
   it("does NOT call processExtractedData — draft skips the SDK", async () => {
     mockUploadFile.mockResolvedValue({ success: true });
-    await saveValidatedDataAsDraft(
+    await saveValidatedDataAsDraftToOrchestrator(
       makeSdk(),
       makeData(),
       42,
@@ -318,7 +323,7 @@ describe("saveValidatedDataAsDraft", () => {
   it("uploads raw validatedData to the bucket and returns success", async () => {
     mockUploadFile.mockResolvedValue({ success: true });
 
-    const result = await saveValidatedDataAsDraft(
+    const result = await saveValidatedDataAsDraftToOrchestrator(
       makeSdk(),
       makeData(),
       42,
@@ -342,7 +347,7 @@ describe("saveValidatedDataAsDraft", () => {
   it("returns error when the bucket upload reports failure", async () => {
     mockUploadFile.mockResolvedValue({ success: false, statusCode: 403 });
 
-    const result = await saveValidatedDataAsDraft(
+    const result = await saveValidatedDataAsDraftToOrchestrator(
       makeSdk(),
       makeData(),
       42,
@@ -356,7 +361,7 @@ describe("saveValidatedDataAsDraft", () => {
   it("returns error when the bucket upload throws", async () => {
     mockUploadFile.mockRejectedValue(new Error("boom"));
 
-    const result = await saveValidatedDataAsDraft(
+    const result = await saveValidatedDataAsDraftToOrchestrator(
       makeSdk(),
       makeData(),
       42,

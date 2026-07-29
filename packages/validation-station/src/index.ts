@@ -3,6 +3,8 @@ export type {
   BucketArtifacts,
   DeleteFieldValueByPath,
   IValidationStationOptions,
+  IVsSaveValidatedDataAsDraftRequest,
+  IVsSaveValidatedDataRequest,
   SaveValidatedDataResult,
   SelectAndFocusFieldValueByPath,
   SetFieldValueByPath,
@@ -10,6 +12,15 @@ export type {
 } from "./types.js";
 export { ValidationStation } from "./ValidationStation.js";
 export { useBucketArtifacts } from "./useBucketArtifacts.js";
+
+// ─── Orchestrator persistence helpers (opt-in) ────────────────────────────────
+// The widgets never call these — they emit the save payloads and the host
+// persists them. Use these for the standard Orchestrator write (DU module
+// ProcessExtractedData + zipped upload to the storage bucket), or write your own.
+export {
+  saveValidatedDataAsDraftToOrchestrator,
+  submitValidatedDataToOrchestrator,
+} from "./orchestratorPersistence.js";
 
 // ─── Subcomponents ────────────────────────────────────────────────────────────
 export { CompactBusinessRules } from "./subcomponents/CompactBusinessRules.js";

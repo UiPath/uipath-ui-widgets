@@ -55,8 +55,7 @@ export function useWcElement(params: {
   const persistent = common.persistent ?? false;
   const tag = persistent ? convertToPersistentTag(baseTag) : baseTag;
 
-  const { artifacts, error, documentId, canPersist, resolvedFolderId } =
-    useSubcomponentArtifacts(dataSource);
+  const { artifacts, error, documentId } = useSubcomponentArtifacts(dataSource);
   // Gate on the tag actually rendered, not always the base tag.
   const wcReady = useWcReady(tag);
 
@@ -74,8 +73,6 @@ export function useWcElement(params: {
     artifacts,
     error,
     documentId,
-    canPersist,
-    resolvedFolderId,
     wcReady,
     tag,
     commonProps,

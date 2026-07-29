@@ -7,10 +7,6 @@ import type {
 } from "@uipath/du-validation-station-wc";
 import { useWcRef } from "../bindWcEvents.js";
 import { DU_WC_TAGS } from "../loadValidationStationWc.js";
-import {
-  saveValidatedDataAsDraft,
-  submitValidatedData,
-} from "../saveValidatedDataUtil.js";
 import { TelemetryEvent, TelemetryStatus } from "../types.js";
 import { trackTelemetry } from "../utils/telemetryUtils.js";
 import { renderWcElement, resolveArtifacts } from "./shared.js";
@@ -19,10 +15,10 @@ import { useWcElement } from "./useWcElement.js";
 
 /**
  * React wrapper for `<ui-du-compact-fields-form-standalone-wc-element>` — the
- * extraction-fields panel without a document viewer. Save-capable: when an
- * `sdk` + `data` + folder id are available it auto-wires the submit / draft
- * flows (like `ValidationStation`); otherwise handle the raw save-request
- * events yourself.
+ * extraction-fields panel without a document viewer. It renders the save
+ * actions but performs no persistence: submit / save-as-draft / report-exception
+ * are emitted to the host, which writes them back (see the exported
+ * `submitValidatedDataToOrchestrator` / `saveValidatedDataAsDraftToOrchestrator` helpers).
  */
 export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
   sdk,
@@ -55,22 +51,12 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
   onSelectAndFocusFieldValueByPathResult,
   onDeleteFieldValueByPathResult,
   onSaveResult,
-  onSubmitComplete,
-  onSaveAsDraftComplete,
   onReportExceptionComplete,
   onSaveValidatedDataRequest,
   onSaveValidatedDataAsDraftRequest,
   onSaveExceptionReportRequest,
 }) => {
-  const {
-    artifacts,
-    error,
-    wcReady,
-    tag,
-    commonProps,
-    canPersist,
-    resolvedFolderId,
-  } = useWcElement({
+  const { artifacts, error, wcReady, tag, commonProps } = useWcElement({
     baseTag: DU_WC_TAGS.compactFieldsForm,
     dataSource: {
       sdk,
@@ -90,30 +76,15 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
     },
   });
 
-  // Auto-wire persistence only when a full self-fetching context is available
-  // (canPersist); otherwise the raw save-request callbacks are the only signal.
+  // No persistence here — the payload goes to the host. Telemetry marks the
+  // emit, not the outcome: the host owns the API calls and their result.
   const handleSubmit = (request: IVsSaveValidatedDataRequest) => {
+    trackTelemetry(TelemetryEvent.Submit, TelemetryStatus.Success);
     onSaveValidatedDataRequest?.(request);
-    if (canPersist) {
-      submitValidatedData(sdk!, data!, resolvedFolderId!, request).then(
-        (result) => {
-          trackTelemetry(
-            TelemetryEvent.Submit,
-            result.success ? TelemetryStatus.Success : TelemetryStatus.Error,
-          );
-          onSubmitComplete?.(result);
-        },
-      );
-    }
   };
 
   const handleSaveAsDraft = (request: IVsSaveValidatedDataAsDraftRequest) => {
     onSaveValidatedDataAsDraftRequest?.(request);
-    if (canPersist) {
-      saveValidatedDataAsDraft(sdk!, data!, resolvedFolderId!, request).then(
-        onSaveAsDraftComplete,
-      );
-    }
   };
 
   const handleException = (request: IVsSaveExceptionReportRequest) => {

@@ -8,6 +8,17 @@ import { type DuFramework } from "@uipath/uipath-typescript/document-understandi
 import { OrchestratorDuModule } from "@uipath/uipath-typescript/orchestrator-du-module";
 import { strToU8, zipSync } from "fflate";
 
+/**
+ * Opt-in Orchestrator persistence helpers for the validation-station save flows.
+ *
+ * The widgets do **not** call these: they emit `onSaveValidatedDataRequest` /
+ * `onSaveValidatedDataAsDraftRequest` and the host decides what to persist and
+ * when (e.g. save, then complete the Orchestrator task). These functions
+ * implement the standard write — the Orchestrator DU module's
+ * `ProcessExtractedData` (submit only) plus the zipped upload to the
+ * Orchestrator storage bucket at `ValidatedExtractionResultsPath` — so hosts
+ * that want the standard behaviour don't have to rebuild it.
+ */
 export interface SaveValidatedDataResult {
   success: boolean;
   error?: string;
@@ -46,7 +57,7 @@ async function uploadResultToBucket(
   }
 }
 
-export async function submitValidatedData(
+export async function submitValidatedDataToOrchestrator(
   sdk: UiPath,
   data: DuFramework.ContentValidationData,
   folderId: number,
@@ -89,7 +100,7 @@ export async function submitValidatedData(
   }
 }
 
-export async function saveValidatedDataAsDraft(
+export async function saveValidatedDataAsDraftToOrchestrator(
   sdk: UiPath,
   data: DuFramework.ContentValidationData,
   folderId: number,

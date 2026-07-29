@@ -13,8 +13,11 @@ import {
   Typography,
 } from "@mui/material";
 import {
+  saveValidatedDataAsDraftToOrchestrator,
+  submitValidatedDataToOrchestrator,
   ValidationStation,
-  type SaveValidatedDataResult,
+  type IVsSaveValidatedDataAsDraftRequest,
+  type IVsSaveValidatedDataRequest,
   type SelectAndFocusFieldValueByPath,
   type SetFieldValueByPath,
 } from "@uipath/ui-widgets-validation-station";
@@ -93,13 +96,25 @@ function ValidationStationPage({ uipathSdk }: ValidationStationPageProps) {
     fetchTasks();
   }, [fetchTasks]);
 
-  const handleSubmitComplete = useCallback(
-    async (result: SaveValidatedDataResult) => {
+  const handleSaveValidatedDataRequest = useCallback(
+    async (request: IVsSaveValidatedDataRequest) => {
+      if (!selectedTask) return;
+      const data = selectedTask.data as DuFramework.ContentValidationData;
+      const folderId = selectedTask.folderId ?? data.FolderId;
+      if (!folderId) {
+        console.error("Cannot submit: no folder id on the task or its payload");
+        return;
+      }
+      const result = await submitValidatedDataToOrchestrator(
+        uipathSdk,
+        data,
+        folderId,
+        request,
+      );
       if (!result.success) {
         console.error("Submit failed:", result.error);
         return;
       }
-      if (!selectedTask) return;
       try {
         await selectedTask.complete({
           type: TaskType.DocumentValidation,
@@ -112,7 +127,28 @@ function ValidationStationPage({ uipathSdk }: ValidationStationPageProps) {
         console.error("Failed to complete task:", err);
       }
     },
-    [selectedTask, fetchTasks],
+    [uipathSdk, selectedTask, fetchTasks],
+  );
+
+  // Draft: persist the in-progress edits and leave the task open.
+  const handleSaveValidatedDataAsDraftRequest = useCallback(
+    async (request: IVsSaveValidatedDataAsDraftRequest) => {
+      if (!selectedTask) return;
+      const data = selectedTask.data as DuFramework.ContentValidationData;
+      const folderId = selectedTask.folderId ?? data.FolderId;
+      if (!folderId) {
+        console.error("Cannot save draft: no folder id on the task or payload");
+        return;
+      }
+      const result = await saveValidatedDataAsDraftToOrchestrator(
+        uipathSdk,
+        data,
+        folderId,
+        request,
+      );
+      if (!result.success) console.error("Draft save failed:", result.error);
+    },
+    [uipathSdk, selectedTask],
   );
 
   const handleReportException = useCallback(
@@ -418,7 +454,12 @@ function ValidationStationPage({ uipathSdk }: ValidationStationPageProps) {
                           reason,
                         )
                       }
-                      onSubmitComplete={handleSubmitComplete}
+                      onSaveValidatedDataRequest={
+                        handleSaveValidatedDataRequest
+                      }
+                      onSaveValidatedDataAsDraftRequest={
+                        handleSaveValidatedDataAsDraftRequest
+                      }
                     />
                   </Box>
                 </Box>

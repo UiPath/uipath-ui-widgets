@@ -37,14 +37,6 @@ export interface ResolvedArtifacts {
   artifacts: BucketArtifacts | null;
   error: string | null;
   documentId: string | undefined;
-  /**
-   * True when a full self-fetching / persistence context (`sdk` + `data` +
-   * resolved folder id) is available — i.e. the fields-form can round-trip
-   * submit / save-as-draft through the SDK.
-   */
-  canPersist: boolean;
-  /** Folder id used for fetch/persist, resolved from the prop or `data.FolderId`. */
-  resolvedFolderId: number | undefined;
 }
 
 /**
@@ -63,10 +55,9 @@ export function useSubcomponentArtifacts({
 
   const resolvedFolderId = folderId ?? data?.FolderId;
   const resolvedDocumentId = documentId ?? data?.DocumentId;
-  const canPersist = !!sdk && !!data && !!resolvedFolderId;
   // Fetch only when the caller did not supply artifacts and a full context is
   // present (the missing-folderId case is surfaced at render).
-  const shouldFetch = !provided && canPersist;
+  const shouldFetch = !provided && !!sdk && !!data && !!resolvedFolderId;
 
   // Keep the latest sdk reachable so each fetch uses the current instance (token
   // refresh / tenant switch) without making sdk identity a fetch trigger.
@@ -117,8 +108,6 @@ export function useSubcomponentArtifacts({
       artifacts: provided,
       error: null,
       documentId: resolvedDocumentId,
-      canPersist,
-      resolvedFolderId,
     };
   }
 
@@ -128,8 +117,6 @@ export function useSubcomponentArtifacts({
       error:
         "No data source provided. Pass `artifacts` (pre-fetched) or `sdk` + `data` (to fetch).",
       documentId: resolvedDocumentId,
-      canPersist,
-      resolvedFolderId,
     };
   }
 
@@ -139,8 +126,6 @@ export function useSubcomponentArtifacts({
       error:
         "folderId of Storage bucket is required. Provide it as a prop or ensure data.FolderId is set.",
       documentId: resolvedDocumentId,
-      canPersist,
-      resolvedFolderId,
     };
   }
 
@@ -148,7 +133,5 @@ export function useSubcomponentArtifacts({
     artifacts: fetched,
     error,
     documentId: resolvedDocumentId,
-    canPersist,
-    resolvedFolderId,
   };
 }

@@ -1,16 +1,20 @@
 import type {
   DeleteFieldValueByPath,
   IValidationStationOptions,
+  IVsSaveValidatedDataAsDraftRequest,
+  IVsSaveValidatedDataRequest,
   SelectAndFocusFieldValueByPath,
   SetFieldValueByPath,
 } from "@uipath/du-validation-station-wc";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
-import type { SaveValidatedDataResult } from "./saveValidatedDataUtil.js";
+import type { SaveValidatedDataResult } from "./orchestratorPersistence.js";
 
 export type {
   DeleteFieldValueByPath,
   IValidationStationOptions,
+  IVsSaveValidatedDataAsDraftRequest,
+  IVsSaveValidatedDataRequest,
   SaveValidatedDataResult,
   SelectAndFocusFieldValueByPath,
   SetFieldValueByPath,
@@ -67,18 +71,21 @@ export interface ValidationStationProps {
   selectAndFocusFieldValueByPath?: SelectAndFocusFieldValueByPath;
   deleteFieldValueByPath?: DeleteFieldValueByPath;
   /**
-   * Fired after the submit flow (`save={{ validate: true }}`) finishes
-   * (ProcessExtractedData + bucket upload). `result.success` is `false` on
-   * any failure — the host app decides whether to retry, complete the task,
-   * surface an error, etc.
+   * Fired when the user submits (`save={{ validate: true }}`). The widget makes
+   * **no** API call — it hands you the edited extraction result, the automatic
+   * one, and the taxonomy. Persist them with the exported
+   * {@link submitValidatedDataToOrchestrator} helper (ProcessExtractedData + bucket upload) or
+   * your own flow, then complete the task.
    */
-  onSubmitComplete?: (result: SaveValidatedDataResult) => void;
+  onSaveValidatedDataRequest?: (request: IVsSaveValidatedDataRequest) => void;
   /**
-   * Fired after the save-as-draft flow (`save={{ validate: false }}`)
-   * finishes (uploads `validatedData` straight to the bucket, no
-   * `ProcessExtractedData` call).
+   * Fired when the user saves as draft (`save={{ validate: false }}`). No API
+   * call — persist `request.validatedData` yourself, typically via the exported
+   * {@link saveValidatedDataAsDraftToOrchestrator} helper.
    */
-  onSaveAsDraftComplete?: (result: SaveValidatedDataResult) => void;
+  onSaveValidatedDataAsDraftRequest?: (
+    request: IVsSaveValidatedDataAsDraftRequest,
+  ) => void;
   /**
    * Fired when the user reports the document as an exception. The widget does
    * NOT call any API for this flow — the host owns persistence (typically a

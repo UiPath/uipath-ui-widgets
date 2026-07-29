@@ -7,7 +7,8 @@ import {
   DocumentViewer,
   useBucketArtifacts,
   ValidationStationLanguage,
-  type SaveValidatedDataResult,
+  type IVsSaveValidatedDataAsDraftRequest,
+  type IVsSaveValidatedDataRequest,
 } from "@uipath/ui-widgets-validation-station";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import { type DuFramework } from "@uipath/uipath-typescript/document-understanding";
@@ -19,8 +20,10 @@ import Panel from "./Panel";
 interface ReviewWorkspaceProps {
   sdk: UiPath;
   task: TaskGetResponse;
-  onSubmitComplete: (result: SaveValidatedDataResult) => void;
-  onSaveAsDraftComplete: (result: SaveValidatedDataResult) => void;
+  onSaveValidatedDataRequest: (request: IVsSaveValidatedDataRequest) => void;
+  onSaveValidatedDataAsDraftRequest: (
+    request: IVsSaveValidatedDataAsDraftRequest,
+  ) => void;
   onReportException: (documentId: string, reason: string) => void;
 }
 
@@ -32,16 +35,15 @@ interface ReviewWorkspaceProps {
  * highlights it in the viewer, selecting the line-items table opens the table
  * editor, and rule clicks focus the offending field — no cross-wiring needed.
  *
- * Only the fields form persists: it receives `sdk` + `data` + `folderId` (in
- * addition to the shared artifacts) so its built-in Submit / Save-draft /
- * Report-exception actions round-trip through the SDK. The other four are
- * fed pre-fetched artifacts only.
+ * Only the fields form exposes the save actions, and it performs no persistence
+ * of its own: Submit / Save-draft / Report-exception are emitted upward and the
+ * host writes them back. The other four are fed pre-fetched artifacts only.
  */
 function ReviewWorkspace({
   sdk,
   task,
-  onSubmitComplete,
-  onSaveAsDraftComplete,
+  onSaveValidatedDataRequest,
+  onSaveValidatedDataAsDraftRequest,
   onReportException,
 }: ReviewWorkspaceProps) {
   const data = task.data as DuFramework.ContentValidationData;
@@ -117,8 +119,10 @@ function ReviewWorkspace({
               setStatus(`Selected field: ${d.Field?.FieldName ?? "?"}`)
             }
             onDirtyChange={(dirty) => dirty && setStatus("Unsaved changes")}
-            onSubmitComplete={onSubmitComplete}
-            onSaveAsDraftComplete={onSaveAsDraftComplete}
+            onSaveValidatedDataRequest={onSaveValidatedDataRequest}
+            onSaveValidatedDataAsDraftRequest={
+              onSaveValidatedDataAsDraftRequest
+            }
             onReportExceptionComplete={onReportException}
           />
         </Panel>
