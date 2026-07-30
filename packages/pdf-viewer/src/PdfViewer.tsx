@@ -1,13 +1,24 @@
 import { Button } from "@uipath/apollo-wind";
-import { trackEvent } from "@uipath/uipath-typescript/core";
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import "./pdfWorker";
 import "./PdfViewer.css";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  DownloadIcon,
+  ErrorIcon,
+  FileIcon,
+  FitWidthIcon,
+  RotateIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
+} from "./icons";
 import { getSourceKey, useResolvedSource } from "./sources/useResolvedSource";
 import { PdfViewerProps, PdfViewerSource, TelemetryConstants } from "./types";
+import { trackTelemetry } from "./utils/telemetryUtils";
 
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
@@ -43,68 +54,6 @@ function defaultFileName(source: PdfViewerSource): string {
       return "document.pdf";
   }
 }
-
-/* Inline SVG icons — the widgets repo has no icon library dependency. */
-const iconProps = {
-  width: 16,
-  height: 16,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 2,
-  strokeLinecap: "round",
-  strokeLinejoin: "round",
-  "aria-hidden": true,
-} as const;
-
-const ChevronLeftIcon = () => (
-  <svg {...iconProps}>
-    <path d="M15 6l-6 6 6 6" />
-  </svg>
-);
-const ChevronRightIcon = () => (
-  <svg {...iconProps}>
-    <path d="M9 6l6 6-6 6" />
-  </svg>
-);
-const ZoomOutIcon = () => (
-  <svg {...iconProps}>
-    <circle cx="11" cy="11" r="7" />
-    <path d="M16.5 16.5L21 21M8 11h6" />
-  </svg>
-);
-const ZoomInIcon = () => (
-  <svg {...iconProps}>
-    <circle cx="11" cy="11" r="7" />
-    <path d="M16.5 16.5L21 21M8 11h6M11 8v6" />
-  </svg>
-);
-const FitWidthIcon = () => (
-  <svg {...iconProps}>
-    <path d="M4 12h16M7 8l-3 4 3 4M17 8l3 4-3 4" />
-  </svg>
-);
-const RotateIcon = () => (
-  <svg {...iconProps}>
-    <path d="M20 11A8 8 0 1 0 8.5 19.4M20 5v6h-6" />
-  </svg>
-);
-const DownloadIcon = () => (
-  <svg {...iconProps}>
-    <path d="M12 4v11M7 11l5 5 5-5M5 20h14" />
-  </svg>
-);
-const FileIcon = () => (
-  <svg {...iconProps}>
-    <path d="M6 3h8l5 5v13H6zM14 3v5h5" />
-  </svg>
-);
-const ErrorIcon = () => (
-  <svg {...iconProps} width={28} height={28}>
-    <circle cx="12" cy="12" r="9" />
-    <path d="M12 7.5v5.5M12 16.6v.1" />
-  </svg>
-);
 
 const LoadingState = () => (
   <div
@@ -175,12 +124,10 @@ export const PdfViewer: FC<PdfViewerProps> = ({
   // Surface adapter (fetch) failures: telemetry + consumer callback.
   useEffect(() => {
     if (!resolveError) return;
-    trackEvent(
+    trackTelemetry(
       TelemetryConstants.Service.LoadDocument,
       TelemetryConstants.Telemetry.Error,
       {
-        ApplicationName: TelemetryConstants.ApplicationName,
-        WidgetVersion: TelemetryConstants.Version,
         SourceType: source.type,
         Stage: "fetch",
         Error: resolveError.message,
@@ -197,12 +144,10 @@ export const PdfViewer: FC<PdfViewerProps> = ({
     (pdf: { numPages: number }) => {
       setNumPages(pdf.numPages);
       setPageNumber(1);
-      trackEvent(
+      trackTelemetry(
         TelemetryConstants.Service.LoadDocument,
         TelemetryConstants.Telemetry.Usage,
         {
-          ApplicationName: TelemetryConstants.ApplicationName,
-          WidgetVersion: TelemetryConstants.Version,
           SourceType: source.type,
           NumPages: pdf.numPages,
         },
@@ -215,12 +160,10 @@ export const PdfViewer: FC<PdfViewerProps> = ({
   const handleDocumentLoadError = useCallback(
     (error: Error) => {
       setRenderError(error);
-      trackEvent(
+      trackTelemetry(
         TelemetryConstants.Service.LoadDocument,
         TelemetryConstants.Telemetry.Error,
         {
-          ApplicationName: TelemetryConstants.ApplicationName,
-          WidgetVersion: TelemetryConstants.Version,
           SourceType: source.type,
           Stage: "render",
           Error: error.message,
@@ -286,22 +229,18 @@ export const PdfViewer: FC<PdfViewerProps> = ({
       anchor.remove();
       setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000);
 
-      trackEvent(
+      trackTelemetry(
         TelemetryConstants.Service.DownloadFile,
         TelemetryConstants.Telemetry.Usage,
         {
-          ApplicationName: TelemetryConstants.ApplicationName,
-          WidgetVersion: TelemetryConstants.Version,
           SourceType: source.type,
         },
       );
     } catch (error) {
-      trackEvent(
+      trackTelemetry(
         TelemetryConstants.Service.DownloadFile,
         TelemetryConstants.Telemetry.Error,
         {
-          ApplicationName: TelemetryConstants.ApplicationName,
-          WidgetVersion: TelemetryConstants.Version,
           SourceType: source.type,
           Error: error instanceof Error ? error.message : "Download failed",
         },
