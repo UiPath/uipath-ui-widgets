@@ -132,6 +132,58 @@ describe("PdfViewer", () => {
     });
   });
 
+  describe("source switching resets the view", () => {
+    it("resets page, zoom, and rotation when the source changes", async () => {
+      const user = userEvent.setup();
+      const { rerender } = render(
+        <PdfViewer source={{ type: "blob", data: pdfBlob }} />,
+      );
+      await waitForDocumentLoaded();
+
+      // Move off the default view: page 2, 125%, rotated 90°.
+      await user.click(screen.getByRole("button", { name: "Next page" }));
+      await user.click(screen.getByRole("button", { name: "Zoom in" }));
+      await user.click(
+        screen.getByRole("button", { name: "Rotate clockwise" }),
+      );
+      expect(screen.getByTestId("pdf-page")).toHaveTextContent(
+        "page-2 scale-1.25 rotate-90",
+      );
+
+      // Switch to a different source → full view reset.
+      rerender(
+        <PdfViewer
+          source={{ type: "url", url: "https://example.com/b.pdf" }}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-page")).toHaveTextContent(
+          "page-1 scale-1 rotate-0",
+        ),
+      );
+    });
+
+    it("resets when switching between two different blob sources (same sourceKey)", async () => {
+      const user = userEvent.setup();
+      const blobA = new Blob(["%PDF-A"], { type: "application/pdf" });
+      const blobB = new Blob(["%PDF-B"], { type: "application/pdf" });
+      const { rerender } = render(
+        <PdfViewer source={{ type: "blob", data: blobA }} />,
+      );
+      await waitForDocumentLoaded();
+
+      await user.click(
+        screen.getByRole("button", { name: "Rotate clockwise" }),
+      );
+      expect(screen.getByTestId("pdf-page")).toHaveTextContent("rotate-90");
+
+      rerender(<PdfViewer source={{ type: "blob", data: blobB }} />);
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-page")).toHaveTextContent("rotate-0"),
+      );
+    });
+  });
+
   describe("toolbar", () => {
     it("navigates pages with next/previous and the page input", async () => {
       const user = userEvent.setup();
@@ -282,9 +334,11 @@ describe("PdfViewer", () => {
       await waitFor(() =>
         expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
       );
-      expect(mockGetReadUri).toHaveBeenCalledWith(123, "inv/0714.pdf", {
-        folderId: 456,
-      });
+      expect(mockGetReadUri).toHaveBeenCalledWith(
+        123,
+        "inv/0714.pdf",
+        expect.objectContaining({ folderId: 456 }),
+      );
       expect(fetchMock).toHaveBeenCalledWith(
         "https://signed.example.com/inv.pdf",
         {
@@ -292,6 +346,57 @@ describe("PdfViewer", () => {
         },
       );
       expect(lastDocumentFile).toBeInstanceOf(Blob);
+    });
+
+    it("scopes the bucket by folderKey when provided instead of folderId", async () => {
+      mockGetReadUri.mockResolvedValue({
+        uri: "https://signed.example.com/inv.pdf",
+        httpMethod: "GET",
+        requiresAuth: false,
+        headers: {},
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({ ok: true, blob: async () => pdfBlob })),
+      );
+
+      render(
+        <PdfViewer
+          sdk={sdk}
+          source={{
+            type: "bucket",
+            bucketId: 123,
+            folderKey: "5f6dadf1-3677-49dc-8aca-c2999dd4b3ba",
+            path: "inv/0714.pdf",
+          }}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
+      );
+      expect(mockGetReadUri).toHaveBeenCalledWith(
+        123,
+        "inv/0714.pdf",
+        expect.objectContaining({
+          folderKey: "5f6dadf1-3677-49dc-8aca-c2999dd4b3ba",
+        }),
+      );
+    });
+
+    it("shows the error state when no folder identifier is provided", async () => {
+      render(
+        <PdfViewer
+          sdk={sdk}
+          source={{ type: "bucket", bucketId: 1, path: "a.pdf" }}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-viewer-error")).toBeInTheDocument(),
+      );
+      expect(
+        screen.getByText(/one of folderId, folderKey, or folderPath/),
+      ).toBeInTheDocument();
     });
 
     it("shows the error state when the sdk prop is missing", async () => {

@@ -142,6 +142,9 @@ export const PdfViewer: FC<PdfViewerProps> = ({
   const pageDims = useRef<{ width: number; height: number } | null>(null);
 
   const sourceKey = getSourceKey(source);
+  // All blob sources share the sourceKey "blob", so track the blob identity
+  // separately to also detect a switch between two different blob sources.
+  const blobIdentity = source.type === "blob" ? source.data : null;
   const {
     file,
     isResolving,
@@ -157,13 +160,17 @@ export const PdfViewer: FC<PdfViewerProps> = ({
 
   const resolvedFileName = fileName ?? defaultFileName(source);
 
-  // Reset viewer state when the document changes.
+  // Reset the full view state when the document changes — a new document opens
+  // at page 1, unzoomed, and unrotated. blobIdentity is included so switching
+  // between two blob sources (which share the same sourceKey) resets too.
   useEffect(() => {
     setNumPages(0);
     setPageNumber(1);
+    setScale(1);
+    setRotation(0);
     setRenderError(null);
     pageDims.current = null;
-  }, [sourceKey]);
+  }, [sourceKey, blobIdentity]);
 
   // Surface adapter (fetch) failures: telemetry + consumer callback.
   useEffect(() => {

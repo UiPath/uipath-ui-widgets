@@ -15,8 +15,17 @@ export type PdfViewerSource =
       type: "bucket";
       /** Orchestrator Storage Bucket ID */
       bucketId: number;
-      /** Folder containing the bucket */
-      folderId: number;
+      /**
+       * Folder containing the bucket. Provide exactly one of `folderId`,
+       * `folderKey`, or `folderPath` (mirrors the SDK's folder-scoping
+       * options). Modern Orchestrator / coded apps usually have the GUID
+       * `folderKey` rather than the numeric `folderId`.
+       */
+      folderId?: number;
+      /** Folder key (GUID) — alternative to `folderId`. */
+      folderKey?: string;
+      /** Slash-delimited folder path, e.g. "Shared/Finance" — alternative to `folderId`. */
+      folderPath?: string;
       /** Path of the file inside the bucket, e.g. "invoices/inv-0714.pdf" */
       path: string;
     }

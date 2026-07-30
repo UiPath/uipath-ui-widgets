@@ -32,7 +32,7 @@ export interface ResolvedSourceState {
 export function getSourceKey(source: PdfViewerSource): string {
   switch (source.type) {
     case "bucket":
-      return `bucket:${source.bucketId}:${source.folderId}:${source.path}`;
+      return `bucket:${source.bucketId}:${source.folderId ?? source.folderKey ?? source.folderPath ?? ""}:${source.path}`;
     case "entity":
       return `entity:${source.entityId}:${source.recordId}:${source.fieldName}`;
     case "url":
@@ -71,10 +71,23 @@ async function resolveSource(
           "An initialized UiPath SDK instance (`sdk` prop) is required for 'bucket' sources.",
         );
       }
+      if (
+        source.folderId === undefined &&
+        !source.folderKey &&
+        !source.folderPath
+      ) {
+        throw new Error(
+          "A 'bucket' source requires one of folderId, folderKey, or folderPath.",
+        );
+      }
       // Buckets are two-step: get a pre-signed read URI, then download it.
+      // Pass whichever folder identifier the caller provided (the SDK's
+      // getReadUri accepts folderId / folderKey / folderPath).
       const buckets = new BucketService(sdk);
       const access = await buckets.getReadUri(source.bucketId, source.path, {
         folderId: source.folderId,
+        folderKey: source.folderKey,
+        folderPath: source.folderPath,
       });
       const response = await fetch(access.uri, { headers: access.headers });
       if (!response.ok) {

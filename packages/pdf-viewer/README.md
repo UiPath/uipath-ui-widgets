@@ -43,8 +43,10 @@ function App() {
 One `source` prop, four shapes (a discriminated union — the `type` field selects which other fields apply):
 
 ```tsx
-// Orchestrator storage bucket (requires `sdk`)
-<PdfViewer sdk={sdk} source={{ type: "bucket", bucketId, folderId, path }} />
+// Orchestrator storage bucket (requires `sdk`).
+// Scope the folder with one of folderId, folderKey (GUID), or folderPath —
+// coded apps usually have the GUID folderKey.
+<PdfViewer sdk={sdk} source={{ type: "bucket", bucketId, folderKey, path }} />
 
 // Data Fabric entity file field (requires `sdk`)
 <PdfViewer sdk={sdk} source={{ type: "entity", entityId, recordId, fieldName }} />
