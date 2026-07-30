@@ -1,0 +1,403 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { PdfViewer } from "../PdfViewer";
+import { getSourceKey } from "../sources/useResolvedSource";
+import { UiPath, trackEvent } from "@uipath/uipath-typescript/core";
+
+// Captures the `file` prop react-pdf receives, per render.
+let lastDocumentFile: unknown = null;
+
+// Mock react-pdf: <Document> "loads" 3 pages asynchronously; <Page> echoes its props.
+vi.mock("react-pdf", async () => {
+  const React = await import("react");
+  return {
+    pdfjs: { GlobalWorkerOptions: {} },
+    Document: ({ file, onLoadSuccess, children }: any) => {
+      lastDocumentFile = file;
+      React.useEffect(() => {
+        onLoadSuccess?.({ numPages: 3 });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      return <div data-testid="pdf-document">{children}</div>;
+    },
+    Page: ({ pageNumber, scale, rotate }: any) => (
+      <div data-testid="pdf-page">
+        page-{pageNumber} scale-{scale} rotate-{rotate}
+      </div>
+    ),
+  };
+});
+
+// Mock SDK services to avoid real network/auth.
+const mockGetReadUri = vi.fn();
+vi.mock("@uipath/uipath-typescript/buckets", () => ({
+  BucketService: class {
+    getReadUri = mockGetReadUri;
+  },
+}));
+
+const mockDownloadAttachment = vi.fn();
+vi.mock("@uipath/uipath-typescript/entities", () => ({
+  Entities: class {
+    downloadAttachment = mockDownloadAttachment;
+  },
+}));
+
+vi.mock("@uipath/uipath-typescript/core", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    trackEvent: vi.fn(),
+  };
+});
+
+vi.mock("@uipath/apollo-wind", () => ({
+  Button: ({ children, onClick, disabled, ...rest }: any) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={rest["aria-label"]}
+    >
+      {children}
+    </button>
+  ),
+}));
+
+const sdk = new UiPath({
+  baseUrl: "https://test.uipath.com",
+  orgName: "test-org",
+  tenantName: "test-tenant",
+  secret: "test-secret",
+});
+
+const pdfBlob = new Blob(["%PDF-fake"], { type: "application/pdf" });
+
+/** Waits until the mocked document has fully "loaded" (numPages committed). */
+const waitForDocumentLoaded = () =>
+  waitFor(() =>
+    expect(
+      screen.getByRole("spinbutton", { name: "Page number" }),
+    ).toHaveAttribute("max", "3"),
+  );
+
+describe("PdfViewer", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    lastDocumentFile = null;
+  });
+
+  describe("url and blob sources (no SDK required)", () => {
+    it("renders the document from a url source and passes the url through", async () => {
+      render(
+        <PdfViewer
+          source={{ type: "url", url: "https://example.com/doc.pdf" }}
+        />,
+      );
+
+      await waitForDocumentLoaded();
+      expect(screen.getByTestId("pdf-page")).toHaveTextContent("page-1");
+      expect(lastDocumentFile).toBe("https://example.com/doc.pdf");
+    });
+
+    it("normalizes an ArrayBuffer blob source into a typed Blob", async () => {
+      const buffer = new TextEncoder().encode("%PDF-fake").buffer;
+      render(<PdfViewer source={{ type: "blob", data: buffer }} />);
+
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
+      );
+      expect(lastDocumentFile).toBeInstanceOf(Blob);
+      expect((lastDocumentFile as Blob).type).toBe("application/pdf");
+    });
+
+    it("reports load success via callback and telemetry", async () => {
+      const onLoadSuccess = vi.fn();
+      render(
+        <PdfViewer
+          source={{ type: "blob", data: pdfBlob }}
+          onLoadSuccess={onLoadSuccess}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(onLoadSuccess).toHaveBeenCalledWith({ numPages: 3 }),
+      );
+      expect(trackEvent).toHaveBeenCalledWith(
+        "PDFV.LoadDocument",
+        "PDFV.Usage",
+        expect.objectContaining({ SourceType: "blob", NumPages: 3 }),
+      );
+    });
+  });
+
+  describe("toolbar", () => {
+    it("navigates pages with next/previous and the page input", async () => {
+      const user = userEvent.setup();
+      render(<PdfViewer source={{ type: "blob", data: pdfBlob }} />);
+      await waitForDocumentLoaded();
+
+      await user.click(screen.getByRole("button", { name: "Next page" }));
+      expect(screen.getByTestId("pdf-page")).toHaveTextContent("page-2");
+
+      await user.click(screen.getByRole("button", { name: "Previous page" }));
+      expect(screen.getByTestId("pdf-page")).toHaveTextContent("page-1");
+
+      fireEvent.change(
+        screen.getByRole("spinbutton", { name: "Page number" }),
+        {
+          target: { value: "3" },
+        },
+      );
+      expect(screen.getByTestId("pdf-page")).toHaveTextContent("page-3");
+      // Out-of-range input is clamped to the last page.
+      fireEvent.change(
+        screen.getByRole("spinbutton", { name: "Page number" }),
+        {
+          target: { value: "99" },
+        },
+      );
+      expect(screen.getByTestId("pdf-page")).toHaveTextContent("page-3");
+    });
+
+    it("zooms in and out within bounds", async () => {
+      const user = userEvent.setup();
+      render(<PdfViewer source={{ type: "blob", data: pdfBlob }} />);
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByRole("button", { name: "Zoom in" }));
+      expect(screen.getByText("125%")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Zoom out" }));
+      await user.click(screen.getByRole("button", { name: "Zoom out" }));
+      expect(screen.getByText("75%")).toBeInTheDocument();
+    });
+
+    it("rotates the page clockwise in 90° steps", async () => {
+      const user = userEvent.setup();
+      render(<PdfViewer source={{ type: "blob", data: pdfBlob }} />);
+      await waitForDocumentLoaded();
+
+      await user.click(
+        screen.getByRole("button", { name: "Rotate clockwise" }),
+      );
+      expect(screen.getByTestId("pdf-page")).toHaveTextContent("rotate-90");
+    });
+
+    it("hides the toolbar entirely with toolbar={false}", async () => {
+      render(
+        <PdfViewer source={{ type: "blob", data: pdfBlob }} toolbar={false} />,
+      );
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
+      );
+      expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
+    });
+
+    it("hides individual features via per-feature toggles", async () => {
+      render(
+        <PdfViewer
+          source={{ type: "blob", data: pdfBlob }}
+          toolbar={{ zoom: false, download: false }}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
+      );
+      expect(
+        screen.getByRole("button", { name: "Next page" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Zoom in" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Download" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("downloads the resolved blob via an object URL", async () => {
+      const user = userEvent.setup();
+      const createObjectURL = vi.fn(() => "blob:mock-url");
+      const revokeObjectURL = vi.fn();
+      vi.stubGlobal(
+        "URL",
+        Object.assign(URL, { createObjectURL, revokeObjectURL }),
+      );
+      // jsdom can't navigate; stub the programmatic anchor click.
+      const anchorClick = vi
+        .spyOn(HTMLAnchorElement.prototype, "click")
+        .mockImplementation(() => {});
+
+      render(
+        <PdfViewer
+          source={{ type: "blob", data: pdfBlob }}
+          fileName="invoice.pdf"
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByRole("button", { name: "Download" }));
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+      expect(anchorClick).toHaveBeenCalledTimes(1);
+      expect(trackEvent).toHaveBeenCalledWith(
+        "PDFV.DownloadFile",
+        "PDFV.Usage",
+        expect.objectContaining({ SourceType: "blob" }),
+      );
+      anchorClick.mockRestore();
+    });
+  });
+
+  describe("bucket source", () => {
+    it("resolves via getReadUri and downloads the signed uri with its headers", async () => {
+      mockGetReadUri.mockResolvedValue({
+        uri: "https://signed.example.com/inv.pdf",
+        httpMethod: "GET",
+        requiresAuth: false,
+        headers: { "x-signed": "1" },
+      });
+      const fetchMock = vi.fn(async () => ({
+        ok: true,
+        blob: async () => pdfBlob,
+      }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      render(
+        <PdfViewer
+          sdk={sdk}
+          source={{
+            type: "bucket",
+            bucketId: 123,
+            folderId: 456,
+            path: "inv/0714.pdf",
+          }}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
+      );
+      expect(mockGetReadUri).toHaveBeenCalledWith(123, "inv/0714.pdf", {
+        folderId: 456,
+      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://signed.example.com/inv.pdf",
+        {
+          headers: { "x-signed": "1" },
+        },
+      );
+      expect(lastDocumentFile).toBeInstanceOf(Blob);
+    });
+
+    it("shows the error state when the sdk prop is missing", async () => {
+      const onLoadError = vi.fn();
+      render(
+        <PdfViewer
+          source={{ type: "bucket", bucketId: 1, folderId: 2, path: "a.pdf" }}
+          onLoadError={onLoadError}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-viewer-error")).toBeInTheDocument(),
+      );
+      expect(
+        screen.getByText(/required for 'bucket' sources/),
+      ).toBeInTheDocument();
+      expect(onLoadError).toHaveBeenCalled();
+      expect(trackEvent).toHaveBeenCalledWith(
+        "PDFV.LoadDocument",
+        "PDFV.Error",
+        expect.objectContaining({ SourceType: "bucket", Stage: "fetch" }),
+      );
+    });
+  });
+
+  describe("entity source", () => {
+    it("downloads the record's file field via downloadAttachment", async () => {
+      mockDownloadAttachment.mockResolvedValue(pdfBlob);
+
+      render(
+        <PdfViewer
+          sdk={sdk}
+          source={{
+            type: "entity",
+            entityId: "entity-1",
+            recordId: "record-1",
+            fieldName: "document",
+          }}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
+      );
+      expect(mockDownloadAttachment).toHaveBeenCalledWith(
+        "entity-1",
+        "record-1",
+        "document",
+      );
+      expect(lastDocumentFile).toBeInstanceOf(Blob);
+    });
+
+    it("shows the error state on fetch failure and recovers via Retry", async () => {
+      const user = userEvent.setup();
+      mockDownloadAttachment
+        .mockRejectedValueOnce(new Error("Attachment not found"))
+        .mockResolvedValueOnce(pdfBlob);
+
+      render(
+        <PdfViewer
+          sdk={sdk}
+          source={{
+            type: "entity",
+            entityId: "entity-1",
+            recordId: "record-1",
+            fieldName: "document",
+          }}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-viewer-error")).toBeInTheDocument(),
+      );
+      expect(screen.getByText("Attachment not found")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Retry" }));
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
+      );
+      expect(mockDownloadAttachment).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("getSourceKey", () => {
+    it("produces distinct, stable keys per source identity", () => {
+      expect(
+        getSourceKey({
+          type: "bucket",
+          bucketId: 1,
+          folderId: 2,
+          path: "a.pdf",
+        }),
+      ).toBe("bucket:1:2:a.pdf");
+      expect(
+        getSourceKey({
+          type: "entity",
+          entityId: "e",
+          recordId: "r",
+          fieldName: "f",
+        }),
+      ).toBe("entity:e:r:f");
+      expect(getSourceKey({ type: "url", url: "https://x/y.pdf" })).toBe(
+        "url:https://x/y.pdf",
+      );
+      expect(getSourceKey({ type: "blob", data: pdfBlob })).toBe("blob");
+    });
+  });
+});

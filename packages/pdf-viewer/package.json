@@ -1,0 +1,85 @@
+{
+  "name": "@uipath/ui-widgets-pdf-viewer",
+  "version": "1.0.0-beta.1",
+  "description": "A React PDF viewer widget for UiPath coded apps — renders PDFs from Orchestrator Storage Buckets, Data Fabric entity attachments, or plain URLs/Blobs",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./PdfViewer.css": "./dist/PdfViewer.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "npm run clean && tsc && npm run copy-styles",
+    "clean": "rimraf dist",
+    "copy-styles": "sass --no-source-map src/PdfViewer.scss | postcss -o dist/PdfViewer.css",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage --run"
+  },
+  "keywords": [
+    "react",
+    "pdf",
+    "pdf-viewer",
+    "react-pdf",
+    "uipath",
+    "storage-bucket",
+    "data-fabric",
+    "ui"
+  ],
+  "author": "UiPath",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/UiPath/uipath-ui-widgets.git",
+    "directory": "packages/pdf-viewer"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "bugs": {
+    "url": "https://github.com/UiPath/uipath-ui-widgets/issues"
+  },
+  "homepage": "https://uipath.github.io/uipath-ui-widgets/?path=/docs/components-pdfviewer--docs",
+  "peerDependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "@uipath/uipath-typescript": "^1.4.1"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/ui": "^4.0.18",
+    "jsdom": "^25.0.1",
+    "typescript": "~5.9.3",
+    "vite": "^6.0.3",
+    "vitest": "^4.0.18",
+    "postcss": "^8.5.6",
+    "postcss-cli": "^11.0.1",
+    "sass": "^1.83.4",
+    "lightningcss": "^1.30.2",
+    "@tailwindcss/oxide": "^4.1.18"
+  },
+  "dependencies": {
+    "@uipath/apollo-core": "^5.7.0",
+    "@uipath/apollo-wind": "^0.10.0",
+    "react-pdf": "^10.3.0",
+    "pdfjs-dist": "5.4.296"
+  }
+}

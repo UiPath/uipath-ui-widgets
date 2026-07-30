@@ -11,7 +11,8 @@
     "packages/datatable",
     "packages/conversational-agent-chat",
     "packages/validation-station",
-    "packages/external-auth"
+    "packages/external-auth",
+    "packages/pdf-viewer"
   ],
   "scripts": {
     "dev": "vite",

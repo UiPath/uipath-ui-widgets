@@ -1,0 +1,27 @@
+import { describe, it, expect } from "vitest";
+import reactPdfPackage from "react-pdf/package.json";
+import pdfjsPackage from "pdfjs-dist/package.json";
+import ourPackage from "../../package.json";
+
+/**
+ * The pdf.js engine is split in two: the API half (imported via react-pdf)
+ * and the worker file (resolved from OUR "pdfjs-dist" dependency by the
+ * consumer's bundler — see pdfWorker.ts). If the two resolve to different
+ * pdfjs-dist versions, the viewer dies at runtime with
+ * "API version X does not match Worker version Y".
+ *
+ * react-pdf exact-pins its pdfjs-dist for this reason; we must pin the same
+ * version. This test fails whenever react-pdf is bumped without re-syncing
+ * our pdfjs-dist pin.
+ */
+describe("pdfjs-dist version sync", () => {
+  it("our pdfjs-dist pin matches react-pdf's exact pin", () => {
+    const reactPdfPin = reactPdfPackage.dependencies["pdfjs-dist"];
+    expect(ourPackage.dependencies["pdfjs-dist"]).toBe(reactPdfPin);
+  });
+
+  it("the resolved pdfjs-dist copy matches react-pdf's pin", () => {
+    const reactPdfPin = reactPdfPackage.dependencies["pdfjs-dist"];
+    expect(pdfjsPackage.version).toBe(reactPdfPin);
+  });
+});
