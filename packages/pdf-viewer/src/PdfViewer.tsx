@@ -408,6 +408,13 @@ export const PdfViewer: FC<PdfViewerProps> = ({
             file={documentFile}
             onLoadSuccess={handleDocumentLoadSuccess}
             onLoadError={handleDocumentLoadError}
+            onPassword={() =>
+              handleDocumentLoadError(
+                new Error(
+                  "This PDF is password-protected, which isn't supported.",
+                ),
+              )
+            }
             loading={<LoadingState />}
             noData={
               <p className="py-16 text-sm text-[var(--color-foreground-light)]">

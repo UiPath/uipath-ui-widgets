@@ -8,16 +8,20 @@ import { UiPath, trackEvent } from "@uipath/uipath-typescript/core";
 
 // Captures the `file` prop react-pdf receives, per render.
 let lastDocumentFile: unknown = null;
+// When true, the mocked <Document> fires onPassword (a password-protected PDF)
+// instead of loading — for the "not supported" test.
+let simulatePasswordPrompt = false;
 
 // Mock react-pdf: <Document> "loads" 3 pages asynchronously; <Page> echoes its props.
 vi.mock("react-pdf", async () => {
   const React = await import("react");
   return {
     pdfjs: { GlobalWorkerOptions: {} },
-    Document: ({ file, onLoadSuccess, children }: any) => {
+    Document: ({ file, onLoadSuccess, onPassword, children }: any) => {
       lastDocumentFile = file;
       React.useEffect(() => {
-        onLoadSuccess?.({ numPages: 3 });
+        if (simulatePasswordPrompt) onPassword?.(() => {}, 1);
+        else onLoadSuccess?.({ numPages: 3 });
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, []);
       return <div data-testid="pdf-document">{children}</div>;
@@ -86,6 +90,7 @@ describe("PdfViewer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     lastDocumentFile = null;
+    simulatePasswordPrompt = false;
   });
 
   describe("url and blob sources (no SDK required)", () => {
@@ -129,6 +134,23 @@ describe("PdfViewer", () => {
         "PDFV.Usage",
         expect.objectContaining({ SourceType: "blob", NumPages: 3 }),
       );
+    });
+
+    it("shows the error state for password-protected PDFs (not supported)", async () => {
+      simulatePasswordPrompt = true;
+      const onLoadError = vi.fn();
+      render(
+        <PdfViewer
+          source={{ type: "blob", data: pdfBlob }}
+          onLoadError={onLoadError}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-viewer-error")).toBeInTheDocument(),
+      );
+      expect(screen.getByText(/password-protected/i)).toBeInTheDocument();
+      expect(onLoadError).toHaveBeenCalled();
     });
   });
 

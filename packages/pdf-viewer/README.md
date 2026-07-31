@@ -81,6 +81,14 @@ One `source` prop, four shapes (a discriminated union — the `type` field selec
   embedding beside other content (e.g. an approval form in a coded action app)
 - Telemetry (`Widget.PdfViewer`) for document load success/failure and downloads
 
+## Limitations (v1)
+
+- **Password-protected PDFs are not supported** — a protected document shows the
+  error state rather than prompting for a password.
+- **Non-Latin / CJK PDFs may render blank glyphs** — pdf.js needs cMap assets to
+  render some non-Latin (e.g. Chinese / Japanese / Korean) scripts, which v1
+  does not bundle.
+
 ## Development
 
 ```bash
