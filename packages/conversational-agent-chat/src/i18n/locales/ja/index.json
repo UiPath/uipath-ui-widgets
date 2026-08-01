@@ -2,6 +2,7 @@
   "error_open_conversation": "会話を開けませんでした: {{errorMessage}}",
   "error_generic": "問題が発生しました。もう一度お試しください。",
   "error_send_message": "メールを送信できませんでした: {{errorMessage}}",
+  "error_session_start_timeout": "会話のセッションを開始する際にタイムアウトしました。もう一度お試しください。",
   "error_upload_attachments": "添付ファイルのアップロードに失敗しました。もう一度お試しください。",
   "error_missing_conversation_params": "conversationId または agentId のいずれかと folderId を指定する必要があります。",
   "error_initialize_chat": "チャットの初期化に失敗しました。",

@@ -2,6 +2,7 @@
   "error_open_conversation": "Impossible d’ouvrir la conversation : {{errorMessage}}",
   "error_generic": "Une erreur s'est produite. Veuillez réessayer.",
   "error_send_message": "Impossible d’envoyer l’e-mail : {{errorMessage}}",
+  "error_session_start_timeout": "",
   "error_upload_attachments": "Impossible de charger les pièces jointes. Veuillez réessayer.",
   "error_missing_conversation_params": "Il est nécessaire de fournir le folderId, accompagné du conversationId ou de l’agentId.",
   "error_initialize_chat": "Échec de l’initialisation de la conversation",

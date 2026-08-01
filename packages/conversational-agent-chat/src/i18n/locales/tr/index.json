@@ -2,6 +2,7 @@
   "error_open_conversation": "Sohbet açılamadı: {{errorMessage}}",
   "error_generic": "Bir sorun oldu. Lütfen tekrar deneyin.",
   "error_send_message": "Mesaj gönderilemedi: {{errorMessage}}",
+  "error_session_start_timeout": "Görüşme için bir oturum başlatma zaman aşımına uğradı. Lütfen tekrar deneyin.",
   "error_upload_attachments": "Ekler yüklenemedi. Lütfen tekrar deneyin.",
   "error_missing_conversation_params": "conversationId veya agentId ve folderId sağlanmalıdır.",
   "error_initialize_chat": "Sohbet başlatılamadı",
