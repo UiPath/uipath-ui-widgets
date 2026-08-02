@@ -1,6 +1,6 @@
 import { Button } from "@uipath/apollo-wind";
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Document, Page } from "react-pdf";
+import { Document, Page, PasswordResponses } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import "./pdfWorker";
@@ -12,6 +12,7 @@ import {
   ErrorIcon,
   FileIcon,
   FitWidthIcon,
+  LockIcon,
   RotateIcon,
   ZoomInIcon,
   ZoomOutIcon,
@@ -70,6 +71,70 @@ const ToolbarSeparator = () => (
   <div className="mx-1 h-5 w-px bg-[var(--color-border-de-emp)]" aria-hidden />
 );
 
+/**
+ * A pending pdf.js password request. Submitting retries the load with the
+ * given password; cancelling fails the load into the widget's error state.
+ */
+interface PasswordRequest {
+  callback: (password: string | null) => void;
+  /** True when a previous password was wrong (INCORRECT_PASSWORD). */
+  isRetry: boolean;
+}
+
+/** In-viewer password prompt shown for password-protected documents. */
+const PasswordPrompt: FC<{
+  isRetry: boolean;
+  onSubmit: (password: string) => void;
+  onCancel: () => void;
+}> = ({ isRetry, onSubmit, onCancel }) => {
+  const [password, setPassword] = useState("");
+
+  return (
+    <form
+      className="flex flex-col items-center justify-center gap-3 py-16 text-center"
+      data-testid="pdf-viewer-password"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!password) return;
+        // Clear before submitting so a wrong attempt re-prompts empty.
+        setPassword("");
+        onSubmit(password);
+      }}
+    >
+      <span className="text-[var(--color-foreground-light)]">
+        <LockIcon />
+      </span>
+      <p className="text-sm font-semibold text-foreground">
+        This document is password-protected
+      </p>
+      <p className="max-w-xs text-sm text-[var(--color-foreground-light)]">
+        Enter the password to open it.
+      </p>
+      {isRetry && (
+        <p className="text-sm text-[var(--color-error-icon)]" role="alert">
+          Incorrect password. Try again.
+        </p>
+      )}
+      <input
+        type="password"
+        value={password}
+        onChange={(event) => setPassword(event.target.value)}
+        aria-label="Document password"
+        autoFocus
+        className="w-56 rounded border border-[var(--color-border-de-emp)] bg-background px-2 py-1 text-center text-sm text-foreground"
+      />
+      <div className="flex gap-2">
+        <Button variant="outline" type="button" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={!password}>
+          Open document
+        </Button>
+      </div>
+    </form>
+  );
+};
+
 export const PdfViewer: FC<PdfViewerProps> = ({
   source,
   sdk,
@@ -85,6 +150,8 @@ export const PdfViewer: FC<PdfViewerProps> = ({
   const [rotation, setRotation] = useState(0);
   const [retryKey, setRetryKey] = useState(0);
   const [renderError, setRenderError] = useState<Error | null>(null);
+  const [passwordRequest, setPasswordRequest] =
+    useState<PasswordRequest | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   // Natural page size at scale 1, captured on page load — used by fit-to-width.
@@ -118,6 +185,7 @@ export const PdfViewer: FC<PdfViewerProps> = ({
     setScale(1);
     setRotation(0);
     setRenderError(null);
+    setPasswordRequest(null);
     pageDims.current = null;
   }, [sourceKey, blobIdentity]);
 
@@ -144,6 +212,7 @@ export const PdfViewer: FC<PdfViewerProps> = ({
     (pdf: { numPages: number }) => {
       setNumPages(pdf.numPages);
       setPageNumber(1);
+      setPasswordRequest(null);
       trackTelemetry(
         TelemetryConstants.Service.LoadDocument,
         TelemetryConstants.Telemetry.Usage,
@@ -160,6 +229,7 @@ export const PdfViewer: FC<PdfViewerProps> = ({
   const handleDocumentLoadError = useCallback(
     (error: Error) => {
       setRenderError(error);
+      setPasswordRequest(null);
       trackTelemetry(
         TelemetryConstants.Service.LoadDocument,
         TelemetryConstants.Telemetry.Error,
@@ -176,8 +246,22 @@ export const PdfViewer: FC<PdfViewerProps> = ({
 
   const handleRetry = useCallback(() => {
     setRenderError(null);
+    setPasswordRequest(null);
     setRetryKey((key) => key + 1);
   }, []);
+
+  // pdf.js requests a password (or re-requests one after a wrong attempt).
+  // Show the widget's own styled prompt instead of react-pdf's default,
+  // which calls the browser-native window.prompt.
+  const handlePassword = useCallback(
+    (callback: (password: string | null) => void, reason: number) => {
+      setPasswordRequest({
+        callback,
+        isRetry: reason === PasswordResponses.INCORRECT_PASSWORD,
+      });
+    },
+    [],
+  );
 
   const goToPage = useCallback(
     (page: number) => {
@@ -403,40 +487,51 @@ export const PdfViewer: FC<PdfViewerProps> = ({
         ) : isResolving ? (
           <LoadingState />
         ) : documentFile ? (
-          <Document
-            key={`${sourceKey}-${retryKey}`}
-            file={documentFile}
-            onLoadSuccess={handleDocumentLoadSuccess}
-            onLoadError={handleDocumentLoadError}
-            onPassword={() =>
-              handleDocumentLoadError(
-                new Error(
-                  "This PDF is password-protected, which isn't supported.",
-                ),
-              )
-            }
-            loading={<LoadingState />}
-            noData={
-              <p className="py-16 text-sm text-[var(--color-foreground-light)]">
-                No document to display.
-              </p>
-            }
-          >
-            <Page
-              pageNumber={pageNumber}
-              scale={scale}
-              rotate={rotation}
-              renderTextLayer
-              renderAnnotationLayer
-              className="shadow-md"
-              onLoadSuccess={(page) => {
-                pageDims.current = {
-                  width: page.originalWidth,
-                  height: page.originalHeight,
-                };
-              }}
-            />
-          </Document>
+          <>
+            {passwordRequest && (
+              <PasswordPrompt
+                isRetry={passwordRequest.isRetry}
+                onSubmit={(password) => {
+                  setPasswordRequest(null);
+                  passwordRequest.callback(password);
+                }}
+                onCancel={() => passwordRequest.callback(null)}
+              />
+            )}
+            {/* Keep <Document> mounted while the prompt is up — pdf.js is
+                suspended awaiting the password callback; unmounting would
+                destroy the pending load. */}
+            <div style={passwordRequest ? { display: "none" } : undefined}>
+              <Document
+                key={`${sourceKey}-${retryKey}`}
+                file={documentFile}
+                onLoadSuccess={handleDocumentLoadSuccess}
+                onLoadError={handleDocumentLoadError}
+                onPassword={handlePassword}
+                loading={<LoadingState />}
+                noData={
+                  <p className="py-16 text-sm text-[var(--color-foreground-light)]">
+                    No document to display.
+                  </p>
+                }
+              >
+                <Page
+                  pageNumber={pageNumber}
+                  scale={scale}
+                  rotate={rotation}
+                  renderTextLayer
+                  renderAnnotationLayer
+                  className="shadow-md"
+                  onLoadSuccess={(page) => {
+                    pageDims.current = {
+                      width: page.originalWidth,
+                      height: page.originalHeight,
+                    };
+                  }}
+                />
+              </Document>
+            </div>
+          </>
         ) : null}
       </div>
     </div>

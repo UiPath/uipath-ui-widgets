@@ -8,20 +8,42 @@ import { UiPath, trackEvent } from "@uipath/uipath-typescript/core";
 
 // Captures the `file` prop react-pdf receives, per render.
 let lastDocumentFile: unknown = null;
-// When true, the mocked <Document> fires onPassword (a password-protected PDF)
-// instead of loading — for the "not supported" test.
-let simulatePasswordPrompt = false;
+// When true, the mocked <Document> behaves like a password-protected PDF:
+// it fires onPassword and only "loads" once CORRECT_PASSWORD is supplied.
+let simulatePasswordProtected = false;
+const CORRECT_PASSWORD = "letmein";
 
 // Mock react-pdf: <Document> "loads" 3 pages asynchronously; <Page> echoes its props.
 vi.mock("react-pdf", async () => {
   const React = await import("react");
   return {
     pdfjs: { GlobalWorkerOptions: {} },
-    Document: ({ file, onLoadSuccess, onPassword, children }: any) => {
+    PasswordResponses: { NEED_PASSWORD: 1, INCORRECT_PASSWORD: 2 },
+    Document: ({
+      file,
+      onLoadSuccess,
+      onLoadError,
+      onPassword,
+      children,
+    }: any) => {
       lastDocumentFile = file;
       React.useEffect(() => {
-        if (simulatePasswordPrompt) onPassword?.(() => {}, 1);
-        else onLoadSuccess?.({ numPages: 3 });
+        if (simulatePasswordProtected) {
+          // Mirrors pdf.js: retries with INCORRECT_PASSWORD until the right
+          // password arrives; a null password (cancel) fails the load.
+          const attempt = (password: string | null) => {
+            if (password === null) {
+              onLoadError?.(new Error("No password given"));
+            } else if (password === CORRECT_PASSWORD) {
+              onLoadSuccess?.({ numPages: 3 });
+            } else {
+              onPassword?.(attempt, 2); // INCORRECT_PASSWORD
+            }
+          };
+          onPassword?.(attempt, 1); // NEED_PASSWORD
+        } else {
+          onLoadSuccess?.({ numPages: 3 });
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, []);
       return <div data-testid="pdf-document">{children}</div>;
@@ -62,6 +84,7 @@ vi.mock("@uipath/apollo-wind", () => ({
     <button
       onClick={onClick}
       disabled={disabled}
+      type={rest.type ?? "button"}
       aria-label={rest["aria-label"]}
     >
       {children}
@@ -90,7 +113,7 @@ describe("PdfViewer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     lastDocumentFile = null;
-    simulatePasswordPrompt = false;
+    simulatePasswordProtected = false;
   });
 
   describe("url and blob sources (no SDK required)", () => {
@@ -135,9 +158,85 @@ describe("PdfViewer", () => {
         expect.objectContaining({ SourceType: "blob", NumPages: 3 }),
       );
     });
+  });
 
-    it("shows the error state for password-protected PDFs (not supported)", async () => {
-      simulatePasswordPrompt = true;
+  describe("password-protected PDFs", () => {
+    it("shows the in-viewer password prompt instead of the native window.prompt", async () => {
+      simulatePasswordProtected = true;
+      render(<PdfViewer source={{ type: "blob", data: pdfBlob }} />);
+
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-viewer-password")).toBeInTheDocument(),
+      );
+      expect(screen.getByText(/password-protected/i)).toBeInTheDocument();
+      expect(screen.getByLabelText("Document password")).toBeInTheDocument();
+    });
+
+    it("unlocks and renders once the correct password is submitted", async () => {
+      simulatePasswordProtected = true;
+      const user = userEvent.setup();
+      const onLoadSuccess = vi.fn();
+      render(
+        <PdfViewer
+          source={{ type: "blob", data: pdfBlob }}
+          onLoadSuccess={onLoadSuccess}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-viewer-password")).toBeInTheDocument(),
+      );
+      await user.type(
+        screen.getByLabelText("Document password"),
+        CORRECT_PASSWORD,
+      );
+      await user.click(screen.getByRole("button", { name: "Open document" }));
+
+      await waitFor(() =>
+        expect(onLoadSuccess).toHaveBeenCalledWith({ numPages: 3 }),
+      );
+      expect(
+        screen.queryByTestId("pdf-viewer-password"),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("pdf-page")).toHaveTextContent("page-1");
+    });
+
+    it("shows an incorrect-password message and allows retrying", async () => {
+      simulatePasswordProtected = true;
+      const user = userEvent.setup();
+      const onLoadSuccess = vi.fn();
+      render(
+        <PdfViewer
+          source={{ type: "blob", data: pdfBlob }}
+          onLoadSuccess={onLoadSuccess}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-viewer-password")).toBeInTheDocument(),
+      );
+      await user.type(screen.getByLabelText("Document password"), "wrong");
+      await user.click(screen.getByRole("button", { name: "Open document" }));
+
+      // The prompt returns with the incorrect-password message.
+      await waitFor(() =>
+        expect(screen.getByText(/incorrect password/i)).toBeInTheDocument(),
+      );
+
+      // Retrying with the right password recovers.
+      await user.type(
+        screen.getByLabelText("Document password"),
+        CORRECT_PASSWORD,
+      );
+      await user.click(screen.getByRole("button", { name: "Open document" }));
+      await waitFor(() =>
+        expect(onLoadSuccess).toHaveBeenCalledWith({ numPages: 3 }),
+      );
+    });
+
+    it("falls through to the error state when the prompt is cancelled", async () => {
+      simulatePasswordProtected = true;
+      const user = userEvent.setup();
       const onLoadError = vi.fn();
       render(
         <PdfViewer
@@ -147,10 +246,17 @@ describe("PdfViewer", () => {
       );
 
       await waitFor(() =>
+        expect(screen.getByTestId("pdf-viewer-password")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() =>
         expect(screen.getByTestId("pdf-viewer-error")).toBeInTheDocument(),
       );
-      expect(screen.getByText(/password-protected/i)).toBeInTheDocument();
       expect(onLoadError).toHaveBeenCalled();
+      expect(
+        screen.queryByTestId("pdf-viewer-password"),
+      ).not.toBeInTheDocument();
     });
   });
 

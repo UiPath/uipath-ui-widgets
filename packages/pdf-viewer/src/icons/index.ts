@@ -6,4 +6,5 @@ export { FitWidthIcon } from "./FitWidthIcon";
 export { RotateIcon } from "./RotateIcon";
 export { DownloadIcon } from "./DownloadIcon";
 export { FileIcon } from "./FileIcon";
+export { LockIcon } from "./LockIcon";
 export { ErrorIcon } from "./ErrorIcon";
