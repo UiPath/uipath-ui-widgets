@@ -11,15 +11,17 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./PdfViewer.css": "./dist/PdfViewer.css"
+    "./PdfViewer.css": "./dist/PdfViewer.css",
+    "./pdf.worker.min.mjs": "./dist/pdf.worker.min.mjs"
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "npm run clean && tsc && npm run copy-styles",
+    "build": "npm run clean && tsc && npm run copy-styles && npm run copy-worker",
     "clean": "rimraf dist",
     "copy-styles": "sass --no-source-map src/PdfViewer.scss | postcss -o dist/PdfViewer.css",
+    "copy-worker": "node scripts/copy-worker.mjs",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
@@ -76,10 +78,11 @@
     "lightningcss": "^1.30.2",
     "@tailwindcss/oxide": "^4.1.18"
   },
+  "//": "react-pdf and pdfjs-dist are EXACT-pinned on purpose: pdf.js requires its API and worker halves to be the same version, and this package ships the worker (dist/pdf.worker.min.mjs, copied from our pinned pdfjs-dist at build time). A caret range would let a consumer's install pair a newer react-pdf API with our packaged worker and fail at runtime. Bump react-pdf and pdfjs-dist together — scripts/copy-worker.mjs and pdfjs-version-sync.test.ts enforce the match.",
   "dependencies": {
     "@uipath/apollo-core": "^5.7.0",
     "@uipath/apollo-wind": "^0.10.0",
-    "react-pdf": "^10.3.0",
+    "react-pdf": "10.4.1",
     "pdfjs-dist": "5.4.296"
   }
 }

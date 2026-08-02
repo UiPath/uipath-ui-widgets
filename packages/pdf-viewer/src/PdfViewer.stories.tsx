@@ -1,7 +1,18 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { UiPath } from "@uipath/uipath-typescript/core";
+import { pdfjs } from "react-pdf";
 import "./PdfViewer.scss";
 import { PdfViewer } from "./PdfViewer";
+
+// Storybook consumes the widget's *source*, where the packaged worker file
+// (copied into dist/ at build time — see scripts/copy-worker.mjs) doesn't
+// exist next to pdfWorker.ts. Resolve it from pdfjs-dist via the bundler
+// instead — the same one-line override documented for consumers with
+// non-standard setups. Runs after the widget's own default (import order).
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url,
+).toString();
 
 /**
  * A tiny 3-page PDF embedded as base64 so the default stories render

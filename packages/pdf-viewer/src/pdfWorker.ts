@@ -9,11 +9,21 @@ import { pdfjs } from "react-pdf";
 // worker fetch is blocked, and runtime-loading the engine from a third party
 // defeats the "UiPath owns the dependency" purpose of this widget.
 //
-// `new URL(..., import.meta.url)` is the standards-based pattern that Vite and
-// webpack 5 both recognize: the consumer's bundler copies the worker out of
-// node_modules into the app's own build output (same-origin, version-pinned
-// to the pdfjs-dist that react-pdf resolves).
+// The worker file SHIPS INSIDE THIS PACKAGE (copied into dist/ at build time
+// from our exact-pinned pdfjs-dist — see scripts/copy-worker.mjs) and is
+// referenced relative to this module:
+//  - production bundlers (Vite / webpack 5) recognize the standards-based
+//    `new URL(relative, import.meta.url)` pattern even inside dependencies
+//    and emit the worker into the app's build output (same-origin, hashed);
+//  - dev servers that don't rewrite it (e.g. Vite dev serving a pre-built
+//    dependency) still resolve to the real file inside node_modules, which
+//    they serve directly — no consumer configuration needed;
+//  - the worker bytes are always OUR pinned pdfjs-dist version, immune to a
+//    different pdfjs-dist being hoisted elsewhere in the consumer's tree.
+//
+// Escape hatch: a consumer with an exotic setup can still override this by
+// assigning `pdfjs.GlobalWorkerOptions.workerSrc` after importing the widget.
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
+  "./pdf.worker.min.mjs",
   import.meta.url,
 ).toString();

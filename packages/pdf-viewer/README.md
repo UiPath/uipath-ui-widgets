@@ -2,7 +2,7 @@
 
 A React PDF viewer widget for UiPath coded apps. Renders PDFs from **Orchestrator Storage Buckets**, **Data Fabric entity attachments**, or plain **URLs/Blobs** — with a prop-toggleable toolbar, selectable text, and built-in loading/error states.
 
-Built on [react-pdf](https://www.npmjs.com/package/react-pdf) (Mozilla pdf.js). The pdf.js worker is **bundled locally** (no CDN), so the widget works behind enterprise CSP/firewalls — e.g. coded apps deployed on `*.uipath.host` — and UiPath owns the dependency update cadence.
+Built on [react-pdf](https://www.npmjs.com/package/react-pdf) (Mozilla pdf.js). The pdf.js worker **ships inside this package** (no CDN, no bundler configuration), so the widget works behind enterprise CSP/firewalls — e.g. coded apps deployed on `*.uipath.host` — and UiPath owns the dependency update cadence. The packaged worker is byte-exact the `pdfjs-dist` version this widget pins, so the pdf.js API and worker can never mismatch regardless of what the consumer's dependency tree hoists.
 
 ## Installation
 
@@ -76,15 +76,32 @@ One `source` prop, four shapes (a discriminated union — the `type` field selec
 - Zoom 50%–300%, fit-to-width, 90° rotation
 - Download the original file
 - Selectable/copyable text (pdf.js text layer) and clickable in-PDF links
+- Password-protected PDFs — an in-viewer password prompt (with retry on a wrong
+  password), replacing the browser-native `window.prompt`
 - Loading, error (with Retry), and empty states built in
 - Container-sized: fills its parent and scrolls internally — designed for
   embedding beside other content (e.g. an approval form in a coded action app)
 - Telemetry (`Widget.PdfViewer`) for document load success/failure and downloads
 
+## Worker configuration (advanced)
+
+No configuration is needed: the widget points pdf.js at the worker file shipped
+in this package (`new URL("./pdf.worker.min.mjs", import.meta.url)`), which
+production bundlers emit into the app build and dev servers serve straight from
+`node_modules`. If your toolchain resolves neither (e.g. a dev server that
+pre-bundles dependencies and rewrites `import.meta.url`), override it once in
+your app after importing the widget:
+
+```ts
+import { pdfjs } from "react-pdf";
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url,
+).toString();
+```
+
 ## Limitations (v1)
 
-- **Password-protected PDFs are not supported** — a protected document shows the
-  error state rather than prompting for a password.
 - **Non-Latin / CJK PDFs may render blank glyphs** — pdf.js needs cMap assets to
   render some non-Latin (e.g. Chinese / Japanese / Korean) scripts, which v1
   does not bundle.

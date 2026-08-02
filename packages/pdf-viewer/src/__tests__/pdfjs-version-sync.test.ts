@@ -24,4 +24,15 @@ describe("pdfjs-dist version sync", () => {
     const reactPdfPin = reactPdfPackage.dependencies["pdfjs-dist"];
     expect(pdfjsPackage.version).toBe(reactPdfPin);
   });
+
+  // The worker ships inside the package: pdfWorker.ts references
+  // "./pdf.worker.min.mjs" and the build copies it into dist/ (with its own
+  // version check — see scripts/copy-worker.mjs). If the copy step is dropped
+  // from the build, the published package 404s its own worker.
+  it("the build pipeline copies the packaged worker into dist", () => {
+    expect(ourPackage.scripts.build).toContain("copy-worker");
+    expect(ourPackage.exports["./pdf.worker.min.mjs"]).toBe(
+      "./dist/pdf.worker.min.mjs",
+    );
+  });
 });
