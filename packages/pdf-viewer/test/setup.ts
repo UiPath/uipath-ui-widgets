@@ -3,9 +3,11 @@ import { expect, afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
-// Cleanup after each test case (e.g. clearing jsdom)
+// Cleanup after each test case (e.g. clearing jsdom) and revert any
+// vi.stubGlobal(...) stubs so global state never leaks across tests.
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 // Add custom matchers

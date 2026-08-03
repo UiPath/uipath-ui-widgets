@@ -83,6 +83,9 @@ async function resolveSource(
       // Buckets are two-step: get a pre-signed read URI, then download it.
       // Pass whichever folder identifier the caller provided (the SDK's
       // getReadUri accepts folderId / folderKey / folderPath).
+      // Note: the positional call below is the SDK's PREFERRED overload
+      // (available since the ^1.4.1 peer floor); the single-options-object
+      // form some older widgets use is marked @deprecated in the SDK.
       const buckets = new BucketService(sdk);
       const access = await buckets.getReadUri(source.bucketId, source.path, {
         folderId: source.folderId,

@@ -5,8 +5,9 @@ import { version } from "../package.json";
  * Where the PDF lives. A discriminated union — the `type` field selects
  * which other fields apply, so mutually exclusive source shapes can't be mixed.
  *
- * Field names mirror the SDK signatures they map to:
- * - `bucket`  → `Buckets.getReadUri(bucketId, path, { folderId })`
+ * Field names mirror the SDK signatures they map to (the SDK's preferred
+ * positional forms — the single-options-object overloads are deprecated):
+ * - `bucket`  → `Buckets.getReadUri(bucketId, path, { folderId | folderKey | folderPath })`
  * - `entity`  → `Entities.downloadAttachment(entityId, recordId, fieldName)`
  * - `url` / `blob` → escape hatches for custom data stores (no SDK required)
  */

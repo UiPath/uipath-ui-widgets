@@ -28,6 +28,7 @@
     "**/__tests__/**",
     "**/*.test.ts",
     "**/*.test.tsx",
+    "**/*.stories.tsx",
     "test"
   ]
 }
