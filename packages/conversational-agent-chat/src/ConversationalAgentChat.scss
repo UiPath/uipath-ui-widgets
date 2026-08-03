@@ -55,17 +55,47 @@
     }
   }
 
-  // Schema form: flow scalar fields into two columns when the form's own
-  // container is wide enough. Object/array fields keep `col-span-2` so their
-  // own nested grid uses the full width. Below the breakpoint we stay single
-  // column to avoid cramming date pickers / chip inputs side-by-side.
-  .uipath-cas-schema-form {
-    container-type: inline-size;
+  // TEMP SHIM — remove once apollo-react ships the loader gradient fix.
+  // Apollo's chat "Generating…" loader sweeps a shimmer gradient across the
+  // text, but its stylesheet builds the gradient as `var(--color-background)20`
+  // — appending a hex-alpha suffix to a var() is invalid CSS, so the whole
+  // background is dropped and the sweep is invisible (loader looks frozen).
+  // The shimmer container is the div directly wrapping the loader's only
+  // aria-live="polite" node; re-apply a valid color-mix gradient to its
+  // ::after. Delete this block after bumping to the fixed apollo-react.
+  div:has(> [aria-live="polite"])::after {
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-background) 12%, transparent) 0%,
+      color-mix(in srgb, var(--color-background) 25%, transparent) 25%,
+      color-mix(in srgb, var(--color-background) 50%, transparent) 50%,
+      color-mix(in srgb, var(--color-background) 25%, transparent) 75%,
+      color-mix(in srgb, var(--color-background) 12%, transparent) 100%
+    );
   }
 
-  @container (min-width: 500px) {
-    .uipath-cas-schema-grid {
-      grid-template-columns: 1fr 1fr;
+  // Schema form: pair scalar fields into two columns when there's room, and
+  // collapse to a single column when space is tight. We use an intrinsic
+  // `auto-fit` grid rather than a container query so every grid sizes to its
+  // OWN width — including nested object/array grids, which are indented and
+  // narrower than the form and would otherwise inherit the outer width and
+  // stay stuck at two cramped columns. `minmax(min(100%, 15rem), 1fr)` keeps a
+  // lone field full-width and never lets a column force horizontal overflow.
+  .uipath-cas-schema-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+
+    // Grid items default to `min-width: auto`, so a long label or input refuses
+    // to shrink below its content and spills into its neighbor. Let cells
+    // shrink to their track so content truncates/wraps instead of overlapping.
+    > * {
+      min-width: 0;
+    }
+
+    // Object/array fields own a nested grid and must take the whole row no
+    // matter how many columns auto-fit produced (`col-span-2` assumes exactly
+    // two tracks, which breaks once the count changes).
+    > .col-span-2 {
+      grid-column: 1 / -1;
     }
   }
 

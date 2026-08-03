@@ -1,12 +1,31 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import i18next from "i18next";
 import { ConversationalAgentChat } from "../ConversationalAgentChat";
 import { UiPath } from "@uipath/uipath-typescript/core";
 
 // Mock @uipath/apollo-react
 vi.mock("@uipath/apollo-react/core/fonts/font.css", () => ({}));
+
+// Stub FilePreviewer so citation-preview tests stay off the pdfjs stack.
+vi.mock("../components/FilePreviewer", () => ({
+  default: (props: any) => (
+    <div
+      data-testid="file-previewer"
+      data-usepdfjs={String(props.usePdfJs)}
+      data-page={String(props.pageNumber)}
+      data-iframeparams={props.iframeParams}
+      data-filename={props.file?.name}
+    />
+  ),
+}));
 
 const createMockChatService = () => ({
   on: vi.fn(() => vi.fn()),
@@ -19,6 +38,7 @@ const createMockChatService = () => ({
   stopResponse: vi.fn(),
   clearError: vi.fn(),
   appendOlderHistoryItems: vi.fn(),
+  prependOlderMessages: vi.fn(),
   setLocale: vi.fn(),
   setTheme: vi.fn(),
   getLocale: vi.fn().mockReturnValue("en"),
@@ -48,10 +68,21 @@ vi.mock("@uipath/apollo-react/material/components", () => ({
     OpenConversation: "openConversation",
     DeleteConversation: "deleteConversation",
     HistoryLoadMore: "historyLoadMore",
+    ConversationLoadMore: "conversationLoadMore",
     HistorySearch: "historySearch",
     Feedback: "feedback",
     StopResponse: "stopResponse",
     CustomHeaderActionClicked: "customHeaderActionClicked",
+  },
+  AutopilotChatPreHookAction: {
+    NewChat: "new-chat",
+    ToggleHistory: "toggle-history",
+    ToggleSettings: "toggle-settings",
+    ToggleChat: "toggle-chat",
+    CloseChat: "close-chat",
+    CitationClick: "citation-click",
+    Feedback: "feedback",
+    DeleteConversation: "delete-conversation",
   },
   AutopilotChatService: {
     Instantiate: vi.fn(() => mockChatService),
@@ -72,11 +103,19 @@ const {
   mockGetById,
   mockCreate,
   mockUpdateById,
+  mockDownloadCitationSource,
+  mockExchangesGetAll,
+  sessionControl,
 } = vi.hoisted(() => ({
   capturedAgentConstructorArgs: [] as any[][],
   mockGetById: vi.fn(),
   mockCreate: vi.fn(),
   mockUpdateById: vi.fn(),
+  mockDownloadCitationSource: vi.fn(),
+  mockExchangesGetAll: vi.fn(),
+  // When neverStarts is true, startSession returns a session that never fires
+  // sessionStarted and keeps emits paused — exercises the start-timeout path.
+  sessionControl: { neverStarts: false },
 }));
 
 // Store handlers for testing
@@ -88,6 +127,8 @@ let chunkHandler: any = null;
 let contentPartEndHandler: any = null;
 let toolCallEndHandler: any = null;
 let labelUpdatedHandler: any = null;
+let lastSessionHelper: any = null;
+let lastExchange: any = null;
 
 // Prevent lint errors for handler variables that are assigned inside mocks
 void contentPartStartHandler;
@@ -149,12 +190,21 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
     },
   ];
 
+  // Default: one page of exchanges with an older page still available, so
+  // infinite-scroll tests can exercise the ConversationLoadMore path.
+  mockExchangesGetAll.mockResolvedValue({
+    items: mockExch,
+    nextCursor: { value: "exch-cursor-1" },
+    hasNextPage: true,
+  });
+
   return {
     ConversationalAgent: class {
       constructor(...args: any[]) {
         capturedAgentConstructorArgs.push(args);
       }
       getById = mockGetById;
+      downloadCitationSource = mockDownloadCitationSource;
 
       getAll = vi.fn().mockResolvedValue([
         {
@@ -181,7 +231,7 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
         }),
         getById: vi.fn().mockResolvedValue({
           exchanges: {
-            getAll: vi.fn().mockResolvedValue({ items: mockExch }),
+            getAll: mockExchangesGetAll,
           },
         }),
         uploadAttachment: vi.fn().mockResolvedValue({
@@ -193,25 +243,39 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
         startSession: vi.fn().mockImplementation(() => {
           const sessionHelper = {
             onSessionStarted: vi.fn((callback: any) => {
-              setTimeout(callback, 0);
-              return sessionHelper;
+              if (!sessionControl.neverStarts) setTimeout(callback, 0);
+              return () => {};
             }),
+            onErrorStart: vi.fn(() => () => {}),
             onLabelUpdated: vi.fn((handler: any) => {
               labelUpdatedHandler = handler;
               return () => {};
             }),
-            startExchange: vi.fn(() => ({
-              onErrorStart: vi.fn((handler: any) => {
-                exchangeErrorHandler = handler;
-              }),
-              onMessageStart: vi.fn((handler: any) => {
-                messageStartHandler = handler;
-              }),
-              onExchangeEnd: vi.fn(),
-              sendExchangeEnd: vi.fn(),
-              startMessage: vi.fn(() => mockMessageBuilder),
-            })),
+            sendSessionEnd: vi.fn(),
+            pauseEmits: vi.fn(function (this: any) {
+              this.isEmitPaused = true;
+            }),
+            resumeEmits: vi.fn(function (this: any) {
+              this.isEmitPaused = false;
+            }),
+            isEmitPaused: false,
+            startExchange: vi.fn(() => {
+              const exchange = {
+                onErrorStart: vi.fn((handler: any) => {
+                  exchangeErrorHandler = handler;
+                }),
+                onMessageStart: vi.fn((handler: any) => {
+                  messageStartHandler = handler;
+                }),
+                onExchangeEnd: vi.fn(),
+                sendExchangeEnd: vi.fn(),
+                startMessage: vi.fn(() => mockMessageBuilder),
+              };
+              lastExchange = exchange;
+              return exchange;
+            }),
           };
+          lastSessionHelper = sessionHelper;
           return sessionHelper;
         }),
       };
@@ -271,6 +335,9 @@ describe("ConversationalAgentChat", () => {
     contentPartEndHandler = null;
     toolCallEndHandler = null;
     labelUpdatedHandler = null;
+    lastSessionHelper = null;
+    lastExchange = null;
+    sessionControl.neverStarts = false;
     defaultProps = {
       sdk: mockSdk as UiPath,
       agentId: 1,
@@ -467,6 +534,62 @@ describe("ConversationalAgentChat", () => {
             config: expect.objectContaining({
               firstRunExperience: expect.objectContaining({
                 suggestions: [{ label: "Test Prompt", prompt: "test" }],
+              }),
+            }),
+          }),
+        );
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it("should let host firstRunExperience override agent appearance", async () => {
+    const { AutopilotChatService } =
+      await import("@uipath/apollo-react/material/components");
+
+    render(
+      <ConversationalAgentChat
+        {...defaultProps}
+        firstRunExperience={{
+          title: "Host Title",
+          description: "Host Description",
+          suggestions: [{ label: "Host Prompt", prompt: "host" }],
+        }}
+      />,
+    );
+
+    await waitFor(
+      () => {
+        expect(AutopilotChatService.Instantiate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            config: expect.objectContaining({
+              firstRunExperience: {
+                title: "Host Title",
+                description: "Host Description",
+                suggestions: [{ label: "Host Prompt", prompt: "host" }],
+              },
+            }),
+          }),
+        );
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it("should fall back to agent appearance when no host firstRunExperience is provided", async () => {
+    const { AutopilotChatService } =
+      await import("@uipath/apollo-react/material/components");
+
+    render(<ConversationalAgentChat {...defaultProps} />);
+
+    await waitFor(
+      () => {
+        expect(AutopilotChatService.Instantiate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            config: expect.objectContaining({
+              firstRunExperience: expect.objectContaining({
+                title: "Welcome to Test Agent",
+                description: "This is a test agent",
               }),
             }),
           }),
@@ -708,6 +831,42 @@ describe("ConversationalAgentChat", () => {
       expect(mockChatService.setConversation).toHaveBeenCalled();
     });
 
+    it("ends the active session before reopening a conversation", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      // Establish a session by sending a message.
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Hello", attachments: [] });
+      const startedSession = lastSessionHelper;
+      const startedExchange = lastExchange;
+
+      const onClickOpenConversation = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "openConversation",
+      )?.[1];
+      await onClickOpenConversation?.("conv-1");
+
+      // Switching away ends the outgoing session so the reopened chat does
+      // not send on a stale session whose sessionStarted never re-fires.
+      await waitFor(() =>
+        expect(startedSession?.sendSessionEnd).toHaveBeenCalledTimes(1),
+      );
+      // But the in-flight exchange keeps running so reopening resumes its turn;
+      // ending the turn is reserved for Stop.
+      expect(startedExchange?.sendExchangeEnd).not.toHaveBeenCalled();
+    });
+
     it("should call stopResponse and clearError when opening a conversation", async () => {
       render(<ConversationalAgentChat {...defaultProps} />);
 
@@ -780,6 +939,76 @@ describe("ConversationalAgentChat", () => {
       expect(mockChatService.setConversation).not.toHaveBeenCalled();
     });
 
+    it("should prepend older messages when scrolling to the top", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "conversationLoadMore",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const openConversation = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "openConversation",
+      )?.[1];
+      const onConversationLoadMore = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "conversationLoadMore",
+      )?.[1];
+
+      // Open a conversation so there is an active conversation + exchange cursor.
+      await openConversation?.("conv-1");
+
+      mockChatService.prependOlderMessages.mockClear();
+      await onConversationLoadMore?.();
+
+      // hasNextPage is true, so the older page is prepended with done=false.
+      expect(mockChatService.prependOlderMessages).toHaveBeenCalledWith(
+        expect.any(Array),
+        false,
+      );
+    });
+
+    it("should signal done to prependOlderMessages when no older pages remain", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "conversationLoadMore",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const openConversation = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "openConversation",
+      )?.[1];
+      const onConversationLoadMore = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "conversationLoadMore",
+      )?.[1];
+
+      // First (and only) page reports no further pages, so the cursor clears.
+      mockExchangesGetAll.mockResolvedValueOnce({
+        items: [],
+        nextCursor: undefined,
+        hasNextPage: false,
+      });
+      await openConversation?.("conv-1");
+
+      mockChatService.prependOlderMessages.mockClear();
+      await onConversationLoadMore?.();
+
+      expect(mockChatService.prependOlderMessages).toHaveBeenCalledWith(
+        [],
+        true,
+      );
+    });
+
     it("should load conversation history on init", async () => {
       render(<ConversationalAgentChat {...defaultProps} />);
 
@@ -841,6 +1070,39 @@ describe("ConversationalAgentChat", () => {
 
       // Trigger new chat - should not throw
       onNewChat?.();
+    });
+
+    it("ends the active session before starting a new chat", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      // Establish a session by sending a message.
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Hello", attachments: [] });
+      const startedSession = lastSessionHelper;
+      expect(startedSession?.sendSessionEnd).not.toHaveBeenCalled();
+
+      const onNewChat = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "newChat",
+      )?.[1];
+      onNewChat?.();
+
+      // The outgoing session is ended so reopening it later starts cleanly
+      // and receives a fresh sessionStarted rather than hanging the send.
+      await waitFor(() =>
+        expect(startedSession?.sendSessionEnd).toHaveBeenCalledTimes(1),
+      );
     });
   });
 
@@ -2181,6 +2443,79 @@ describe("ConversationalAgentChat", () => {
       );
     });
 
+    it("buffers outgoing events until the session starts, then flushes", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Hello", attachments: [] });
+
+      // Emits are paused on session creation so the send never blocks on the
+      // sessionStarted round-trip…
+      expect(lastSessionHelper?.pauseEmits).toHaveBeenCalled();
+      // …and flushed once the server signals the session has started.
+      await waitFor(() =>
+        expect(lastSessionHelper?.resumeEmits).toHaveBeenCalled(),
+      );
+    });
+
+    it("surfaces an error and clears the session if it never starts", async () => {
+      vi.useFakeTimers();
+      try {
+        sessionControl.neverStarts = true;
+        render(<ConversationalAgentChat {...defaultProps} />);
+
+        // Flush the async agent/service setup so the request handler registers.
+        await vi.waitFor(() =>
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          ),
+        );
+        const onSendMessage = mockChatService.on.mock.calls.find(
+          (call: any) => call[0] === "request",
+        )?.[1];
+
+        await act(async () => {
+          await onSendMessage?.({ content: "Hello", attachments: [] });
+        });
+        // The session is created and emits paused (never resumed here).
+        expect(lastSessionHelper?.pauseEmits).toHaveBeenCalled();
+        expect(mockChatService.setError).not.toHaveBeenCalled();
+        const abandonedSession = lastSessionHelper;
+
+        // The watchdog fires after the start timeout, surfacing the error.
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(30_000);
+        });
+        expect(mockChatService.setError).toHaveBeenCalledWith(
+          "Timed out starting a session for the conversation. Please try again.",
+        );
+
+        // A subsequent send builds a fresh session rather than reusing the
+        // permanently-paused one that was cleared by the watchdog.
+        sessionControl.neverStarts = false;
+        await act(async () => {
+          await onSendMessage?.({ content: "Retry", attachments: [] });
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(lastSessionHelper).not.toBe(abandonedSession);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("should track OpenConversation success telemetry", async () => {
       render(<ConversationalAgentChat {...defaultProps} />);
 
@@ -2429,6 +2764,134 @@ describe("ConversationalAgentChat", () => {
 
       const [, options] = capturedAgentConstructorArgs[0];
       expect(options?.externalUserId).toBeUndefined();
+    });
+  });
+
+  describe("citation preview", () => {
+    const pdfCitation = {
+      number: 1,
+      title: "Doc.pdf",
+      download_url: "https://example.com/doc",
+      page_number: 2,
+    };
+
+    const getCitationClickHandler = async () => {
+      const { AutopilotChatService } =
+        await import("@uipath/apollo-react/material/components");
+      let handler: any;
+      await waitFor(() => {
+        const call = (AutopilotChatService.Instantiate as any).mock.calls.at(
+          -1,
+        );
+        handler = call?.[0]?.config?.preHooks?.["citation-click"];
+        expect(handler).toBeTypeOf("function");
+      });
+      return handler;
+    };
+
+    it("opens a preview dialog for a context-grounding citation by default", async () => {
+      mockDownloadCitationSource.mockResolvedValue(
+        new Blob(["pdf"], { type: "application/pdf" }),
+      );
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      const handler = await getCitationClickHandler();
+      let result: boolean | undefined;
+      await act(async () => {
+        result = await handler({ citation: pdfCitation });
+      });
+
+      // Consumed the click so Apollo does not also handle it.
+      expect(result).toBe(false);
+      // Citation is mapped to the SDK's CitationSourceMedia shape (camelCase).
+      expect(mockDownloadCitationSource).toHaveBeenCalledWith({
+        title: "Doc.pdf",
+        number: 1,
+        downloadUrl: "https://example.com/doc",
+        pageNumber: "2",
+      });
+
+      const previewer = await screen.findByTestId("file-previewer");
+      expect(previewer).toBeInTheDocument();
+      // Defaults to the pdfjs viewer and forwards the cited page.
+      expect(previewer).toHaveAttribute("data-usepdfjs", "true");
+      expect(previewer).toHaveAttribute("data-page", "2");
+      expect(screen.getByText("Doc.pdf")).toBeInTheDocument();
+    });
+
+    it("renders the preview with usePdfJs=false when usePdfJsViewer is false", async () => {
+      mockDownloadCitationSource.mockResolvedValue(
+        new Blob(["pdf"], { type: "application/pdf" }),
+      );
+      render(
+        <ConversationalAgentChat {...defaultProps} usePdfJsViewer={false} />,
+      );
+
+      const handler = await getCitationClickHandler();
+      await act(async () => {
+        await handler({ citation: pdfCitation });
+      });
+
+      const previewer = await screen.findByTestId("file-previewer");
+      expect(previewer).toHaveAttribute("data-usepdfjs", "false");
+      // Native viewer navigates to the cited page via the #page anchor.
+      expect(previewer).toHaveAttribute("data-iframeparams", "#page=2");
+    });
+
+    it("falls through without opening a preview when citationPreview is false", async () => {
+      render(
+        <ConversationalAgentChat {...defaultProps} citationPreview={false} />,
+      );
+
+      const handler = await getCitationClickHandler();
+      let result: boolean | undefined;
+      await act(async () => {
+        result = await handler({ citation: pdfCitation });
+      });
+
+      expect(result).toBe(true);
+      expect(mockDownloadCitationSource).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("file-previewer")).not.toBeInTheDocument();
+    });
+
+    it("falls through for citations without a download_url", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      const handler = await getCitationClickHandler();
+      let result: boolean | undefined;
+      await act(async () => {
+        result = await handler({
+          citation: {
+            number: 1,
+            title: "External",
+            url: "https://example.com",
+          },
+        });
+      });
+
+      expect(result).toBe(true);
+      expect(mockDownloadCitationSource).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("file-previewer")).not.toBeInTheDocument();
+    });
+
+    it("consumes the click and shows an error when the source fails to download", async () => {
+      mockDownloadCitationSource.mockRejectedValue(new Error("401"));
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      const handler = await getCitationClickHandler();
+      let result: boolean | undefined;
+      await act(async () => {
+        result = await handler({ citation: pdfCitation });
+      });
+
+      // Consume the click (return false) instead of falling through to
+      // Apollo's default, which would re-open the auth-gated URL and 401.
+      expect(result).toBe(false);
+      expect(screen.queryByTestId("file-previewer")).not.toBeInTheDocument();
+      expect(
+        await screen.findByText("Failed to load file preview."),
+      ).toBeInTheDocument();
     });
   });
 });

@@ -120,5 +120,12 @@ export async function fetchBucketArtifacts(
       fetchArtifactText(bucketService, BucketId, folderId, EncodedDocumentPath),
     ]);
 
-  return { taxonomy, extractionResult, dom, text, customizationInfo, original };
+  return {
+    taxonomy: taxonomy as DuFramework.DocumentTaxonomy,
+    extractionResult: extractionResult as DuFramework.ExtractionResult,
+    dom: dom as DuFramework.DocumentEntity,
+    text,
+    customizationInfo,
+    original,
+  };
 }

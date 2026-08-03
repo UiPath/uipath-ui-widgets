@@ -6,12 +6,23 @@ import {
   AutopilotChatFileInfo,
   AutopilotChatMessage,
   AutopilotChatMode,
+  AutopilotChatPreHookAction,
   AutopilotChatService,
   type SupportedLocale,
 } from "@uipath/apollo-react/material/components";
 import { FontVariantToken } from "@uipath/apollo-core";
 import i18next from "i18next";
-import { Alert, AlertDescription, Button } from "@uipath/apollo-wind";
+import {
+  Alert,
+  AlertDescription,
+  Button,
+  Column,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  PortalContainerProvider,
+} from "@uipath/apollo-wind";
 import {
   ContentPartChunkEvent,
   ContentPartStream,
@@ -72,6 +83,7 @@ import {
   convertAttachmentToFile,
   createFileKey,
   getConversationHistoryDisplayItems,
+  getFirstRunExperience,
   mapCitationSource,
   mapExchangesToChatMessages,
   normalizeInput,
@@ -80,10 +92,19 @@ import {
 import { trackTelemetry } from "./utils/telemetryUtils";
 import { initI18n } from "./i18n";
 import { resolveAgent as fetchAgentRelease } from "./utils/resolveAgent";
+import FilePreviewer from "./components/FilePreviewer";
 
 initI18n();
 
 const TOOL_CONFIRMATION_WIDGET_ID_PREFIX = "confirmation-";
+// Exchanges per page when lazily loading a conversation's history. Pages are
+// fetched newest-first and prepended as the user scrolls toward the top.
+const EXCHANGES_PAGE_SIZE = 15;
+
+// Watchdog for a session that never starts: buffered sends only flush on
+// `sessionStarted`, so if it never arrives, surface an error instead of
+// leaving the send silently pending.
+const SESSION_START_TIMEOUT_MS = 30_000;
 type ConversationCreateOptionsArg = Parameters<
   ConversationalAgent["conversations"]["create"]
 >[2];
@@ -106,6 +127,8 @@ export const ConversationalAgentChat = ({
   overrideLabels,
   firstRunExperience,
   disabledFeatures,
+  citationPreview = true,
+  usePdfJsViewer = true,
   jobStartOverrides,
   isDebugMode = false,
   evaluationSets,
@@ -165,6 +188,7 @@ export const ConversationalAgentChat = ({
     folderIdRef.current = folderId;
     onEvaluationSetClickedRef.current = onEvaluationSetClicked;
     onUserMessageSentRef.current = onUserMessageSent;
+    citationPreviewRef.current = citationPreview;
     toolConfirmationLabelsRef.current = {
       cancel: t("cancel"),
       confirm: t("tool_confirmation_confirm"),
@@ -178,6 +202,7 @@ export const ConversationalAgentChat = ({
     firstRunExperience,
     onEvaluationSetClicked,
     onUserMessageSent,
+    citationPreview,
     folderId,
     t,
   ]);
@@ -200,6 +225,9 @@ export const ConversationalAgentChat = ({
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
   const conversationsCursor = useRef<{ value: string } | undefined>(undefined);
+  // Cursor for the active conversation's exchange history. Reset whenever a
+  // conversation is opened/started; undefined means no older pages remain.
+  const exchangesCursor = useRef<{ value: string } | undefined>(undefined);
   const agentIdRef = useRef<number | undefined>(undefined);
   const agentKeyRef = useRef<string | undefined>(undefined);
   const searchTextRef = useRef<string>("");
@@ -217,6 +245,14 @@ export const ConversationalAgentChat = ({
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [feedbackIsPositive, setFeedbackIsPositive] = useState(false);
   const pendingFeedback = useRef<AutopilotChatActionPayload | null>(null);
+  // Citation source-document preview, opened from a citation click.
+  const [citationPreviewData, setCitationPreviewData] = useState<{
+    file?: File;
+    title: string;
+    pageNumber: number;
+    error?: boolean;
+  } | null>(null);
+  const citationPreviewRef = useRef(citationPreview);
   const [hasMessages, setHasMessages] = useState(false);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
   const onUserMessageSentRef = useRef(onUserMessageSent);
@@ -648,6 +684,9 @@ export const ConversationalAgentChat = ({
       conversation.id,
       { echo: false },
     );
+    // Mark active before registering handlers so a synchronous sessionStarted
+    // can't lose the `session.current === sessionHelper` guard race below.
+    session.current = sessionHelper;
     // Refresh the sidebar label when the service auto-generates one (or the
     // label is updated via the API). Bind to this session's conversation id
     // so a stale event from an orphaned session can't mislabel the active one.
@@ -658,18 +697,57 @@ export const ConversationalAgentChat = ({
         ),
       );
     });
-    return new Promise((resolve) => {
-      sessionHelper.onSessionStarted(() => {
-        session.current = sessionHelper;
-        resolve(sessionHelper);
-      });
+    // Buffer outgoing events until the server confirms the session is started,
+    // then flush — so a send never blocks on the sessionStarted round-trip.
+    // Combined with ending the session on switch (see endActiveSession), a
+    // reopened conversation starts fresh and its buffered send flushes as soon
+    // as the fresh sessionStarted arrives.
+    sessionHelper.pauseEmits();
+    const startTimeout = setTimeout(() => {
+      // Ignore a session abandoned by a switch/unmount so it can't error on the
+      // now-active conversation. If the active session never started, nothing
+      // flushes the buffer — surface an error and clear it so a retry can build
+      // a fresh session rather than reusing this permanently-paused one.
+      if (session.current !== sessionHelper) return;
+      if (sessionHelper.isEmitPaused) {
+        session.current = null;
+        chatService?.setError(t("error_session_start_timeout"));
+      }
+    }, SESSION_START_TIMEOUT_MS);
+    sessionHelper.onSessionStarted(() => {
+      clearTimeout(startTimeout);
+      if (session.current !== sessionHelper) return;
+      sessionHelper.resumeEmits();
     });
-  }, [getConversation, setConversationHistory]);
+    sessionHelper.onErrorStart((error) => {
+      clearTimeout(startTimeout);
+      if (session.current !== sessionHelper) return;
+      session.current = null;
+      chatService?.setError(error.message || t("error_generic"));
+    });
+    return sessionHelper;
+  }, [chatService, getConversation, setConversationHistory, t]);
+
+  // End the session on conversation switch/unmount so a reopen starts fresh and
+  // gets a new `sessionStarted` — reusing a stale session hangs the send. The
+  // in-flight exchange is left running (ending it is reserved for onStopResponse),
+  // so switching away from a busy conversation and reopening resumes its turn.
+  const endActiveSession = useCallback(() => {
+    try {
+      session.current?.sendSessionEnd();
+    } catch {
+      /* session already closed */
+    }
+    activeExchange.current = null;
+    session.current = null;
+  }, []);
 
   const onNewChat = useCallback(() => {
+    endActiveSession();
     currentConversation.current = null;
     session.current = null;
     activeExchange.current = null;
+    exchangesCursor.current = undefined;
     storedAgentInputs.current = {};
     setHasMessages(false);
     // Re-show the InputsPage with a cleared form when the agent's schema has
@@ -680,7 +758,7 @@ export const ConversationalAgentChat = ({
       setShowInputPage(true);
     }
     trackTelemetry(TelemetryEvent.NewChat, TelemetryStatus.Success);
-  }, [inputSchemaState]);
+  }, [endActiveSession, inputSchemaState]);
 
   const buildHistoryFilterOptions = useCallback(() => {
     // The SDK's URL builder calls value.toString() without a null check, so
@@ -880,16 +958,29 @@ export const ConversationalAgentChat = ({
     [chatService, processAttachmentsInBatch, t],
   );
 
+  // Fetch one page of a conversation's exchanges, newest-first, advancing
+  // `exchangesCursor` so the next call returns the chunk immediately older.
+  // The returned page is sorted chronologically (ascending) so messages render
+  // top-to-bottom; callers prepend each older page above the existing ones.
   const fetchExchanges = useCallback(
-    async (conversationId: string): Promise<ExchangeGetResponse[]> => {
+    async (
+      conversationId: string,
+      cursor?: { value: string },
+    ): Promise<{ exchanges: ExchangeGetResponse[]; hasNextPage: boolean }> => {
       const conversation =
         await agentService.current.conversations.getById(conversationId);
-      const allExchanges = (await conversation.exchanges.getAll()).items;
-      allExchanges.sort(
+      const result = await conversation.exchanges.getAll({
+        pageSize: EXCHANGES_PAGE_SIZE,
+        exchangeSort: SortOrder.Descending,
+        messageSort: SortOrder.Ascending,
+        ...(cursor ? { cursor } : {}),
+      });
+      exchangesCursor.current = result.nextCursor;
+      const exchanges = [...result.items].sort(
         (a: ExchangeGetResponse, b: ExchangeGetResponse) =>
           new Date(a.createdTime).getTime() - new Date(b.createdTime).getTime(),
       );
-      return allExchanges;
+      return { exchanges, hasNextPage: result.hasNextPage };
     },
     [],
   );
@@ -906,11 +997,13 @@ export const ConversationalAgentChat = ({
         );
         if (!selectedConversation) return;
 
+        endActiveSession();
         currentConversation.current = selectedConversation;
         session.current = null;
+        exchangesCursor.current = undefined;
 
-        const allExchanges = await fetchExchanges(selectedConversation.id);
-        const messages = mapExchangesToChatMessages(allExchanges);
+        const { exchanges } = await fetchExchanges(selectedConversation.id);
+        const messages = mapExchangesToChatMessages(exchanges);
         chatService.setConversation(messages);
         setHasMessages(messages.length > 0);
         trackTelemetry(
@@ -929,8 +1022,37 @@ export const ConversationalAgentChat = ({
         chatService.setError(t("error_open_conversation", { errorMessage }));
       }
     },
-    [chatService, fetchExchanges, t],
+    [chatService, endActiveSession, fetchExchanges, t],
   );
+
+  // Apollo fires this when the user scrolls to the top of the message list.
+  // Prepend the next older page; signal `done` (no more pages) so Apollo stops
+  // requesting once the cursor is exhausted.
+  const onConversationLoadMore = useCallback(async () => {
+    if (!chatService) return;
+    const conversationId = currentConversation.current?.id;
+    if (!conversationId || !exchangesCursor.current) {
+      chatService.prependOlderMessages([], true);
+      return;
+    }
+    try {
+      const { exchanges, hasNextPage } = await fetchExchanges(
+        conversationId,
+        exchangesCursor.current,
+      );
+      chatService.prependOlderMessages(
+        mapExchangesToChatMessages(exchanges),
+        !hasNextPage,
+      );
+    } catch (err) {
+      chatService.prependOlderMessages([], true);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      trackTelemetry(TelemetryEvent.OpenConversation, TelemetryStatus.Error, {
+        conversationId,
+        error: errorMessage,
+      });
+    }
+  }, [chatService, fetchExchanges]);
 
   const initChat = useCallback(async () => {
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
@@ -967,33 +1089,13 @@ export const ConversationalAgentChat = ({
         setShowInputPage(true);
       }
 
-      // If the agent provides any first-run appearance data, show only what
-      // the agent provides. The `firstRunExperience` prop is a fallback used
-      // when the agent has no welcome title, description, or starting
-      // prompts at all — it must not be mixed with partial agent data.
-      const appearance = agentRelease?.appearance;
-      const agentSuggestions = (appearance?.startingPrompts ?? []).map(
-        (prompt) => ({
-          label: prompt.displayPrompt,
-          prompt: prompt.actualPrompt,
-        }),
+      // Resolve the first-run experience: the host-provided config wins so
+      // callers can override the welcome copy and starting prompts, falling
+      // back to the agent's own appearance.
+      const firstRunExperienceConfig = getFirstRunExperience(
+        firstRunExperienceRef.current,
+        agentRelease?.appearance,
       );
-      const agentHasFre =
-        !!appearance?.welcomeTitle ||
-        !!appearance?.welcomeDescription ||
-        agentSuggestions.length > 0;
-      const hostFallback = firstRunExperienceRef.current;
-      const firstRunExperienceConfig = agentHasFre
-        ? {
-            title: appearance?.welcomeTitle ?? "",
-            description: appearance?.welcomeDescription ?? "",
-            suggestions: agentSuggestions,
-          }
-        : {
-            title: hostFallback?.title ?? "",
-            description: hostFallback?.description ?? "",
-            suggestions: hostFallback?.suggestions ?? [],
-          };
 
       // Persists agent inputs against the active conversation via
       // updateConversation. Server-side this applies to all subsequent
@@ -1030,15 +1132,17 @@ export const ConversationalAgentChat = ({
         const conversationId = currentConversation.current?.id ?? "no-conv";
         const inputsResetKey = `${profileResetKey}-${conversationId}`;
         root.render(
-          <SettingsDialog
-            profileResetKey={profileResetKey}
-            conversationalAgent={agentService.current}
-            onClose={() => chatServiceRef.current?.toggleSettings(false)}
-            inputSchema={inputSchemaStateRef.current}
-            initialInputs={storedAgentInputs.current}
-            onApplyInputs={handleApplySettingsInputs}
-            inputsResetKey={inputsResetKey}
-          />,
+          <PortalContainerProvider>
+            <SettingsDialog
+              profileResetKey={profileResetKey}
+              conversationalAgent={agentService.current}
+              onClose={() => chatServiceRef.current?.toggleSettings(false)}
+              inputSchema={inputSchemaStateRef.current}
+              initialInputs={storedAgentInputs.current}
+              onApplyInputs={handleApplySettingsInputs}
+              inputsResetKey={inputsResetKey}
+            />
+          </PortalContainerProvider>,
         );
       };
 
@@ -1049,7 +1153,11 @@ export const ConversationalAgentChat = ({
           locale: toApolloSupportedLocale(locale),
           theme: themeRef.current,
           readOnly,
-          firstRunExperience: firstRunExperienceConfig,
+          firstRunExperience: firstRunExperienceConfig && {
+            title: firstRunExperienceConfig.title ?? "",
+            description: firstRunExperienceConfig.description ?? "",
+            suggestions: firstRunExperienceConfig.suggestions ?? [],
+          },
           overrideLabels: {
             title: overrideLabelsRef.current?.title ?? agentName,
             footerDisclaimer:
@@ -1060,7 +1168,51 @@ export const ConversationalAgentChat = ({
               t("chat_input_placeholder"),
           },
           paginatedHistory: true,
+          paginatedMessages: true,
           settingsRenderer: renderSettings,
+          preHooks: {
+            [AutopilotChatPreHookAction.CitationClick]: async (
+              citationData,
+            ) => {
+              // When preview is disabled, or the citation is not a
+              // context-grounding citation (no download_url to a source
+              // document), fall through to Apollo's default handling.
+              if (!citationPreviewRef.current) return true;
+
+              const { citation } = citationData;
+              if (!citation?.download_url) return true;
+
+              const pageNumber = Number(citation.page_number) || 1;
+              try {
+                const blob = await agentService.current.downloadCitationSource({
+                  title: citation.title,
+                  number: citation.number ?? citation.id ?? 0,
+                  downloadUrl: citation.download_url,
+                  pageNumber: String(pageNumber),
+                });
+                const file = new File([blob], citation.title, {
+                  type: blob.type,
+                });
+                setCitationPreviewData({
+                  file,
+                  title: citation.title,
+                  pageNumber,
+                });
+              } catch (e) {
+                // Consume the click and surface the error in-dialog. Falling
+                // through to Apollo's default would re-open the auth-gated
+                // download_url in a new tab, which is exactly the 401 this
+                // preview replaces.
+                console.error("Failed to load citation document", e);
+                setCitationPreviewData({
+                  title: citation.title,
+                  pageNumber,
+                  error: true,
+                });
+              }
+              return false;
+            },
+          },
           // Apollo's ApChat defaults message text to fontSizeM (14px); the
           // deprecated portal-shell chat used a larger size, so bump primary
           // text and markdown body tokens to fontSizeL (16px) to match.
@@ -1100,9 +1252,10 @@ export const ConversationalAgentChat = ({
 
       if (existingConversationId) {
         const conversation = await getConversation();
-        const allExchanges = await fetchExchanges(conversation.id);
+        exchangesCursor.current = undefined;
+        const { exchanges } = await fetchExchanges(conversation.id);
         chatServiceInstance.setConversation(
-          mapExchangesToChatMessages(allExchanges),
+          mapExchangesToChatMessages(exchanges),
         );
       } else {
         // AutopilotChatService is a singleton, so it may still hold the
@@ -1212,9 +1365,6 @@ export const ConversationalAgentChat = ({
   useEffect(() => {
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
     if (initializedFor.current !== initKey) {
-      // initChat is async; its setStates run after awaits, not synchronously
-      // inside the effect body. The lint rule can't see that.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       initChat();
     }
   }, [agentId, folderId, existingConversationId, externalUserId, initChat]);
@@ -1235,20 +1385,9 @@ export const ConversationalAgentChat = ({
   // Close the SDK session on unmount so the WebSocket doesn't linger.
   useEffect(() => {
     return () => {
-      try {
-        activeExchange.current?.sendExchangeEnd();
-      } catch {
-        /* exchange already ended */
-      }
-      try {
-        session.current?.sendSessionEnd();
-      } catch {
-        /* session already closed */
-      }
-      activeExchange.current = null;
-      session.current = null;
+      endActiveSession();
     };
-  }, []);
+  }, [endActiveSession]);
 
   // Release React state held by the imperative tool-confirmation and client-side tool roots.
   useEffect(() => {
@@ -1285,6 +1424,10 @@ export const ConversationalAgentChat = ({
             onClickDeleteConversation,
           ),
           chatService.on(AutopilotChatEvent.HistoryLoadMore, onHistoryLoadMore),
+          chatService.on(
+            AutopilotChatEvent.ConversationLoadMore,
+            onConversationLoadMore,
+          ),
           chatService.on(AutopilotChatEvent.HistorySearch, onHistorySearch),
           chatService.on(AutopilotChatEvent.Feedback, onFeedback),
           chatService.on(AutopilotChatEvent.StopResponse, onStopResponse),
@@ -1323,6 +1466,7 @@ export const ConversationalAgentChat = ({
     folderId,
     onClickDeleteConversation,
     onClickOpenConversation,
+    onConversationLoadMore,
     onFeedback,
     onHistoryLoadMore,
     onHistorySearch,
@@ -1379,70 +1523,103 @@ export const ConversationalAgentChat = ({
 
   return (
     <div className="uipath-conversational-agent-chat">
-      {!error && showInputPage && inputSchemaState && (
-        <InputsPage
-          key={`${agentId}-${inputsInstance}`}
-          agentName={agentNameState}
-          inputSchema={inputSchemaState}
-          onSubmit={async (data) => {
-            const inputs = data as Record<string, unknown>;
-            if (isDebugMode && existingConversationId) {
-              await agentService.current.conversations.updateById(
-                existingConversationId,
-                { agentInput: { inline: inputs as JSONObject } },
-              );
-            } else {
-              const agent = await resolveAgent();
-              if (!agent) {
-                throw new Error(t("error_missing_conversation_params"));
+      <PortalContainerProvider>
+        {!error && showInputPage && inputSchemaState && (
+          <InputsPage
+            key={`${agentId}-${inputsInstance}`}
+            agentName={agentNameState}
+            inputSchema={inputSchemaState}
+            onSubmit={async (data) => {
+              const inputs = data as Record<string, unknown>;
+              if (isDebugMode && existingConversationId) {
+                await agentService.current.conversations.updateById(
+                  existingConversationId,
+                  { agentInput: { inline: inputs as JSONObject } },
+                );
+              } else {
+                const agent = await resolveAgent();
+                if (!agent) {
+                  throw new Error(t("error_missing_conversation_params"));
+                }
+                const conversation = await agent.conversations.create({
+                  ...(jobStartOverrides ? { jobStartOverrides } : {}),
+                  agentInput: { inline: inputs as JSONObject },
+                } as ConversationCreateOptionsArg);
+                currentConversation.current = conversation;
               }
-              const conversation = await agent.conversations.create({
-                ...(jobStartOverrides ? { jobStartOverrides } : {}),
-                agentInput: { inline: inputs as JSONObject },
-              } as ConversationCreateOptionsArg);
-              currentConversation.current = conversation;
-            }
-            storedAgentInputs.current = inputs;
-            setShowInputPage(false);
+              storedAgentInputs.current = inputs;
+              setShowInputPage(false);
+            }}
+          />
+        )}
+
+        {error && (
+          <div className="info-container">
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+            <Button variant={"outline"} onClick={handleReload}>
+              {t("reload")}
+            </Button>
+          </div>
+        )}
+
+        {!error && !chatService && (
+          <div className="info-container">
+            <div>{t("loading")}</div>
+            <Loader />
+          </div>
+        )}
+
+        {!error && chatService && !showInputPage && (
+          <ApChat
+            key={locale}
+            chatServiceInstance={chatService}
+            locale={toApolloSupportedLocale(locale)}
+            theme={theme}
+            enableInternalThemeProvider
+          />
+        )}
+
+        <FeedbackDialog
+          open={feedbackDialogOpen}
+          isPositive={feedbackIsPositive}
+          onOpenChange={setFeedbackDialogOpen}
+          onSubmit={onFeedbackSubmit}
+          onCancel={onFeedbackCancel}
+        />
+        <Dialog
+          open={!!citationPreviewData}
+          onOpenChange={(open) => {
+            if (!open) setCitationPreviewData(null);
           }}
-        />
-      )}
-
-      {error && (
-        <div className="info-container">
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-          <Button variant={"outline"} onClick={handleReload}>
-            {t("reload")}
-          </Button>
-        </div>
-      )}
-
-      {!error && !chatService && (
-        <div className="info-container">
-          <div>{t("loading")}</div>
-          <Loader />
-        </div>
-      )}
-
-      {!error && chatService && !showInputPage && (
-        <ApChat
-          key={locale}
-          chatServiceInstance={chatService}
-          locale={toApolloSupportedLocale(locale)}
-          theme={theme}
-          enableInternalThemeProvider
-        />
-      )}
-
-      <FeedbackDialog
-        open={feedbackDialogOpen}
-        isPositive={feedbackIsPositive}
-        onOpenChange={setFeedbackDialogOpen}
-        onSubmit={onFeedbackSubmit}
-        onCancel={onFeedbackCancel}
-      />
+        >
+          {citationPreviewData && (
+            <DialogContent className="sm:max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>{citationPreviewData.title}</DialogTitle>
+              </DialogHeader>
+              {citationPreviewData.error ? (
+                <Column
+                  w="full"
+                  align="center"
+                  justify="center"
+                  style={{ height: "60vh", maxHeight: "600px" }}
+                >
+                  {t("file_preview_error")}
+                </Column>
+              ) : (
+                <FilePreviewer
+                  file={citationPreviewData.file}
+                  usePdfJs={usePdfJsViewer}
+                  pageNumber={citationPreviewData.pageNumber}
+                  iframeParams={`#page=${citationPreviewData.pageNumber}`}
+                />
+              )}
+            </DialogContent>
+          )}
+        </Dialog>
+      </PortalContainerProvider>
     </div>
   );
 };

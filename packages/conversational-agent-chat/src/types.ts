@@ -70,14 +70,25 @@ export interface ConversationalAgentChatProps {
   readOnly?: boolean;
   overrideLabels?: OverrideLabels;
   /**
-   * Fallback first-run experience. Used only when the agent's appearance
-   * provides no welcome title, description, or starting prompts. When the
-   * agent has any FRE data, this prop is ignored and only the agent's data
-   * is rendered.
+   * Host-provided first-run experience (welcome title/description and starting
+   * prompts). Takes precedence over the agent's own appearance, which is used as
+   * a fallback. Precedence is whole-object.
    */
   firstRunExperience?: FirstRunExperience;
   /** Override which features are disabled. Merged with defaults (fullScreen, preview, close are always disabled). */
   disabledFeatures?: DisabledFeatures;
+  /**
+   * Whether clicking a context-grounding citation opens a preview dialog for its
+   * source document. When false, citations fall through to Apollo's default
+   * handling. Defaults to true.
+   */
+  citationPreview?: boolean;
+  /**
+   * PDF/text citation preview mode. `true` (default) renders via pdfjs to a
+   * <canvas> — safe inside sandboxed iframes; `false` uses the browser's native
+   * viewer in an <iframe>. Images are unaffected.
+   */
+  usePdfJsViewer?: boolean;
   /** Optional configuration for job start behavior */
   jobStartOverrides?: ConversationJobStartOverrides;
   /** @internal */

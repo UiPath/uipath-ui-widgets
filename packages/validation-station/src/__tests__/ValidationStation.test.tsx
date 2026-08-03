@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, waitFor } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import { ValidationStation } from "../ValidationStation";
 
 vi.mock("../loadValidationStationWc", () => ({
@@ -78,25 +78,33 @@ describe("ValidationStation", () => {
     });
   });
 
-  it("renders error when useBucketArtifacts returns error", () => {
+  it("renders error when useBucketArtifacts returns error", async () => {
     mockUseBucketArtifacts.mockReturnValue({
       artifacts: null,
       error: "Something went wrong",
     });
 
-    const { container } = render(<ValidationStation {...baseProps} />);
+    // `await act` flushes the WC-ready promise the mount effect subscribes to,
+    // so the trailing setWcReady state update happens inside act (no warning).
+    let container!: HTMLElement;
+    await act(async () => {
+      ({ container } = render(<ValidationStation {...baseProps} />));
+    });
     expect(container.textContent).toContain(
       "Failed to load document artifacts",
     );
   });
 
-  it("renders loading state when artifacts are null", () => {
+  it("renders loading state when artifacts are null", async () => {
     mockUseBucketArtifacts.mockReturnValue({
       artifacts: null,
       error: null,
     });
 
-    const { container } = render(<ValidationStation {...baseProps} />);
+    let container!: HTMLElement;
+    await act(async () => {
+      ({ container } = render(<ValidationStation {...baseProps} />));
+    });
     expect(container.textContent).toContain("Loading...");
   });
 

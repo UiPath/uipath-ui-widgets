@@ -12,10 +12,13 @@ import {
   saveValidatedDataAsDraft,
 } from "./saveValidatedDataUtil.js";
 import {
+  TelemetryEvent,
+  TelemetryStatus,
   ValidationStationLanguage,
   type ValidationStationProps,
 } from "./types.js";
 import { useBucketArtifacts } from "./useBucketArtifacts.js";
+import { trackTelemetry } from "./utils/telemetryUtils.js";
 
 export const ValidationStation: React.FC<ValidationStationProps> = ({
   sdk,
@@ -68,7 +71,13 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
 
     const onSubmitRequest = (event: CustomEvent<IVsSaveValidatedDataRequest>) =>
       submitValidatedData(sdk, data, resolvedFolderId, event.detail).then(
-        onSubmitComplete,
+        (result) => {
+          trackTelemetry(
+            TelemetryEvent.Submit,
+            result.success ? TelemetryStatus.Success : TelemetryStatus.Error,
+          );
+          onSubmitComplete?.(result);
+        },
       );
 
     const onSaveAsDraftRequest = (
@@ -84,6 +93,7 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
       const { documentId, exceptionReport } = event.detail;
       const reason =
         (exceptionReport as { Reason?: string } | null)?.Reason ?? "";
+      trackTelemetry(TelemetryEvent.ExceptionRequest, TelemetryStatus.Success);
       onReportExceptionComplete?.(documentId, reason);
     };
 
