@@ -12,17 +12,22 @@ import {
   ErrorIcon,
   FileIcon,
   FitWidthIcon,
-  LockIcon,
   RotateIcon,
   ZoomInIcon,
   ZoomOutIcon,
 } from "./icons";
+import { PasswordPrompt, PasswordRequest } from "./PasswordPrompt";
 import {
   getSourceKey,
   getSourceType,
   useResolvedSource,
 } from "./sources/useResolvedSource";
-import { PdfViewerProps, PdfViewerSource, TelemetryConstants } from "./types";
+import {
+  PdfViewerProps,
+  PdfViewerSource,
+  TelemetryService,
+  TelemetryStatus,
+} from "./types";
 import { trackTelemetry } from "./utils/telemetryUtils";
 
 const MIN_SCALE = 0.5;
@@ -74,74 +79,10 @@ const ToolbarSeparator = () => (
   <div className="mx-1 h-5 w-px bg-[var(--color-border-de-emp)]" aria-hidden />
 );
 
-/**
- * A pending pdf.js password request. Submitting retries the load with the
- * given password; cancelling fails the load into the widget's error state.
- */
-interface PasswordRequest {
-  callback: (password: string | null) => void;
-  /** True when a previous password was wrong (INCORRECT_PASSWORD). */
-  isRetry: boolean;
-}
-
-/** In-viewer password prompt shown for password-protected documents. */
-const PasswordPrompt: FC<{
-  isRetry: boolean;
-  onSubmit: (password: string) => void;
-  onCancel: () => void;
-}> = ({ isRetry, onSubmit, onCancel }) => {
-  const [password, setPassword] = useState("");
-
-  return (
-    <form
-      className="flex flex-col items-center justify-center gap-3 py-16 text-center"
-      data-testid="pdf-viewer-password"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (!password) return;
-        // Clear before submitting so a wrong attempt re-prompts empty.
-        setPassword("");
-        onSubmit(password);
-      }}
-    >
-      <span className="text-[var(--color-foreground-light)]">
-        <LockIcon />
-      </span>
-      <p className="text-sm font-semibold text-foreground">
-        This document is password-protected
-      </p>
-      <p className="max-w-xs text-sm text-[var(--color-foreground-light)]">
-        Enter the password to open it.
-      </p>
-      {isRetry && (
-        <p className="text-sm text-[var(--color-error-icon)]" role="alert">
-          Incorrect password. Try again.
-        </p>
-      )}
-      <input
-        type="password"
-        value={password}
-        onChange={(event) => setPassword(event.target.value)}
-        aria-label="Document password"
-        autoFocus
-        className="w-56 rounded border border-[var(--color-border-de-emp)] bg-background px-2 py-1 text-center text-sm text-foreground"
-      />
-      <div className="flex gap-2">
-        <Button variant="outline" type="button" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={!password}>
-          Open document
-        </Button>
-      </div>
-    </form>
-  );
-};
-
 export const PdfViewer: FC<PdfViewerProps> = ({
   source,
   sdk,
-  toolbar = true,
+  toolbar,
   fileName,
   maxHeight = DEFAULT_MAX_HEIGHT,
   onLoadSuccess,
@@ -172,11 +113,13 @@ export const PdfViewer: FC<PdfViewerProps> = ({
     error: resolveError,
   } = useResolvedSource(source, sdk, retryKey);
 
+  // Per-feature toggles merged over the all-on defaults; disabling every
+  // feature hides the toolbar row entirely.
   const toolbarOptions = useMemo(() => {
-    if (toolbar === false) return null;
-    return toolbar === true
-      ? DEFAULT_TOOLBAR
-      : { ...DEFAULT_TOOLBAR, ...toolbar };
+    const merged = { ...DEFAULT_TOOLBAR, ...toolbar };
+    const anyVisible =
+      merged.pagination || merged.zoom || merged.rotate || merged.download;
+    return anyVisible ? merged : null;
   }, [toolbar]);
 
   const resolvedFileName = fileName ?? defaultFileName(source);
@@ -197,15 +140,11 @@ export const PdfViewer: FC<PdfViewerProps> = ({
   // Surface adapter (fetch) failures: telemetry + consumer callback.
   useEffect(() => {
     if (!resolveError) return;
-    trackTelemetry(
-      TelemetryConstants.Service.LoadDocument,
-      TelemetryConstants.Telemetry.Error,
-      {
-        SourceType: sourceType,
-        Stage: "fetch",
-        Error: resolveError.message,
-      },
-    );
+    trackTelemetry(TelemetryService.LoadDocument, TelemetryStatus.Error, {
+      SourceType: sourceType,
+      Stage: "fetch",
+      Error: resolveError.message,
+    });
     onLoadError?.(resolveError);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolveError]);
@@ -218,14 +157,10 @@ export const PdfViewer: FC<PdfViewerProps> = ({
       setNumPages(pdf.numPages);
       setPageNumber(1);
       setPasswordRequest(null);
-      trackTelemetry(
-        TelemetryConstants.Service.LoadDocument,
-        TelemetryConstants.Telemetry.Usage,
-        {
-          SourceType: sourceType,
-          NumPages: pdf.numPages,
-        },
-      );
+      trackTelemetry(TelemetryService.LoadDocument, TelemetryStatus.Usage, {
+        SourceType: sourceType,
+        NumPages: pdf.numPages,
+      });
       onLoadSuccess?.({ numPages: pdf.numPages });
     },
     [sourceType, onLoadSuccess],
@@ -235,15 +170,11 @@ export const PdfViewer: FC<PdfViewerProps> = ({
     (error: Error) => {
       setRenderError(error);
       setPasswordRequest(null);
-      trackTelemetry(
-        TelemetryConstants.Service.LoadDocument,
-        TelemetryConstants.Telemetry.Error,
-        {
-          SourceType: sourceType,
-          Stage: "render",
-          Error: error.message,
-        },
-      );
+      trackTelemetry(TelemetryService.LoadDocument, TelemetryStatus.Error, {
+        SourceType: sourceType,
+        Stage: "render",
+        Error: error.message,
+      });
       onLoadError?.(error);
     },
     [sourceType, onLoadError],
@@ -318,22 +249,14 @@ export const PdfViewer: FC<PdfViewerProps> = ({
       anchor.remove();
       setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000);
 
-      trackTelemetry(
-        TelemetryConstants.Service.DownloadFile,
-        TelemetryConstants.Telemetry.Usage,
-        {
-          SourceType: sourceType,
-        },
-      );
+      trackTelemetry(TelemetryService.DownloadFile, TelemetryStatus.Usage, {
+        SourceType: sourceType,
+      });
     } catch (error) {
-      trackTelemetry(
-        TelemetryConstants.Service.DownloadFile,
-        TelemetryConstants.Telemetry.Error,
-        {
-          SourceType: sourceType,
-          Error: error instanceof Error ? error.message : "Download failed",
-        },
-      );
+      trackTelemetry(TelemetryService.DownloadFile, TelemetryStatus.Error, {
+        SourceType: sourceType,
+        Error: error instanceof Error ? error.message : "Download failed",
+      });
     }
   }, [file, resolvedFileName, sourceType]);
 

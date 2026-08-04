@@ -30,10 +30,10 @@ export interface ResolvedSourceState {
  * `entityId`, `url`, or `data` is what actually selects the adapter.
  */
 export function getSourceType(source: PdfViewerSource): PdfViewerSourceType {
-  if ("bucketId" in source) return "bucket";
-  if ("entityId" in source) return "entity";
-  if ("url" in source) return "url";
-  return "blob";
+  if ("bucketId" in source) return PdfViewerSourceType.Bucket;
+  if ("entityId" in source) return PdfViewerSourceType.Entity;
+  if ("url" in source) return PdfViewerSourceType.Url;
+  return PdfViewerSourceType.Blob;
 }
 
 /**

@@ -1,11 +1,15 @@
 import { UiPath } from "@uipath/uipath-typescript/core";
-import { version } from "../package.json";
 
 /**
  * The kind of source a {@link PdfViewerSource} describes. Inferred from the
  * fields present on the source (see {@link PdfViewerSource}).
  */
-export type PdfViewerSourceType = "bucket" | "entity" | "url" | "blob";
+export enum PdfViewerSourceType {
+  Bucket = "bucket",
+  Entity = "entity",
+  Url = "url",
+  Blob = "blob",
+}
 
 /**
  * Where the PDF lives. The widget infers the source kind from the fields you
@@ -80,10 +84,10 @@ export interface PdfViewerProps {
    */
   sdk?: UiPath;
   /**
-   * Toolbar visibility: `false` hides it entirely, `true` (default) shows
-   * everything, or pass per-feature toggles.
+   * Per-feature toolbar toggles (all default to true). Disable all four to
+   * hide the toolbar entirely.
    */
-  toolbar?: boolean | PdfViewerToolbarOptions;
+  toolbar?: PdfViewerToolbarOptions;
   /** File name shown in the toolbar and used for downloads */
   fileName?: string;
   /** Max height of the document canvas (default 640). The canvas scrolls internally. */
@@ -94,15 +98,12 @@ export interface PdfViewerProps {
   onLoadError?: (error: Error) => void;
 }
 
-export const TelemetryConstants = {
-  ApplicationName: "Widget.PdfViewer",
-  Version: version,
-  Service: {
-    LoadDocument: "PDFV.LoadDocument",
-    DownloadFile: "PDFV.DownloadFile",
-  },
-  Telemetry: {
-    Usage: "PDFV.Usage",
-    Error: "PDFV.Error",
-  },
-};
+export enum TelemetryService {
+  LoadDocument = "PDFV.LoadDocument",
+  DownloadFile = "PDFV.DownloadFile",
+}
+
+export enum TelemetryStatus {
+  Usage = "PDFV.Usage",
+  Error = "PDFV.Error",
+}

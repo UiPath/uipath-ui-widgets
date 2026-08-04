@@ -67,15 +67,15 @@ the readability, but it's optional.)
 
 ## Props
 
-| Prop            | Type                                   | Required | Description                                                                                                     |
-| --------------- | -------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------- |
-| `source`        | `PdfViewerSource`                      | Yes      | Where the PDF lives (see Sources above)                                                                         |
-| `sdk`           | `UiPath`                               | No\*     | Initialized UiPath SDK instance. \*Required for `bucket`/`entity` sources                                       |
-| `toolbar`       | `boolean \| PdfViewerToolbarOptions`   | No       | `false` hides the toolbar; per-feature toggles: `pagination`, `zoom`, `rotate`, `download` (all default `true`) |
-| `fileName`      | `string`                               | No       | Name shown in the toolbar and used for downloads                                                                |
-| `maxHeight`     | `number \| string`                     | No       | Max canvas height (default `640`); the canvas scrolls internally                                                |
-| `onLoadSuccess` | `(info: { numPages: number }) => void` | No       | Called when the document loads                                                                                  |
-| `onLoadError`   | `(error: Error) => void`               | No       | Called when fetching or rendering fails                                                                         |
+| Prop            | Type                                   | Required | Description                                                                                                                |
+| --------------- | -------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `source`        | `PdfViewerSource`                      | Yes      | Where the PDF lives (see Sources above)                                                                                    |
+| `sdk`           | `UiPath`                               | No\*     | Initialized UiPath SDK instance. \*Required for `bucket`/`entity` sources                                                  |
+| `toolbar`       | `PdfViewerToolbarOptions`              | No       | Per-feature toggles: `pagination`, `zoom`, `rotate`, `download` (all default `true`); disable all four to hide the toolbar |
+| `fileName`      | `string`                               | No       | Name shown in the toolbar and used for downloads                                                                           |
+| `maxHeight`     | `number \| string`                     | No       | Max canvas height (default `640`); the canvas scrolls internally                                                           |
+| `onLoadSuccess` | `(info: { numPages: number }) => void` | No       | Called when the document loads                                                                                             |
+| `onLoadError`   | `(error: Error) => void`               | No       | Called when fetching or rendering fails                                                                                    |
 
 ## Features
 

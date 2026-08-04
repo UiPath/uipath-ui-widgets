@@ -367,9 +367,17 @@ describe("PdfViewer", () => {
       expect(screen.getByTestId("pdf-page")).toHaveTextContent("rotate-90");
     });
 
-    it("hides the toolbar entirely with toolbar={false}", async () => {
+    it("hides the toolbar entirely when every feature is disabled", async () => {
       render(
-        <PdfViewer source={{ type: "blob", data: pdfBlob }} toolbar={false} />,
+        <PdfViewer
+          source={{ type: "blob", data: pdfBlob }}
+          toolbar={{
+            pagination: false,
+            zoom: false,
+            rotate: false,
+            download: false,
+          }}
+        />,
       );
       await waitFor(() =>
         expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
