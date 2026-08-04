@@ -2,7 +2,7 @@ import { UiPath } from "@uipath/uipath-typescript/core";
 import { BucketService } from "@uipath/uipath-typescript/buckets";
 import { Entities } from "@uipath/uipath-typescript/entities";
 import { useEffect, useState } from "react";
-import { PdfViewerSource } from "../types";
+import { PdfViewerSource, PdfViewerSourceType } from "../types";
 
 const PDF_MIME_TYPE = "application/pdf";
 
@@ -25,21 +25,33 @@ export interface ResolvedSourceState {
 }
 
 /**
+ * Infers the source kind from the fields present — the `type` field is
+ * optional on {@link PdfViewerSource}, so the presence of `bucketId`,
+ * `entityId`, `url`, or `data` is what actually selects the adapter.
+ */
+export function getSourceType(source: PdfViewerSource): PdfViewerSourceType {
+  if ("bucketId" in source) return "bucket";
+  if ("entityId" in source) return "entity";
+  if ("url" in source) return "url";
+  return "blob";
+}
+
+/**
  * Stable identity key for a source so consumers passing inline object
  * literals (a new object every render) don't retrigger fetches.
  * Blob identity is tracked separately via the object reference.
  */
 export function getSourceKey(source: PdfViewerSource): string {
-  switch (source.type) {
-    case "bucket":
-      return `bucket:${source.bucketId}:${source.folderId ?? source.folderKey ?? source.folderPath ?? ""}:${source.path}`;
-    case "entity":
-      return `entity:${source.entityId}:${source.recordId}:${source.fieldName}`;
-    case "url":
-      return `url:${source.url}`;
-    case "blob":
-      return "blob";
+  if ("bucketId" in source) {
+    return `bucket:${source.bucketId}:${source.folderId ?? source.folderKey ?? source.folderPath ?? ""}:${source.path}`;
   }
+  if ("entityId" in source) {
+    return `entity:${source.entityId}:${source.recordId}:${source.fieldName}`;
+  }
+  if ("url" in source) {
+    return `url:${source.url}`;
+  }
+  return "blob";
 }
 
 /** Ensure the blob carries the PDF MIME type (some APIs return untyped octet streams). */
@@ -53,69 +65,76 @@ async function resolveSource(
   source: PdfViewerSource,
   sdk: UiPath | undefined,
 ): Promise<ResolvedFile> {
-  switch (source.type) {
-    case "url":
-      // react-pdf downloads URL sources itself; nothing to fetch here.
-      return { url: source.url };
-
-    case "blob": {
-      const { data } = source;
-      return {
-        blob: asPdfBlob(data instanceof Blob ? data : new Blob([data])),
-      };
-    }
-
-    case "bucket": {
-      if (!sdk) {
-        throw new Error(
-          "An initialized UiPath SDK instance (`sdk` prop) is required for 'bucket' sources.",
-        );
-      }
-      if (
-        source.folderId === undefined &&
-        !source.folderKey &&
-        !source.folderPath
-      ) {
-        throw new Error(
-          "A 'bucket' source requires one of folderId, folderKey, or folderPath.",
-        );
-      }
-      // Buckets are two-step: get a pre-signed read URI, then download it.
-      // Pass whichever folder identifier the caller provided (the SDK's
-      // getReadUri accepts folderId / folderKey / folderPath).
-      // Note: the positional call below is the SDK's PREFERRED overload
-      // (available since the ^1.4.1 peer floor); the single-options-object
-      // form some older widgets use is marked @deprecated in the SDK.
-      const buckets = new BucketService(sdk);
-      const access = await buckets.getReadUri(source.bucketId, source.path, {
-        folderId: source.folderId,
-        folderKey: source.folderKey,
-        folderPath: source.folderPath,
-      });
-      const response = await fetch(access.uri, { headers: access.headers });
-      if (!response.ok) {
-        throw new Error(
-          `Failed to download "${source.path}" from the storage bucket (HTTP ${response.status}).`,
-        );
-      }
-      return { blob: asPdfBlob(await response.blob()) };
-    }
-
-    case "entity": {
-      if (!sdk) {
-        throw new Error(
-          "An initialized UiPath SDK instance (`sdk` prop) is required for 'entity' sources.",
-        );
-      }
-      const entities = new Entities(sdk);
-      const blob = await entities.downloadAttachment(
-        source.entityId,
-        source.recordId,
-        source.fieldName,
-      );
-      return { blob: asPdfBlob(blob) };
-    }
+  // The source kind is selected by which fields are present — the `type`
+  // field is optional and purely informational (see PdfViewerSource).
+  if ("url" in source) {
+    // react-pdf downloads URL sources itself; nothing to fetch here.
+    return { url: source.url };
   }
+
+  if ("data" in source) {
+    const { data } = source;
+    return {
+      blob: asPdfBlob(data instanceof Blob ? data : new Blob([data])),
+    };
+  }
+
+  if ("bucketId" in source) {
+    if (!sdk) {
+      throw new Error(
+        "An initialized UiPath SDK instance (`sdk` prop) is required for 'bucket' sources.",
+      );
+    }
+    if (
+      source.folderId === undefined &&
+      !source.folderKey &&
+      !source.folderPath
+    ) {
+      throw new Error(
+        "A 'bucket' source requires one of folderId, folderKey, or folderPath.",
+      );
+    }
+    // Buckets are two-step: get a pre-signed read URI, then download it.
+    // Pass whichever folder identifier the caller provided (the SDK's
+    // getReadUri accepts folderId / folderKey / folderPath).
+    // Note: the positional call below is the SDK's PREFERRED overload
+    // (available since the ^1.4.1 peer floor); the single-options-object
+    // form some older widgets use is marked @deprecated in the SDK.
+    const buckets = new BucketService(sdk);
+    const access = await buckets.getReadUri(source.bucketId, source.path, {
+      folderId: source.folderId,
+      folderKey: source.folderKey,
+      folderPath: source.folderPath,
+    });
+    const response = await fetch(access.uri, { headers: access.headers });
+    if (!response.ok) {
+      throw new Error(
+        `Failed to download "${source.path}" from the storage bucket (HTTP ${response.status}).`,
+      );
+    }
+    return { blob: asPdfBlob(await response.blob()) };
+  }
+
+  if ("entityId" in source) {
+    if (!sdk) {
+      throw new Error(
+        "An initialized UiPath SDK instance (`sdk` prop) is required for 'entity' sources.",
+      );
+    }
+    const entities = new Entities(sdk);
+    const blob = await entities.downloadAttachment(
+      source.entityId,
+      source.recordId,
+      source.fieldName,
+    );
+    return { blob: asPdfBlob(blob) };
+  }
+
+  // Unreachable for TypeScript callers; guards plain-JS misuse with a clear
+  // message (surfaces on the widget's error card instead of crashing).
+  throw new Error(
+    "Unrecognized source: provide bucketId + path (storage bucket), entityId + recordId + fieldName (Data Fabric), url, or data (Blob/ArrayBuffer).",
+  );
 }
 
 /**
@@ -135,7 +154,7 @@ export function useResolvedSource(
   });
 
   const sourceKey = getSourceKey(source);
-  const blobIdentity = source.type === "blob" ? source.data : null;
+  const blobIdentity = "data" in source ? source.data : null;
 
   useEffect(() => {
     let cancelled = false;

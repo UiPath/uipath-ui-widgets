@@ -2,18 +2,27 @@ import { UiPath } from "@uipath/uipath-typescript/core";
 import { version } from "../package.json";
 
 /**
- * Where the PDF lives. A discriminated union — the `type` field selects
- * which other fields apply, so mutually exclusive source shapes can't be mixed.
+ * The kind of source a {@link PdfViewerSource} describes. Inferred from the
+ * fields present on the source (see {@link PdfViewerSource}).
+ */
+export type PdfViewerSourceType = "bucket" | "entity" | "url" | "blob";
+
+/**
+ * Where the PDF lives. The widget infers the source kind from the fields you
+ * pass — `bucketId` → storage bucket, `entityId` → Data Fabric entity,
+ * `url` → direct URL, `data` → pre-fetched bytes. The `type` field is
+ * optional; include it only if you prefer the explicitness (it also gives
+ * per-shape autocomplete in editors).
  *
  * Field names mirror the SDK signatures they map to (the SDK's preferred
  * positional forms — the single-options-object overloads are deprecated):
- * - `bucket`  → `Buckets.getReadUri(bucketId, path, { folderId | folderKey | folderPath })`
- * - `entity`  → `Entities.downloadAttachment(entityId, recordId, fieldName)`
- * - `url` / `blob` → escape hatches for custom data stores (no SDK required)
+ * - bucket → `Buckets.getReadUri(bucketId, path, { folderId | folderKey | folderPath })`
+ * - entity → `Entities.downloadAttachment(entityId, recordId, fieldName)`
+ * - url / blob → escape hatches for custom data stores (no SDK required)
  */
 export type PdfViewerSource =
   | {
-      type: "bucket";
+      type?: "bucket";
       /** Orchestrator Storage Bucket ID */
       bucketId: number;
       /**
@@ -31,7 +40,7 @@ export type PdfViewerSource =
       path: string;
     }
   | {
-      type: "entity";
+      type?: "entity";
       /** Data Fabric entity ID */
       entityId: string;
       /** Record (row) ID within the entity */
@@ -40,12 +49,12 @@ export type PdfViewerSource =
       fieldName: string;
     }
   | {
-      type: "url";
+      type?: "url";
       /** Direct URL to the PDF (must be same-origin or CORS-accessible) */
       url: string;
     }
   | {
-      type: "blob";
+      type?: "blob";
       /** Pre-fetched PDF content */
       data: Blob | ArrayBuffer;
     };

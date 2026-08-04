@@ -26,9 +26,8 @@ function App() {
     <PdfViewer
       sdk={sdk}
       source={{
-        type: "bucket",
         bucketId: 123,
-        folderId: 456,
+        folderKey: "<folder-guid>", // or folderId / folderPath
         path: "invoices/inv-0714.pdf",
       }}
     />
@@ -40,22 +39,30 @@ function App() {
 
 ### Sources
 
-One `source` prop, four shapes (a discriminated union — the `type` field selects which other fields apply):
+One `source` prop, four shapes. **The widget infers the source kind from the
+fields you pass** — `bucketId` → storage bucket, `entityId` → Data Fabric
+entity, `url` → direct URL, `data` → pre-fetched bytes. (An explicit
+`type: "bucket" | "entity" | "url" | "blob"` is still accepted if you prefer
+the readability, but it's optional.)
 
 ```tsx
 // Orchestrator storage bucket (requires `sdk`).
-// Scope the folder with one of folderId, folderKey (GUID), or folderPath —
-// coded apps usually have the GUID folderKey.
-<PdfViewer sdk={sdk} source={{ type: "bucket", bucketId, folderKey, path }} />
+// Scope the folder with EXACTLY ONE of:
+//   folderId   — numeric folder ID
+//   folderKey  — folder GUID (what coded apps usually have)
+//   folderPath — slash-delimited path, e.g. "Shared/Finance"
+<PdfViewer sdk={sdk} source={{ bucketId, folderKey, path }} />
+<PdfViewer sdk={sdk} source={{ bucketId, folderId, path }} />
+<PdfViewer sdk={sdk} source={{ bucketId, folderPath: "Shared/Finance", path }} />
 
 // Data Fabric entity file field (requires `sdk`)
-<PdfViewer sdk={sdk} source={{ type: "entity", entityId, recordId, fieldName }} />
+<PdfViewer sdk={sdk} source={{ entityId, recordId, fieldName }} />
 
 // Plain URL — same-origin or CORS-accessible (no sdk needed)
-<PdfViewer source={{ type: "url", url: signedUrl }} />
+<PdfViewer source={{ url: signedUrl }} />
 
 // Pre-fetched bytes from your own data store (no sdk needed)
-<PdfViewer source={{ type: "blob", data: blobOrArrayBuffer }} />
+<PdfViewer source={{ data: blobOrArrayBuffer }} />
 ```
 
 ## Props

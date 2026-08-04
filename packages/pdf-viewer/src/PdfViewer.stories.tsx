@@ -86,9 +86,8 @@ function App() {
     <PdfViewer
       sdk={sdk}
       source={{
-        type: 'bucket',
         bucketId: 123,
-        folderId: 456,
+        folderKey: '<folder-guid>', // or folderId / folderPath
         path: 'invoices/inv-0714.pdf',
       }}
     />
@@ -102,7 +101,6 @@ Data Fabric entity attachments work the same way:
 <PdfViewer
   sdk={sdk}
   source={{
-    type: 'entity',
     entityId: '<entity-id>',
     recordId: '<record-id>',
     fieldName: 'document',
@@ -113,9 +111,12 @@ Data Fabric entity attachments work the same way:
 And for custom data stores, pass a URL or pre-fetched bytes directly (no \`sdk\` needed):
 
 \`\`\`tsx
-<PdfViewer source={{ type: 'url', url: signedUrl }} />
-<PdfViewer source={{ type: 'blob', data: blob }} />
+<PdfViewer source={{ url: signedUrl }} />
+<PdfViewer source={{ data: blob }} />
 \`\`\`
+
+The widget infers the source kind from the fields you pass — an explicit
+\`type\` (\`'bucket' | 'entity' | 'url' | 'blob'\`) is optional.
         `,
       },
     },
@@ -132,7 +133,7 @@ type Story = StoryObj<typeof meta>;
  */
 export const Default: Story = {
   args: {
-    source: { type: "blob", data: samplePdfBlob },
+    source: { data: samplePdfBlob },
     fileName: "sample-document.pdf",
   },
   render: (args) => (
@@ -148,7 +149,7 @@ export const Default: Story = {
  */
 export const EmbeddedInActionApp: Story = {
   args: {
-    source: { type: "blob", data: samplePdfBlob },
+    source: { data: samplePdfBlob },
     fileName: "invoice-2026-0714.pdf",
     maxHeight: 480,
   },
@@ -193,7 +194,7 @@ export const EmbeddedInActionApp: Story = {
 /** Toolbar hidden entirely — a bare page renderer. */
 export const WithoutToolbar: Story = {
   args: {
-    source: { type: "blob", data: samplePdfBlob },
+    source: { data: samplePdfBlob },
     toolbar: false,
   },
   render: (args) => (
@@ -206,7 +207,7 @@ export const WithoutToolbar: Story = {
 /** Per-feature toolbar toggles: pagination only. */
 export const PaginationOnly: Story = {
   args: {
-    source: { type: "blob", data: samplePdfBlob },
+    source: { data: samplePdfBlob },
     toolbar: { pagination: true, zoom: false, rotate: false, download: false },
   },
   render: (args) => (
@@ -224,7 +225,6 @@ export const FromStorageBucket: Story = {
   args: {
     sdk: mockSdk,
     source: {
-      type: "bucket",
       bucketId: 123,
       folderId: 456,
       path: "invoices/inv-0714.pdf",
@@ -245,7 +245,6 @@ export const FromDataFabricEntity: Story = {
   args: {
     sdk: mockSdk,
     source: {
-      type: "entity",
       entityId: "00000000-0000-0000-0000-000000000000",
       recordId: "00000000-0000-0000-0000-000000000001",
       fieldName: "document",
@@ -261,7 +260,7 @@ export const FromDataFabricEntity: Story = {
 /** Fetch failure → error state with Retry (URL that always 404s). */
 export const ErrorState: Story = {
   args: {
-    source: { type: "url", url: "/this-file-does-not-exist.pdf" },
+    source: { url: "/this-file-does-not-exist.pdf" },
   },
   render: (args) => (
     <div style={{ width: 720 }}>

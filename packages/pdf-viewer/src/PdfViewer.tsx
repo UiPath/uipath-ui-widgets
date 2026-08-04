@@ -17,7 +17,11 @@ import {
   ZoomInIcon,
   ZoomOutIcon,
 } from "./icons";
-import { getSourceKey, useResolvedSource } from "./sources/useResolvedSource";
+import {
+  getSourceKey,
+  getSourceType,
+  useResolvedSource,
+} from "./sources/useResolvedSource";
 import { PdfViewerProps, PdfViewerSource, TelemetryConstants } from "./types";
 import { trackTelemetry } from "./utils/telemetryUtils";
 
@@ -36,24 +40,23 @@ const DEFAULT_TOOLBAR = {
 
 /** Derive a sensible download name when the consumer doesn't pass one. */
 function defaultFileName(source: PdfViewerSource): string {
-  switch (source.type) {
-    case "bucket":
-      return source.path.split("/").pop() || "document.pdf";
-    case "url": {
-      try {
-        const name = new URL(source.url, "http://placeholder.local").pathname
-          .split("/")
-          .pop();
-        return name || "document.pdf";
-      } catch {
-        return "document.pdf";
-      }
-    }
-    case "entity":
-      return `${source.fieldName}.pdf`;
-    case "blob":
-      return "document.pdf";
+  if ("bucketId" in source) {
+    return source.path.split("/").pop() || "document.pdf";
   }
+  if ("url" in source) {
+    try {
+      const name = new URL(source.url, "http://placeholder.local").pathname
+        .split("/")
+        .pop();
+      return name || "document.pdf";
+    } catch {
+      return "document.pdf";
+    }
+  }
+  if ("entityId" in source) {
+    return `${source.fieldName}.pdf`;
+  }
+  return "document.pdf";
 }
 
 const LoadingState = () => (
@@ -158,9 +161,11 @@ export const PdfViewer: FC<PdfViewerProps> = ({
   const pageDims = useRef<{ width: number; height: number } | null>(null);
 
   const sourceKey = getSourceKey(source);
+  // Inferred from the fields present — the `type` field is optional.
+  const sourceType = getSourceType(source);
   // All blob sources share the sourceKey "blob", so track the blob identity
   // separately to also detect a switch between two different blob sources.
-  const blobIdentity = source.type === "blob" ? source.data : null;
+  const blobIdentity = "data" in source ? source.data : null;
   const {
     file,
     isResolving,
@@ -196,7 +201,7 @@ export const PdfViewer: FC<PdfViewerProps> = ({
       TelemetryConstants.Service.LoadDocument,
       TelemetryConstants.Telemetry.Error,
       {
-        SourceType: source.type,
+        SourceType: sourceType,
         Stage: "fetch",
         Error: resolveError.message,
       },
@@ -217,13 +222,13 @@ export const PdfViewer: FC<PdfViewerProps> = ({
         TelemetryConstants.Service.LoadDocument,
         TelemetryConstants.Telemetry.Usage,
         {
-          SourceType: source.type,
+          SourceType: sourceType,
           NumPages: pdf.numPages,
         },
       );
       onLoadSuccess?.({ numPages: pdf.numPages });
     },
-    [source.type, onLoadSuccess],
+    [sourceType, onLoadSuccess],
   );
 
   const handleDocumentLoadError = useCallback(
@@ -234,14 +239,14 @@ export const PdfViewer: FC<PdfViewerProps> = ({
         TelemetryConstants.Service.LoadDocument,
         TelemetryConstants.Telemetry.Error,
         {
-          SourceType: source.type,
+          SourceType: sourceType,
           Stage: "render",
           Error: error.message,
         },
       );
       onLoadError?.(error);
     },
-    [source.type, onLoadError],
+    [sourceType, onLoadError],
   );
 
   const handleRetry = useCallback(() => {
@@ -317,7 +322,7 @@ export const PdfViewer: FC<PdfViewerProps> = ({
         TelemetryConstants.Service.DownloadFile,
         TelemetryConstants.Telemetry.Usage,
         {
-          SourceType: source.type,
+          SourceType: sourceType,
         },
       );
     } catch (error) {
@@ -325,12 +330,12 @@ export const PdfViewer: FC<PdfViewerProps> = ({
         TelemetryConstants.Service.DownloadFile,
         TelemetryConstants.Telemetry.Error,
         {
-          SourceType: source.type,
+          SourceType: sourceType,
           Error: error instanceof Error ? error.message : "Download failed",
         },
       );
     }
-  }, [file, resolvedFileName, source.type]);
+  }, [file, resolvedFileName, sourceType]);
 
   const error = resolveError ?? renderError;
   const documentFile = file?.blob ?? file?.url ?? null;

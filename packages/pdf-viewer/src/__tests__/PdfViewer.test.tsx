@@ -632,5 +632,101 @@ describe("PdfViewer", () => {
       );
       expect(getSourceKey({ type: "blob", data: pdfBlob })).toBe("blob");
     });
+
+    it("produces the same key with or without the optional type field", () => {
+      expect(getSourceKey({ bucketId: 1, folderId: 2, path: "a.pdf" })).toBe(
+        getSourceKey({
+          type: "bucket",
+          bucketId: 1,
+          folderId: 2,
+          path: "a.pdf",
+        }),
+      );
+      expect(getSourceKey({ url: "https://x/y.pdf" })).toBe(
+        getSourceKey({ type: "url", url: "https://x/y.pdf" }),
+      );
+    });
+  });
+
+  describe("source kind inference (optional type field)", () => {
+    it("renders a url source without an explicit type", async () => {
+      render(<PdfViewer source={{ url: "https://example.com/doc.pdf" }} />);
+
+      await waitForDocumentLoaded();
+      expect(screen.getByTestId("pdf-page")).toHaveTextContent("page-1");
+      expect(lastDocumentFile).toBe("https://example.com/doc.pdf");
+    });
+
+    it("renders a blob source without an explicit type", async () => {
+      render(<PdfViewer source={{ data: pdfBlob }} />);
+
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
+      );
+      expect(lastDocumentFile).toBeInstanceOf(Blob);
+    });
+
+    it("resolves a bucket source without an explicit type", async () => {
+      mockGetReadUri.mockResolvedValue({
+        uri: "https://signed.example.com/inv.pdf",
+        httpMethod: "GET",
+        requiresAuth: false,
+        headers: {},
+      });
+      const fetchMock = vi.fn(async () => ({
+        ok: true,
+        blob: async () => pdfBlob,
+      }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      render(
+        <PdfViewer
+          sdk={sdk}
+          source={{ bucketId: 123, folderKey: "fk-1", path: "inv/0714.pdf" }}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
+      );
+      expect(mockGetReadUri).toHaveBeenCalledWith(
+        123,
+        "inv/0714.pdf",
+        expect.objectContaining({ folderKey: "fk-1" }),
+      );
+    });
+
+    it("resolves an entity source without an explicit type", async () => {
+      mockDownloadAttachment.mockResolvedValue(pdfBlob);
+
+      render(
+        <PdfViewer
+          sdk={sdk}
+          source={{ entityId: "e-1", recordId: "r-1", fieldName: "FileField" }}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
+      );
+      expect(mockDownloadAttachment).toHaveBeenCalledWith(
+        "e-1",
+        "r-1",
+        "FileField",
+      );
+    });
+
+    it("shows a clear error for an unrecognized source shape", async () => {
+      render(
+        <PdfViewer
+          source={{} as unknown as import("../types").PdfViewerSource}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-viewer-error")).toBeInTheDocument(),
+      );
+      expect(screen.getByText(/Unrecognized source/)).toBeInTheDocument();
+    });
   });
 });

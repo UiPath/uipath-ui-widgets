@@ -14,15 +14,15 @@ A React PDF viewer widget for UiPath coded apps. Renders PDFs from Orchestrator 
 ## Source resolution (Data Flow)
 
 ```
-source prop (discriminated union)
-  ├─ { type:"url" }    → passed straight to react-pdf (it downloads; CORS applies)
-  ├─ { type:"blob" }   → normalized to a typed Blob (ArrayBuffer wrapped)
-  ├─ { type:"bucket" } → BucketService.getReadUri(bucketId, path, {folderId|folderKey|folderPath})
-  │                       (the SDK's preferred positional overload; the
-  │                        options-object form is deprecated in the SDK)
-  │                       → fetch(uri, {headers}) → Blob        (requires sdk)
-  └─ { type:"entity" } → Entities.downloadAttachment(entityId, recordId, fieldName)
-                          → Blob                                 (requires sdk)
+source prop — kind inferred from the fields present (`type` is optional)
+  ├─ { url }      → passed straight to react-pdf (it downloads; CORS applies)
+  ├─ { data }     → normalized to a typed Blob (ArrayBuffer wrapped)
+  ├─ { bucketId } → BucketService.getReadUri(bucketId, path, {folderId|folderKey|folderPath})
+  │                  (the SDK's preferred positional overload; the
+  │                   options-object form is deprecated in the SDK)
+  │                  → fetch(uri, {headers}) → Blob             (requires sdk)
+  └─ { entityId } → Entities.downloadAttachment(entityId, recordId, fieldName)
+                     → Blob                                      (requires sdk)
   → react-pdf <Document file={...}> → <Page> (canvas + text layer + annotations)
 ```
 
