@@ -480,66 +480,64 @@ export const ConversationalAgentChat = ({
             });
 
             // Handle client-side tool execution
-            toolCall.onExecutingToolCall(
-              () => {
-                if (!isClientSideTool) return;
+            toolCall.onExecutingToolCall(() => {
+              if (!isClientSideTool) return;
 
-                const clientSideWidgetId = `client-side-tool-${toolCall.toolCallId}`;
+              const clientSideWidgetId = `client-side-tool-${toolCall.toolCallId}`;
 
-                // Build default values from output schema properties
-                const outputSchemaObj = (outputSchema ?? {
-                  type: "object",
-                  properties: {},
-                }) as Record<string, unknown>;
-                const outputSchemaProps = outputSchemaObj.properties ?? {};
-                const defaultValues: Record<string, unknown> = {};
-                for (const key of Object.keys(outputSchemaProps)) {
-                  defaultValues[key] = null;
-                }
+              // Build default values from output schema properties
+              const outputSchemaObj = (outputSchema ?? {
+                type: "object",
+                properties: {},
+              }) as Record<string, unknown>;
+              const outputSchemaProps = outputSchemaObj.properties ?? {};
+              const defaultValues: Record<string, unknown> = {};
+              for (const key of Object.keys(outputSchemaProps)) {
+                defaultValues[key] = null;
+              }
 
-                chatService.sendResponse({
-                  id: clientSideWidgetId,
-                  content: t("performing_action_message", {
-                    action: startEvent.toolName,
-                  }),
-                  created_at: new Date().toISOString(),
-                  widget: MessageWidget.ClientSideToolInput,
-                  stream: false,
-                  done: true,
-                  meta: {
-                    toolName: startEvent.toolName,
-                    inputSchema: outputSchemaObj,
-                    defaultValues,
-                    isCompleted: false,
-                    onSubmit: (formData: Record<string, unknown>) => {
-                      const conversation = chatService.getConversation();
-                      const messageToUpdate = conversation?.find(
-                        (m) => m.id === clientSideWidgetId,
-                      );
-                      if (messageToUpdate?.meta) {
-                        messageToUpdate.meta.isCompleted = true;
-                      }
-                      completeToolCallSpinner(formData, false);
-                      toolCall.sendToolCallEnd({
-                        output: formData,
-                        isError: false,
-                      });
-                    },
-                    onCancel: () => {
-                      const conversation = chatService.getConversation();
-                      const messageToUpdate = conversation?.find(
-                        (m) => m.id === clientSideWidgetId,
-                      );
-                      if (messageToUpdate?.meta) {
-                        messageToUpdate.meta.isCompleted = true;
-                      }
-                      completeToolCallSpinner(null, false, true);
-                      toolCall.sendToolCallEnd({ cancelled: true });
-                    },
+              chatService.sendResponse({
+                id: clientSideWidgetId,
+                content: t("performing_action_message", {
+                  action: startEvent.toolName,
+                }),
+                created_at: new Date().toISOString(),
+                widget: MessageWidget.ClientSideToolInput,
+                stream: false,
+                done: true,
+                meta: {
+                  toolName: startEvent.toolName,
+                  inputSchema: outputSchemaObj,
+                  defaultValues,
+                  isCompleted: false,
+                  onSubmit: (formData: Record<string, unknown>) => {
+                    const conversation = chatService.getConversation();
+                    const messageToUpdate = conversation?.find(
+                      (m) => m.id === clientSideWidgetId,
+                    );
+                    if (messageToUpdate?.meta) {
+                      messageToUpdate.meta.isCompleted = true;
+                    }
+                    completeToolCallSpinner(formData, false);
+                    toolCall.sendToolCallEnd({
+                      output: formData,
+                      isError: false,
+                    });
                   },
-                });
-              },
-            );
+                  onCancel: () => {
+                    const conversation = chatService.getConversation();
+                    const messageToUpdate = conversation?.find(
+                      (m) => m.id === clientSideWidgetId,
+                    );
+                    if (messageToUpdate?.meta) {
+                      messageToUpdate.meta.isCompleted = true;
+                    }
+                    completeToolCallSpinner(null, false, true);
+                    toolCall.sendToolCallEnd({ cancelled: true });
+                  },
+                },
+              });
+            });
 
             // New flow: confirmation is a property of the tool call itself.
             if (startEvent.requireConfirmation) {
