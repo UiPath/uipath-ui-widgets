@@ -28,12 +28,20 @@ export interface ResolvedSourceState {
  * Infers the source kind from the fields present — the `type` field is
  * optional on {@link PdfViewerSource}, so the presence of `bucketId`,
  * `entityId`, `url`, or `data` is what actually selects the adapter.
+ *
+ * Every kind is a positive field check; a shape matching none of them (only
+ * possible from untyped JS) is reported as `"unknown"` rather than guessed.
+ * This function runs during render, so it never throws — `resolveSource`
+ * rejects unrecognized sources with a descriptive error instead.
  */
-export function getSourceType(source: PdfViewerSource): PdfViewerSourceType {
+export function getSourceType(
+  source: PdfViewerSource,
+): PdfViewerSourceType | "unknown" {
   if ("bucketId" in source) return PdfViewerSourceType.Bucket;
   if ("entityId" in source) return PdfViewerSourceType.Entity;
   if ("url" in source) return PdfViewerSourceType.Url;
-  return PdfViewerSourceType.Blob;
+  if ("data" in source) return PdfViewerSourceType.Blob;
+  return "unknown";
 }
 
 /**
@@ -51,7 +59,10 @@ export function getSourceKey(source: PdfViewerSource): string {
   if ("url" in source) {
     return `url:${source.url}`;
   }
-  return "blob";
+  if ("data" in source) {
+    return "blob";
+  }
+  return "unknown";
 }
 
 /** Ensure the blob carries the PDF MIME type (some APIs return untyped octet streams). */

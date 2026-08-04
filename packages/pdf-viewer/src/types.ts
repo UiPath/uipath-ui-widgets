@@ -15,8 +15,9 @@ export enum PdfViewerSourceType {
  * Where the PDF lives. The widget infers the source kind from the fields you
  * pass — `bucketId` → storage bucket, `entityId` → Data Fabric entity,
  * `url` → direct URL, `data` → pre-fetched bytes. The `type` field is
- * optional; include it only if you prefer the explicitness (it also gives
- * per-shape autocomplete in editors).
+ * optional and never read at runtime; include it only if you prefer the
+ * explicitness — set it with the {@link PdfViewerSourceType} enum (it also
+ * gives per-shape autocomplete in editors).
  *
  * Field names mirror the SDK signatures they map to (the SDK's preferred
  * positional forms — the single-options-object overloads are deprecated):
@@ -26,7 +27,7 @@ export enum PdfViewerSourceType {
  */
 export type PdfViewerSource =
   | {
-      type?: "bucket";
+      type?: PdfViewerSourceType.Bucket;
       /** Orchestrator Storage Bucket ID */
       bucketId: number;
       /**
@@ -44,7 +45,7 @@ export type PdfViewerSource =
       path: string;
     }
   | {
-      type?: "entity";
+      type?: PdfViewerSourceType.Entity;
       /** Data Fabric entity ID */
       entityId: string;
       /** Record (row) ID within the entity */
@@ -53,12 +54,12 @@ export type PdfViewerSource =
       fieldName: string;
     }
   | {
-      type?: "url";
+      type?: PdfViewerSourceType.Url;
       /** Direct URL to the PDF (must be same-origin or CORS-accessible) */
       url: string;
     }
   | {
-      type?: "blob";
+      type?: PdfViewerSourceType.Blob;
       /** Pre-fetched PDF content */
       data: Blob | ArrayBuffer;
     };

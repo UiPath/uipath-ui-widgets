@@ -3,7 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PdfViewer } from "../PdfViewer";
-import { getSourceKey } from "../sources/useResolvedSource";
+import { getSourceKey, getSourceType } from "../sources/useResolvedSource";
+import { PdfViewerSourceType } from "../types";
 import { UiPath, trackEvent } from "@uipath/uipath-typescript/core";
 
 // Captures the `file` prop react-pdf receives, per render.
@@ -120,7 +121,10 @@ describe("PdfViewer", () => {
     it("renders the document from a url source and passes the url through", async () => {
       render(
         <PdfViewer
-          source={{ type: "url", url: "https://example.com/doc.pdf" }}
+          source={{
+            type: PdfViewerSourceType.Url,
+            url: "https://example.com/doc.pdf",
+          }}
         />,
       );
 
@@ -131,7 +135,7 @@ describe("PdfViewer", () => {
 
     it("normalizes an ArrayBuffer blob source into a typed Blob", async () => {
       const buffer = new TextEncoder().encode("%PDF-fake").buffer;
-      render(<PdfViewer source={{ type: "blob", data: buffer }} />);
+      render(<PdfViewer source={{ data: buffer }} />);
 
       await waitFor(() =>
         expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
@@ -143,10 +147,7 @@ describe("PdfViewer", () => {
     it("reports load success via callback and telemetry", async () => {
       const onLoadSuccess = vi.fn();
       render(
-        <PdfViewer
-          source={{ type: "blob", data: pdfBlob }}
-          onLoadSuccess={onLoadSuccess}
-        />,
+        <PdfViewer source={{ data: pdfBlob }} onLoadSuccess={onLoadSuccess} />,
       );
 
       await waitFor(() =>
@@ -163,7 +164,7 @@ describe("PdfViewer", () => {
   describe("password-protected PDFs", () => {
     it("shows the in-viewer password prompt instead of the native window.prompt", async () => {
       simulatePasswordProtected = true;
-      render(<PdfViewer source={{ type: "blob", data: pdfBlob }} />);
+      render(<PdfViewer source={{ data: pdfBlob }} />);
 
       await waitFor(() =>
         expect(screen.getByTestId("pdf-viewer-password")).toBeInTheDocument(),
@@ -177,10 +178,7 @@ describe("PdfViewer", () => {
       const user = userEvent.setup();
       const onLoadSuccess = vi.fn();
       render(
-        <PdfViewer
-          source={{ type: "blob", data: pdfBlob }}
-          onLoadSuccess={onLoadSuccess}
-        />,
+        <PdfViewer source={{ data: pdfBlob }} onLoadSuccess={onLoadSuccess} />,
       );
 
       await waitFor(() =>
@@ -206,10 +204,7 @@ describe("PdfViewer", () => {
       const user = userEvent.setup();
       const onLoadSuccess = vi.fn();
       render(
-        <PdfViewer
-          source={{ type: "blob", data: pdfBlob }}
-          onLoadSuccess={onLoadSuccess}
-        />,
+        <PdfViewer source={{ data: pdfBlob }} onLoadSuccess={onLoadSuccess} />,
       );
 
       await waitFor(() =>
@@ -239,10 +234,7 @@ describe("PdfViewer", () => {
       const user = userEvent.setup();
       const onLoadError = vi.fn();
       render(
-        <PdfViewer
-          source={{ type: "blob", data: pdfBlob }}
-          onLoadError={onLoadError}
-        />,
+        <PdfViewer source={{ data: pdfBlob }} onLoadError={onLoadError} />,
       );
 
       await waitFor(() =>
@@ -263,9 +255,7 @@ describe("PdfViewer", () => {
   describe("source switching resets the view", () => {
     it("resets page, zoom, and rotation when the source changes", async () => {
       const user = userEvent.setup();
-      const { rerender } = render(
-        <PdfViewer source={{ type: "blob", data: pdfBlob }} />,
-      );
+      const { rerender } = render(<PdfViewer source={{ data: pdfBlob }} />);
       await waitForDocumentLoaded();
 
       // Move off the default view: page 2, 125%, rotated 90°.
@@ -279,11 +269,7 @@ describe("PdfViewer", () => {
       );
 
       // Switch to a different source → full view reset.
-      rerender(
-        <PdfViewer
-          source={{ type: "url", url: "https://example.com/b.pdf" }}
-        />,
-      );
+      rerender(<PdfViewer source={{ url: "https://example.com/b.pdf" }} />);
       await waitFor(() =>
         expect(screen.getByTestId("pdf-page")).toHaveTextContent(
           "page-1 scale-1 rotate-0",
@@ -295,9 +281,7 @@ describe("PdfViewer", () => {
       const user = userEvent.setup();
       const blobA = new Blob(["%PDF-A"], { type: "application/pdf" });
       const blobB = new Blob(["%PDF-B"], { type: "application/pdf" });
-      const { rerender } = render(
-        <PdfViewer source={{ type: "blob", data: blobA }} />,
-      );
+      const { rerender } = render(<PdfViewer source={{ data: blobA }} />);
       await waitForDocumentLoaded();
 
       await user.click(
@@ -305,7 +289,7 @@ describe("PdfViewer", () => {
       );
       expect(screen.getByTestId("pdf-page")).toHaveTextContent("rotate-90");
 
-      rerender(<PdfViewer source={{ type: "blob", data: blobB }} />);
+      rerender(<PdfViewer source={{ data: blobB }} />);
       await waitFor(() =>
         expect(screen.getByTestId("pdf-page")).toHaveTextContent("rotate-0"),
       );
@@ -315,7 +299,7 @@ describe("PdfViewer", () => {
   describe("toolbar", () => {
     it("navigates pages with next/previous and the page input", async () => {
       const user = userEvent.setup();
-      render(<PdfViewer source={{ type: "blob", data: pdfBlob }} />);
+      render(<PdfViewer source={{ data: pdfBlob }} />);
       await waitForDocumentLoaded();
 
       await user.click(screen.getByRole("button", { name: "Next page" }));
@@ -343,7 +327,7 @@ describe("PdfViewer", () => {
 
     it("zooms in and out within bounds", async () => {
       const user = userEvent.setup();
-      render(<PdfViewer source={{ type: "blob", data: pdfBlob }} />);
+      render(<PdfViewer source={{ data: pdfBlob }} />);
       await waitFor(() =>
         expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
       );
@@ -358,7 +342,7 @@ describe("PdfViewer", () => {
 
     it("rotates the page clockwise in 90° steps", async () => {
       const user = userEvent.setup();
-      render(<PdfViewer source={{ type: "blob", data: pdfBlob }} />);
+      render(<PdfViewer source={{ data: pdfBlob }} />);
       await waitForDocumentLoaded();
 
       await user.click(
@@ -370,7 +354,7 @@ describe("PdfViewer", () => {
     it("hides the toolbar entirely when every feature is disabled", async () => {
       render(
         <PdfViewer
-          source={{ type: "blob", data: pdfBlob }}
+          source={{ data: pdfBlob }}
           toolbar={{
             pagination: false,
             zoom: false,
@@ -388,7 +372,7 @@ describe("PdfViewer", () => {
     it("hides individual features via per-feature toggles", async () => {
       render(
         <PdfViewer
-          source={{ type: "blob", data: pdfBlob }}
+          source={{ data: pdfBlob }}
           toolbar={{ zoom: false, download: false }}
         />,
       );
@@ -419,12 +403,7 @@ describe("PdfViewer", () => {
         .spyOn(HTMLAnchorElement.prototype, "click")
         .mockImplementation(() => {});
 
-      render(
-        <PdfViewer
-          source={{ type: "blob", data: pdfBlob }}
-          fileName="invoice.pdf"
-        />,
-      );
+      render(<PdfViewer source={{ data: pdfBlob }} fileName="invoice.pdf" />);
       await waitFor(() =>
         expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
       );
@@ -459,7 +438,6 @@ describe("PdfViewer", () => {
         <PdfViewer
           sdk={sdk}
           source={{
-            type: "bucket",
             bucketId: 123,
             folderId: 456,
             path: "inv/0714.pdf",
@@ -500,7 +478,6 @@ describe("PdfViewer", () => {
         <PdfViewer
           sdk={sdk}
           source={{
-            type: "bucket",
             bucketId: 123,
             folderKey: "5f6dadf1-3677-49dc-8aca-c2999dd4b3ba",
             path: "inv/0714.pdf",
@@ -521,12 +498,7 @@ describe("PdfViewer", () => {
     });
 
     it("shows the error state when no folder identifier is provided", async () => {
-      render(
-        <PdfViewer
-          sdk={sdk}
-          source={{ type: "bucket", bucketId: 1, path: "a.pdf" }}
-        />,
-      );
+      render(<PdfViewer sdk={sdk} source={{ bucketId: 1, path: "a.pdf" }} />);
       await waitFor(() =>
         expect(screen.getByTestId("pdf-viewer-error")).toBeInTheDocument(),
       );
@@ -539,7 +511,7 @@ describe("PdfViewer", () => {
       const onLoadError = vi.fn();
       render(
         <PdfViewer
-          source={{ type: "bucket", bucketId: 1, folderId: 2, path: "a.pdf" }}
+          source={{ bucketId: 1, folderId: 2, path: "a.pdf" }}
           onLoadError={onLoadError}
         />,
       );
@@ -567,7 +539,6 @@ describe("PdfViewer", () => {
         <PdfViewer
           sdk={sdk}
           source={{
-            type: "entity",
             entityId: "entity-1",
             recordId: "record-1",
             fieldName: "document",
@@ -596,7 +567,6 @@ describe("PdfViewer", () => {
         <PdfViewer
           sdk={sdk}
           source={{
-            type: "entity",
             entityId: "entity-1",
             recordId: "record-1",
             fieldName: "document",
@@ -621,7 +591,6 @@ describe("PdfViewer", () => {
     it("produces distinct, stable keys per source identity", () => {
       expect(
         getSourceKey({
-          type: "bucket",
           bucketId: 1,
           folderId: 2,
           path: "a.pdf",
@@ -629,29 +598,27 @@ describe("PdfViewer", () => {
       ).toBe("bucket:1:2:a.pdf");
       expect(
         getSourceKey({
-          type: "entity",
           entityId: "e",
           recordId: "r",
           fieldName: "f",
         }),
       ).toBe("entity:e:r:f");
-      expect(getSourceKey({ type: "url", url: "https://x/y.pdf" })).toBe(
+      expect(getSourceKey({ url: "https://x/y.pdf" })).toBe(
         "url:https://x/y.pdf",
       );
-      expect(getSourceKey({ type: "blob", data: pdfBlob })).toBe("blob");
+      expect(getSourceKey({ data: pdfBlob })).toBe("blob");
     });
 
     it("produces the same key with or without the optional type field", () => {
       expect(getSourceKey({ bucketId: 1, folderId: 2, path: "a.pdf" })).toBe(
         getSourceKey({
-          type: "bucket",
           bucketId: 1,
           folderId: 2,
           path: "a.pdf",
         }),
       );
       expect(getSourceKey({ url: "https://x/y.pdf" })).toBe(
-        getSourceKey({ type: "url", url: "https://x/y.pdf" }),
+        getSourceKey({ url: "https://x/y.pdf" }),
       );
     });
   });
@@ -735,6 +702,48 @@ describe("PdfViewer", () => {
         expect(screen.getByTestId("pdf-viewer-error")).toBeInTheDocument(),
       );
       expect(screen.getByText(/Unrecognized source/)).toBeInTheDocument();
+      // The failure is never misclassified as a blob — diagnostics report it
+      // honestly as "unknown".
+      expect(trackEvent).toHaveBeenCalledWith(
+        "PDFV.LoadDocument",
+        "PDFV.Error",
+        expect.objectContaining({ SourceType: "unknown", Stage: "fetch" }),
+      );
+    });
+
+    it("classifies an unrecognized shape as unknown, never as blob", () => {
+      const garbage = {
+        foo: "bar",
+      } as unknown as import("../types").PdfViewerSource;
+      expect(getSourceType(garbage)).toBe("unknown");
+      expect(getSourceKey(garbage)).toBe("unknown");
+      // A real blob source is still classified as blob.
+      expect(getSourceType({ data: pdfBlob })).toBe("blob");
+      expect(getSourceKey({ data: pdfBlob })).toBe("blob");
+    });
+
+    it("recovers and renders when an unrecognized source is replaced by a valid one", async () => {
+      const { rerender } = render(
+        <PdfViewer
+          source={{} as unknown as import("../types").PdfViewerSource}
+        />,
+      );
+
+      // Starts in the unrecognized-source error state.
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-viewer-error")).toBeInTheDocument(),
+      );
+      expect(screen.getByText(/Unrecognized source/)).toBeInTheDocument();
+
+      // Passing a valid source changes the sourceKey ("unknown" → "blob"),
+      // which re-resolves and renders — the error state is not sticky.
+      rerender(<PdfViewer source={{ data: pdfBlob }} />);
+
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
+      );
+      expect(screen.queryByTestId("pdf-viewer-error")).not.toBeInTheDocument();
+      expect(lastDocumentFile).toBeInstanceOf(Blob);
     });
   });
 });

@@ -116,7 +116,7 @@ And for custom data stores, pass a URL or pre-fetched bytes directly (no \`sdk\`
 \`\`\`
 
 The widget infers the source kind from the fields you pass — an explicit
-\`type\` (\`'bucket' | 'entity' | 'url' | 'blob'\`) is optional.
+\`type\` is optional (use the exported \`PdfViewerSourceType\` enum if you set it).
         `,
       },
     },
@@ -191,11 +191,11 @@ export const EmbeddedInActionApp: Story = {
   ),
 };
 
-/** Toolbar hidden entirely — a bare page renderer. */
+/** Toolbar hidden entirely (all features disabled) — a bare page renderer. */
 export const WithoutToolbar: Story = {
   args: {
     source: { data: samplePdfBlob },
-    toolbar: false,
+    toolbar: { pagination: false, zoom: false, rotate: false, download: false },
   },
   render: (args) => (
     <div style={{ width: 720 }}>
