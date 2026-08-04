@@ -1,5 +1,6 @@
 import { createRoot, type Root } from "react-dom/client";
 import type { AutopilotChatMessage } from "@uipath/apollo-react/material/components";
+import { PortalContainerProvider } from "@uipath/apollo-wind";
 import i18next from "i18next";
 import { initI18n } from "../i18n";
 import {
@@ -58,22 +59,24 @@ export function createClientSideToolRenderer(): ClientSideToolRenderer {
       const labels = resolveClientSideToolLabels(labelOverrides);
 
       root.render(
-        <ClientSideToolWidget
-          toolName={meta.toolName}
-          inputSchema={meta.inputSchema}
-          defaultValues={meta.defaultValues}
-          labels={labels}
-          onSubmit={(formData) => {
-            meta.onSubmit?.(formData);
-            root.unmount();
-            roots.delete(container);
-          }}
-          onCancel={() => {
-            meta.onCancel?.();
-            root.unmount();
-            roots.delete(container);
-          }}
-        />,
+        <PortalContainerProvider>
+          <ClientSideToolWidget
+            toolName={meta.toolName}
+            inputSchema={meta.inputSchema}
+            defaultValues={meta.defaultValues}
+            labels={labels}
+            onSubmit={(formData) => {
+              meta.onSubmit?.(formData);
+              root.unmount();
+              roots.delete(container);
+            }}
+            onCancel={() => {
+              meta.onCancel?.();
+              root.unmount();
+              roots.delete(container);
+            }}
+          />
+        </PortalContainerProvider>,
       );
     },
     unmountAll() {

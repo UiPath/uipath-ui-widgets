@@ -37,7 +37,6 @@ import {
   SortOrder,
   ToolCallEndEvent,
   ToolCallStream,
-  type ExecutingToolCallEvent,
 } from "@uipath/uipath-typescript/conversational-agent";
 import type {
   AgentGetByIdResponse,
@@ -446,6 +445,8 @@ export const ConversationalAgentChat = ({
               isError: boolean,
               cancelled?: boolean,
             ) => {
+              if (!pendingToolCalls.has(toolCall.toolCallId)) return;
+
               const pending = pendingToolCalls.get(toolCall.toolCallId);
               if (pending && !pending.spinnerSent) {
                 sendToolCallSpinner(toolCall.toolCallId);
@@ -480,17 +481,16 @@ export const ConversationalAgentChat = ({
 
             // Handle client-side tool execution
             toolCall.onExecutingToolCall(
-              (_event: ExecutingToolCallEvent) => {
+              () => {
                 if (!isClientSideTool) return;
 
                 const clientSideWidgetId = `client-side-tool-${toolCall.toolCallId}`;
 
                 // Build default values from output schema properties
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const outputSchemaObj = (outputSchema ?? {
                   type: "object",
                   properties: {},
-                }) as any;
+                }) as Record<string, unknown>;
                 const outputSchemaProps = outputSchemaObj.properties ?? {};
                 const defaultValues: Record<string, unknown> = {};
                 for (const key of Object.keys(outputSchemaProps)) {
