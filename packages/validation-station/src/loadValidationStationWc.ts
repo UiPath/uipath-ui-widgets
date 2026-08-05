@@ -116,6 +116,14 @@ export function convertToPersistentTag(tag: string): string {
 export async function waitForWcElementReady(tag: string): Promise<void> {
   // No custom-element registry off the main thread / during SSR — resolve to a
   // no-op so this never touches `window` on the server.
+  //
+  // Guarded here but deliberately *not* in `configureValidationStationWc`, which
+  // uses `document` unguarded: this function is reached through `useWcReady`
+  // during React rendering, so the framework decides when it runs and a consumer
+  // server-rendering <ValidationStation> hits it without opting in. Configuring
+  // is the opposite — an explicit call the consumer places at a browser entry
+  // point, where a loud `ReferenceError` beats an unhandled rejection (the
+  // documented usage is fire-and-forget, with no `.catch`).
   if (typeof window === "undefined") return;
 
   if (loadPromise) {
