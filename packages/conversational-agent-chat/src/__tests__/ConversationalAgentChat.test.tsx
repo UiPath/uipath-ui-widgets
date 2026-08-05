@@ -2088,8 +2088,7 @@ describe("ConversationalAgentChat", () => {
         mockChatService.sendResponse.mockClear();
         cstCall[0].meta.onSubmit({ title: "Plan" });
 
-        const countAfterSubmit =
-          mockChatService.sendResponse.mock.calls.length;
+        const countAfterSubmit = mockChatService.sendResponse.mock.calls.length;
 
         // Second completion via onToolCallEnd — should be a no-op
         toolCallEndHandler?.({ output: "duplicate", isError: false });
