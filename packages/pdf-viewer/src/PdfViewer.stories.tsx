@@ -115,8 +115,7 @@ And for custom data stores, pass a URL or pre-fetched bytes directly (no \`sdk\`
 <PdfViewer source={{ data: blob }} />
 \`\`\`
 
-The widget infers the source kind from the fields you pass — an explicit
-\`type\` is optional (use the exported \`PdfViewerSourceType\` enum if you set it).
+The widget selects the adapter from the fields you pass.
         `,
       },
     },

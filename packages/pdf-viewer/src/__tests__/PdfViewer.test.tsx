@@ -4,7 +4,6 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PdfViewer } from "../PdfViewer";
 import { getSourceKey, getSourceType } from "../sources/useResolvedSource";
-import { PdfViewerSourceType } from "../types";
 import { UiPath, trackEvent } from "@uipath/uipath-typescript/core";
 
 // Captures the `file` prop react-pdf receives, per render.
@@ -122,7 +121,6 @@ describe("PdfViewer", () => {
       render(
         <PdfViewer
           source={{
-            type: PdfViewerSourceType.Url,
             url: "https://example.com/doc.pdf",
           }}
         />,
@@ -587,6 +585,42 @@ describe("PdfViewer", () => {
     });
   });
 
+  describe("source identity (adversarial)", () => {
+    it("switches document when the source changes but fileName is fixed", async () => {
+      const { rerender } = render(
+        <PdfViewer
+          fileName="fixed.pdf"
+          source={{ url: "https://example.com/a.pdf" }}
+        />,
+      );
+      await waitForDocumentLoaded();
+      expect(lastDocumentFile).toBe("https://example.com/a.pdf");
+
+      rerender(
+        <PdfViewer
+          fileName="fixed.pdf"
+          source={{ url: "https://example.com/b.pdf" }}
+        />,
+      );
+      await waitFor(() =>
+        expect(lastDocumentFile).toBe("https://example.com/b.pdf"),
+      );
+    });
+
+    it("switches document when two sources share the same basename", async () => {
+      const { rerender } = render(
+        <PdfViewer source={{ url: "https://a.example.com/doc.pdf" }} />,
+      );
+      await waitForDocumentLoaded();
+      expect(lastDocumentFile).toBe("https://a.example.com/doc.pdf");
+
+      rerender(<PdfViewer source={{ url: "https://b.example.com/doc.pdf" }} />);
+      await waitFor(() =>
+        expect(lastDocumentFile).toBe("https://b.example.com/doc.pdf"),
+      );
+    });
+  });
+
   describe("getSourceKey", () => {
     it("produces distinct, stable keys per source identity", () => {
       expect(
@@ -608,23 +642,10 @@ describe("PdfViewer", () => {
       );
       expect(getSourceKey({ data: pdfBlob })).toBe("blob");
     });
-
-    it("produces the same key with or without the optional type field", () => {
-      expect(getSourceKey({ bucketId: 1, folderId: 2, path: "a.pdf" })).toBe(
-        getSourceKey({
-          bucketId: 1,
-          folderId: 2,
-          path: "a.pdf",
-        }),
-      );
-      expect(getSourceKey({ url: "https://x/y.pdf" })).toBe(
-        getSourceKey({ url: "https://x/y.pdf" }),
-      );
-    });
   });
 
-  describe("source kind inference (optional type field)", () => {
-    it("renders a url source without an explicit type", async () => {
+  describe("source kind inference", () => {
+    it("renders a url source", async () => {
       render(<PdfViewer source={{ url: "https://example.com/doc.pdf" }} />);
 
       await waitForDocumentLoaded();
@@ -632,7 +653,7 @@ describe("PdfViewer", () => {
       expect(lastDocumentFile).toBe("https://example.com/doc.pdf");
     });
 
-    it("renders a blob source without an explicit type", async () => {
+    it("renders a blob source", async () => {
       render(<PdfViewer source={{ data: pdfBlob }} />);
 
       await waitFor(() =>
@@ -641,7 +662,7 @@ describe("PdfViewer", () => {
       expect(lastDocumentFile).toBeInstanceOf(Blob);
     });
 
-    it("resolves a bucket source without an explicit type", async () => {
+    it("resolves a bucket source", async () => {
       mockGetReadUri.mockResolvedValue({
         uri: "https://signed.example.com/inv.pdf",
         httpMethod: "GET",

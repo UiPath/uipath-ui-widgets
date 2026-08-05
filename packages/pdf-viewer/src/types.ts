@@ -1,8 +1,8 @@
 import { UiPath } from "@uipath/uipath-typescript/core";
 
 /**
- * The kind of source a {@link PdfViewerSource} describes. Inferred from the
- * fields present on the source (see {@link PdfViewerSource}).
+ * The kind of source a {@link PdfViewerSource} describes, derived from the
+ * fields present on it. Used for telemetry; consumers never set it.
  */
 export enum PdfViewerSourceType {
   Bucket = "bucket",
@@ -12,12 +12,9 @@ export enum PdfViewerSourceType {
 }
 
 /**
- * Where the PDF lives. The widget infers the source kind from the fields you
+ * Where the PDF lives. The widget selects the adapter from the fields you
  * pass — `bucketId` → storage bucket, `entityId` → Data Fabric entity,
- * `url` → direct URL, `data` → pre-fetched bytes. The `type` field is
- * optional and never read at runtime; include it only if you prefer the
- * explicitness — set it with the {@link PdfViewerSourceType} enum (it also
- * gives per-shape autocomplete in editors).
+ * `url` → direct URL, `data` → pre-fetched bytes.
  *
  * Field names mirror the SDK signatures they map to (the SDK's preferred
  * positional forms — the single-options-object overloads are deprecated):
@@ -27,7 +24,6 @@ export enum PdfViewerSourceType {
  */
 export type PdfViewerSource =
   | {
-      type?: PdfViewerSourceType.Bucket;
       /** Orchestrator Storage Bucket ID */
       bucketId: number;
       /**
@@ -45,7 +41,6 @@ export type PdfViewerSource =
       path: string;
     }
   | {
-      type?: PdfViewerSourceType.Entity;
       /** Data Fabric entity ID */
       entityId: string;
       /** Record (row) ID within the entity */
@@ -54,12 +49,10 @@ export type PdfViewerSource =
       fieldName: string;
     }
   | {
-      type?: PdfViewerSourceType.Url;
       /** Direct URL to the PDF (must be same-origin or CORS-accessible) */
       url: string;
     }
   | {
-      type?: PdfViewerSourceType.Blob;
       /** Pre-fetched PDF content */
       data: Blob | ArrayBuffer;
     };

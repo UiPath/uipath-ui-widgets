@@ -102,7 +102,7 @@ export const PdfViewer: FC<PdfViewerProps> = ({
   const pageDims = useRef<{ width: number; height: number } | null>(null);
 
   const sourceKey = getSourceKey(source);
-  // Inferred from the fields present — the `type` field is optional.
+  // Derived from the fields present; reported with telemetry.
   const sourceType = getSourceType(source);
   // All blob sources share the sourceKey "blob", so track the blob identity
   // separately to also detect a switch between two different blob sources.

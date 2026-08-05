@@ -39,12 +39,9 @@ function App() {
 
 ### Sources
 
-One `source` prop, four shapes. **The widget infers the source kind from the
+One `source` prop, four shapes. **The widget selects the adapter from the
 fields you pass** — `bucketId` → storage bucket, `entityId` → Data Fabric
-entity, `url` → direct URL, `data` → pre-fetched bytes. An explicit `type`
-is optional and never read at runtime — if you want the extra readability,
-set it with the exported `PdfViewerSourceType` enum
-(e.g. `type: PdfViewerSourceType.Bucket`).
+entity, `url` → direct URL, `data` → pre-fetched bytes.
 
 ```tsx
 // Orchestrator storage bucket (requires `sdk`).

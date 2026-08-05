@@ -12,13 +12,12 @@ A React PDF viewer widget for UiPath coded apps. Renders PDFs from Orchestrator 
 - **useResolvedSource** (`sources/useResolvedSource.ts`) — resolves a `PdfViewerSource` into a renderable file (`Blob` or URL string). All SDK access lives here, plus `getSourceType()` / `getSourceKey()`.
 - **pdfWorker** (`pdfWorker.ts`) — side-effect module configuring `pdfjs.GlobalWorkerOptions.workerSrc` as `new URL("./pdf.worker.min.mjs", import.meta.url)`. The worker file is **copied into `dist/` at build time** from the exact-pinned `pdfjs-dist` (`scripts/copy-worker.mjs`, which fails the build on version drift). Production bundlers emit it as a same-origin asset; dev servers serve it straight from `node_modules` — zero consumer configuration. Never replace this with a CDN URL.
 - **utils/telemetryUtils.ts** — `trackTelemetry()` helper injecting `ApplicationName`/`WidgetVersion` (mirrors datatable).
-- **types.ts** — `PdfViewerProps`, the `PdfViewerSource` union, and the `PdfViewerSourceType` / `TelemetryService` / `TelemetryStatus` enums.
+- **types.ts** — `PdfViewerProps`, the `PdfViewerSource` union, and the `PdfViewerSourceType` (telemetry) / `TelemetryService` / `TelemetryStatus` enums.
 
 ## Source resolution (Data Flow)
 
 ```
-source prop — kind inferred from the fields present (`type` is optional,
-never read at runtime; set it with the PdfViewerSourceType enum if desired)
+source prop — adapter selected by the fields present
   ├─ { url }      → passed straight to react-pdf (it downloads; CORS applies)
   ├─ { data }     → normalized to a typed Blob (ArrayBuffer wrapped)
   ├─ { bucketId } → BucketService.getReadUri(bucketId, path, {folderId|folderKey|folderPath})

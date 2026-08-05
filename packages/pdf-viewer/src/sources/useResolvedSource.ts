@@ -25,9 +25,8 @@ export interface ResolvedSourceState {
 }
 
 /**
- * Infers the source kind from the fields present — the `type` field is
- * optional on {@link PdfViewerSource}, so the presence of `bucketId`,
- * `entityId`, `url`, or `data` is what actually selects the adapter.
+ * Derives the source kind from the fields present — `bucketId`, `entityId`,
+ * `url`, or `data` is what selects the adapter.
  *
  * Every kind is a positive field check; a shape matching none of them (only
  * possible from untyped JS) is reported as `"unknown"` rather than guessed.
@@ -76,8 +75,7 @@ async function resolveSource(
   source: PdfViewerSource,
   sdk: UiPath | undefined,
 ): Promise<ResolvedFile> {
-  // The source kind is selected by which fields are present — the `type`
-  // field is optional and purely informational (see PdfViewerSource).
+  // The adapter is selected by which fields are present (see PdfViewerSource).
   if ("url" in source) {
     // react-pdf downloads URL sources itself; nothing to fetch here.
     return { url: source.url };
