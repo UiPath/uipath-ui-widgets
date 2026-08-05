@@ -3,8 +3,20 @@ import type { DuFramework } from "@uipath/uipath-typescript/document-understandi
 import { UiPath } from "@uipath/uipath-typescript/core";
 import { useEffect, useState } from "react";
 import { ValidationStation } from "./ValidationStation";
+import { configureValidationStationWc } from "./loadValidationStationWc";
 import { ValidationStationLanguage } from "./types";
 import type { ValidationStationProps } from "./types";
+
+// Served from `public/du-vs-wc` — staged by the `prestorybook` script and
+// exposed via `staticDirs` in `.storybook/main.ts`. `includeFonts` because
+// Storybook does not load Apollo fonts or Material Icons globally, without which
+// icon glyphs render as empty boxes.
+configureValidationStationWc({
+  deploymentUrl: "/du-vs-wc",
+  includeFonts: true,
+}).catch((error: unknown) => {
+  console.error("Failed to load the Validation Station web component:", error);
+});
 
 interface ValidationStationStoryArgs extends Omit<
   ValidationStationProps,

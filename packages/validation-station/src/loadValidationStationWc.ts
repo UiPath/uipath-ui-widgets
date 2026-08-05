@@ -1,7 +1,15 @@
-import { loadValidationStationWebComponent } from "@uipath/du-utils";
+import {
+  loadValidationStationWebComponent,
+  type LoadWebComponentOptions,
+} from "@uipath/du-utils";
 
-/** Configuration for {@link configureValidationStationWc}. */
-export interface ValidationStationWcConfig {
+/**
+ * Configuration for {@link configureValidationStationWc} — the deployment URL
+ * plus every option the underlying loader accepts (currently `includeFonts`:
+ * inject the web component's `fonts.css` as a light-DOM stylesheet, needed
+ * unless the host already loads Apollo fonts and Material Icons globally).
+ */
+export interface ValidationStationWcConfig extends LoadWebComponentOptions {
   /**
    * Base URL the web component's build artifacts (`polyfills.js`, `main.js`,
    * `styles.css`, `fonts.css`) are served from — e.g. `/du-vs-wc` when the
@@ -14,17 +22,6 @@ export interface ValidationStationWcConfig {
    * one derived from `location`, a query parameter, or any other user input.
    */
   deploymentUrl: string;
-  /**
-   * Inject the web component's `fonts.css` (Apollo text fonts + Material Icons)
-   * as a light-DOM `<link rel="stylesheet">`. Their `@font-face` rules are
-   * ignored inside the component's shadow root, so without this text falls back
-   * to system fonts and icon glyphs render as empty boxes. Leave `false` when
-   * the host already loads Apollo fonts globally (e.g. Action Center, DU
-   * Center) to avoid double-loading them.
-   *
-   * @default false
-   */
-  includeFonts?: boolean;
 }
 
 let loadPromise: Promise<void> | null = null;
@@ -66,11 +63,13 @@ export function configureValidationStationWc(
 ): Promise<void> {
   if (loadPromise && !loadFailed) return loadPromise;
 
+  const { deploymentUrl, ...options } = config;
+
   loadFailed = false;
   loadPromise = loadValidationStationWebComponent(
     document,
-    config.deploymentUrl,
-    { includeFonts: config.includeFonts },
+    deploymentUrl,
+    options,
   )
     .then(restorePromiseTry)
     .catch((error: unknown) => {

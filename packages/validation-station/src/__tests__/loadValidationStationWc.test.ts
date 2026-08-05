@@ -1,4 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// Pure constants and a pure function — unaffected by the module-scope load cache
+// the other tests reset, so they are read from a single static import.
+import {
+  convertToPersistentTag,
+  DU_WC_TAGS,
+  VALIDATION_STATION_TAG,
+} from "../loadValidationStationWc";
 
 const mockLoadWc =
   vi.fn<
@@ -53,14 +60,13 @@ describe("configureValidationStationWc", () => {
     });
   });
 
-  it("passes includeFonts as undefined when omitted", async () => {
+  it("forwards no options when only a deployment URL is given", async () => {
     const mod = await freshModule();
 
     await mod.configureValidationStationWc({ deploymentUrl: "/du-vs-wc" });
 
-    expect(mockLoadWc).toHaveBeenCalledWith(document, "/du-vs-wc", {
-      includeFonts: undefined,
-    });
+    // deploymentUrl is consumed here, not passed through as a loader option.
+    expect(mockLoadWc).toHaveBeenCalledWith(document, "/du-vs-wc", {});
   });
 
   it("loads once — a repeat call returns the same promise and does not re-inject", async () => {
@@ -103,52 +109,50 @@ describe("configureValidationStationWc", () => {
       expect(Promise.try).toBeUndefined();
     });
 
-    it("is restored once the load resolves", async () => {
-      const mod = await freshModule();
-      await mod.configureValidationStationWc({ deploymentUrl: "/du-vs-wc" });
-      expect(typeof Promise.try).toBe("function");
-    });
+    describe("once loaded", () => {
+      // The polyfill is installed on the global, so these read `Promise.try`
+      // directly rather than going back through the module.
+      beforeEach(async () => {
+        const mod = await freshModule();
+        await mod.configureValidationStationWc({ deploymentUrl: "/du-vs-wc" });
+      });
 
-    it("resolves with the callback's return value", async () => {
-      const mod = await freshModule();
-      await mod.configureValidationStationWc({ deploymentUrl: "/du-vs-wc" });
-      await expect(Promise.try(() => 42)).resolves.toBe(42);
-    });
+      it("is restored once the load resolves", () => {
+        expect(typeof Promise.try).toBe("function");
+      });
 
-    it("unwraps a returned promise", async () => {
-      const mod = await freshModule();
-      await mod.configureValidationStationWc({ deploymentUrl: "/du-vs-wc" });
-      await expect(Promise.try(() => Promise.resolve("ok"))).resolves.toBe(
-        "ok",
-      );
-    });
+      it("resolves with the callback's return value", async () => {
+        await expect(Promise.try(() => 42)).resolves.toBe(42);
+      });
 
-    it("rejects when the callback throws synchronously", async () => {
-      const mod = await freshModule();
-      await mod.configureValidationStationWc({ deploymentUrl: "/du-vs-wc" });
-      await expect(
-        Promise.try(() => {
-          throw new Error("boom");
-        }),
-      ).rejects.toThrow("boom");
-    });
+      it("unwraps a returned promise", async () => {
+        await expect(Promise.try(() => Promise.resolve("ok"))).resolves.toBe(
+          "ok",
+        );
+      });
 
-    it("forwards extra arguments to the callback", async () => {
-      const mod = await freshModule();
-      await mod.configureValidationStationWc({ deploymentUrl: "/du-vs-wc" });
-      await expect(
-        Promise.try((a: number, b: number) => a + b, 2, 3),
-      ).resolves.toBe(5);
+      it("rejects when the callback throws synchronously", async () => {
+        await expect(
+          Promise.try(() => {
+            throw new Error("boom");
+          }),
+        ).rejects.toThrow("boom");
+      });
+
+      it("forwards extra arguments to the callback", async () => {
+        await expect(
+          Promise.try((a: number, b: number) => a + b, 2, 3),
+        ).resolves.toBe(5);
+      });
     });
   });
 });
 
 describe("tag names", () => {
-  it("exposes the standalone tag names", async () => {
-    const mod = await freshModule();
+  it("exposes the standalone tag names", () => {
     // Lock the exact tag contract — these strings are the DOM element names the
     // browser registers, so a typo here silently renders an unknown element.
-    expect(mod.DU_WC_TAGS).toEqual({
+    expect(DU_WC_TAGS).toEqual({
       validationStation: "ui-du-validation-station-standalone-wc-element",
       documentViewer: "ui-du-document-viewer-standalone-wc-element",
       compactFieldsForm: "ui-du-compact-fields-form-standalone-wc-element",
@@ -157,30 +161,27 @@ describe("tag names", () => {
         "ui-du-compact-business-rules-standalone-wc-element",
       compactDocTypeField: "ui-du-compact-doc-type-field-standalone-wc-element",
     });
-    expect(mod.DU_WC_TAGS.validationStation).toBe(mod.VALIDATION_STATION_TAG);
+    expect(DU_WC_TAGS.validationStation).toBe(VALIDATION_STATION_TAG);
   });
 
   describe("convertToPersistentTag", () => {
-    it("swaps the -element suffix for the persistent variant", async () => {
-      const mod = await freshModule();
-      expect(mod.convertToPersistentTag(mod.VALIDATION_STATION_TAG)).toBe(
+    it("swaps the -element suffix for the persistent variant", () => {
+      expect(convertToPersistentTag(VALIDATION_STATION_TAG)).toBe(
         "ui-du-validation-station-standalone-wc-persistent-element",
       );
-      expect(mod.convertToPersistentTag(mod.DU_WC_TAGS.documentViewer)).toBe(
+      expect(convertToPersistentTag(DU_WC_TAGS.documentViewer)).toBe(
         "ui-du-document-viewer-standalone-wc-persistent-element",
       );
     });
 
-    it("rewrites only the final -element, not an earlier occurrence", async () => {
-      const mod = await freshModule();
-      expect(mod.convertToPersistentTag("ui-element-foo-element")).toBe(
+    it("rewrites only the final -element, not an earlier occurrence", () => {
+      expect(convertToPersistentTag("ui-element-foo-element")).toBe(
         "ui-element-foo-persistent-element",
       );
     });
 
-    it("only rewrites a trailing -element suffix", async () => {
-      const mod = await freshModule();
-      expect(mod.convertToPersistentTag("ui-element-wrapper")).toBe(
+    it("only rewrites a trailing -element suffix", () => {
+      expect(convertToPersistentTag("ui-element-wrapper")).toBe(
         "ui-element-wrapper",
       );
     });

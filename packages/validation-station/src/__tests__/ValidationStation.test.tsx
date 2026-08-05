@@ -3,12 +3,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render, waitFor } from "@testing-library/react";
 import { ValidationStation } from "../ValidationStation";
 
-// Avoid the real module's @uipath/du-utils import (which injects <script> tags);
-// the tag is all ValidationStation needs from it.
-vi.mock("../loadValidationStationWc", () => ({
-  VALIDATION_STATION_TAG: "ui-du-validation-station-standalone-wc-element",
-}));
-
 vi.mock("../useWcReady", () => ({
   useWcReady: () => true,
 }));

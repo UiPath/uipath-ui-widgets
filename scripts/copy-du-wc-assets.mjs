@@ -11,7 +11,7 @@
 //
 // Paths are fixed — resolved from the installed package and a literal
 // destination — so nothing here is caller-controlled.
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,7 +37,6 @@ if (staged === version) {
 // Full replace rather than merge: a version bump renames the hashed chunks, and
 // leaving the old ones behind would silently grow the directory every upgrade.
 await rm(destination, { recursive: true, force: true });
-await mkdir(destination, { recursive: true });
 await cp(wcRoot, destination, { recursive: true });
 await writeFile(stamp, version);
 
