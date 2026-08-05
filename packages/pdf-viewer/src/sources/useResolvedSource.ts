@@ -94,13 +94,23 @@ async function resolveSource(
         "An initialized UiPath SDK instance (`sdk` prop) is required for 'bucket' sources.",
       );
     }
-    if (
-      source.folderId === undefined &&
-      !source.folderKey &&
-      !source.folderPath
-    ) {
+    // Exactly one folder identifier: the SDK forwards every one it is given as
+    // a separate header and lets Orchestrator decide, so more than one makes
+    // the request ambiguous (and getSourceKey, which reads the first present,
+    // would miss a change to a secondary identifier).
+    const folderScopes = [
+      source.folderId !== undefined,
+      Boolean(source.folderKey),
+      Boolean(source.folderPath),
+    ].filter(Boolean).length;
+    if (folderScopes === 0) {
       throw new Error(
         "A 'bucket' source requires one of folderId, folderKey, or folderPath.",
+      );
+    }
+    if (folderScopes > 1) {
+      throw new Error(
+        "A 'bucket' source accepts exactly one of folderId, folderKey, or folderPath.",
       );
     }
     // Buckets are two-step: get a pre-signed read URI, then download it.

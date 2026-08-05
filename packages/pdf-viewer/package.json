@@ -3,7 +3,7 @@
   "version": "1.0.0-beta.1",
   "description": "A React PDF viewer widget for UiPath coded apps — renders PDFs from Orchestrator Storage Buckets, Data Fabric entity attachments, or plain URLs/Blobs",
   "main": "dist/index.js",
-  "module": "dist/index.esm.js",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
   "exports": {

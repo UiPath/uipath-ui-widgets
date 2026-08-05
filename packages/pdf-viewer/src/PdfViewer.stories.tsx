@@ -75,7 +75,7 @@ npm install @uipath/ui-widgets-pdf-viewer
 \`\`\`tsx
 import { PdfViewer } from '@uipath/ui-widgets-pdf-viewer';
 import '@uipath/ui-widgets-pdf-viewer/PdfViewer.css';
-import { UiPath } from '@uipath/uipath-typescript';
+import { UiPath } from '@uipath/uipath-typescript/core';
 
 function App() {
   const sdk = new UiPath({

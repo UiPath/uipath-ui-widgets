@@ -48,11 +48,17 @@ vi.mock("react-pdf", async () => {
       }, []);
       return <div data-testid="pdf-document">{children}</div>;
     },
-    Page: ({ pageNumber, scale, rotate }: any) => (
-      <div data-testid="pdf-page">
-        page-{pageNumber} scale-{scale} rotate-{rotate}
-      </div>
-    ),
+    Page: ({ pageNumber, scale, rotate, onLoadSuccess }: any) => {
+      React.useEffect(() => {
+        onLoadSuccess?.({ originalWidth: 600, originalHeight: 800 });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      return (
+        <div data-testid="pdf-page">
+          page-{pageNumber} scale-{scale} rotate-{rotate}
+        </div>
+      );
+    },
   };
 });
 
@@ -273,6 +279,40 @@ describe("PdfViewer", () => {
           "page-1 scale-1 rotate-0",
         ),
       );
+    });
+
+    it("fits the page to the container width", async () => {
+      // 932px container - 32px padding = 900 available; natural width 600 -> 1.5
+      const clientWidth = Object.getOwnPropertyDescriptor(
+        HTMLElement.prototype,
+        "clientWidth",
+      );
+      Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+        configurable: true,
+        value: 932,
+      });
+
+      try {
+        const user = userEvent.setup();
+        render(<PdfViewer source={{ data: pdfBlob }} />);
+        await waitForDocumentLoaded();
+        expect(screen.getByTestId("pdf-page")).toHaveTextContent("scale-1");
+
+        await user.click(screen.getByRole("button", { name: "Fit to width" }));
+
+        expect(screen.getByTestId("pdf-page")).toHaveTextContent("scale-1.5");
+      } finally {
+        if (clientWidth) {
+          Object.defineProperty(
+            HTMLElement.prototype,
+            "clientWidth",
+            clientWidth,
+          );
+        } else {
+          delete (HTMLElement.prototype as unknown as Record<string, unknown>)
+            .clientWidth;
+        }
+      }
     });
 
     it("resets when switching between two different blob sources (same sourceKey)", async () => {
@@ -503,6 +543,27 @@ describe("PdfViewer", () => {
       expect(
         screen.getByText(/one of folderId, folderKey, or folderPath/),
       ).toBeInTheDocument();
+    });
+
+    it("shows the error state when more than one folder identifier is provided", async () => {
+      render(
+        <PdfViewer
+          sdk={sdk}
+          source={{
+            bucketId: 1,
+            folderId: 2,
+            folderKey: "5f6dadf1-3677-49dc-8aca-c2999dd4b3ba",
+            path: "a.pdf",
+          }}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByTestId("pdf-viewer-error")).toBeInTheDocument(),
+      );
+      expect(
+        screen.getByText(/exactly one of folderId, folderKey, or folderPath/),
+      ).toBeInTheDocument();
+      expect(mockGetReadUri).not.toHaveBeenCalled();
     });
 
     it("shows the error state when the sdk prop is missing", async () => {
