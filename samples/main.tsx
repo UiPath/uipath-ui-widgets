@@ -6,11 +6,6 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-// The Validation Station web component (~74MB staged, several MB over the
-// wire) is loaded lazily from `loadValidationStationWcOnDemand`, called by
-// whichever page actually renders it — not here, since most widgets in this
-// app never touch DU and shouldn't pay for its bundle.
-
 const uipathSdk = new UiPath({
   baseUrl: import.meta.env.VITE_UIPATH_BASE_URL,
   orgName: import.meta.env.VITE_UIPATH_ORG_NAME,

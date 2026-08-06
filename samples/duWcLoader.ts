@@ -10,9 +10,6 @@ import { configureValidationStationWc } from "@uipath/ui-widgets-validation-stat
 export function loadValidationStationWcOnDemand(): void {
   configureValidationStationWc({
     deploymentUrl: "/du-vs-wc",
-    // This app ships only Roboto (via @fontsource), not Apollo fonts or
-    // Material Icons — without these, icon glyphs in the component render as
-    // empty boxes.
     includeFonts: true,
   }).catch((error: unknown) => {
     console.error(
