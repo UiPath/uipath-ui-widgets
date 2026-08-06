@@ -27,6 +27,7 @@ import type {
 } from "@uipath/uipath-typescript/tasks";
 import { Tasks, TaskStatus, TaskType } from "@uipath/uipath-typescript/tasks";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { loadValidationStationWcOnDemand } from "../duWcLoader";
 import PageHeader from "./PageHeader";
 
 const TASK_STATUS_TABS = [
@@ -71,6 +72,10 @@ function ValidationStationPage({ uipathSdk }: ValidationStationPageProps) {
   );
   const [taskLoading, setTaskLoading] = useState(false);
   const [assigningTaskId, setAssigningTaskId] = useState<number | null>(null);
+
+  useEffect(() => {
+    loadValidationStationWcOnDemand();
+  }, []);
 
   const fetchTasks = useCallback(async () => {
     try {

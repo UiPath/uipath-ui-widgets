@@ -1,23 +1,15 @@
 import "@fontsource/roboto/300.css";
 import "@fontsource/roboto/400.css";
 import { UiPath } from "@uipath/uipath-typescript/core";
-import { configureValidationStationWc } from "@uipath/ui-widgets-validation-station";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-// Served from this app's own origin out of `public/du-vs-wc`, staged from
-// node_modules by `npm run stage-du-wc` (wired to `predev`). Loading is async
-// and the widgets wait for it, so this is deliberately not awaited.
-configureValidationStationWc({
-  deploymentUrl: "/du-vs-wc",
-  // This app ships only Roboto (via @fontsource), not Apollo fonts or Material
-  // Icons — without these, icon glyphs in the component render as empty boxes.
-  includeFonts: true,
-}).catch((error: unknown) => {
-  console.error("Failed to load the Validation Station web component:", error);
-});
+// The Validation Station web component (~74MB staged, several MB over the
+// wire) is loaded lazily from `loadValidationStationWcOnDemand`, called by
+// whichever page actually renders it — not here, since most widgets in this
+// app never touch DU and shouldn't pay for its bundle.
 
 const uipathSdk = new UiPath({
   baseUrl: import.meta.env.VITE_UIPATH_BASE_URL,

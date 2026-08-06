@@ -11,6 +11,8 @@ import {
   Tooltip,
 } from "@mui/material";
 import type { UiPath } from "@uipath/uipath-typescript/core";
+import { useEffect } from "react";
+import { loadValidationStationWcOnDemand } from "../../duWcLoader";
 import PageHeader from "../PageHeader";
 import CenteredMessage from "./CenteredMessage";
 import ReviewWorkspace from "./ReviewWorkspace";
@@ -37,6 +39,10 @@ function InvoiceReviewWorkspacePage({
     notification,
     dismissNotification,
   } = useInvoiceReviewTasks(uipathSdk);
+
+  useEffect(() => {
+    loadValidationStationWcOnDemand();
+  }, []);
 
   return (
     <>
