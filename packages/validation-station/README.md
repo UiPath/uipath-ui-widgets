@@ -29,9 +29,9 @@ import {
 import { UiPath } from "@uipath/uipath-typescript/core";
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 
-// Once, at app startup — tells the widgets where the web component is hosted.
-// See "Hosting the web component" below.
-configureValidationStationWc({ deploymentUrl: "/du-vs-wc" });
+// Once, at app startup — loads the web component from `du-vs-wc`, next to
+// your app's own root by default. See "Hosting the web component" below.
+configureValidationStationWc();
 
 const sdk = new UiPath({
   baseUrl: "https://cloud.uipath.com",
@@ -56,8 +56,9 @@ function App() {
 > `theme` defaults to `"light"` and `language` defaults to `ValidationStationLanguage.English`, so the minimal mount just needs `sdk`, `data`, and a folder.
 
 > You must call `configureValidationStationWc` once before rendering any widget
-> from this package, and host the web component's files at the `deploymentUrl` you
-> pass it. See [Hosting the web component](#hosting-the-web-component).
+> from this package, and host the web component's files where it expects them
+> (a `deploymentUrl` default handles this for most hosts — override it if
+> yours doesn't). See [Hosting the web component](#hosting-the-web-component).
 
 ## Props
 
@@ -169,6 +170,7 @@ All parameter types are re-exported from the package for convenience:
 import {
   configureValidationStationWc,
   DU_WC_TAGS,
+  joinDeploymentUrl,
   VALIDATION_STATION_TAG,
   ValidationStationLanguage,
 } from "@uipath/ui-widgets-validation-station";
@@ -290,14 +292,14 @@ you host, via [`@uipath/du-utils`](https://www.npmjs.com/package/@uipath/du-util
 That means there is no bundler configuration to write. You need two things:
 
 1. Serve the contents of `node_modules/@uipath/du-validation-station-wc` as static
-   files at some path or origin.
-2. Point `configureValidationStationWc` at it, once, before rendering any widget.
+   files at `du-vs-wc`, next to your app's own root (see the default below —
+   pass an explicit `deploymentUrl` if you host it somewhere else).
+2. Call `configureValidationStationWc` once, before rendering any widget.
 
 ```ts
 import { configureValidationStationWc } from "@uipath/ui-widgets-validation-station";
 
 configureValidationStationWc({
-  deploymentUrl: "/du-vs-wc",
   // Set true unless your app already loads Apollo fonts + Material Icons
   // globally — otherwise icon glyphs render as empty boxes.
   includeFonts: true,
@@ -305,6 +307,34 @@ configureValidationStationWc({
   console.error("Validation Station web component failed to load", error);
 });
 ```
+
+`deploymentUrl` defaults to `du-vs-wc` joined onto
+[`getAppBase()`](https://www.npmjs.com/package/@uipath/uipath-typescript) —
+`/du-vs-wc` on a plain host, or the deployed app's own base path if you're
+running as a UiPath Coded App. Most integrations need nothing more than the
+call above. Pass an explicit `deploymentUrl` only when the web component is
+hosted somewhere that default doesn't reach:
+
+```ts
+import {
+  configureValidationStationWc,
+  joinDeploymentUrl,
+} from "@uipath/ui-widgets-validation-station";
+
+configureValidationStationWc({
+  // A literal, a build-time constant, or a resolver — see "Notes" below.
+  deploymentUrl: joinDeploymentUrl(
+    "https://cdn.example.com/my-app",
+    "du-vs-wc",
+  ),
+  includeFonts: true,
+});
+```
+
+`joinDeploymentUrl(base, path)` exists because hand-rolled string
+concatenation is an easy way to end up with a doubled or missing slash — it
+strips any trailing slash from `base` and any leading slash from `path` before
+joining them, regardless of which one supplied it (or neither).
 
 The served directory must keep the package's own layout, because the bundle
 resolves these against its own `import.meta.url`:
@@ -330,10 +360,14 @@ which stages it into the gitignored `public/du-vs-wc`.
 - **The returned promise is the error channel.** Components only observe success;
   a bad URL or a 404 surfaces on the promise, so attach a `.catch`. Without it, a
   load failure leaves the widgets showing their loading state.
+- **`deploymentUrl` accepts a resolver.** Pass `() => string | Promise<string>`
+  instead of a plain string for cases where the URL isn't known synchronously —
+  it's called lazily, at most once per load.
 - **`deploymentUrl` is a script source.** The loader injects
   `<script type="module" src>` from it, so whoever controls the URL executes code
-  in your app's origin. Pass a literal or build-time constant — never a value from
-  `location`, a query parameter, or other user input.
+  in your app's origin. Pass a literal, a build-time constant, or a resolver
+  derived from one of those — never a value from `location`, a query parameter,
+  or other user input.
 - **CSP.** Serving from your own origin needs no more than `script-src 'self'`.
   A separate origin must be added to `script-src` and `style-src`, and note that
   the loader offers no Subresource Integrity hook — self-hosting avoids that

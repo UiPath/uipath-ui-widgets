@@ -10,15 +10,23 @@ import {
 const mockLoadWc =
   vi.fn<
     (
+      appName: string,
       doc: Document,
-      url: string,
+      url: string | (() => string | Promise<string>),
       options?: { includeFonts?: boolean },
     ) => Promise<void>
   >();
 
 vi.mock("@uipath/du-utils", () => ({
-  loadValidationStationWebComponent: (...args: Parameters<typeof mockLoadWc>) =>
+  loadWebComponent: (...args: Parameters<typeof mockLoadWc>) =>
     mockLoadWc(...args),
+  vsAppName: "du-vs-wc",
+}));
+
+const mockGetAppBase = vi.fn<() => string>();
+
+vi.mock("@uipath/uipath-typescript", () => ({
+  getAppBase: () => mockGetAppBase(),
 }));
 
 type Mod = typeof import("../loadValidationStationWc");
@@ -37,6 +45,8 @@ const originalPromiseTry = Promise.try;
 beforeEach(() => {
   vi.clearAllMocks();
   mockLoadWc.mockResolvedValue(undefined);
+  // No `uipath:app-base` meta tag in this environment — matches a plain host.
+  mockGetAppBase.mockReturnValue("/");
 });
 
 afterEach(() => {
@@ -55,7 +65,7 @@ describe("configureValidationStationWc", () => {
     });
 
     expect(mockLoadWc).toHaveBeenCalledTimes(1);
-    expect(mockLoadWc).toHaveBeenCalledWith(document, "/du-vs-wc", {
+    expect(mockLoadWc).toHaveBeenCalledWith("du-vs-wc", document, "/du-vs-wc", {
       includeFonts: true,
     });
   });
@@ -66,7 +76,50 @@ describe("configureValidationStationWc", () => {
     await mod.configureValidationStationWc({ deploymentUrl: "/du-vs-wc" });
 
     // deploymentUrl is consumed here, not passed through as a loader option.
-    expect(mockLoadWc).toHaveBeenCalledWith(document, "/du-vs-wc", {});
+    expect(mockLoadWc).toHaveBeenCalledWith(
+      "du-vs-wc",
+      document,
+      "/du-vs-wc",
+      {},
+    );
+  });
+
+  it("defaults deploymentUrl to du-vs-wc joined onto getAppBase() when omitted", async () => {
+    mockGetAppBase.mockReturnValue("/");
+    const mod = await freshModule();
+
+    await mod.configureValidationStationWc();
+
+    expect(mockLoadWc).toHaveBeenCalledWith(
+      "du-vs-wc",
+      document,
+      "/du-vs-wc",
+      {},
+    );
+  });
+
+  it("defaults to the coded app's own base path when getAppBase() returns one", async () => {
+    mockGetAppBase.mockReturnValue("/org/apps_/some-app/public");
+    const mod = await freshModule();
+
+    await mod.configureValidationStationWc({ includeFonts: true });
+
+    expect(mockLoadWc).toHaveBeenCalledWith(
+      "du-vs-wc",
+      document,
+      "/org/apps_/some-app/public/du-vs-wc",
+      { includeFonts: true },
+    );
+  });
+
+  it("accepts a resolver function for deploymentUrl and forwards it unresolved", async () => {
+    const mod = await freshModule();
+    const resolver = () => "/resolved-at-load-time";
+
+    await mod.configureValidationStationWc({ deploymentUrl: resolver });
+
+    // Resolving it is the underlying loader's job, not ours — see its own tests.
+    expect(mockLoadWc).toHaveBeenCalledWith("du-vs-wc", document, resolver, {});
   });
 
   it("loads once — a repeat call returns the same promise and does not re-inject", async () => {
@@ -79,7 +132,12 @@ describe("configureValidationStationWc", () => {
     await first;
     expect(mockLoadWc).toHaveBeenCalledTimes(1);
     // Documents the consequence of the load-once cache: the second URL is ignored.
-    expect(mockLoadWc).toHaveBeenCalledWith(document, "/a", expect.anything());
+    expect(mockLoadWc).toHaveBeenCalledWith(
+      "du-vs-wc",
+      document,
+      "/a",
+      expect.anything(),
+    );
   });
 
   it("starts a fresh attempt when called again after a failure", async () => {

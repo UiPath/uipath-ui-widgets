@@ -1,7 +1,11 @@
 import {
-  loadValidationStationWebComponent,
+  loadWebComponent,
+  vsAppName,
   type LoadWebComponentOptions,
+  type ResolveBaseUrl,
 } from "@uipath/du-utils";
+import { getAppBase } from "@uipath/uipath-typescript";
+import { joinDeploymentUrl } from "./urlUtil.js";
 
 /**
  * Configuration for {@link configureValidationStationWc} — the deployment URL
@@ -14,14 +18,23 @@ export interface ValidationStationWcConfig extends LoadWebComponentOptions {
    * Base URL the web component's build artifacts (`polyfills.js`, `main.js`,
    * `styles.css`, `fonts.css`) are served from — e.g. `/du-vs-wc` when the
    * contents of `@uipath/du-validation-station-wc` are hosted from the app's
-   * own static assets.
+   * own static assets. Accepts a resolver (`() => string | Promise<string>`)
+   * for cases where the URL isn't known synchronously — it's called lazily,
+   * at most once per load.
+   *
+   * Defaults to `du-vs-wc` joined onto {@link getAppBase}, which resolves to
+   * `/du-vs-wc` for a plain host and to the deployed app's own base path for a
+   * UiPath Coded App — no decision needed for either case. Pass an explicit
+   * `deploymentUrl` only when the web component is actually hosted somewhere
+   * that default doesn't reach (a different origin, a renamed path).
    *
    * Treat this as trusted application configuration: the loader injects
    * `<script type="module" src>` from it, so whoever controls this URL executes
-   * script in your app's origin. Pass a literal or a build-time value — never
-   * one derived from `location`, a query parameter, or any other user input.
+   * script in your app's origin. Pass a literal, a build-time value, or a
+   * resolver derived from one of those — never one derived from `location`, a
+   * query parameter, or any other user input.
    */
-  deploymentUrl: string;
+  deploymentUrl?: string | ResolveBaseUrl;
 }
 
 let loadPromise: Promise<void> | null = null;
@@ -44,9 +57,12 @@ function restorePromiseTry(): void {
 }
 
 /**
- * Loads the Validation Station web component from `deploymentUrl` and registers
+ * Loads the Validation Station web component from `deploymentUrl` (or its
+ * default — see {@link ValidationStationWcConfig.deploymentUrl}) and registers
  * every custom element in {@link DU_WC_TAGS}. Call this once at app startup,
- * before rendering any component from this package.
+ * before rendering any component from this package. Every argument is
+ * optional, so `configureValidationStationWc()` is a valid call on a plain
+ * host or a UiPath Coded App alike.
  *
  * Loading is per-page and idempotent: while a load is pending or has succeeded,
  * repeat calls return that same promise without re-injecting scripts, so a later
@@ -59,18 +75,17 @@ function restorePromiseTry(): void {
  * forever.
  */
 export function configureValidationStationWc(
-  config: ValidationStationWcConfig,
+  config: ValidationStationWcConfig = {},
 ): Promise<void> {
   if (loadPromise && !loadFailed) return loadPromise;
 
-  const { deploymentUrl, ...options } = config;
+  const {
+    deploymentUrl = joinDeploymentUrl(getAppBase(), vsAppName),
+    ...options
+  } = config;
 
   loadFailed = false;
-  loadPromise = loadValidationStationWebComponent(
-    document,
-    deploymentUrl,
-    options,
-  )
+  loadPromise = loadWebComponent(vsAppName, document, deploymentUrl, options)
     .then(restorePromiseTry)
     .catch((error: unknown) => {
       // Flag rather than clear: `waitForWcElementReady` must still see this

@@ -18,6 +18,7 @@ export {
   VALIDATION_STATION_TAG,
 } from "./loadValidationStationWc.js";
 export type { ValidationStationWcConfig } from "./loadValidationStationWc.js";
+export { joinDeploymentUrl } from "./urlUtil.js";
 
 // ─── Subcomponents ────────────────────────────────────────────────────────────
 export { CompactBusinessRules } from "./subcomponents/CompactBusinessRules.js";
