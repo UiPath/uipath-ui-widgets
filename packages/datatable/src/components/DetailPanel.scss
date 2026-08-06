@@ -1,0 +1,9 @@
+.detail-panel {
+  padding: 20px;
+  background-color: #f8fafc;
+
+  .ag-center-cols-container,
+  .ag-center-cols-viewport {
+    min-height: unset;
+  }
+}

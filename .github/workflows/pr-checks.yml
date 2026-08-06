@@ -1,0 +1,87 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [release/*, develop]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  pr-checks:
+    runs-on: uipath-ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24.x"
+          cache: "npm"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@uipath"
+
+      - name: Ensure npm >= 11.5.0 (required for minimum-release-age)
+        # Deliberate global npm upgrade (enables `minimum-release-age` supply-chain
+        # hardening), not an ad-hoc dependency install — suppress zizmor's heuristic.
+        run: npm install -g npm@^11.5.0 # zizmor: ignore[adhoc-packages]
+
+      - name: Install dependencies
+        run: npm install --include=optional --legacy-peer-deps
+
+      - name: Validate commits
+        id: commitlint
+        continue-on-error: true
+        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+
+      - name: Check formatting
+        id: prettier
+        continue-on-error: true
+        run: npx prettier --check .
+
+      - name: Run linter
+        id: lint
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Security audit
+        id: audit
+        continue-on-error: true
+        run: npm audit --audit-level=high --omit=dev
+
+      # Zizmor is a specialized GitHub Actions security linter that catches workflow-specific
+      # vulnerabilities (script injection, unpinned actions, etc.) that CodeQL's analysis may miss.
+      - name: Scan workflows for security issues
+        id: zizmor
+        continue-on-error: true
+        run: |
+          pip install zizmor
+          zizmor .github/workflows/ --min-confidence medium --min-severity low
+
+      - name: Check results
+        if: always()
+        env:
+          COMMITLINT_OUTCOME: ${{ steps.commitlint.outcome }}
+          PRETTIER_OUTCOME: ${{ steps.prettier.outcome }}
+          LINT_OUTCOME: ${{ steps.lint.outcome }}
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+          ZIZMOR_OUTCOME: ${{ steps.zizmor.outcome }}
+        run: |
+          FAILED=""
+          [[ "$COMMITLINT_OUTCOME" == "failure" ]] && FAILED="$FAILED commitlint"
+          [[ "$PRETTIER_OUTCOME" == "failure" ]] && FAILED="$FAILED prettier"
+          [[ "$LINT_OUTCOME" == "failure" ]] && FAILED="$FAILED lint"
+          [[ "$AUDIT_OUTCOME" == "failure" ]] && FAILED="$FAILED audit"
+          [[ "$ZIZMOR_OUTCOME" == "failure" ]] && FAILED="$FAILED zizmor"
+
+          if [[ -n "$FAILED" ]]; then
+            echo "::error::The following checks failed:$FAILED"
+            exit 1
+          fi

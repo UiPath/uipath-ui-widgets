@@ -1,0 +1,55 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [release/*, develop]
+  pull_request:
+    branches: [release/*, develop]
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: "ci-build-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: uipath-ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PACKAGES: datatable multi-file-upload conversational-agent-chat
+      # uipath-ubuntu-* runners have less RAM than ubuntu-latest, so Node
+      # auto-sizes its heap to ~2 GB and the Storybook build OOMs (exit 134).
+      NODE_OPTIONS: --max-old-space-size=6144
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24.x"
+          cache: "npm"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@uipath"
+
+      - name: Ensure npm >= 11.5.0 (required for minimum-release-age)
+        # Deliberate global npm upgrade (enables `minimum-release-age` supply-chain
+        # hardening), not an ad-hoc dependency install — suppress zizmor's heuristic.
+        run: npm install -g npm@^11.5.0 # zizmor: ignore[adhoc-packages]
+
+      - name: Install dependencies
+        run: npm install --include=optional --legacy-peer-deps
+
+      - name: Build packages
+        run: npm run build
+
+      - name: Build Storybook
+        run: npm run build-storybook

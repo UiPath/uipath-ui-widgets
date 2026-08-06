@@ -1,0 +1,15 @@
+import { trackEvent } from "@uipath/uipath-typescript/core";
+import { version } from "../../package.json";
+import { TelemetryService, TelemetryStatus } from "../types";
+
+export const trackTelemetry = (
+  service: TelemetryService,
+  status: TelemetryStatus,
+  properties?: Record<string, string | number | boolean>,
+) => {
+  trackEvent(service, status, {
+    ApplicationName: "Widget.PdfViewer",
+    WidgetVersion: version,
+    ...properties,
+  });
+};

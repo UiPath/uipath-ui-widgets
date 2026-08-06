@@ -1,0 +1,36 @@
+@import "@uipath/apollo-wind/tailwind.css";
+@source "../node_modules/@uipath/apollo-wind/dist/**/*.js";
+@source "../../../node_modules/@uipath/apollo-wind/dist/**/*.js";
+@source "../dist/components/**/*.{js,css}";
+
+.uipath-datatable-container {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-family: inherit;
+
+  .datatable-grid-wrapper {
+    flex: 1;
+
+    .ag-cell-inline-editing {
+      overflow: visible;
+    }
+  }
+}
+
+.datatable-loading,
+.datatable-error,
+.datatable-empty {
+  padding: 16px;
+  text-align: center;
+}
+
+.datatable-error {
+  color: #d32f2f;
+}
+
+.datatable-empty {
+  color: #666;
+}

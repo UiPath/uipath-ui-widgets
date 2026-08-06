@@ -1,0 +1,10 @@
+/**
+ * Placeholder stylesheet for local development and tests.
+ *
+ * The real styles are authored in `DataTable.scss` and compiled to
+ * `dist/DataTable.css` via the `copy-styles` build script. This file exists
+ * only so that Vite/Vitest can resolve the `./DataTable.css` import from
+ * `DataTable.tsx` when running tests against the `src` tree.
+ *
+ * Do not add production styles here; update `DataTable.scss` instead.
+ */

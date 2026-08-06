@@ -1,0 +1,73 @@
+{
+  "name": "@uipath/ui-widgets-validation-station",
+  "version": "1.0.1",
+  "description": "A React component for UiPath Document Understanding Validation Station.",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prepack": "rimraf *.tgz",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage --run"
+  },
+  "keywords": [
+    "react",
+    "validation-station",
+    "validation",
+    "ui-widgets"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/UiPath/uipath-ui-widgets.git",
+    "directory": "packages/validation-station"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "peerDependencies": {
+    "@uipath/uipath-typescript": "^1.4.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/oxide": "^4.1.18",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/ui": "^4.0.18",
+    "jsdom": "^25.0.1",
+    "lightningcss": "^1.30.2",
+    "rimraf": "^6.0.1",
+    "rollup": "^4.55.1",
+    "typescript": "~5.9.3",
+    "vite": "^6.0.3",
+    "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "@uipath/apollo-wind": "^0.10.0",
+    "@uipath/du-validation-station-wc": "1.0.0-rc.1",
+    "fflate": "^0.8.2"
+  }
+}

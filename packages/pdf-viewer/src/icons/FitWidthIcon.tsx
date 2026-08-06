@@ -1,0 +1,19 @@
+import type { SVGProps } from "react";
+
+export const FitWidthIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg
+    width={16}
+    height={16}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden
+    {...props}
+  >
+    <path d="M4 12h16M7 8l-3 4 3 4M17 8l3 4-3 4" />
+  </svg>
+);

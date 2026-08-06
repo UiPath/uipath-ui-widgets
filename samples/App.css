@@ -1,0 +1,1542 @@
+/* App Container Styling */
+.app-container {
+  background: var(--background-gradient);
+  height: 100vh;
+  padding: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.app-header {
+  background: linear-gradient(135deg, var(--teal-700) 0%, var(--teal-900) 100%);
+  color: white;
+  padding: 16px 24px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-lg);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.app-header::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, var(--pumpkin-500) 0%, transparent 70%);
+  opacity: 0.2;
+  border-radius: 50%;
+  transform: translate(40%, -40%);
+}
+
+.app-header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  position: relative;
+  z-index: 1;
+  letter-spacing: -0.3px;
+}
+
+.app-header p {
+  font-size: 0.875rem;
+  margin-top: 2px;
+  opacity: 0.9;
+  position: relative;
+  z-index: 1;
+  font-weight: 300;
+}
+
+.back-link {
+  display: inline-block;
+  position: relative;
+  z-index: 1;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  transition: color 0.2s ease;
+}
+
+.back-link:hover {
+  color: white;
+}
+
+/* Home Page (widget list) */
+.home-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  align-content: start;
+}
+
+.home-list li {
+  display: flex;
+}
+
+.home-list-item {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  color: inherit;
+  overflow: hidden;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.home-list-item:hover {
+  transform: translateY(-2px);
+  border-color: var(--teal-300);
+  box-shadow: var(--shadow-md);
+}
+
+.home-list-item-preview {
+  background: var(--background-gradient);
+  border-bottom: 1px solid var(--border-color);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-list-item-preview svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+}
+
+.home-list-item-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 6px;
+  padding: 16px 20px 20px;
+}
+
+.home-list-item-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--teal-800);
+}
+
+.home-list-item-description {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  min-height: calc(0.875rem * 1.5 * 3);
+}
+
+/* Grid Layout */
+.app-grid {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Entity List Sidebar */
+.entity-sidebar {
+  background: var(--surface-color);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color);
+}
+
+.entity-sidebar-header {
+  background: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-700) 100%);
+  color: white;
+  padding: 14px 20px;
+  font-size: 1.1rem;
+  font-weight: 500;
+  border-bottom: 3px solid var(--pumpkin-500);
+  letter-spacing: 0.3px;
+}
+
+.entity-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.entity-list-item {
+  margin-bottom: 4px;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.entity-list-item:hover {
+  transform: translateX(4px);
+}
+
+.entity-list-button {
+  padding: 12px 16px !important;
+  border-radius: 10px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative;
+}
+
+.entity-list-button::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pumpkin-500);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.entity-list-button.Mui-selected::after {
+  opacity: 1;
+}
+
+.entity-list-text {
+  font-weight: 400 !important;
+  color: var(--text-primary) !important;
+}
+
+.entity-list-button.Mui-selected .entity-list-text {
+  font-weight: 500 !important;
+  color: var(--teal-800) !important;
+}
+
+/* Main Content Area */
+.content-area {
+  background: var(--surface-color);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  padding: 20px;
+  height: 100%;
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.content-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--teal-100);
+  flex-shrink: 0;
+}
+
+.content-header-icon {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(
+    135deg,
+    var(--pumpkin-400) 0%,
+    var(--pumpkin-600) 100%
+  );
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.25rem;
+  font-weight: bold;
+  box-shadow: var(--shadow-sm);
+}
+
+.content-header-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--teal-800);
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.empty-state-icon {
+  width: 120px;
+  height: 120px;
+  background: linear-gradient(135deg, var(--teal-100) 0%, var(--teal-200) 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+  font-size: 3rem;
+  color: var(--teal-600);
+}
+
+.empty-state-title {
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  letter-spacing: -0.2px;
+}
+
+.empty-state-description {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  max-width: 400px;
+}
+
+/* DataTable Container */
+.datatable-wrapper {
+  background: white;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--teal-100);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Inventory Alert Styles */
+.datatable-row-low-inventory {
+  background: linear-gradient(
+    90deg,
+    var(--pumpkin-50) 0%,
+    var(--pumpkin-100) 100%
+  ) !important;
+  border-left: 4px solid var(--pumpkin-600) !important;
+  font-weight: 500;
+}
+
+.datatable-cell-low-inventory {
+  background: var(--pumpkin-200) !important;
+  color: var(--pumpkin-900) !important;
+  font-weight: 700 !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  display: inline-block;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Loading State */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  gap: 16px;
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--teal-100);
+  border-top-color: var(--teal-600);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-text {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .app-grid {
+    grid-template-columns: 280px 1fr;
+    gap: 16px;
+  }
+
+  .content-area {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    padding: 16px;
+  }
+
+  .app-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: 250px 1fr;
+  }
+
+  .entity-sidebar {
+    height: 100%;
+  }
+
+  .app-header {
+    padding: 16px 24px;
+    margin-bottom: 16px;
+  }
+
+  .app-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .app-header p {
+    font-size: 0.9rem;
+  }
+
+  .content-area {
+    padding: 20px;
+  }
+}
+
+/* Enhanced hover effects */
+.entity-list-button:hover {
+  background-color: var(--teal-50) !important;
+  transform: translateX(2px);
+}
+
+.entity-list-button.Mui-selected:hover {
+  background-color: var(--teal-100) !important;
+}
+
+/* Accessibility */
+.entity-list-button:focus-visible {
+  outline: 3px solid var(--pumpkin-400);
+  outline-offset: 2px;
+}
+
+/* Animation for content loading */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.content-area {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.datatable-wrapper {
+  animation: fadeIn 0.6s ease-out;
+}
+
+/* ========================================
+   AG GRID THEME CUSTOMIZATION
+   ======================================== */
+
+/* AG Grid Quartz Theme Overrides */
+.datatable-wrapper .ag-theme-quartz,
+.datatable-wrapper .ag-theme-alpine {
+  --ag-header-background-color: #00897b;
+  --ag-header-foreground-color: white;
+  --ag-odd-row-background-color: #ffffff;
+  --ag-row-hover-color: #e0f2f1;
+  --ag-selected-row-background-color: #b2dfdb;
+  --ag-border-color: #e0f2f1;
+  --ag-header-cell-hover-background-color: #00695c;
+  --ag-cell-horizontal-border: solid #e0f2f1;
+  font-size: 14px;
+  border-radius: 8px;
+  height: 100%;
+}
+
+.datatable-wrapper .ag-header {
+  background: linear-gradient(
+    135deg,
+    var(--teal-600) 0%,
+    var(--teal-700) 100%
+  ) !important;
+  border-radius: 8px 8px 0 0;
+}
+
+.datatable-wrapper .ag-header-cell {
+  font-weight: 500;
+  padding: 12px 16px;
+  color: white !important;
+  letter-spacing: 0.3px;
+}
+
+.datatable-wrapper .ag-header-cell-text {
+  color: white !important;
+}
+
+.datatable-wrapper .ag-header-cell-label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  width: 100% !important;
+}
+
+/* Sort Icons */
+.datatable-wrapper .ag-icon-asc,
+.datatable-wrapper .ag-icon-desc,
+.datatable-wrapper .ag-icon-none,
+.datatable-wrapper .ag-sort-indicator-icon {
+  color: white !important;
+  opacity: 0.9;
+  flex-shrink: 0 !important;
+}
+
+.datatable-wrapper .ag-header-cell:hover .ag-icon-asc,
+.datatable-wrapper .ag-header-cell:hover .ag-icon-desc,
+.datatable-wrapper .ag-header-cell:hover .ag-icon-none {
+  opacity: 1;
+}
+
+/* Filter Icons */
+.datatable-wrapper .ag-icon-filter,
+.datatable-wrapper .ag-icon-menu {
+  color: white !important;
+  opacity: 0.85;
+  flex-shrink: 0 !important;
+}
+
+.datatable-wrapper .ag-header-cell:hover .ag-icon-filter,
+.datatable-wrapper .ag-header-cell:hover .ag-icon-menu {
+  opacity: 1;
+}
+
+/* All header icons */
+.datatable-wrapper .ag-header-icon,
+.datatable-wrapper .ag-header .ag-icon {
+  color: white !important;
+  flex-shrink: 0 !important;
+}
+
+.datatable-wrapper .ag-header-cell-sortable .ag-header-cell-label {
+  color: white !important;
+}
+
+.datatable-wrapper .ag-sort-order {
+  color: white !important;
+}
+
+/* Sort indicator container */
+.datatable-wrapper .ag-sort-indicator-container {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  flex-shrink: 0 !important;
+}
+
+/* Filter menu button spacing */
+.datatable-wrapper .ag-header-cell-menu-button {
+  display: flex !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* Filter panel text styling */
+.datatable-wrapper .ag-filter,
+.datatable-wrapper .ag-filter-body {
+  color: var(--text-primary) !important;
+}
+
+.datatable-wrapper .ag-filter-toolpanel-instance-header,
+.datatable-wrapper .ag-filter-toolpanel-header {
+  color: var(--text-primary) !important;
+  padding: 8px !important;
+}
+
+.datatable-wrapper .ag-filter-toolpanel-instance-body {
+  padding: 8px !important;
+}
+
+/* Filter input field spacing to prevent icon overlap */
+.datatable-wrapper .ag-filter-wrapper {
+  padding: 8px !important;
+}
+
+.datatable-wrapper .ag-text-field-input-wrapper {
+  position: relative !important;
+}
+
+.datatable-wrapper .ag-filter .ag-text-field-input,
+.datatable-wrapper .ag-filter .ag-input-field-input {
+  padding-left: 32px !important;
+  padding-right: 12px !important;
+  height: 36px !important;
+  border: 2px solid var(--teal-200) !important;
+  border-radius: 8px !important;
+}
+
+.datatable-wrapper .ag-filter .ag-text-field-input:focus,
+.datatable-wrapper .ag-filter .ag-input-field-input:focus {
+  border-color: var(--teal-600) !important;
+  box-shadow: 0 0 0 3px rgba(0, 137, 123, 0.15) !important;
+}
+
+/* Position the search/filter icon properly */
+.datatable-wrapper .ag-input-field-input-wrapper .ag-icon {
+  position: absolute !important;
+  left: 8px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  color: var(--teal-600) !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+}
+
+.datatable-wrapper .ag-filter-body-wrapper {
+  padding: 12px !important;
+}
+
+/* Filter condition dropdown spacing */
+.datatable-wrapper .ag-filter .ag-picker-field-wrapper,
+.datatable-wrapper .ag-filter select {
+  padding: 8px 12px !important;
+  border: 2px solid var(--teal-200) !important;
+  border-radius: 8px !important;
+  margin-bottom: 8px !important;
+}
+
+.datatable-wrapper .ag-filter .ag-picker-field-wrapper:focus,
+.datatable-wrapper .ag-filter select:focus {
+  border-color: var(--teal-600) !important;
+  box-shadow: 0 0 0 3px rgba(0, 137, 123, 0.15) !important;
+}
+
+/* Filter buttons */
+.datatable-wrapper .ag-filter .ag-standard-button {
+  padding: 8px 16px !important;
+  border-radius: 6px !important;
+  margin: 4px !important;
+  background: var(--teal-600) !important;
+  color: white !important;
+  border: none !important;
+  font-weight: 500 !important;
+}
+
+.datatable-wrapper .ag-filter .ag-standard-button:hover {
+  background: var(--teal-700) !important;
+}
+
+/* Placeholder text color */
+.datatable-wrapper .ag-filter input::placeholder {
+  color: var(--text-secondary) !important;
+  opacity: 0.6 !important;
+}
+
+/* Ensure text doesn't wrap unnecessarily */
+.datatable-wrapper .ag-header-cell-comp-wrapper {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex: 1 !important;
+  width: 100% !important;
+}
+
+.datatable-wrapper .ag-header-cell-resize {
+  flex-shrink: 0 !important;
+}
+
+.datatable-wrapper .ag-cell {
+  padding: 12px 16px;
+  line-height: 1.6;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+.datatable-wrapper .ag-row {
+  border-bottom: 1px solid var(--teal-50);
+  transition: background-color 0.2s ease;
+}
+
+.datatable-wrapper .ag-row:hover {
+  background-color: var(--teal-50) !important;
+}
+
+.datatable-wrapper .ag-row-selected {
+  background-color: var(--teal-100) !important;
+  border-left: 3px solid var(--pumpkin-500);
+}
+
+.datatable-wrapper .ag-paging-panel {
+  border-top: 2px solid var(--teal-100);
+  padding: 16px;
+  background: linear-gradient(90deg, #f5f7fa 0%, #e8f5f3 100%);
+  border-radius: 0 0 8px 8px;
+}
+
+.datatable-wrapper .ag-icon {
+  color: var(--teal-700);
+}
+
+/* Override icon color in header */
+.datatable-wrapper .ag-header .ag-icon {
+  color: white !important;
+}
+
+.datatable-wrapper .ag-root-wrapper {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--teal-100);
+}
+
+/* ========================================
+   AG GRID CELL EDITING CONTROLS FIX
+   ======================================== */
+
+/* Text Input Editor */
+.datatable-wrapper .ag-cell-inline-editing {
+  padding: 0 !important;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.datatable-wrapper .ag-cell-editor {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+}
+
+.datatable-wrapper .ag-text-field-input,
+.datatable-wrapper .ag-input-field-input {
+  height: 100% !important;
+  min-height: 40px !important;
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  font-family: inherit !important;
+  border: 2px solid var(--teal-400) !important;
+  border-radius: 8px !important;
+  background-color: white !important;
+  color: var(--text-primary) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.datatable-wrapper .ag-text-field-input:focus,
+.datatable-wrapper .ag-input-field-input:focus {
+  outline: none !important;
+  border-color: var(--teal-600) !important;
+  box-shadow: 0 0 0 3px rgba(0, 137, 123, 0.2) !important;
+  border-radius: 8px !important;
+}
+
+/* Large Text Editor (Textarea) */
+.datatable-wrapper .ag-large-text {
+  height: 100% !important;
+  min-height: 40px !important;
+  border-radius: 8px !important;
+}
+
+.datatable-wrapper .ag-large-textarea {
+  height: 100% !important;
+  min-height: 40px !important;
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  font-family: inherit !important;
+  border: 2px solid var(--teal-400) !important;
+  border-radius: 8px !important;
+  background-color: white !important;
+  color: var(--text-primary) !important;
+  resize: vertical !important;
+}
+
+.datatable-wrapper .ag-large-textarea:focus {
+  outline: none !important;
+  border-color: var(--teal-600) !important;
+  box-shadow: 0 0 0 3px rgba(0, 137, 123, 0.2) !important;
+  border-radius: 8px !important;
+}
+
+/* Select/Dropdown Editor */
+.datatable-wrapper .ag-select {
+  height: 100% !important;
+  min-height: 40px !important;
+  border-radius: 8px !important;
+}
+
+.datatable-wrapper .ag-select select,
+.datatable-wrapper .ag-picker-field-wrapper {
+  height: 100% !important;
+  min-height: 40px !important;
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  font-family: inherit !important;
+  border: 2px solid var(--teal-400) !important;
+  border-radius: 8px !important;
+  background-color: white !important;
+  color: var(--text-primary) !important;
+}
+
+.datatable-wrapper .ag-select select:focus,
+.datatable-wrapper .ag-picker-field-wrapper:focus {
+  outline: none !important;
+  border-color: var(--teal-600) !important;
+  box-shadow: 0 0 0 3px rgba(0, 137, 123, 0.2) !important;
+  border-radius: 8px !important;
+}
+
+/* Number Editor */
+.datatable-wrapper input[type="number"] {
+  height: 100% !important;
+  min-height: 40px !important;
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  font-family: inherit !important;
+  border: 2px solid var(--teal-400) !important;
+  border-radius: 8px !important;
+  background-color: white !important;
+  color: var(--text-primary) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.datatable-wrapper input[type="number"]:focus {
+  outline: none !important;
+  border-color: var(--teal-600) !important;
+  box-shadow: 0 0 0 3px rgba(0, 137, 123, 0.2) !important;
+  border-radius: 8px !important;
+}
+
+/* Date Picker Editor */
+.datatable-wrapper input[type="date"],
+.datatable-wrapper input[type="datetime-local"] {
+  height: 100% !important;
+  min-height: 40px !important;
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  font-family: inherit !important;
+  border: 2px solid var(--teal-400) !important;
+  border-radius: 8px !important;
+  background-color: white !important;
+  color: var(--text-primary) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.datatable-wrapper input[type="date"]:focus,
+.datatable-wrapper input[type="datetime-local"]:focus {
+  outline: none !important;
+  border-color: var(--teal-600) !important;
+  box-shadow: 0 0 0 3px rgba(0, 137, 123, 0.2) !important;
+  border-radius: 8px !important;
+}
+
+/* Checkbox Editor */
+.datatable-wrapper .ag-checkbox-input-wrapper {
+  width: 20px !important;
+  height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  flex-shrink: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.datatable-wrapper .ag-checkbox-input-wrapper input {
+  width: 18px !important;
+  height: 18px !important;
+  max-width: 18px !important;
+  max-height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  cursor: pointer !important;
+  accent-color: var(--teal-600) !important;
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+}
+
+.datatable-wrapper .ag-checkbox {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  height: auto !important;
+}
+
+/* Prevent cell from stretching checkbox content */
+.datatable-wrapper .ag-cell:has(.ag-checkbox),
+.datatable-wrapper .ag-cell:has(.ag-checkbox-input-wrapper) {
+  display: flex !important;
+  align-items: center !important;
+}
+
+.datatable-wrapper .ag-selection-checkbox {
+  height: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Rich Select Editor */
+.datatable-wrapper .ag-rich-select {
+  height: 100% !important;
+  min-height: 40px !important;
+  border-radius: 8px !important;
+}
+
+.datatable-wrapper .ag-rich-select-value {
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  min-height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+  border-radius: 8px !important;
+}
+
+/* Cell Editor Popup (for large editors) */
+.datatable-wrapper .ag-popup-editor {
+  border: 2px solid var(--teal-400) !important;
+  border-radius: 8px !important;
+  box-shadow: var(--shadow-lg) !important;
+  background: white !important;
+  padding: 4px !important;
+}
+
+/* Ensure cell is properly sized during editing */
+.datatable-wrapper .ag-cell-editing {
+  padding: 0 !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+.datatable-wrapper .ag-cell-edit-wrapper {
+  height: 100% !important;
+  width: 100% !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+}
+
+.datatable-wrapper .ag-cell-editor-wrapper {
+  height: 100% !important;
+  width: 100% !important;
+  border-radius: 8px !important;
+}
+
+/* Input wrapper for all editor types */
+.datatable-wrapper .ag-input-wrapper {
+  height: 100% !important;
+  min-height: 18px !important;
+  border-radius: 8px !important;
+}
+
+.datatable-wrapper .ag-input-field {
+  height: 100% !important;
+  min-height: 40px !important;
+  border-radius: 8px !important;
+}
+
+/* Text field wrapper */
+.datatable-wrapper .ag-text-field {
+  height: 100% !important;
+  min-height: 40px !important;
+  border-radius: 8px !important;
+}
+
+.datatable-wrapper .ag-text-field-input-wrapper {
+  height: 100% !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+}
+
+/* DataTable Container Fixes */
+.datatable-wrapper .datatable-container {
+  height: 100%;
+}
+
+.datatable-wrapper .datatable-grid-wrapper {
+  min-height: 0;
+}
+
+/* ========================================
+   DATATABLE TOOLBAR STYLING
+   ======================================== */
+
+.datatable-wrapper .datatable-toolbar {
+  padding: 16px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8f5f3 100%);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--teal-100);
+  gap: 12px;
+}
+
+.datatable-wrapper .datatable-toolbar-button {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.datatable-wrapper .datatable-toolbar-button::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition:
+    width 0.6s,
+    height 0.6s;
+}
+
+.datatable-wrapper .datatable-toolbar-button:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+.datatable-wrapper .datatable-toolbar-button.primary {
+  background: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-700) 100%);
+}
+
+.datatable-wrapper .datatable-toolbar-button.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--teal-700) 0%, var(--teal-800) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 137, 123, 0.3);
+}
+
+.datatable-wrapper .datatable-toolbar-button.destructive {
+  background: linear-gradient(
+    135deg,
+    var(--pumpkin-500) 0%,
+    var(--pumpkin-700) 100%
+  );
+}
+
+.datatable-wrapper .datatable-toolbar-button.destructive:hover:not(:disabled) {
+  background: linear-gradient(
+    135deg,
+    var(--pumpkin-700) 0%,
+    var(--pumpkin-800) 100%
+  );
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+}
+
+.datatable-wrapper .datatable-toolbar-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.datatable-wrapper .datatable-toolbar-button:disabled {
+  background: var(--border-color);
+  color: var(--text-secondary);
+  box-shadow: none;
+}
+
+.datatable-wrapper .datatable-toolbar-button:focus-visible {
+  outline: 3px solid var(--pumpkin-400);
+  outline-offset: 2px;
+}
+
+/* Group By Selector */
+.datatable-wrapper .datatable-group-by-container {
+  padding: 8px 16px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  gap: 12px;
+}
+
+.datatable-wrapper .datatable-group-by-label {
+  font-weight: 500;
+  color: var(--teal-700);
+}
+
+.datatable-wrapper .datatable-group-by-select {
+  padding: 8px 16px;
+  border: 2px solid var(--teal-100);
+  border-radius: 8px;
+  min-width: 180px;
+  font-weight: 400;
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+}
+
+.datatable-wrapper .datatable-group-by-select:hover {
+  border-color: var(--teal-600);
+  background-color: var(--teal-50);
+}
+
+.datatable-wrapper .datatable-group-by-select:focus {
+  border-color: var(--teal-700);
+  box-shadow: 0 0 0 3px rgba(0, 137, 123, 0.2);
+}
+
+/* ========================================
+   DATATABLE DIALOG (DIFF) STYLING
+   ======================================== */
+
+.datatable-dialog-overlay {
+  background-color: rgba(0, 77, 64, 0.6) !important;
+  backdrop-filter: blur(4px);
+  animation: dialogFadeIn 0.3s ease;
+}
+
+@keyframes dialogFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.datatable-dialog {
+  border-radius: 16px !important;
+  box-shadow: var(--shadow-xl) !important;
+  border: 2px solid var(--teal-100) !important;
+  animation: dialogSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes dialogSlideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.datatable-dialog-header {
+  padding: 24px 32px !important;
+  background: linear-gradient(
+    135deg,
+    var(--teal-600) 0%,
+    var(--teal-700) 100%
+  ) !important;
+  color: white !important;
+  border-radius: 14px 14px 0 0 !important;
+}
+
+.datatable-dialog-header h2 {
+  font-size: 24px !important;
+  font-weight: 600 !important;
+  color: white !important;
+  letter-spacing: -0.3px !important;
+}
+
+.datatable-dialog-close {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: white !important;
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 10px !important;
+  transition: all 0.3s ease !important;
+}
+
+.datatable-dialog-close:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
+  transform: rotate(90deg);
+}
+
+.datatable-dialog-content {
+  padding: 32px !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f7fa 100%) !important;
+}
+
+.datatable-diff-row {
+  margin-bottom: 32px !important;
+}
+
+.datatable-diff-row h3 {
+  color: var(--teal-700) !important;
+  font-weight: 500 !important;
+  padding-bottom: 8px !important;
+  border-bottom: 2px solid var(--teal-100) !important;
+}
+
+.datatable-diff-table {
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.datatable-diff-table th {
+  background: linear-gradient(
+    135deg,
+    var(--teal-50) 0%,
+    var(--teal-100) 100%
+  ) !important;
+  color: var(--teal-800) !important;
+  font-weight: 500 !important;
+  text-transform: uppercase !important;
+  font-size: 11px !important;
+  letter-spacing: 0.8px !important;
+}
+
+.datatable-diff-table td {
+  border-color: var(--teal-50) !important;
+}
+
+.datatable-diff-old {
+  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%) !important;
+  border-radius: 6px !important;
+  padding: 8px 12px !important;
+}
+
+.datatable-diff-old::before {
+  content: "❌ ";
+  margin-right: 4px;
+}
+
+.datatable-diff-new {
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%) !important;
+  border-radius: 6px !important;
+  padding: 8px 12px !important;
+}
+
+.datatable-diff-new::before {
+  content: "✓ ";
+  margin-right: 4px;
+  color: #4caf50;
+}
+
+.datatable-button-revert-field {
+  background: white !important;
+  border: 2px solid var(--pumpkin-500) !important;
+  color: var(--pumpkin-500) !important;
+  padding: 6px 10px !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+}
+
+.datatable-button-revert-field:hover {
+  background: var(--pumpkin-500) !important;
+  color: white !important;
+  transform: scale(1.05);
+}
+
+.datatable-dialog-footer {
+  padding: 24px 32px !important;
+  border-top: 2px solid var(--teal-100) !important;
+  background: #f5f7fa !important;
+  border-radius: 0 0 14px 14px !important;
+  gap: 16px !important;
+}
+
+.datatable-button-revert-all {
+  padding: 12px 32px !important;
+  border-radius: 10px !important;
+  font-weight: 500 !important;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%) !important;
+  color: var(--text-secondary) !important;
+  border: 2px solid var(--border-color) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.datatable-button-revert-all:hover {
+  background: linear-gradient(135deg, #f5f5f5 0%, #eeeeee 100%) !important;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md) !important;
+}
+
+.datatable-button-commit {
+  padding: 12px 32px !important;
+  border-radius: 10px !important;
+  font-weight: 500 !important;
+  background: linear-gradient(
+    135deg,
+    var(--teal-600) 0%,
+    var(--teal-700) 100%
+  ) !important;
+  color: white !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.datatable-button-commit:hover {
+  background: linear-gradient(
+    135deg,
+    var(--teal-700) 0%,
+    var(--teal-800) 100%
+  ) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 137, 123, 0.4) !important;
+}
+
+/* ========================================
+   DETAIL PANEL STYLING
+   ======================================== */
+
+.detail-panel {
+  padding: 24px !important;
+  background: linear-gradient(
+    135deg,
+    var(--teal-50) 0%,
+    #f5f7fa 100%
+  ) !important;
+  border-radius: 12px !important;
+  margin: 8px !important;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+.detail-panel .detail-panel-grid {
+  border-radius: 10px !important;
+  box-shadow: 0 4px 12px rgba(0, 137, 123, 0.15) !important;
+  border: 2px solid var(--teal-100) !important;
+}
+
+/* Center text content within detail panel table cells */
+.detail-panel .ag-cell {
+  display: flex !important;
+  align-items: center !important;
+  padding: 12px 16px !important;
+  line-height: 1.5 !important;
+}
+
+.detail-panel .ag-header-cell {
+  display: flex !important;
+  align-items: center !important;
+  padding: 12px 16px !important;
+}
+
+.detail-panel .ag-theme-quartz,
+.detail-panel .ag-theme-alpine {
+  --ag-cell-horizontal-padding: 16px;
+}
+
+.detail-panel::before {
+  content: "↳ Details";
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--teal-700);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin-bottom: 12px;
+  padding-left: 4px;
+}
+
+/* ========================================
+   EXPAND BUTTON STYLING
+   ======================================== */
+
+.expand-button-cell {
+  gap: 10px !important;
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+}
+
+.expand-button {
+  background: linear-gradient(
+    135deg,
+    var(--teal-50) 0%,
+    var(--teal-100) 100%
+  ) !important;
+  border: 2px solid var(--teal-300) !important;
+  padding: 6px !important;
+  color: var(--teal-700) !important;
+  border-radius: 8px !important;
+  width: 28px !important;
+  height: 28px !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  flex-shrink: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.expand-button:hover {
+  background: linear-gradient(
+    135deg,
+    var(--teal-100) 0%,
+    var(--teal-200) 100%
+  ) !important;
+  color: var(--teal-900) !important;
+  transform: scale(1.1) !important;
+  border-color: var(--teal-400) !important;
+  box-shadow: 0 3px 8px rgba(0, 137, 123, 0.25) !important;
+}
+
+.expand-button.expanded {
+  background: linear-gradient(
+    135deg,
+    var(--pumpkin-500) 0%,
+    var(--pumpkin-700) 100%
+  ) !important;
+  border-color: var(--pumpkin-600) !important;
+  color: white !important;
+}
+
+.expand-button.expanded:hover {
+  background: linear-gradient(
+    135deg,
+    var(--pumpkin-600) 0%,
+    var(--pumpkin-800) 100%
+  ) !important;
+  border-color: var(--pumpkin-700) !important;
+}
+
+.expand-button svg {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  width: 16px !important;
+  height: 16px !important;
+  display: block !important;
+  margin: 0 auto !important;
+}
+
+.cell-value {
+  font-weight: 400 !important;
+  color: var(--text-primary) !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* ========================================
+   GROUP BY / MASTER-DETAIL ROW STYLING
+   ======================================== */
+
+/* Master row (grouped row) styling */
+.datatable-wrapper .ag-row-group {
+  background: linear-gradient(
+    90deg,
+    var(--teal-50) 0%,
+    #ffffff 100%
+  ) !important;
+  font-weight: 500 !important;
+  border-left: 4px solid var(--teal-500) !important;
+}
+
+.datatable-wrapper .ag-row-group:hover {
+  background: linear-gradient(
+    90deg,
+    var(--teal-100) 0%,
+    var(--teal-50) 100%
+  ) !important;
+}
+
+/* Ensure expand button in grouped rows is centered */
+.datatable-wrapper .ag-row-group .expand-button-cell {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  height: 100% !important;
+  padding: 0 16px !important;
+}
+
+.datatable-wrapper .ag-row-group .expand-button {
+  margin: 0 !important;
+}
+
+.datatable-wrapper .ag-cell:has(.expand-button-cell) {
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.datatable-wrapper .expand-button-cell {
+  padding: 0 16px !important;
+}
+
+/* Full width detail rows */
+.datatable-wrapper .ag-full-width-row {
+  background: var(--teal-50) !important;
+}
+
+/* ========================================
+   DATATABLE STATE STYLING
+   ======================================== */
+
+.datatable-loading {
+  color: var(--teal-700) !important;
+  font-weight: 400 !important;
+  padding: 48px 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 16px !important;
+}
+
+.datatable-loading::before {
+  content: "" !important;
+  width: 40px !important;
+  height: 40px !important;
+  border: 3px solid var(--teal-100) !important;
+  border-top-color: var(--teal-700) !important;
+  border-radius: 50% !important;
+  animation: spin 1s linear infinite !important;
+}
+
+.datatable-error {
+  color: var(--pumpkin-800) !important;
+  font-weight: 500 !important;
+  background: var(--pumpkin-50) !important;
+  border-radius: 8px !important;
+  border: 2px solid var(--pumpkin-300) !important;
+  padding: 48px 16px !important;
+}
+
+.datatable-error::before {
+  content: "⚠️ " !important;
+  font-size: 1.5rem !important;
+  display: block !important;
+  margin-bottom: 8px !important;
+}
+
+.datatable-empty {
+  color: var(--text-secondary) !important;
+  font-weight: 400 !important;
+  background: #f5f7fa !important;
+  border-radius: 8px !important;
+  border: 2px dashed var(--border-color) !important;
+  padding: 48px 16px !important;
+}
+
+.datatable-empty::before {
+  content: "📭 " !important;
+  font-size: 2rem !important;
+  display: block !important;
+  margin-bottom: 8px !important;
+}

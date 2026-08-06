@@ -1,0 +1,97 @@
+name: Publish SDK package
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Package to publish"
+        required: true
+        type: choice
+        options:
+          - multi-file-upload
+          - datatable
+          - conversational-agent-chat
+          - validation-station
+          - external-auth
+          - pdf-viewer
+      beta:
+        description: "Check for prerelease/beta versions"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  publish-sdk:
+    runs-on: uipath-ubuntu-latest
+    environment: production
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Print publish info
+        run: |
+          VERSION=$(node -p "require('./packages/${{ inputs.package }}/package.json').version")
+          TAG=$([ "${{ inputs.beta }}" = "true" ] && echo "beta" || echo "latest")
+          echo "Package: ${{ inputs.package }}"
+          echo "Version: $VERSION"
+          echo "Tag: $TAG"
+
+      - name: Setup Node.js for GitHub Packages
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@uipath"
+
+      - name: Ensure npm >= 11.5.0 (required for minimum-release-age)
+        # Deliberate global npm upgrade (enables `minimum-release-age` supply-chain
+        # hardening), not an ad-hoc dependency install — suppress zizmor's heuristic.
+        run: npm install -g npm@^11.5.0 # zizmor: ignore[adhoc-packages]
+
+      - name: Install Dependencies
+        run: npm install --include=optional --legacy-peer-deps
+
+      - name: Build
+        working-directory: packages/${{ inputs.package }}
+        run: npm run build
+
+      - name: Build Storybook
+        run: npm run build-storybook
+
+      - name: Deploy Storybook to GitHub Pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          npx gh-pages -d storybook-static -b gh-pages
+
+      - name: Publish to GitHub Packages
+        working-directory: packages/${{ inputs.package }}
+        run: npm publish --tag latest
+
+      - name: Setup Node.js for npm
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          scope: "@uipath"
+
+      - name: Publish to npm
+        working-directory: packages/${{ inputs.package }}
+        run: |
+          if [ "${{ inputs.beta }}" = "true" ]; then
+            npm publish --provenance --access public --tag beta
+          else
+            npm publish --provenance --access public
+          fi
