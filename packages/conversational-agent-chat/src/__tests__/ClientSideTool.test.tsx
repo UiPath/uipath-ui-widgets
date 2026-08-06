@@ -3,9 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
-  ClientSideToolWidget,
+  ClientSideTool,
   type ClientSideToolLabels,
-} from "../components/ClientSideToolWidget";
+} from "../components/ClientSideTool";
 import { initI18n } from "../i18n";
 
 beforeAll(() => {
@@ -25,10 +25,10 @@ const inputSchema = {
   },
 };
 
-describe("ClientSideToolWidget", () => {
+describe("ClientSideTool", () => {
   it("renders the tool name and description", () => {
     render(
-      <ClientSideToolWidget
+      <ClientSideTool
         toolName="lookup_user"
         inputSchema={inputSchema}
         labels={labels}
@@ -44,7 +44,7 @@ describe("ClientSideToolWidget", () => {
 
   it("renders the form with default values", () => {
     render(
-      <ClientSideToolWidget
+      <ClientSideTool
         toolName="lookup_user"
         inputSchema={inputSchema}
         defaultValues={{ name: "Alice" }}
@@ -60,7 +60,7 @@ describe("ClientSideToolWidget", () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
     render(
-      <ClientSideToolWidget
+      <ClientSideTool
         toolName="lookup_user"
         inputSchema={inputSchema}
         defaultValues={{ name: "Alice" }}
@@ -81,7 +81,7 @@ describe("ClientSideToolWidget", () => {
     const user = userEvent.setup();
     const onCancel = vi.fn();
     render(
-      <ClientSideToolWidget
+      <ClientSideTool
         toolName="lookup_user"
         inputSchema={inputSchema}
         labels={labels}
@@ -96,7 +96,7 @@ describe("ClientSideToolWidget", () => {
   it("disables buttons after submit", async () => {
     const user = userEvent.setup();
     render(
-      <ClientSideToolWidget
+      <ClientSideTool
         toolName="lookup_user"
         inputSchema={inputSchema}
         defaultValues={{ name: "Alice" }}
@@ -115,7 +115,7 @@ describe("ClientSideToolWidget", () => {
   it("disables buttons after cancel", async () => {
     const user = userEvent.setup();
     render(
-      <ClientSideToolWidget
+      <ClientSideTool
         toolName="lookup_user"
         inputSchema={inputSchema}
         labels={labels}

@@ -6,7 +6,7 @@ import {
 } from "./AgentSchemaForm/AgentSchemaForm";
 import type { InputSchema } from "./AgentSchemaForm/types";
 
-export interface ClientSideToolWidgetProps {
+export interface ClientSideToolProps {
   toolName: string;
   inputSchema: unknown;
   defaultValues?: Record<string, unknown>;
@@ -21,14 +21,14 @@ export interface ClientSideToolLabels {
   description: string;
 }
 
-export function ClientSideToolWidget({
+export function ClientSideTool({
   toolName,
   inputSchema,
   defaultValues,
   labels,
   onSubmit,
   onCancel,
-}: ClientSideToolWidgetProps) {
+}: ClientSideToolProps) {
   const formRef = useRef<AgentSchemaFormHandle>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 

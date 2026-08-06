@@ -4,9 +4,9 @@ import { PortalContainerProvider } from "@uipath/apollo-wind";
 import i18next from "i18next";
 import { initI18n } from "../i18n";
 import {
-  ClientSideToolWidget,
+  ClientSideTool,
   type ClientSideToolLabels,
-} from "./ClientSideToolWidget";
+} from "./ClientSideTool";
 
 initI18n();
 
@@ -60,7 +60,7 @@ export function createClientSideToolRenderer(): ClientSideToolRenderer {
 
       root.render(
         <PortalContainerProvider>
-          <ClientSideToolWidget
+          <ClientSideTool
             toolName={meta.toolName}
             inputSchema={meta.inputSchema}
             defaultValues={meta.defaultValues}
