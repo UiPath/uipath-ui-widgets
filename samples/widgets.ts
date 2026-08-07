@@ -18,6 +18,12 @@ export const widgets: Widget[] = [
       "Review document understanding tasks side-by-side with the source document and apply field-level corrections.",
   },
   {
+    id: "validation-station-prefetched",
+    title: "Validation Station (pre-fetched)",
+    description:
+      "The same review screen, with the document fetched by the app instead of the widget — `fetchDuDocumentArtifacts` loads the artifacts, they are passed straight in, and the app owns the submit and draft write-back.",
+  },
+  {
     id: "invoice-review-workspace",
     title: "Invoice Review Workspace",
     description:

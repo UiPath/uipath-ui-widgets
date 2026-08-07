@@ -33,8 +33,8 @@ function InvoiceReviewWorkspacePage({
     taskLoading,
     fetchTasks,
     selectTask,
-    handleSubmitComplete,
-    handleSaveAsDraftComplete,
+    handleSubmit,
+    handleSaveAsDraft,
     handleReportException,
     notification,
     dismissNotification,
@@ -130,8 +130,8 @@ function InvoiceReviewWorkspacePage({
             <ReviewWorkspace
               sdk={uipathSdk}
               task={selectedTask}
-              onSubmitComplete={handleSubmitComplete}
-              onSaveAsDraftComplete={handleSaveAsDraftComplete}
+              onSubmit={handleSubmit}
+              onSaveAsDraft={handleSaveAsDraft}
               onReportException={handleReportException}
             />
           )}

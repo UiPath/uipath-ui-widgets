@@ -5,9 +5,9 @@ import {
   CompactFieldsForm,
   CompactTableEditor,
   DocumentViewer,
-  useBucketArtifacts,
+  useDuDocumentArtifacts,
   ValidationStationLanguage,
-  type SaveValidatedDataResult,
+  type CompactFieldsFormProps,
 } from "@uipath/ui-widgets-validation-station";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import { type DuFramework } from "@uipath/uipath-typescript/document-understanding";
@@ -19,14 +19,14 @@ import Panel from "./Panel";
 interface ReviewWorkspaceProps {
   sdk: UiPath;
   task: TaskGetResponse;
-  onSubmitComplete: (result: SaveValidatedDataResult) => void;
-  onSaveAsDraftComplete: (result: SaveValidatedDataResult) => void;
-  onReportException: (documentId: string, reason: string) => void;
+  onSubmit: CompactFieldsFormProps["onSubmit"];
+  onSaveAsDraft: CompactFieldsFormProps["onSaveAsDraft"];
+  onReportException: CompactFieldsFormProps["onReportException"];
 }
 
 /**
  * The composed review screen. It fetches the document artifacts **once** via
- * `useBucketArtifacts`, then hands the same artifacts to five compact
+ * `useDuDocumentArtifacts`, then hands the same artifacts to five compact
  * subcomponents laid out in a custom grid. Every subcomponent carries the same
  * `instanceId`, so they share one store: selecting a field in the form
  * highlights it in the viewer, selecting the line-items table opens the table
@@ -40,13 +40,13 @@ interface ReviewWorkspaceProps {
 function ReviewWorkspace({
   sdk,
   task,
-  onSubmitComplete,
-  onSaveAsDraftComplete,
+  onSubmit,
+  onSaveAsDraft,
   onReportException,
 }: ReviewWorkspaceProps) {
   const data = task.data as DuFramework.ContentValidationData;
   const folderId = task.folderId;
-  const { artifacts, error } = useBucketArtifacts(sdk, data, folderId);
+  const { artifacts, error } = useDuDocumentArtifacts(sdk, data, folderId);
   const [status, setStatus] = useState<string>("");
 
   if (error)
@@ -117,9 +117,9 @@ function ReviewWorkspace({
               setStatus(`Selected field: ${d.Field?.FieldName ?? "?"}`)
             }
             onDirtyChange={(dirty) => dirty && setStatus("Unsaved changes")}
-            onSubmitComplete={onSubmitComplete}
-            onSaveAsDraftComplete={onSaveAsDraftComplete}
-            onReportExceptionComplete={onReportException}
+            onSubmit={onSubmit}
+            onSaveAsDraft={onSaveAsDraft}
+            onReportException={onReportException}
           />
         </Panel>
 

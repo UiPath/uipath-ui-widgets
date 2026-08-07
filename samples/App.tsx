@@ -6,7 +6,10 @@ import DataTablePage from "./pages/DataTablePage";
 import HomePage from "./pages/HomePage";
 import InvoiceReviewWorkspacePage from "./pages/InvoiceReviewWorkspace";
 import MultiFileUploadPage from "./pages/MultiFileUploadPage";
-import ValidationStationPage from "./pages/ValidationStationPage";
+import {
+  ValidationStationPage,
+  ValidationStationPrefetchedPage,
+} from "./pages/ValidationStation";
 
 interface AppProps {
   uipathSdk: UiPath;
@@ -32,6 +35,9 @@ function App({ uipathSdk }: AppProps) {
       break;
     case "validation-station":
       page = <ValidationStationPage uipathSdk={uipathSdk} />;
+      break;
+    case "validation-station-prefetched":
+      page = <ValidationStationPrefetchedPage uipathSdk={uipathSdk} />;
       break;
     case "invoice-review-workspace":
       page = <InvoiceReviewWorkspacePage uipathSdk={uipathSdk} />;

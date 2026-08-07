@@ -24,17 +24,14 @@ export function useInvoiceReviewTasks(uipathSdk: UiPath) {
     selectTask,
     clearSelection,
   } = useSelectedTask(uipathSdk, taskList);
-  const {
-    handleSubmitComplete,
-    handleSaveAsDraftComplete,
-    handleReportException,
-  } = useTaskMutations({
-    uipathSdk,
-    selectedTask,
-    clearSelection,
-    refetch: fetchTasks,
-    notify,
-  });
+  const { handleSubmit, handleSaveAsDraft, handleReportException } =
+    useTaskMutations({
+      uipathSdk,
+      selectedTask,
+      clearSelection,
+      refetch: fetchTasks,
+      notify,
+    });
 
   return {
     taskList,
@@ -44,8 +41,8 @@ export function useInvoiceReviewTasks(uipathSdk: UiPath) {
     taskLoading,
     fetchTasks,
     selectTask,
-    handleSubmitComplete,
-    handleSaveAsDraftComplete,
+    handleSubmit,
+    handleSaveAsDraft,
     handleReportException,
     notification,
     dismissNotification,
