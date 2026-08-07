@@ -7,10 +7,11 @@ vi.mock("../useWcReady", () => ({
   useWcReady: () => true,
 }));
 
-const mockUseBucketArtifacts = vi.fn();
+const mockUseSubcomponentArtifacts = vi.fn();
 
-vi.mock("../useBucketArtifacts", () => ({
-  useBucketArtifacts: (...args: any[]) => mockUseBucketArtifacts(...args),
+vi.mock("../useResolvedArtifacts", () => ({
+  useResolvedArtifacts: (...args: any[]) =>
+    mockUseSubcomponentArtifacts(...args),
 }));
 
 const mockSubmitValidatedData = vi.fn();
@@ -38,12 +39,24 @@ const baseProps: any = {
   },
 };
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockUseBucketArtifacts.mockReturnValue({
+/** Mirrors the real hook's resolution rules so `canPersist` tracks the props. */
+const resolved = (source: any = {}, overrides: any = {}) => {
+  const resolvedFolderId = source.folderId ?? source.data?.FolderId;
+  return {
     artifacts: mockArtifacts,
     error: null,
-  });
+    documentId: source.documentId ?? source.data?.DocumentId,
+    resolvedFolderId,
+    canPersist: !!source.sdk && !!source.data && !!resolvedFolderId,
+    ...overrides,
+  };
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockUseSubcomponentArtifacts.mockImplementation((source: any) =>
+    resolved(source),
+  );
 });
 
 describe("ValidationStation", () => {
@@ -77,11 +90,10 @@ describe("ValidationStation", () => {
     });
   });
 
-  it("renders error when useBucketArtifacts returns error", async () => {
-    mockUseBucketArtifacts.mockReturnValue({
-      artifacts: null,
-      error: "Something went wrong",
-    });
+  it("renders error when artifact resolution returns an error", async () => {
+    mockUseSubcomponentArtifacts.mockImplementation((source: any) =>
+      resolved(source, { artifacts: null, error: "Something went wrong" }),
+    );
 
     // `await act` flushes the WC-ready promise the mount effect subscribes to,
     // so the trailing setWcReady state update happens inside act (no warning).
@@ -95,10 +107,9 @@ describe("ValidationStation", () => {
   });
 
   it("renders loading state when artifacts are null", async () => {
-    mockUseBucketArtifacts.mockReturnValue({
-      artifacts: null,
-      error: null,
-    });
+    mockUseSubcomponentArtifacts.mockImplementation((source: any) =>
+      resolved(source, { artifacts: null }),
+    );
 
     let container!: HTMLElement;
     await act(async () => {
@@ -117,15 +128,11 @@ describe("ValidationStation", () => {
         return el;
       });
 
-    it("forwards saveValidatedDataRequest to submitValidatedData and onSubmitComplete", async () => {
+    it("persists a submit itself and emits the request plus the outcome", async () => {
       mockSubmitValidatedData.mockResolvedValue({ success: true });
-      const onSubmitComplete = vi.fn();
+      const onSubmit = vi.fn();
       const { container } = render(
-        <ValidationStation
-          {...baseProps}
-          folderId={42}
-          onSubmitComplete={onSubmitComplete}
-        />,
+        <ValidationStation {...baseProps} folderId={42} onSubmit={onSubmit} />,
       );
       const el = await waitForWc(container);
 
@@ -141,18 +148,18 @@ describe("ValidationStation", () => {
         );
       });
       await waitFor(() => {
-        expect(onSubmitComplete).toHaveBeenCalledWith({ success: true });
+        expect(onSubmit).toHaveBeenCalledWith(detail, { success: true });
       });
     });
 
-    it("forwards saveValidatedDataAsDraftRequest to saveValidatedDataAsDraft and onSaveAsDraftComplete", async () => {
+    it("persists a draft itself and emits the request plus the outcome", async () => {
       mockSaveValidatedDataAsDraft.mockResolvedValue({ success: true });
-      const onSaveAsDraftComplete = vi.fn();
+      const onSaveAsDraft = vi.fn();
       const { container } = render(
         <ValidationStation
           {...baseProps}
           folderId={42}
-          onSaveAsDraftComplete={onSaveAsDraftComplete}
+          onSaveAsDraft={onSaveAsDraft}
         />,
       );
       const el = await waitForWc(container);
@@ -171,54 +178,31 @@ describe("ValidationStation", () => {
         );
       });
       await waitFor(() => {
-        expect(onSaveAsDraftComplete).toHaveBeenCalledWith({ success: true });
+        expect(onSaveAsDraft).toHaveBeenCalledWith(detail, { success: true });
       });
     });
 
-    it("extracts documentId + reason from saveExceptionReportRequest and calls onReportExceptionComplete", async () => {
-      const onReportExceptionComplete = vi.fn();
+    it("emits the exception request untouched, and never persists it", async () => {
+      const onReportException = vi.fn();
       const { container } = render(
         <ValidationStation
           {...baseProps}
           folderId={42}
-          onReportExceptionComplete={onReportExceptionComplete}
+          onReportException={onReportException}
         />,
       );
       const el = await waitForWc(container);
 
+      const detail = {
+        documentId: "doc-xyz",
+        exceptionReport: { Reason: "missing page" },
+      };
       el.dispatchEvent(
-        new CustomEvent("saveExceptionReportRequest", {
-          detail: {
-            documentId: "doc-xyz",
-            exceptionReport: { Reason: "missing page" },
-          },
-        }),
+        new CustomEvent("saveExceptionReportRequest", { detail }),
       );
 
-      expect(onReportExceptionComplete).toHaveBeenCalledWith(
-        "doc-xyz",
-        "missing page",
-      );
-    });
-
-    it("falls back to empty reason when the exception DTO has no Reason field", async () => {
-      const onReportExceptionComplete = vi.fn();
-      const { container } = render(
-        <ValidationStation
-          {...baseProps}
-          folderId={42}
-          onReportExceptionComplete={onReportExceptionComplete}
-        />,
-      );
-      const el = await waitForWc(container);
-
-      el.dispatchEvent(
-        new CustomEvent("saveExceptionReportRequest", {
-          detail: { documentId: "doc-abc", exceptionReport: null },
-        }),
-      );
-
-      expect(onReportExceptionComplete).toHaveBeenCalledWith("doc-abc", "");
+      expect(onReportException).toHaveBeenCalledWith(detail);
+      expect(mockSubmitValidatedData).not.toHaveBeenCalled();
     });
 
     it("does not throw when callbacks are not provided", async () => {
@@ -251,6 +235,101 @@ describe("ValidationStation", () => {
         expect(mockSubmitValidatedData).toHaveBeenCalled();
         expect(mockSaveValidatedDataAsDraft).toHaveBeenCalled();
       });
+    });
+  });
+
+  describe("pre-fetched artifacts (no sdk/data)", () => {
+    const prefetchedProps: any = {
+      artifacts: mockArtifacts,
+      documentId: "doc-prefetched",
+    };
+
+    const waitForWc = async (container: HTMLElement) =>
+      await waitFor(() => {
+        const el = container.querySelector(
+          "ui-du-validation-station-standalone-wc-element",
+        );
+        if (!el) throw new Error("WC element not mounted");
+        return el;
+      });
+
+    it("renders the web component from artifacts passed in as props", async () => {
+      const { container } = render(<ValidationStation {...prefetchedProps} />);
+
+      await waitForWc(container);
+      expect(mockUseSubcomponentArtifacts).toHaveBeenCalledWith(
+        expect.objectContaining({
+          artifacts: mockArtifacts,
+          documentId: "doc-prefetched",
+          sdk: undefined,
+          data: undefined,
+        }),
+      );
+    });
+
+    it("emits the request with no outcome when it cannot persist", async () => {
+      const onSubmit = vi.fn();
+      const onSaveAsDraft = vi.fn();
+      const { container } = render(
+        <ValidationStation
+          {...prefetchedProps}
+          onSubmit={onSubmit}
+          onSaveAsDraft={onSaveAsDraft}
+        />,
+      );
+      const el = await waitForWc(container);
+
+      const submitDetail = { documentId: "doc-prefetched", validatedData: {} };
+      const draftDetail = { documentId: "doc-prefetched", validatedData: {} };
+      el.dispatchEvent(
+        new CustomEvent("saveValidatedDataRequest", { detail: submitDetail }),
+      );
+      el.dispatchEvent(
+        new CustomEvent("saveValidatedDataAsDraftRequest", {
+          detail: draftDetail,
+        }),
+      );
+
+      // Same callbacks as self-fetching mode, minus the outcome the widget
+      // cannot know — the write-back is the host's.
+      expect(onSubmit).toHaveBeenCalledWith(submitDetail);
+      expect(onSaveAsDraft).toHaveBeenCalledWith(draftDetail);
+      expect(mockSubmitValidatedData).not.toHaveBeenCalled();
+      expect(mockSaveValidatedDataAsDraft).not.toHaveBeenCalled();
+    });
+
+    it("does not throw when no callback is wired and it cannot persist", async () => {
+      const { container } = render(<ValidationStation {...prefetchedProps} />);
+      const el = await waitForWc(container);
+
+      el.dispatchEvent(
+        new CustomEvent("saveValidatedDataRequest", {
+          detail: { documentId: "doc-prefetched", validatedData: {} },
+        }),
+      );
+
+      expect(mockSubmitValidatedData).not.toHaveBeenCalled();
+    });
+
+    it("still reports exceptions to the host", async () => {
+      const onReportException = vi.fn();
+      const { container } = render(
+        <ValidationStation
+          {...prefetchedProps}
+          onReportException={onReportException}
+        />,
+      );
+      const el = await waitForWc(container);
+
+      const detail = {
+        documentId: "doc-prefetched",
+        exceptionReport: { Reason: "blurry scan" },
+      };
+      el.dispatchEvent(
+        new CustomEvent("saveExceptionReportRequest", { detail }),
+      );
+
+      expect(onReportException).toHaveBeenCalledWith(detail);
     });
   });
 });

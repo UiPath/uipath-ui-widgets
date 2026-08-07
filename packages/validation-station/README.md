@@ -60,13 +60,101 @@ function App() {
 > (a `deploymentUrl` default handles this for most hosts — override it if
 > yours doesn't). See [Hosting the web component](#hosting-the-web-component).
 
+## Data sources
+
+The widget needs a taxonomy, an extraction result and a document DOM. There are two mutually-exclusive ways to give it those:
+
+| Mode              | Pass                          | Who fetches                                                   | Who writes back                                 |
+| ----------------- | ----------------------------- | ------------------------------------------------------------- | ----------------------------------------------- |
+| **Self-fetching** | `sdk` + `data` (+ `folderId`) | The widget, from the bucket paths on `ContentValidationData`  | The widget, to `ValidatedExtractionResultsPath` |
+| **Pre-fetched**   | `artifacts` (+ `documentId`)  | You — hand it a `DuDocumentArtifacts` object you already hold | You, from the request the widget emits          |
+
+**The outputs do not change with the mode.** `onSubmit`, `onSaveAsDraft` and `onReportException` fire for every user action either way, and always carry the request the web component produced. The only difference is a second argument: when the widget persisted the data itself, it passes the outcome too.
+
+Pre-fetched mode is what you want when the document does not live in a storage bucket, when the artifacts are already in memory (e.g. fetched once and shared with the [subcomponents](./docs/validation-station-subcomponents.md)), or when persistence goes somewhere other than `ValidatedExtractionResultsPath`.
+
+```tsx
+import {
+  ValidationStation,
+  type DuDocumentArtifacts,
+} from "@uipath/ui-widgets-validation-station";
+
+function App({ artifacts }: { artifacts: DuDocumentArtifacts }) {
+  return (
+    <ValidationStation
+      artifacts={artifacts}
+      documentId="doc-123"
+      onSubmit={(request) => persistItYourself(request)}
+    />
+  );
+}
+```
+
+The two modes can be mixed: pass `artifacts` **and** `sdk` + `data` + a folder id to skip the fetch while keeping the built-in write-back — `onSubmit` then receives the outcome as well.
+
+> `DuDocumentArtifacts` is `{ taxonomy, extractionResult, dom, text, customizationInfo, original }` — `original` is the base64-encoded document the viewer renders.
+
+### Owning the round-trip
+
+Pre-fetched mode does not mean writing the bucket plumbing yourself. Everything the widget does internally is exported, so a host can drive the same flow:
+
+| Export                                                   | Use                                                                                                                                 |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `fetchDuDocumentArtifacts(sdk, data, folderId?)`         | Fetch `DuDocumentArtifacts` imperatively — outside render, ahead of time, or in a loader. `folderId` falls back to `data.FolderId`. |
+| `useDuDocumentArtifacts(sdk, data, folderId)`            | The same fetch as a hook, for when the fetch belongs to a component's lifecycle.                                                    |
+| `submitValidatedData(sdk, data, folderId, request)`      | The submit flow: `ProcessExtractedData`, then upload to `ValidatedExtractionResultsPath`.                                           |
+| `saveValidatedDataAsDraft(sdk, data, folderId, request)` | The draft flow: upload `validatedData` straight to the bucket.                                                                      |
+
+```tsx
+import {
+  fetchDuDocumentArtifacts,
+  submitValidatedData,
+  saveValidatedDataAsDraft,
+  ValidationStation,
+  type DuDocumentArtifacts,
+} from "@uipath/ui-widgets-validation-station";
+
+function HostOwnedReview({ sdk, data, folderId }) {
+  const [artifacts, setArtifacts] = useState<DuDocumentArtifacts | null>(null);
+
+  useEffect(() => {
+    fetchDuDocumentArtifacts(sdk, data, folderId).then(setArtifacts);
+  }, [sdk, data, folderId]);
+
+  if (!artifacts) return <div>Loading document…</div>;
+
+  return (
+    <ValidationStation
+      artifacts={artifacts}
+      documentId={data.DocumentId}
+      // no sdk / data — the host loads and persists
+      onSubmit={async (request) => {
+        const result = await submitValidatedData(sdk, data, folderId, request);
+        afterSubmit(result);
+      }}
+      onSaveAsDraft={(request) =>
+        saveValidatedDataAsDraft(sdk, data, folderId, request)
+      }
+    />
+  );
+}
+```
+
+> Handle **both** callbacks. The widget always offers "Save as draft", so leaving `onSaveAsDraft` unwired means a draft click persists nothing.
+
+The request payloads are exported too — `IVsSaveValidatedDataRequest`, `IVsSaveValidatedDataAsDraftRequest` and `IVsSaveExceptionReportRequest` — so handlers declared outside JSX can name their parameter.
+
+A full working example lives in the repo's sample app under `samples/pages/ValidationStation/ValidationStationPrefetchedPage.tsx`.
+
 ## Props
 
 | Prop                             | Type                                           | Required | Default   | Description                                                                                                                                                                                                                                                                                                                                       |
 | -------------------------------- | ---------------------------------------------- | -------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sdk`                            | `UiPath`                                       | Yes      | —         | UiPath SDK instance for authentication and API calls                                                                                                                                                                                                                                                                                              |
-| `data`                           | `ContentValidationData`                        | Yes      | —         | Document data containing bucket paths, document ID, and folder references                                                                                                                                                                                                                                                                         |
-| `folderId`                       | `number`                                       | No\*     | —         | Storage bucket folder ID. Falls back to `data.FolderId`. **One of the two must resolve to a value** — otherwise the widget show an error.                                                                                                                                                                                                         |
+| `sdk`                            | `UiPath`                                       | No\*     | —         | UiPath SDK instance for authentication and API calls. Required for self-fetching / persistence                                                                                                                                                                                                                                                    |
+| `data`                           | `ContentValidationData`                        | No\*     | —         | Document data containing bucket paths, document ID, and folder references. Required for self-fetching / persistence                                                                                                                                                                                                                               |
+| `artifacts`                      | `DuDocumentArtifacts`                          | No\*     | —         | Pre-fetched document artifacts. When supplied, no bucket fetch is performed. \*Either `artifacts` or `sdk` + `data` must be provided                                                                                                                                                                                                              |
+| `documentId`                     | `string`                                       | No       | —         | Document id forwarded to the web component. Falls back to `data.DocumentId` — pass it in pre-fetched mode, where there is no `data`                                                                                                                                                                                                               |
+| `folderId`                       | `number`                                       | No\*     | —         | Storage bucket folder ID. Falls back to `data.FolderId`. **In self-fetching mode one of the two must resolve to a value** — otherwise the widget shows an error.                                                                                                                                                                                  |
 | `theme`                          | `'light' \| 'dark' \| 'light-hc' \| 'dark-hc'` | No       | `'light'` | Visual theme                                                                                                                                                                                                                                                                                                                                      |
 | `language`                       | `ValidationStationLanguage`                    | No       | `English` | UI language (see enum below)                                                                                                                                                                                                                                                                                                                      |
 | `isReadonly`                     | `boolean`                                      | No       | `false`   | When `true`, renders in read-only mode                                                                                                                                                                                                                                                                                                            |
@@ -78,19 +166,21 @@ function App() {
 | `selectAndFocusFieldValueByPath` | `SelectAndFocusFieldValueByPath`               | No       | —         | Select and focus a field value addressed by a path; focuses the document reference if any                                                                                                                                                                                                                                                         |
 | `deleteFieldValueByPath`         | `DeleteFieldValueByPath`                       | No       | —         | Delete a field value addressed by a path                                                                                                                                                                                                                                                                                                          |
 
-> Three additional callback props (`onSubmitComplete`, `onSaveAsDraftComplete`, `onReportExceptionComplete`) are documented in the next section.
+> The three callback props (`onSubmit`, `onSaveAsDraft`, `onReportException`) are documented in the next section.
 
 ### Reacting to save / draft / exception flows
 
-The widget surfaces three user-initiated flows. Submit and draft are owned end-to-end by the widget; exception reporting is forwarded to the host so it can call the SDK directly.
+The widget surfaces three user-initiated flows and reports each through exactly one callback, whichever mode it is in. Every callback receives the raw request; `result` is filled in only for the flows the widget persisted itself.
 
-| Callback                    | User action             | Signature                                      | What the widget does                                                                                                                                                        | What the host does                                                                                           |
-| --------------------------- | ----------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `onSubmitComplete`          | **Submit**              | `(result: SaveValidatedDataResult) => void`    | Calls `OrchestratorDuModule.processExtractedData(...)`, then uploads the merged result to `ValidatedExtractionResultsPath`. Fires the callback with the persistence result. | (optional) react to success/failure (complete the task, retry, log, etc.).                                   |
-| `onSaveAsDraftComplete`     | **Save as draft**       | `(result: SaveValidatedDataResult) => void`    | Uploads the in-progress `validatedData` straight to `ValidatedExtractionResultsPath` (no `processExtractedData` call). Fires the callback with the persistence result.      | (optional) react to success/failure.                                                                         |
-| `onReportExceptionComplete` | **Report as exception** | `(documentId: string, reason: string) => void` | Extracts `documentId` and `reason` from the web component's exception DTO and hands them to the host. **No API call.**                                                      | Required if you want the report persisted — call `OrchestratorDuModule.submitExceptionReport(...)` yourself. |
+| Callback            | User action             | Signature                    | What the widget does                                                                                                                                                | What the host does                                                                                                                        |
+| ------------------- | ----------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `onSubmit`          | **Submit**              | `(request, result?) => void` | With `sdk` + `data`: `processExtractedData`, then uploads to `ValidatedExtractionResultsPath`, and passes the outcome as `result`. Without: emits the request only. | React to `result`, or — when it is absent — persist the request yourself (`submitValidatedData` does exactly what the widget would have). |
+| `onSaveAsDraft`     | **Save as draft**       | `(request, result?) => void` | With `sdk` + `data`: uploads `validatedData` straight to the bucket (no `processExtractedData`). Without: emits the request only.                                   | Same as above; the host-side equivalent is `saveValidatedDataAsDraft`.                                                                    |
+| `onReportException` | **Report as exception** | `(request) => void`          | Nothing — the widget never persists exceptions, in either mode. The reason is at `request.exceptionReport.Reason`.                                                  | Required if you want the report persisted — call `OrchestratorDuModule.submitExceptionReport(...)` yourself.                              |
 
 Submit/draft hand you a `SaveValidatedDataResult` (`{ success, error? }`) — the host owns all UI feedback (toast, retry, etc.); the widget does not surface failures itself. The exception callback hands you `documentId` and `reason` strings ready to forward to the SDK.
+
+All three fire on every user action, regardless of mode — that is the contract. Only `result` varies.
 
 ```tsx
 import {
@@ -100,22 +190,24 @@ import {
 import { OrchestratorDuModule } from "@uipath/uipath-typescript/orchestrator-du-module";
 
 function App({ sdk, data, task }) {
-  const handleSubmitComplete = async (result: SaveValidatedDataResult) => {
-    if (!result.success) {
-      console.warn("Submit failed:", result.error);
+  // `sdk` + `data` are set, so the widget persisted it and `result` is present.
+  const handleSubmit = async (request, result?: SaveValidatedDataResult) => {
+    if (!result?.success) {
+      console.warn("Submit failed:", result?.error);
       return;
     }
     await task.complete({ action: "Completed", type: "DocumentValidation" });
   };
 
-  const handleDraftComplete = (result: SaveValidatedDataResult) => {
-    if (!result.success) console.warn("Draft save failed:", result.error);
+  const handleSaveAsDraft = (request, result?: SaveValidatedDataResult) => {
+    if (!result?.success) console.warn("Draft save failed:", result?.error);
   };
 
-  const handleReportException = async (documentId: string, reason: string) => {
+  const handleReportException = async (request) => {
+    const reason = request.exceptionReport?.Reason ?? "";
     const response = await new OrchestratorDuModule(sdk).submitExceptionReport(
       task.id,
-      documentId,
+      request.documentId,
       reason || "Reported via Validation Station",
       { folderId: task.folderId },
     );
@@ -129,15 +221,15 @@ function App({ sdk, data, task }) {
       sdk={sdk}
       data={data}
       folderId={task.folderId}
-      onSubmitComplete={handleSubmitComplete}
-      onSaveAsDraftComplete={handleDraftComplete}
-      onReportExceptionComplete={handleReportException}
+      onSubmit={handleSubmit}
+      onSaveAsDraft={handleSaveAsDraft}
+      onReportException={handleReportException}
     />
   );
 }
 ```
 
-> Submit and draft callbacks are optional, but failures are silent if you skip them — the widget does not surface errors on its own. The exception callback is the only place the report goes; without it the user's "Report as exception" click is a no-op.
+> All three callbacks are optional, but failures are silent if you skip them — the widget surfaces no errors on its own. `onReportException` is the only place the report goes; without it the user's "Report as exception" click is a no-op.
 
 ## Language enum
 
@@ -177,7 +269,12 @@ import {
 import type {
   ValidationStationProps,
   ValidationStationWcConfig,
+  DuArtifactsSource,
+  DuDocumentArtifacts,
   IValidationStationOptions,
+  IVsSaveValidatedDataRequest,
+  IVsSaveValidatedDataAsDraftRequest,
+  IVsSaveExceptionReportRequest,
   SaveValidatedDataResult,
   SetFieldValueByPath,
   SelectAndFocusFieldValueByPath,

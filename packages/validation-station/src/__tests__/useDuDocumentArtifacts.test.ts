@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { useBucketArtifacts } from "../useBucketArtifacts";
+import { useDuDocumentArtifacts } from "../useDuDocumentArtifacts";
 
 const mockFetchBucketArtifacts = vi.fn();
 
@@ -36,12 +36,12 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("useBucketArtifacts", () => {
+describe("useDuDocumentArtifacts", () => {
   it("fetches artifacts on mount and returns them", async () => {
     mockFetchBucketArtifacts.mockResolvedValue(mockArtifacts);
 
     const { result } = renderHook(() =>
-      useBucketArtifacts(mockSdk, makeData(), 42),
+      useDuDocumentArtifacts(mockSdk, makeData(), 42),
     );
 
     expect(result.current.artifacts).toBeNull();
@@ -59,7 +59,7 @@ describe("useBucketArtifacts", () => {
     mockFetchBucketArtifacts.mockResolvedValue(mockArtifacts);
 
     renderHook(() =>
-      useBucketArtifacts(mockSdk, makeData({ FolderId: 10 }), 99),
+      useDuDocumentArtifacts(mockSdk, makeData({ FolderId: 10 }), 99),
     );
 
     await waitFor(() => {
@@ -74,7 +74,7 @@ describe("useBucketArtifacts", () => {
     mockFetchBucketArtifacts.mockResolvedValue(mockArtifacts);
 
     renderHook(() =>
-      useBucketArtifacts(mockSdk, makeData({ FolderId: 55 }), undefined),
+      useDuDocumentArtifacts(mockSdk, makeData({ FolderId: 55 }), undefined),
     );
 
     await waitFor(() => {
@@ -87,7 +87,11 @@ describe("useBucketArtifacts", () => {
 
   it("returns error when folderId is missing from both prop and data", () => {
     const { result } = renderHook(() =>
-      useBucketArtifacts(mockSdk, makeData({ FolderId: undefined }), undefined),
+      useDuDocumentArtifacts(
+        mockSdk,
+        makeData({ FolderId: undefined }),
+        undefined,
+      ),
     );
 
     expect(result.current.error).toBe(
@@ -101,7 +105,7 @@ describe("useBucketArtifacts", () => {
     mockFetchBucketArtifacts.mockRejectedValue(new Error("Network failure"));
 
     const { result } = renderHook(() =>
-      useBucketArtifacts(mockSdk, makeData(), 42),
+      useDuDocumentArtifacts(mockSdk, makeData(), 42),
     );
 
     await waitFor(() => {
@@ -115,7 +119,7 @@ describe("useBucketArtifacts", () => {
     mockFetchBucketArtifacts.mockRejectedValue("string error");
 
     const { result } = renderHook(() =>
-      useBucketArtifacts(mockSdk, makeData(), 42),
+      useDuDocumentArtifacts(mockSdk, makeData(), 42),
     );
 
     await waitFor(() => {
@@ -128,7 +132,7 @@ describe("useBucketArtifacts", () => {
     const data = makeData();
 
     const { result, rerender } = renderHook(() =>
-      useBucketArtifacts(mockSdk, data, 42),
+      useDuDocumentArtifacts(mockSdk, data, 42),
     );
 
     await waitFor(() => {
@@ -145,7 +149,7 @@ describe("useBucketArtifacts", () => {
     let data = makeData({ DocumentId: "doc-1" });
 
     const { result, rerender } = renderHook(() =>
-      useBucketArtifacts(mockSdk, data, 42),
+      useDuDocumentArtifacts(mockSdk, data, 42),
     );
 
     await waitFor(() => {

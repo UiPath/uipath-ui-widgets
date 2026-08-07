@@ -4,23 +4,25 @@ import type { DuFramework } from "@uipath/uipath-typescript/document-understandi
 import { useEffect, useRef, useState } from "react";
 import { fetchBucketArtifacts } from "./bucketArtifactsUtil.js";
 import {
-  type BucketArtifacts,
+  type DuDocumentArtifacts,
   TelemetryEvent,
   TelemetryStatus,
 } from "./types.js";
 import { trackTelemetry } from "./utils/telemetryUtils.js";
 
 /**
- * Data source shared by every subcomponent wrapper. Two mutually-exclusive
- * modes:
+ * Data source shared by `ValidationStation` and every subcomponent wrapper. Two
+ * mutually-exclusive modes:
  *
  * 1. **Pre-fetched** — pass `artifacts` (and usually `documentId`). No HTTP
  *    call is made. This is the composition mode: a parent fetches once and
- *    hands the same artifacts to a linked viewer + fields-form + table-editor.
+ *    hands the same artifacts to a linked viewer + fields-form + table-editor,
+ *    and the mode to use when the host already holds the taxonomy / extraction
+ *    result / DOM in memory rather than in a storage bucket.
  * 2. **Self-fetching** — pass `sdk` + `data` (+ optional `folderId`). The hook
- *    fetches the bucket artifacts itself, exactly like `ValidationStation`.
+ *    fetches the bucket artifacts itself from the paths on `data`.
  */
-export interface SubcomponentDataSource {
+export interface DuArtifactsSource {
   /** SDK instance — required for self-fetching mode. */
   sdk?: UiPath;
   /** Content-validation descriptor — required for self-fetching mode. */
@@ -28,13 +30,13 @@ export interface SubcomponentDataSource {
   /** Storage-bucket folder id. Falls back to `data.FolderId`. */
   folderId?: number;
   /** Pre-fetched artifacts. When supplied, no fetch is performed. */
-  artifacts?: BucketArtifacts;
+  artifacts?: DuDocumentArtifacts;
   /** Document id. Falls back to `data.DocumentId`. */
   documentId?: string;
 }
 
 export interface ResolvedArtifacts {
-  artifacts: BucketArtifacts | null;
+  artifacts: DuDocumentArtifacts | null;
   error: string | null;
   documentId: string | undefined;
   /**
@@ -48,17 +50,18 @@ export interface ResolvedArtifacts {
 }
 
 /**
- * Resolves the artifacts a subcomponent needs, transparently handling both the
- * pre-fetched and self-fetching modes described on {@link SubcomponentDataSource}.
+ * Resolves the artifacts a widget needs — `ValidationStation` and every
+ * subcomponent alike — transparently handling both the pre-fetched and
+ * self-fetching modes described on {@link DuArtifactsSource}.
  */
-export function useSubcomponentArtifacts({
+export function useResolvedArtifacts({
   sdk,
   data,
   folderId,
   artifacts: provided,
   documentId,
-}: SubcomponentDataSource): ResolvedArtifacts {
-  const [fetched, setFetched] = useState<BucketArtifacts | null>(null);
+}: DuArtifactsSource): ResolvedArtifacts {
+  const [fetched, setFetched] = useState<DuDocumentArtifacts | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const resolvedFolderId = folderId ?? data?.FolderId;
@@ -105,7 +108,7 @@ export function useSubcomponentArtifacts({
     return () => {
       cancelled = true;
     };
-    // Keyed on `data` identity (as useBucketArtifacts always has) + folder: the
+    // Keyed on `data` identity (as useDuDocumentArtifacts always has) + folder: the
     // fetch reads the bucket PATH fields off `data`, not just DocumentId, so a
     // new payload with the same DocumentId but different paths must refetch.
     // Callers pass a stable `data` reference (React state) so this does not

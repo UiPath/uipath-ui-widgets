@@ -1,28 +1,20 @@
 import type {
   ICompactFieldsFormStandaloneWcEventMap,
   ICompactFieldsFormStandaloneWcJsxProps,
-  IVsSaveExceptionReportRequest,
-  IVsSaveValidatedDataAsDraftRequest,
-  IVsSaveValidatedDataRequest,
 } from "@uipath/du-validation-station-wc";
 import { useWcRef } from "../bindWcEvents.js";
 import { DU_WC_TAGS } from "../loadValidationStationWc.js";
-import {
-  saveValidatedDataAsDraft,
-  submitValidatedData,
-} from "../saveValidatedDataUtil.js";
-import { TelemetryEvent, TelemetryStatus } from "../types.js";
-import { trackTelemetry } from "../utils/telemetryUtils.js";
+import { createSaveHandlers } from "../saveHandlers.js";
 import { renderWcElement, resolveArtifacts } from "./shared.js";
 import type { CompactFieldsFormProps } from "./types.js";
 import { useWcElement } from "./useWcElement.js";
 
 /**
  * React wrapper for `<ui-du-compact-fields-form-standalone-wc-element>` — the
- * extraction-fields panel without a document viewer. Save-capable: when an
- * `sdk` + `data` + folder id are available it auto-wires the submit / draft
- * flows (like `ValidationStation`); otherwise handle the raw save-request
- * events yourself.
+ * extraction-fields panel without a document viewer. The only save-capable
+ * subcomponent: given `sdk` + `data` + a folder id it persists the submit and
+ * draft flows itself, exactly as `ValidationStation` does, and reports through
+ * the same callbacks either way.
  */
 export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
   sdk,
@@ -55,12 +47,9 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
   onSelectAndFocusFieldValueByPathResult,
   onDeleteFieldValueByPathResult,
   onSaveResult,
-  onSubmitComplete,
-  onSaveAsDraftComplete,
-  onReportExceptionComplete,
-  onSaveValidatedDataRequest,
-  onSaveValidatedDataAsDraftRequest,
-  onSaveExceptionReportRequest,
+  onSubmit,
+  onSaveAsDraft,
+  onReportException,
 }) => {
   const {
     artifacts,
@@ -90,39 +79,11 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
     },
   });
 
-  // Auto-wire persistence only when a full self-fetching context is available
-  // (canPersist); otherwise the raw save-request callbacks are the only signal.
-  const handleSubmit = (request: IVsSaveValidatedDataRequest) => {
-    onSaveValidatedDataRequest?.(request);
-    if (canPersist) {
-      submitValidatedData(sdk!, data!, resolvedFolderId!, request).then(
-        (result) => {
-          trackTelemetry(
-            TelemetryEvent.Submit,
-            result.success ? TelemetryStatus.Success : TelemetryStatus.Error,
-          );
-          onSubmitComplete?.(result);
-        },
-      );
-    }
-  };
-
-  const handleSaveAsDraft = (request: IVsSaveValidatedDataAsDraftRequest) => {
-    onSaveValidatedDataAsDraftRequest?.(request);
-    if (canPersist) {
-      saveValidatedDataAsDraft(sdk!, data!, resolvedFolderId!, request).then(
-        onSaveAsDraftComplete,
-      );
-    }
-  };
-
-  const handleException = (request: IVsSaveExceptionReportRequest) => {
-    onSaveExceptionReportRequest?.(request);
-    const reason =
-      (request.exceptionReport as { Reason?: string } | null)?.Reason ?? "";
-    trackTelemetry(TelemetryEvent.ExceptionRequest, TelemetryStatus.Success);
-    onReportExceptionComplete?.(request.documentId, reason);
-  };
+  const { handleSubmit, handleSaveAsDraft, handleException } =
+    createSaveHandlers(
+      { sdk, data, resolvedFolderId, canPersist },
+      { onSubmit, onSaveAsDraft, onReportException },
+    );
 
   const ref = useWcRef<ICompactFieldsFormStandaloneWcEventMap>(
     {
