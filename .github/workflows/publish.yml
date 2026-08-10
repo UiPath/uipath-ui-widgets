@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   publish-sdk:
-    runs-on: ubuntu-latest
+    runs-on: uipath-ubuntu-latest
     environment: production
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
