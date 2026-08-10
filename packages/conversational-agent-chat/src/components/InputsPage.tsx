@@ -1,6 +1,6 @@
 import { Alert, AlertDescription, Button } from "@uipath/apollo-wind";
 import { useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useWidgetTranslation } from "../i18n/useWidgetTranslation";
 
 import { AgentSchemaForm } from "./AgentSchemaForm";
 import type { AgentSchemaFormHandle } from "./AgentSchemaForm";
@@ -27,7 +27,7 @@ export function InputsPage({
   inputSchema,
   onSubmit,
 }: InputsPageProps) {
-  const { t } = useTranslation();
+  const { t } = useWidgetTranslation();
   const formRef = useRef<AgentSchemaFormHandle>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);

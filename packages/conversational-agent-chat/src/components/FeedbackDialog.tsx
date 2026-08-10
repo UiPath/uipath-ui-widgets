@@ -8,7 +8,7 @@ import {
   Textarea,
 } from "@uipath/apollo-wind";
 import { type ChangeEvent, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useWidgetTranslation } from "../i18n/useWidgetTranslation";
 
 interface FeedbackDialogProps {
   open: boolean;
@@ -25,7 +25,7 @@ export const FeedbackDialog = ({
   onSubmit,
   onCancel,
 }: FeedbackDialogProps) => {
-  const { t } = useTranslation();
+  const { t } = useWidgetTranslation();
   const [comment, setComment] = useState("");
 
   const handleSubmit = () => {

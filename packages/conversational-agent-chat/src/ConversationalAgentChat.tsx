@@ -11,7 +11,6 @@ import {
   type SupportedLocale,
 } from "@uipath/apollo-react/material/components";
 import { FontVariantToken } from "@uipath/apollo-core";
-import i18next from "i18next";
 import {
   Alert,
   AlertDescription,
@@ -53,7 +52,7 @@ import {
   useState,
 } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { useTranslation } from "react-i18next";
+import { useWidgetTranslation } from "./i18n/useWidgetTranslation";
 import { InputsPage } from "./components/InputsPage";
 import type { InputSchema } from "./components/AgentSchemaForm/types";
 import { FeedbackDialog } from "./components/FeedbackDialog";
@@ -85,11 +84,13 @@ import {
   sortEvaluationSets,
 } from "./utils";
 import { trackTelemetry } from "./utils/telemetryUtils";
-import { initI18n } from "./i18n";
+import { getI18n } from "./i18n";
 import { resolveAgent as fetchAgentRelease } from "./utils/resolveAgent";
 import FilePreviewer from "./components/FilePreviewer";
 
-initI18n();
+// The widget's own i18next instance — never the shared default one, which a
+// host (Studio Web) may already own. See i18n/i18n.config.ts.
+const i18n = getI18n();
 
 const TOOL_CONFIRMATION_WIDGET_ID_PREFIX = "confirmation-";
 // Exchanges per page when lazily loading a conversation's history. Pages are
@@ -142,10 +143,10 @@ export const ConversationalAgentChat = ({
     );
   }
   // must change language before useTranslation is called to avoid stale translations
-  if (i18next.language !== locale) {
-    i18next.changeLanguage(locale);
+  if (i18n.language !== locale) {
+    i18n.changeLanguage(locale);
   }
-  const { t } = useTranslation();
+  const { t } = useWidgetTranslation();
   const agentService = useRef(
     new ConversationalAgent(sdk, {
       ...(externalUserId ? { externalUserId } : {}),

@@ -7,7 +7,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import i18next from "i18next";
+import { getI18n } from "../i18n";
 import { ConversationalAgentChat } from "../ConversationalAgentChat";
 import { UiPath } from "@uipath/uipath-typescript/core";
 
@@ -317,7 +317,9 @@ describe("ConversationalAgentChat", () => {
       lastActivityTime: "2024-01-03T10:00:00Z",
     });
     mockUpdateById.mockReset().mockResolvedValue(undefined);
-    i18next.changeLanguage("en");
+    // The widget owns a private instance; the shared default one is the host's
+    // and is never initialized here.
+    getI18n().changeLanguage("en");
     mockSdk = {} as any;
     mockChatService = createMockChatService();
     mockMessageBuilder = {
@@ -1706,7 +1708,6 @@ describe("ConversationalAgentChat", () => {
         expect(mockChatService.sendResponse).toHaveBeenCalled();
       }
     });
-
     it("should handle tool calls without input", async () => {
       render(<ConversationalAgentChat {...defaultProps} />);
 

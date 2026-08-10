@@ -1,7 +1,7 @@
 import { Badge, Input, cn } from "@uipath/apollo-wind";
 import { Close } from "@uipath/apollo-react/icons";
 import { type ChangeEvent, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useWidgetTranslation } from "../../../i18n/useWidgetTranslation";
 
 import type { AgentSchemaFieldProps } from "../AgentSchemaField";
 import { FieldShell } from "../FieldShell";
@@ -18,7 +18,7 @@ export const ArrayField = ({
   disabled,
   label,
 }: ArrayFieldProps) => {
-  const { t } = useTranslation();
+  const { t } = useWidgetTranslation();
   const chips = (value as string[] | undefined) ?? [];
   const [inputValue, setInputValue] = useState("");
 

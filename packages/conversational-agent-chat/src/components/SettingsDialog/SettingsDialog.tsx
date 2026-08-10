@@ -5,7 +5,7 @@ import {
   AccordionTrigger,
 } from "@uipath/apollo-wind";
 import type { ConversationalAgent } from "@uipath/uipath-typescript/conversational-agent";
-import { useTranslation } from "react-i18next";
+import { useWidgetTranslation } from "../../i18n/useWidgetTranslation";
 import type { InputSchema } from "../AgentSchemaForm/types";
 import { InputsSection } from "./InputsSection";
 import { ProfileSection } from "./ProfileSection";
@@ -49,7 +49,7 @@ export const SettingsDialog = ({
   onApplyInputs,
   inputsResetKey,
 }: SettingsDialogProps) => {
-  const { t } = useTranslation();
+  const { t } = useWidgetTranslation();
   const showInputs =
     inputSchema != null &&
     onApplyInputs != null &&

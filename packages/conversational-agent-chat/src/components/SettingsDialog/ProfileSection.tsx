@@ -14,7 +14,7 @@ import type {
   UserSettingsUpdateOptions,
 } from "@uipath/uipath-typescript/conversational-agent";
 import { useEffect, useId, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useWidgetTranslation } from "../../i18n/useWidgetTranslation";
 import { COUNTRY_CODES, type CountryCode } from "../../constants/countries";
 
 export interface ProfileSectionProps {
@@ -128,7 +128,7 @@ export const ProfileSection = ({
   conversationalAgent,
   onSaved,
 }: ProfileSectionProps) => {
-  const { t } = useTranslation();
+  const { t } = useWidgetTranslation();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [initial, setInitial] = useState<FormState | null>(null);
   const [loading, setLoading] = useState(true);

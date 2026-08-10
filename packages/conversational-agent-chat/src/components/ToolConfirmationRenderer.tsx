@@ -1,30 +1,30 @@
 import { createRoot, type Root } from "react-dom/client";
 import type { AutopilotChatMessage } from "@uipath/apollo-react/material/components";
-import i18next from "i18next";
-import { initI18n } from "../i18n";
+import { getI18n } from "../i18n";
 import {
   ToolConfirmation,
   type ToolConfirmationLabels,
 } from "./ToolConfirmation";
 import { PortalContainerProvider } from "@uipath/apollo-wind";
 
-// Ensure i18next is initialized when this module is imported directly (i.e.
-// without first importing ConversationalAgentChat). Idempotent.
-initI18n();
+// The widget's own instance, created on first use — never the shared default
+// one, which a host may already own. Safe when this module is imported directly
+// (i.e. without first importing ConversationalAgentChat).
+const i18n = getI18n();
 
 /** Resolves labels for a separate React root (tool confirmation widget). Prefer passing overrides from the chat component where `useTranslation` runs. */
 export function resolveToolConfirmationLabels(
   overrides?: Partial<ToolConfirmationLabels>,
 ): ToolConfirmationLabels {
   return {
-    cancel: overrides?.cancel ?? i18next.t("cancel"),
-    confirm: overrides?.confirm ?? i18next.t("tool_confirmation_confirm"),
+    cancel: overrides?.cancel ?? i18n.t("cancel"),
+    confirm: overrides?.confirm ?? i18n.t("tool_confirmation_confirm"),
     statusCancelled:
       overrides?.statusCancelled ??
-      i18next.t("tool_confirmation_status_cancelled"),
+      i18n.t("tool_confirmation_status_cancelled"),
     statusConfirmed:
       overrides?.statusConfirmed ??
-      i18next.t("tool_confirmation_status_confirmed"),
+      i18n.t("tool_confirmation_status_confirmed"),
   };
 }
 

@@ -1,6 +1,6 @@
 import { Column, Spinner } from "@uipath/apollo-wind";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useWidgetTranslation } from "../i18n/useWidgetTranslation";
 
 import type { PDFDocumentProxy } from "pdfjs-dist";
 
@@ -50,7 +50,7 @@ const PdfJsViewer = ({ file, pageNumber = 1 }: PdfJsViewerProps) => {
   const renderedPages = useRef<Set<number>>(new Set());
   const renderingPages = useRef<Set<number>>(new Set());
 
-  const { t } = useTranslation();
+  const { t } = useWidgetTranslation();
 
   // Load the PDF document
   useEffect(() => {
