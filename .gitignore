@@ -20,6 +20,10 @@ build
 *.local
 *.tgz
 
+# DU Validation Station web component, staged from node_modules by
+# `npm run stage-du-wc` (see scripts/copy-du-wc-assets.mjs)
+public/du-vs-wc
+
 # TypeScript
 *.tsbuildinfo
 .tsbuildinfo

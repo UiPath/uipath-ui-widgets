@@ -67,7 +67,11 @@ describe("PdfJsViewer", () => {
     await waitFor(() =>
       expect(container.querySelectorAll("canvas")).toHaveLength(3),
     );
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    // The scroll happens at the end of an async render chain, so it can land
+    // several ticks after the canvases mount — poll instead of asserting once.
+    await waitFor(() =>
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalled(),
+    );
   });
 
   it("renders visible pages on scroll without throwing", async () => {

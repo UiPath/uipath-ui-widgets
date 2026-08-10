@@ -67,6 +67,7 @@
   },
   "dependencies": {
     "@uipath/apollo-wind": "^0.10.0",
+    "@uipath/du-utils": "^1.0.0-rc.1",
     "@uipath/du-validation-station-wc": "1.0.0-rc.1",
     "fflate": "^0.8.2"
   }

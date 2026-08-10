@@ -3,9 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render, waitFor } from "@testing-library/react";
 import { ValidationStation } from "../ValidationStation";
 
-vi.mock("../loadValidationStationWc", () => ({
-  validationStationWcReady: Promise.resolve(),
-  VALIDATION_STATION_TAG: "ui-du-validation-station-standalone-wc-element",
+vi.mock("../useWcReady", () => ({
+  useWcReady: () => true,
 }));
 
 const mockUseBucketArtifacts = vi.fn();
