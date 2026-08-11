@@ -3,10 +3,7 @@ import type { AutopilotChatMessage } from "@uipath/apollo-react/material/compone
 import { PortalContainerProvider } from "@uipath/apollo-wind";
 import i18next from "i18next";
 import { initI18n } from "../i18n";
-import {
-  ClientSideTool,
-  type ClientSideToolLabels,
-} from "./ClientSideTool";
+import { ClientSideTool, type ClientSideToolLabels } from "./ClientSideTool";
 
 initI18n();
 
