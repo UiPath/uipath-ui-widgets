@@ -1,8 +1,7 @@
 # UiPath UI Widgets
 
-[![Test](https://github.com/uipath/ui-widgets/actions/workflows/test.yml/badge.svg)](https://github.com/uipath/ui-widgets/actions/workflows/test.yml)
-[![Build & Deploy](https://github.com/uipath/ui-widgets/actions/workflows/build-and-deploy.yml/badge.svg)](https://github.com/uipath/ui-widgets/actions/workflows/build-and-deploy.yml)
-[![Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen.svg)](./coverage)
+[![Test](https://github.com/UiPath/uipath-ui-widgets/actions/workflows/test.yml/badge.svg)](https://github.com/UiPath/uipath-ui-widgets/actions/workflows/test.yml)
+[![Build & Deploy](https://github.com/UiPath/uipath-ui-widgets/actions/workflows/build.yml/badge.svg)](https://github.com/UiPath/uipath-ui-widgets/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-blue.svg)](https://react.dev/)
@@ -51,6 +50,37 @@ A provider-agnostic sign-in widget that renders one button per configured authen
 - 🎨 apollo-wind design-system styling, custom icons per provider
 - 📊 Product telemetry for sign-in attempts and redirect outcomes
 
+### [@uipath/ui-widgets-conversational-agent-chat](./packages/conversational-agent-chat)
+
+A chat interface powered by UiPath Conversational Agents.
+
+**Features:**
+
+- 💬 Real-time streaming responses from conversational agents
+- 🗂️ Conversation history and management
+- 🎨 Built on UiPath Apollo React components
+- 🔌 Powered by the UiPath TypeScript SDK
+
+### [@uipath/ui-widgets-validation-station](./packages/validation-station)
+
+A React wrapper for the UiPath Document Understanding Validation Station.
+
+**Features:**
+
+- 📄 Document validation and review UI as a React component
+- ⚙️ Handles web component loading and bucket artifact fetching
+- 🧩 Declarative props API for all Validation Station features
+
+### [@uipath/ui-widgets-pdf-viewer](./packages/pdf-viewer)
+
+A PDF viewer widget for UiPath coded apps.
+
+**Features:**
+
+- 📄 Renders PDFs from Orchestrator Storage Buckets, Data Fabric entity attachments, or plain URLs/Blobs
+- 🧰 Prop-toggleable toolbar, selectable text, built-in loading/error states
+- 📦 pdf.js worker ships inside the package — no CDN or bundler configuration, works behind enterprise CSP/firewalls
+
 ## 🚀 Getting Started
 
 ### Installation
@@ -94,8 +124,6 @@ npm run test:ui
 npm run test:coverage
 ```
 
-See [TEST_GUIDE.md](./TEST_GUIDE.md) for comprehensive testing documentation.
-
 ## 📚 Storybook
 
 This project uses Storybook for component documentation and development. Storybook provides an interactive UI for viewing and testing components in isolation.
@@ -118,31 +146,20 @@ This creates a static build of Storybook in the `storybook-static` directory.
 
 ### Deployment
 
-Storybook is automatically deployed to GitHub Pages when changes are pushed to the `main` or `develop` branches. The deployment workflow builds both the packages and Storybook, then publishes the static Storybook site.
-
-To enable GitHub Pages deployment:
-
-1. Go to your repository settings
-2. Navigate to Pages
-3. Set Source to "GitHub Actions"
+Storybook is deployed to GitHub Pages by the **Publish SDK package** workflow when a package is published.
 
 ## 📁 Project Structure
 
 ```
 uipath-ui-widgets/
 ├── packages/
-│   └── datatable/          # DataTable component package
-│       ├── src/
-│       │   ├── components/ # React components
-│       │   ├── hooks/      # Custom React hooks
-│       │   ├── utils/      # Utility functions
-│       │   └── types.ts    # TypeScript types
-│       └── package.json
-├── samples/                # Sample applications
-├── test/                   # Test setup and utilities
-│   ├── setup.ts           # Test configuration
-│   └── utils/             # Test helpers
-├── vitest.config.ts       # Vitest configuration
+│   ├── conversational-agent-chat/  # Conversational agent chat widget
+│   ├── datatable/                  # DataTable component
+│   ├── external-auth/              # Provider-agnostic sign-in widget
+│   ├── multi-file-upload/          # Multi-file upload to storage buckets
+│   ├── pdf-viewer/                 # PDF viewer widget
+│   └── validation-station/         # Document Understanding Validation Station wrapper
+├── samples/                        # Sample applications
 └── package.json
 ```
 
