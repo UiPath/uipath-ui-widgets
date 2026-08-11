@@ -154,6 +154,7 @@ export enum MessageWidget {
   Human = "human",
   ApolloAgentsToolCall = "apollo-agents-tool-call",
   ToolConfirmation = "apollo-cas-tool-confirmation",
+  ClientSideToolInput = "apollo-cas-client-side-tool-input",
 }
 
 export interface AttachFileOutput {

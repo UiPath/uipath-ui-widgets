@@ -28,6 +28,8 @@
   "tool_confirmation_confirm": "Confirm",
   "tool_confirmation_status_cancelled": "Cancelled",
   "tool_confirmation_status_confirmed": "Confirmed",
+  "client_side_tool_submit": "Submit",
+  "client_side_tool_description": "Fill in the fields below and submit to continue.",
   "inputs_page_submit_error": "Failed to start the conversation. Please try again.",
   "inputs_page_intro": "Before we get started, I need a few details.",
   "inputs_page_starting": "Starting...",

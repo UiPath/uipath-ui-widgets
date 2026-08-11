@@ -48,6 +48,7 @@ const createMockChatService = () => ({
   setWaiting: vi.fn(),
   setCustomHeaderActions: vi.fn(),
   setAllowedAttachments: vi.fn(),
+  getConversation: vi.fn().mockReturnValue([]),
 });
 
 let mockChatService = createMockChatService();
@@ -1689,6 +1690,7 @@ describe("ConversationalAgentChat", () => {
           onToolCallEnd: vi.fn((handler: any) => {
             toolCallEndHandler = handler;
           }),
+          onExecutingToolCall: vi.fn(),
         };
         const mockMessage = createMockMessage({
           onToolCallStart: vi.fn((handler: any) => {
@@ -1732,6 +1734,7 @@ describe("ConversationalAgentChat", () => {
           toolCallId: "tool-2",
           startEvent: { toolName: "ping", input: null },
           onToolCallEnd: vi.fn(),
+          onExecutingToolCall: vi.fn(),
         };
         const mockMessage = createMockMessage({
           onToolCallStart: vi.fn((handler: any) => handler(mockToolCall)),
@@ -1845,6 +1848,7 @@ describe("ConversationalAgentChat", () => {
         onToolCallEnd: vi.fn((handler: any) => {
           toolCallEndHandler = handler;
         }),
+        onExecutingToolCall: vi.fn(),
       };
       const mockMessage = createMockMessage({
         onToolCallStart: vi.fn((handler: any) => handler(mockToolCall)),
@@ -1895,6 +1899,7 @@ describe("ConversationalAgentChat", () => {
         },
         sendToolCallConfirm,
         onToolCallEnd: vi.fn(),
+        onExecutingToolCall: vi.fn(),
       };
       messageStartHandler?.(
         createMockMessage({
@@ -1907,6 +1912,190 @@ describe("ConversationalAgentChat", () => {
       );
       confirmCall[0].meta.onCancel();
       expect(sendToolCallConfirm).toHaveBeenCalledWith({ approved: false });
+    });
+
+    it("sends a ClientSideToolInput widget when a client-side tool is executing", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Test", attachments: [] });
+
+      let executingHandler: any;
+      const sendToolCallEnd = vi.fn();
+      const mockToolCall = {
+        toolCallId: "tool-cst-1",
+        startEvent: {
+          toolName: "create_plan",
+          input: {},
+          isClientSideTool: true,
+          outputSchema: {
+            type: "object",
+            properties: { title: { type: "string" } },
+          },
+        },
+        sendToolCallEnd,
+        onToolCallEnd: vi.fn(),
+        onExecutingToolCall: vi.fn((handler: any) => {
+          executingHandler = handler;
+        }),
+      };
+      const mockMessage = createMockMessage({
+        onToolCallStart: vi.fn((handler: any) => handler(mockToolCall)),
+      });
+      messageStartHandler?.(mockMessage);
+
+      // Trigger the executing handler
+      executingHandler?.({});
+
+      // Should have sent a ClientSideToolInput widget
+      const cstCall = mockChatService.sendResponse.mock.calls.find(
+        ([msg]: any) => msg.widget === "apollo-cas-client-side-tool-input",
+      );
+      expect(cstCall).toBeTruthy();
+      expect(cstCall[0].meta.toolName).toBe("create_plan");
+      expect(cstCall[0].meta.isCompleted).toBe(false);
+
+      // Simulate submit
+      cstCall[0].meta.onSubmit({ title: "My Plan" });
+      expect(sendToolCallEnd).toHaveBeenCalledWith({
+        output: { title: "My Plan" },
+        isError: false,
+      });
+    });
+
+    it("handles cancel on a client-side tool", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Test", attachments: [] });
+
+      let executingHandler: any;
+      const sendToolCallEnd = vi.fn();
+      const mockToolCall = {
+        toolCallId: "tool-cst-2",
+        startEvent: {
+          toolName: "create_plan",
+          input: {},
+          isClientSideTool: true,
+          outputSchema: {
+            type: "object",
+            properties: { title: { type: "string" } },
+          },
+        },
+        sendToolCallEnd,
+        onToolCallEnd: vi.fn(),
+        onExecutingToolCall: vi.fn((handler: any) => {
+          executingHandler = handler;
+        }),
+      };
+      messageStartHandler?.(
+        createMockMessage({
+          onToolCallStart: vi.fn((handler: any) => handler(mockToolCall)),
+        }),
+      );
+
+      executingHandler?.({});
+
+      const cstCall = mockChatService.sendResponse.mock.calls.find(
+        ([msg]: any) => msg.widget === "apollo-cas-client-side-tool-input",
+      );
+      expect(cstCall).toBeTruthy();
+
+      // Simulate cancel
+      cstCall[0].meta.onCancel();
+      expect(sendToolCallEnd).toHaveBeenCalledWith({ cancelled: true });
+    });
+
+    it("does not double-complete a tool call spinner", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Test", attachments: [] });
+
+      if (messageStartHandler) {
+        let executingHandler: any;
+        let toolCallEndHandler: any;
+        const sendToolCallEnd = vi.fn();
+        const mockToolCall = {
+          toolCallId: "tool-cst-3",
+          startEvent: {
+            toolName: "create_plan",
+            input: {},
+            isClientSideTool: true,
+            outputSchema: {
+              type: "object",
+              properties: { title: { type: "string" } },
+            },
+          },
+          sendToolCallEnd,
+          onToolCallEnd: vi.fn((handler: any) => {
+            toolCallEndHandler = handler;
+          }),
+          onExecutingToolCall: vi.fn((handler: any) => {
+            executingHandler = handler;
+          }),
+        };
+        messageStartHandler(
+          createMockMessage({
+            onToolCallStart: vi.fn((handler: any) => handler(mockToolCall)),
+          }),
+        );
+
+        executingHandler?.({});
+
+        const cstCall = mockChatService.sendResponse.mock.calls.find(
+          ([msg]: any) => msg.widget === "apollo-cas-client-side-tool-input",
+        );
+        expect(cstCall).toBeTruthy();
+
+        // First completion via submit
+        mockChatService.sendResponse.mockClear();
+        cstCall[0].meta.onSubmit({ title: "Plan" });
+
+        const countAfterSubmit = mockChatService.sendResponse.mock.calls.length;
+
+        // Second completion via onToolCallEnd — should be a no-op
+        toolCallEndHandler?.({ output: "duplicate", isError: false });
+        expect(mockChatService.sendResponse.mock.calls.length).toBe(
+          countAfterSubmit,
+        );
+      }
     });
 
     it("stops the active response when StopResponse fires", async () => {
