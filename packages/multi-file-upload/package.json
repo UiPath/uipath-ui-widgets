@@ -76,6 +76,6 @@
   },
   "dependencies": {
     "@uipath/apollo-core": "^5.7.0",
-    "@uipath/apollo-wind": "^0.10.0"
+    "@uipath/apollo-wind": "^2.32.2"
   }
 }
