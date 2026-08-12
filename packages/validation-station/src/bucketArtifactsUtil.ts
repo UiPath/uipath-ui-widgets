@@ -1,7 +1,8 @@
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
-import type { BucketService } from "@uipath/uipath-typescript/buckets";
+import { BucketService } from "@uipath/uipath-typescript/buckets";
+import type { UiPath } from "@uipath/uipath-typescript/core";
 import { unzipSync } from "fflate";
-import type { BucketArtifacts } from "./types.js";
+import type { DuDocumentArtifacts } from "./types.js";
 
 /** Fetch a URI, unzip the first file in the archive, and return the raw text. */
 async function fetchAndUnzip(uri: string): Promise<string> {
@@ -65,11 +66,34 @@ async function fetchArtifactText(
   return await fetchAndUnzip(r.uri);
 }
 
+/**
+ * Fetches a document's artifacts from the storage bucket paths on
+ * `ContentValidationData`, ready to pass as the `artifacts` prop. The
+ * imperative counterpart of `useDuDocumentArtifacts`.
+ *
+ * @param folderId Storage-bucket folder id; falls back to `data.FolderId`.
+ * @throws if neither resolves to a folder id, or if `data` is missing any of
+ * the bucket paths the artifacts are read from.
+ */
+export async function fetchDuDocumentArtifacts(
+  sdk: UiPath,
+  data: DuFramework.ContentValidationData,
+  folderId?: number,
+): Promise<DuDocumentArtifacts> {
+  const resolvedFolderId = folderId ?? data.FolderId;
+  if (!resolvedFolderId) {
+    throw new Error(
+      "folderId of Storage bucket is required. Pass it explicitly or ensure data.FolderId is set.",
+    );
+  }
+  return fetchBucketArtifacts(new BucketService(sdk), data, resolvedFolderId);
+}
+
 export async function fetchBucketArtifacts(
   bucketService: BucketService,
   data: DuFramework.ContentValidationData,
   folderId: number,
-): Promise<BucketArtifacts> {
+): Promise<DuDocumentArtifacts> {
   const {
     BucketId,
     TextPath,

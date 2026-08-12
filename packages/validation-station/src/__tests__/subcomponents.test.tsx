@@ -19,8 +19,8 @@ vi.mock("../loadValidationStationWc", () => ({
 }));
 
 const mockUseSubcomponentArtifacts = vi.fn();
-vi.mock("../useSubcomponentArtifacts", () => ({
-  useSubcomponentArtifacts: (...args: any[]) =>
+vi.mock("../useResolvedArtifacts", () => ({
+  useResolvedArtifacts: (...args: any[]) =>
     mockUseSubcomponentArtifacts(...args),
 }));
 
@@ -152,17 +152,15 @@ describe("CompactFieldsForm save wiring", () => {
     );
   });
 
-  it("forwards saveValidatedDataRequest to submitValidatedData and onSubmitComplete", async () => {
+  it("persists a submit itself and emits the request plus the outcome", async () => {
     mockSubmitValidatedData.mockResolvedValue({ success: true });
-    const onSubmitComplete = vi.fn();
-    const onSaveValidatedDataRequest = vi.fn();
+    const onSubmit = vi.fn();
     const { container } = render(
       <CompactFieldsForm
         sdk={sdk}
         data={data}
         folderId={42}
-        onSubmitComplete={onSubmitComplete}
-        onSaveValidatedDataRequest={onSaveValidatedDataRequest}
+        onSubmit={onSubmit}
       />,
     );
     const el = container.querySelector(
@@ -172,7 +170,6 @@ describe("CompactFieldsForm save wiring", () => {
     const detail = { documentId: "doc-123", validatedData: { v: 1 } };
     el.dispatchEvent(new CustomEvent("saveValidatedDataRequest", { detail }));
 
-    expect(onSaveValidatedDataRequest).toHaveBeenCalledWith(detail);
     await waitFor(() =>
       expect(mockSubmitValidatedData).toHaveBeenCalledWith(
         sdk,
@@ -182,22 +179,22 @@ describe("CompactFieldsForm save wiring", () => {
       ),
     );
     await waitFor(() =>
-      expect(onSubmitComplete).toHaveBeenCalledWith({ success: true }),
+      expect(onSubmit).toHaveBeenCalledWith(detail, { success: true }),
     );
   });
 
-  it("forwards a failed submit result verbatim to onSubmitComplete", async () => {
+  it("forwards a failed submit result verbatim to onSubmit", async () => {
     // The wrapper must surface failures too — it resolves with the result
     // object, it does not swallow or reinterpret a { success: false }.
     const failure = { success: false, error: "save rejected" };
     mockSubmitValidatedData.mockResolvedValue(failure);
-    const onSubmitComplete = vi.fn();
+    const onSubmit = vi.fn();
     const { container } = render(
       <CompactFieldsForm
         sdk={sdk}
         data={data}
         folderId={42}
-        onSubmitComplete={onSubmitComplete}
+        onSubmit={onSubmit}
       />,
     );
     const el = container.querySelector(
@@ -210,20 +207,20 @@ describe("CompactFieldsForm save wiring", () => {
       }),
     );
 
-    await waitFor(() => expect(onSubmitComplete).toHaveBeenCalledWith(failure));
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(expect.anything(), failure),
+    );
   });
 
   it("forwards saveValidatedDataAsDraftRequest to saveValidatedDataAsDraft", async () => {
     mockSaveValidatedDataAsDraft.mockResolvedValue({ success: true });
-    const onSaveAsDraftComplete = vi.fn();
-    const onSaveValidatedDataAsDraftRequest = vi.fn();
+    const onSaveAsDraft = vi.fn();
     const { container } = render(
       <CompactFieldsForm
         sdk={sdk}
         data={data}
         folderId={42}
-        onSaveAsDraftComplete={onSaveAsDraftComplete}
-        onSaveValidatedDataAsDraftRequest={onSaveValidatedDataAsDraftRequest}
+        onSaveAsDraft={onSaveAsDraft}
       />,
     );
     const el = container.querySelector(
@@ -235,8 +232,6 @@ describe("CompactFieldsForm save wiring", () => {
       new CustomEvent("saveValidatedDataAsDraftRequest", { detail }),
     );
 
-    // Raw request callback fires synchronously before the SDK round-trip.
-    expect(onSaveValidatedDataAsDraftRequest).toHaveBeenCalledWith(detail);
     await waitFor(() =>
       expect(mockSaveValidatedDataAsDraft).toHaveBeenCalledWith(
         sdk,
@@ -246,73 +241,44 @@ describe("CompactFieldsForm save wiring", () => {
       ),
     );
     await waitFor(() =>
-      expect(onSaveAsDraftComplete).toHaveBeenCalledWith({ success: true }),
+      expect(onSaveAsDraft).toHaveBeenCalledWith(detail, { success: true }),
     );
   });
 
-  it("extracts documentId + reason from saveExceptionReportRequest", () => {
-    const onReportExceptionComplete = vi.fn();
+  it("emits the exception request untouched", () => {
+    const onReportException = vi.fn();
     const { container } = render(
       <CompactFieldsForm
         sdk={sdk}
         data={data}
         folderId={42}
-        onReportExceptionComplete={onReportExceptionComplete}
+        onReportException={onReportException}
       />,
     );
     const el = container.querySelector(
       "ui-du-compact-fields-form-standalone-wc-element",
     )!;
 
-    el.dispatchEvent(
-      new CustomEvent("saveExceptionReportRequest", {
-        detail: {
-          documentId: "doc-xyz",
-          exceptionReport: { Reason: "missing page" },
-        },
-      }),
-    );
+    const detail = {
+      documentId: "doc-xyz",
+      exceptionReport: { Reason: "missing page" },
+    };
+    el.dispatchEvent(new CustomEvent("saveExceptionReportRequest", { detail }));
 
-    expect(onReportExceptionComplete).toHaveBeenCalledWith(
-      "doc-xyz",
-      "missing page",
-    );
+    expect(onReportException).toHaveBeenCalledWith(detail);
   });
 
-  it("falls back to empty reason when the exception DTO has no Reason", () => {
-    const onReportExceptionComplete = vi.fn();
-    const { container } = render(
-      <CompactFieldsForm
-        sdk={sdk}
-        data={data}
-        folderId={42}
-        onReportExceptionComplete={onReportExceptionComplete}
-      />,
-    );
-    const el = container.querySelector(
-      "ui-du-compact-fields-form-standalone-wc-element",
-    )!;
-
-    el.dispatchEvent(
-      new CustomEvent("saveExceptionReportRequest", {
-        detail: { documentId: "doc-abc", exceptionReport: null },
-      }),
-    );
-
-    expect(onReportExceptionComplete).toHaveBeenCalledWith("doc-abc", "");
-  });
-
-  it("does not persist when canPersist is false, but still fires the raw request callbacks", () => {
+  it("emits the request with no outcome when it cannot persist", () => {
     mockUseSubcomponentArtifacts.mockReturnValue(
       readyState({ canPersist: false, resolvedFolderId: undefined }),
     );
-    const onSaveValidatedDataRequest = vi.fn();
-    const onSaveValidatedDataAsDraftRequest = vi.fn();
+    const onSubmit = vi.fn();
+    const onSaveAsDraft = vi.fn();
     const { container } = render(
       <CompactFieldsForm
         instanceId="i1"
-        onSaveValidatedDataRequest={onSaveValidatedDataRequest}
-        onSaveValidatedDataAsDraftRequest={onSaveValidatedDataAsDraftRequest}
+        onSubmit={onSubmit}
+        onSaveAsDraft={onSaveAsDraft}
       />,
     );
     const el = container.querySelector(
@@ -333,8 +299,8 @@ describe("CompactFieldsForm save wiring", () => {
     // No SDK round-trip without a persist context...
     expect(mockSubmitValidatedData).not.toHaveBeenCalled();
     expect(mockSaveValidatedDataAsDraft).not.toHaveBeenCalled();
-    // ...but the raw events are forwarded so the host can drive persistence itself.
-    expect(onSaveValidatedDataRequest).toHaveBeenCalledWith(submitDetail);
-    expect(onSaveValidatedDataAsDraftRequest).toHaveBeenCalledWith(draftDetail);
+    // ...and the same callbacks fire, minus the outcome, so the host can persist.
+    expect(onSubmit).toHaveBeenCalledWith(submitDetail);
+    expect(onSaveAsDraft).toHaveBeenCalledWith(draftDetail);
   });
 });

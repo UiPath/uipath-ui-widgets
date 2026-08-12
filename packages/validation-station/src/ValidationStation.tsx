@@ -1,29 +1,32 @@
 import type {
-  IValidationStationStandaloneWcElement,
-  IVsSaveExceptionReportRequest,
-  IVsSaveValidatedDataAsDraftRequest,
-  IVsSaveValidatedDataRequest,
+  IValidationStationStandaloneWcEventMap,
+  IValidationStationStandaloneWcJsxProps,
 } from "@uipath/du-validation-station-wc";
-import { toast, Toaster } from "@uipath/apollo-wind";
+import { useWcRef } from "./bindWcEvents.js";
 import { VALIDATION_STATION_TAG } from "./loadValidationStationWc.js";
-import { useWcReady } from "./useWcReady.js";
+import { createSaveHandlers } from "./saveHandlers.js";
+import { renderWcElement, resolveArtifacts } from "./subcomponents/shared.js";
 import {
-  submitValidatedData,
-  saveValidatedDataAsDraft,
-} from "./saveValidatedDataUtil.js";
-import {
-  TelemetryEvent,
-  TelemetryStatus,
   ValidationStationLanguage,
   type ValidationStationProps,
 } from "./types.js";
-import { useBucketArtifacts } from "./useBucketArtifacts.js";
-import { trackTelemetry } from "./utils/telemetryUtils.js";
+import { useResolvedArtifacts } from "./useResolvedArtifacts.js";
+import { useWcReady } from "./useWcReady.js";
 
+/**
+ * The all-in-one Document Understanding Validation Station: document viewer,
+ * fields form, table editor, business rules and save actions in one element.
+ *
+ * Takes its document either pre-fetched (`artifacts`) or self-fetched from the
+ * bucket paths on `data` (`sdk` + `data` + folder id) — see
+ * {@link DuArtifactsSource}.
+ */
 export const ValidationStation: React.FC<ValidationStationProps> = ({
   sdk,
   data,
   folderId,
+  artifacts: providedArtifacts,
+  documentId: documentIdProp,
   theme = "light",
   language = ValidationStationLanguage.English,
   isReadonly = false,
@@ -33,102 +36,54 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
   setFieldValueByPath,
   selectAndFocusFieldValueByPath,
   deleteFieldValueByPath,
-  onSubmitComplete,
-  onSaveAsDraftComplete,
-  onReportExceptionComplete,
+  onSubmit,
+  onSaveAsDraft,
+  onReportException,
 }) => {
-  const { artifacts, error } = useBucketArtifacts(sdk, data, folderId);
+  const { artifacts, error, documentId, canPersist, resolvedFolderId } =
+    useResolvedArtifacts({
+      sdk,
+      data,
+      folderId,
+      artifacts: providedArtifacts,
+      documentId: documentIdProp,
+    });
   const wcReady = useWcReady(VALIDATION_STATION_TAG);
 
-  if (error) {
-    return <div>Failed to load document artifacts: {error}</div>;
-  }
-
-  if (!artifacts || !wcReady) {
-    return <div>Loading...</div>;
-  }
-
-  const resolvedFolderId = folderId ?? data.FolderId;
-
-  const refCallback = (el: IValidationStationStandaloneWcElement | null) => {
-    if (!el) return;
-    if (!resolvedFolderId) {
-      toast.error(
-        "folderId of Storage bucket is required. Provide it as a prop or ensure data.FolderId is set.",
-      );
-      return;
-    }
-
-    const onSubmitRequest = (event: CustomEvent<IVsSaveValidatedDataRequest>) =>
-      submitValidatedData(sdk, data, resolvedFolderId, event.detail).then(
-        (result) => {
-          trackTelemetry(
-            TelemetryEvent.Submit,
-            result.success ? TelemetryStatus.Success : TelemetryStatus.Error,
-          );
-          onSubmitComplete?.(result);
-        },
-      );
-
-    const onSaveAsDraftRequest = (
-      event: CustomEvent<IVsSaveValidatedDataAsDraftRequest>,
-    ) =>
-      saveValidatedDataAsDraft(sdk, data, resolvedFolderId, event.detail).then(
-        onSaveAsDraftComplete,
-      );
-
-    const onExceptionRequest = (
-      event: CustomEvent<IVsSaveExceptionReportRequest>,
-    ) => {
-      const { documentId, exceptionReport } = event.detail;
-      const reason =
-        (exceptionReport as { Reason?: string } | null)?.Reason ?? "";
-      trackTelemetry(TelemetryEvent.ExceptionRequest, TelemetryStatus.Success);
-      onReportExceptionComplete?.(documentId, reason);
-    };
-
-    el.addEventListener("saveValidatedDataRequest", onSubmitRequest);
-    el.addEventListener(
-      "saveValidatedDataAsDraftRequest",
-      onSaveAsDraftRequest,
+  const { handleSubmit, handleSaveAsDraft, handleException } =
+    createSaveHandlers(
+      { sdk, data, resolvedFolderId, canPersist },
+      { onSubmit, onSaveAsDraft, onReportException },
     );
-    el.addEventListener("saveExceptionReportRequest", onExceptionRequest);
 
-    return () => {
-      el.removeEventListener("saveValidatedDataRequest", onSubmitRequest);
-      el.removeEventListener(
-        "saveValidatedDataAsDraftRequest",
-        onSaveAsDraftRequest,
-      );
-      el.removeEventListener("saveExceptionReportRequest", onExceptionRequest);
-    };
+  const ref = useWcRef<IValidationStationStandaloneWcEventMap>({
+    saveValidatedDataRequest: handleSubmit,
+    saveValidatedDataAsDraftRequest: handleSaveAsDraft,
+    saveExceptionReportRequest: handleException,
+  });
+
+  const gate = resolveArtifacts(error, wcReady, artifacts);
+  if (!gate.ready) return gate.fallback;
+
+  const props: IValidationStationStandaloneWcJsxProps = {
+    theme,
+    language,
+    isReadonly,
+    enableSaveAsDraft: true,
+    documentId,
+    taxonomy: gate.artifacts.taxonomy,
+    extractionResult: gate.artifacts.extractionResult,
+    dom: gate.artifacts.dom,
+    text: gate.artifacts.text,
+    customizationInfo: gate.artifacts.customizationInfo,
+    original: gate.artifacts.original,
+    options,
+    save,
+    discardChanges,
+    setFieldValueByPath,
+    selectAndFocusFieldValueByPath,
+    deleteFieldValueByPath,
   };
 
-  return (
-    <>
-      <ui-du-validation-station-standalone-wc-element
-        {...({ ref: refCallback } as {
-          ref: React.Ref<IValidationStationStandaloneWcElement>;
-        })}
-        theme={theme}
-        language={language}
-        isReadonly={isReadonly}
-        enableSaveAsDraft={true}
-        documentId={data.DocumentId}
-        taxonomy={artifacts.taxonomy}
-        extractionResult={artifacts.extractionResult}
-        dom={artifacts.dom}
-        text={artifacts.text}
-        customizationInfo={artifacts.customizationInfo}
-        original={artifacts.original}
-        options={options}
-        save={save}
-        discardChanges={discardChanges}
-        setFieldValueByPath={setFieldValueByPath}
-        selectAndFocusFieldValueByPath={selectAndFocusFieldValueByPath}
-        deleteFieldValueByPath={deleteFieldValueByPath}
-      />
-      <Toaster position="top-right" />
-    </>
-  );
+  return renderWcElement(VALIDATION_STATION_TAG, props, ref);
 };

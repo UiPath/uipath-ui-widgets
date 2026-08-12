@@ -14,12 +14,12 @@ If the user just wants the standard, self-contained review screen, use the monol
 
 ## Critical Rules
 
-1. **Fetch artifacts once, in the parent — never per subcomponent.** Call `useBucketArtifacts(sdk, data, folderId)` once and pass the resulting `artifacts` to every panel. Each subcomponent _can_ self-fetch if given `sdk` + `data`, but composing N self-fetching panels hits the bucket N times for the same document. Pre-fetch, then hand down `artifacts`.
+1. **Fetch artifacts once, in the parent — never per subcomponent.** Call `useDuDocumentArtifacts(sdk, data, folderId)` once and pass the resulting `artifacts` to every panel. Each subcomponent _can_ self-fetch if given `sdk` + `data`, but composing N self-fetching panels hits the bucket N times for the same document. Pre-fetch, then hand down `artifacts`. The monolithic `ValidationStation` takes the same `artifacts` / `documentId` pair, so a host that already holds the artifacts (or keeps them somewhere other than a bucket) can feed the all-in-one widget directly — see the package README's _Data sources_ section.
 2. **Give every subcomponent the same `instanceId`.** That is what makes them share one store and mirror each other's selection/edits/document-type. Different (or missing) `instanceId` → isolated stores → no cross-linking. It is immutable once mounted — set it before render, don't change it.
 3. **Set `persistent={false}` for a static layout.** The panels live in a fixed grid and are never re-parented, so they don't need the portal-survival path. Leaving `persistent` on makes React StrictMode's throwaway unmount call `forceDestroy()`, tearing down the Angular element so it never re-renders (blank panel). Only set `persistent={true}` if a panel is genuinely moved across the DOM (e.g. into a portal / tab that unmounts).
 4. **Only `CompactFieldsForm` persists.** Other panels may still be _editable_ — `CompactTableEditor` edits cells/rows, `CompactDocTypeField` changes the type — but none write to Orchestrator. Those edits land in the shared store and are committed when the user saves through the form. Submit / save-as-draft / report-exception all flow through `CompactFieldsForm` — it is the only panel that takes `sdk` + `data` + `folderId`.
 5. **Avoid duplicate surfaces.** If you render standalone `CompactBusinessRules` and/or `CompactDocTypeField` panels, tell the form to drop its built-in ones via `options={{ hideBusinessRules: true, hideDocumentTypeField: true }}` — otherwise the field appears twice.
-6. **Save-as-draft needs a flag.** Set `options={{ emitDtoStateChanges: true }}` on `CompactFieldsForm` or the save-as-draft flow (and `onSaveAsDraftComplete`) never fires.
+6. **Save-as-draft needs a flag.** Set `options={{ emitDtoStateChanges: true }}` on `CompactFieldsForm` or the save-as-draft flow (and `onSaveAsDraft`) never fires.
 
 ## Install
 
@@ -29,28 +29,28 @@ npm install @uipath/ui-widgets-validation-station
 
 ## The Subcomponents
 
-| Component              | Purpose                                 | Editable?         | Owns save flow? | Key extra props                                                                                                |
-| ---------------------- | --------------------------------------- | ----------------- | --------------- | -------------------------------------------------------------------------------------------------------------- |
-| `DocumentViewer`       | PDF/text viewer with bounding boxes     | No (read-only)    | No              | `onTokensSelect`, `onCurrentPageChange`, `goToPage`                                                            |
-| `CompactFieldsForm`    | Extraction-fields editor + save actions | Yes (fields)      | **Yes**         | `sdk`, `data`, `folderId`, `options`, `onSubmitComplete`, `onSaveAsDraftComplete`, `onReportExceptionComplete` |
-| `CompactTableEditor`   | Line-items / table-field editor         | Yes (cells, rows) | No              | `onClosed`, `isTableSelectionEnabled`                                                                          |
-| `CompactBusinessRules` | Evaluated business-rules panel          | No (read-only)    | No              | `onBusinessRuleClick`, `onBusinessRulesToggle`                                                                 |
-| `CompactDocTypeField`  | Document-type selector                  | Yes (doc-type)    | No              | `onDocumentTypeChanged`, `onPanelOpenChange`                                                                   |
+| Component              | Purpose                                 | Editable?         | Owns save flow? | Key extra props                                                                        |
+| ---------------------- | --------------------------------------- | ----------------- | --------------- | -------------------------------------------------------------------------------------- |
+| `DocumentViewer`       | PDF/text viewer with bounding boxes     | No (read-only)    | No              | `onTokensSelect`, `onCurrentPageChange`, `goToPage`                                    |
+| `CompactFieldsForm`    | Extraction-fields editor + save actions | Yes (fields)      | **Yes**         | `sdk`, `data`, `folderId`, `options`, `onSubmit`, `onSaveAsDraft`, `onReportException` |
+| `CompactTableEditor`   | Line-items / table-field editor         | Yes (cells, rows) | No              | `onClosed`, `isTableSelectionEnabled`                                                  |
+| `CompactBusinessRules` | Evaluated business-rules panel          | No (read-only)    | No              | `onBusinessRuleClick`, `onBusinessRulesToggle`                                         |
+| `CompactDocTypeField`  | Document-type selector                  | Yes (doc-type)    | No              | `onDocumentTypeChanged`, `onPanelOpenChange`                                           |
 
 > **"Editable?" vs "Owns save flow?" — they are different questions.** _Editable_ means the panel lets the user change data in place (edit fields, edit table cells/rows, pick a document type). _Owns save flow_ means the panel writes back to Orchestrator — it takes `sdk` + `data` + `folderId` and exposes submit / save-as-draft / report-exception. Only `CompactFieldsForm` does the latter. Every panel sharing the same `instanceId` mutates **one shared store**, so edits made in `CompactTableEditor` (or `CompactDocTypeField`) are committed when the user saves **through `CompactFieldsForm`** — the table editor deliberately has no save button of its own. It signals its changes via `onDirtyChange` / `onFieldValueChanged` / `onExtractionResultChanged`.
 
 **Shared props** (every subcomponent — `SubcomponentCommonProps`):
 
-| Prop                  | Required          | Notes                                                                                                                                                    |
-| --------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `artifacts`           | Yes\*             | Pre-fetched `BucketArtifacts` from `useBucketArtifacts`. \*Omit only if you deliberately let this one panel self-fetch (then pass `sdk`+`data` instead). |
-| `documentId`          | No                | Falls back to `data.DocumentId`. Pass it in pre-fetched mode where there's no `data`.                                                                    |
-| `instanceId`          | Yes (for linking) | Same value across panels → shared store. Omit for an isolated panel.                                                                                     |
-| `theme`               | No                | `'light' \| 'dark' \| 'light-hc' \| 'dark-hc'`. Keep in sync with body class.                                                                            |
-| `language`            | No                | `ValidationStationLanguage` enum from the package.                                                                                                       |
-| `persistent`          | No                | Default `false`. Keep `false` for static grids (see Critical Rule 3).                                                                                    |
-| `isReadonly`          | No                | `true` for an audit/read-only view.                                                                                                                      |
-| `style` / `className` | No                | The viewer usually wants `style={{ height: '100%' }}`.                                                                                                   |
+| Prop                  | Required          | Notes                                                                                                                                                            |
+| --------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `artifacts`           | Yes\*             | Pre-fetched `DuDocumentArtifacts` from `useDuDocumentArtifacts`. \*Omit only if you deliberately let this one panel self-fetch (then pass `sdk`+`data` instead). |
+| `documentId`          | No                | Falls back to `data.DocumentId`. Pass it in pre-fetched mode where there's no `data`.                                                                            |
+| `instanceId`          | Yes (for linking) | Same value across panels → shared store. Omit for an isolated panel.                                                                                             |
+| `theme`               | No                | `'light' \| 'dark' \| 'light-hc' \| 'dark-hc'`. Keep in sync with body class.                                                                                    |
+| `language`            | No                | `ValidationStationLanguage` enum from the package.                                                                                                               |
+| `persistent`          | No                | Default `false`. Keep `false` for static grids (see Critical Rule 3).                                                                                            |
+| `isReadonly`          | No                | `true` for an audit/read-only view.                                                                                                                              |
+| `style` / `className` | No                | The viewer usually wants `style={{ height: '100%' }}`.                                                                                                           |
 
 ## Composition Pattern (worked example)
 
@@ -61,7 +61,10 @@ A web app that lists DU validation tasks and opens each one in a custom five-pan
 ```tsx
 // useReviewTasks.ts
 import { useCallback, useEffect, useState } from "react";
-import type { SaveValidatedDataResult } from "@uipath/ui-widgets-validation-station";
+import type {
+  CompactFieldsFormProps,
+  SaveValidatedDataResult,
+} from "@uipath/ui-widgets-validation-station";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import { OrchestratorDuModule } from "@uipath/uipath-typescript/orchestrator-du-module";
 import { Tasks, TaskType } from "@uipath/uipath-typescript/tasks";
@@ -90,9 +93,9 @@ export function useReviewTasks(sdk: UiPath) {
   );
 
   // Submit succeeded → complete the task. The widget renders NO error UI — surface it here.
-  const handleSubmitComplete = useCallback(
-    async (result: SaveValidatedDataResult) => {
-      if (!result.success)
+  const handleSubmit: CompactFieldsFormProps["onSubmit"] = useCallback(
+    async (_request, result?: SaveValidatedDataResult) => {
+      if (!result?.success)
         return setNotification({ message: "Submit failed", severity: "error" });
       if (!selectedTask) return;
       await selectedTask.complete({
@@ -106,44 +109,45 @@ export function useReviewTasks(sdk: UiPath) {
   );
 
   // Save-as-draft persists edits WITHOUT completing the task — leave the selection in place.
-  const handleSaveAsDraftComplete = useCallback(
-    (result: SaveValidatedDataResult) => {
+  const handleSaveAsDraft: CompactFieldsFormProps["onSaveAsDraft"] =
+    useCallback((_request, result?: SaveValidatedDataResult) => {
       setNotification(
-        result.success
+        result?.success
           ? { message: "Draft saved", severity: "success" }
           : { message: "Failed to save draft", severity: "error" },
       );
-    },
-    [],
-  );
+    }, []);
 
   // Report-as-exception makes NO API call in the widget — the host must persist it.
-  const handleReportException = useCallback(
-    async (documentId: string, reason: string) => {
-      if (!selectedTask) return;
-      const res = await new OrchestratorDuModule(sdk).submitExceptionReport(
-        selectedTask.id,
-        documentId,
-        reason || "Reported via review workspace",
-        { folderId: selectedTask.folderId },
-      );
-      if (!res.IsSuccessful)
-        return setNotification({
-          message: "Failed to report exception",
-          severity: "error",
-        });
-      setSelectedTask(null);
-      setNotification({ message: "Exception reported", severity: "success" });
-    },
-    [sdk, selectedTask],
-  );
+  const handleReportException: CompactFieldsFormProps["onReportException"] =
+    useCallback(
+      async (request) => {
+        if (!selectedTask) return;
+        const documentId = request.documentId;
+        const reason = request.exceptionReport?.Reason ?? "";
+        const res = await new OrchestratorDuModule(sdk).submitExceptionReport(
+          selectedTask.id,
+          documentId,
+          reason || "Reported via review workspace",
+          { folderId: selectedTask.folderId },
+        );
+        if (!res.IsSuccessful)
+          return setNotification({
+            message: "Failed to report exception",
+            severity: "error",
+          });
+        setSelectedTask(null);
+        setNotification({ message: "Exception reported", severity: "success" });
+      },
+      [sdk, selectedTask],
+    );
 
   return {
     selectedTask,
     openTask,
     notification,
-    handleSubmitComplete,
-    handleSaveAsDraftComplete,
+    handleSubmit,
+    handleSaveAsDraft,
     handleReportException,
   };
 }
@@ -159,9 +163,9 @@ import {
   CompactFieldsForm,
   CompactTableEditor,
   DocumentViewer,
-  useBucketArtifacts,
+  useDuDocumentArtifacts,
   ValidationStationLanguage,
-  type SaveValidatedDataResult,
+  type CompactFieldsFormProps,
 } from "@uipath/ui-widgets-validation-station";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
@@ -170,21 +174,21 @@ import type { TaskGetResponse } from "@uipath/uipath-typescript/tasks";
 export function ReviewWorkspace({
   sdk,
   task,
-  onSubmitComplete,
-  onSaveAsDraftComplete,
+  onSubmit,
+  onSaveAsDraft,
   onReportException,
 }: {
   sdk: UiPath;
   task: TaskGetResponse;
-  onSubmitComplete: (r: SaveValidatedDataResult) => void;
-  onSaveAsDraftComplete: (r: SaveValidatedDataResult) => void;
+  onSubmit: CompactFieldsFormProps["onSubmit"];
+  onSaveAsDraft: CompactFieldsFormProps["onSaveAsDraft"];
   onReportException: (documentId: string, reason: string) => void;
 }) {
   const data = task.data as DuFramework.ContentValidationData;
   const folderId = task.folderId;
 
   // FETCH ONCE. All five panels below share this result.
-  const { artifacts, error } = useBucketArtifacts(sdk, data, folderId);
+  const { artifacts, error } = useDuDocumentArtifacts(sdk, data, folderId);
   if (error) return <div>Failed to load document: {error}</div>;
   if (!artifacts) return <div>Loading document…</div>;
 
@@ -229,9 +233,9 @@ export function ReviewWorkspace({
             hideDocumentTypeField: true,
             emitDtoStateChanges: true,
           }}
-          onSubmitComplete={onSubmitComplete}
-          onSaveAsDraftComplete={onSaveAsDraftComplete}
-          onReportExceptionComplete={onReportException}
+          onSubmit={onSubmit}
+          onSaveAsDraft={onSaveAsDraft}
+          onReportException={onReportException}
         />
       </div>
 
@@ -261,8 +265,8 @@ return (
       <ReviewWorkspace
         sdk={sdk}
         task={t.selectedTask}
-        onSubmitComplete={t.handleSubmitComplete}
-        onSaveAsDraftComplete={t.handleSaveAsDraftComplete}
+        onSubmit={t.handleSubmit}
+        onSaveAsDraft={t.handleSaveAsDraft}
         onReportException={t.handleReportException}
       />
     )}
@@ -284,7 +288,7 @@ The `on*` callbacks (`onFieldValueSelected`, `onBusinessRuleClick`, `onDocumentT
 
 ## Anti-patterns
 
-- **Do not self-fetch in each panel.** Passing `sdk`+`data` to all five triggers five bucket fetches for one document. Pre-fetch once with `useBucketArtifacts`, pass `artifacts` down.
+- **Do not self-fetch in each panel.** Passing `sdk`+`data` to all five triggers five bucket fetches for one document. Pre-fetch once with `useDuDocumentArtifacts`, pass `artifacts` down.
 - **Do not give panels different `instanceId`s** (or omit it) and then expect cross-linking. Same document → same `instanceId`.
 - **Do not leave `persistent` at `true` in a static grid.** StrictMode's dev double-mount calls `forceDestroy()` and blanks the panel. Use `persistent={false}` unless the panel is truly re-parented.
 - **Do not render duplicate surfaces.** Standalone `CompactBusinessRules`/`CompactDocTypeField` + a form that still shows its own = the field twice. Set `hideBusinessRules`/`hideDocumentTypeField`.

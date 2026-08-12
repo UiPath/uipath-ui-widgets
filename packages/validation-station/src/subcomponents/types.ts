@@ -9,9 +9,6 @@ import type {
   IFieldValueDetailsDto,
   ISaveResult,
   IValidationStationOptions,
-  IVsSaveExceptionReportRequest,
-  IVsSaveValidatedDataAsDraftRequest,
-  IVsSaveValidatedDataRequest,
   SelectAndFocusFieldValueByPath,
   SelectAndFocusFieldValueByPathResult,
   SetFieldValueByPath,
@@ -19,18 +16,17 @@ import type {
 } from "@uipath/du-validation-station-wc";
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import type { CSSProperties } from "react";
-import type { SaveValidatedDataResult } from "../saveValidatedDataUtil.js";
-import type { SubcomponentDataSource } from "../useSubcomponentArtifacts.js";
-import type { ValidationStationLanguage } from "../types.js";
+import type { DuArtifactsSource } from "../useResolvedArtifacts.js";
+import type { DuSaveCallbacks, ValidationStationLanguage } from "../types.js";
 
 /** Theme variants accepted by every DU standalone element. */
 export type WcTheme = "light" | "dark" | "light-hc" | "dark-hc";
 
 /**
  * Props common to every subcomponent wrapper: a data source (see
- * {@link SubcomponentDataSource}), shared-store linking, and presentation.
+ * {@link DuArtifactsSource}), shared-store linking, and presentation.
  */
-export interface SubcomponentCommonProps extends SubcomponentDataSource {
+export interface SubcomponentCommonProps extends DuArtifactsSource {
   /**
    * Links this element's store to sibling standalone elements. Elements sharing
    * the same `instanceId` mirror each other's edits, selection, and document
@@ -86,7 +82,8 @@ export interface CompactFieldsFormProps
   extends
     SubcomponentCommonProps,
     SubcomponentCommandProps,
-    SubcomponentStateEventProps {
+    SubcomponentStateEventProps,
+    DuSaveCallbacks {
   options?: IValidationStationOptions;
   /** Trigger a save; `{ validate: true }` validates before saving. */
   save?: { validate: boolean };
@@ -94,26 +91,6 @@ export interface CompactFieldsFormProps
   enableSaveAsDraft?: boolean;
   /** Result of a `save` command. */
   onSaveResult?: (result: ISaveResult) => void;
-  /**
-   * Fired after the submit flow completes. Only auto-wired when the wrapper has
-   * an `sdk` + `data` + resolved `folderId`; otherwise handle the raw
-   * `onSaveValidatedDataRequest` event yourself.
-   */
-  onSubmitComplete?: (result: SaveValidatedDataResult) => void;
-  /** Fired after the save-as-draft flow completes (self-fetching mode only). */
-  onSaveAsDraftComplete?: (result: SaveValidatedDataResult) => void;
-  /** Fired when the user reports the document as an exception. */
-  onReportExceptionComplete?: (documentId: string, reason: string) => void;
-  /** Raw save-request event — use when driving persistence yourself. */
-  onSaveValidatedDataRequest?: (request: IVsSaveValidatedDataRequest) => void;
-  /** Raw save-as-draft-request event. */
-  onSaveValidatedDataAsDraftRequest?: (
-    request: IVsSaveValidatedDataAsDraftRequest,
-  ) => void;
-  /** Raw report-exception-request event. */
-  onSaveExceptionReportRequest?: (
-    request: IVsSaveExceptionReportRequest,
-  ) => void;
 }
 
 // ─── Compact table editor ─────────────────────────────────────────────────────

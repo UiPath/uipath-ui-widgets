@@ -1,6 +1,24 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fetchBucketArtifacts } from "../bucketArtifactsUtil";
+import {
+  fetchBucketArtifacts,
+  fetchDuDocumentArtifacts,
+} from "../bucketArtifactsUtil";
+
+// `fetchDuDocumentArtifacts` builds its own BucketService from the sdk; capture
+// the instances so the tests can assert what it was constructed with.
+const constructedWithSdks: unknown[] = [];
+
+vi.mock("@uipath/uipath-typescript/buckets", () => ({
+  BucketService: class {
+    constructor(sdk: unknown) {
+      constructedWithSdks.push(sdk);
+    }
+    getReadUri(args: unknown) {
+      return mockGetReadUri(args);
+    }
+  },
+}));
 
 // Mock fflate to avoid jsdom binary data issues with Response.arrayBuffer()
 vi.mock("fflate", () => ({
@@ -28,6 +46,7 @@ const mockData = {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.restoreAllMocks();
+  constructedWithSdks.length = 0;
 });
 
 describe("fetchBucketArtifacts", () => {
@@ -211,5 +230,73 @@ describe("fetchBucketArtifacts", () => {
     );
 
     expect(result.extractionResult).toEqual(validatedResult);
+  });
+});
+
+describe("fetchDuDocumentArtifacts", () => {
+  const mockSdk = { id: "sdk" } as any;
+
+  /** Answers every getReadUri/fetch pair with an empty JSON artifact. */
+  const stubBucketReads = () => {
+    mockGetReadUri.mockResolvedValue({ uri: "https://example.com/f" });
+    vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(new Response("{}")),
+    );
+  };
+
+  it("builds a BucketService from the sdk and fetches with the given folder", async () => {
+    stubBucketReads();
+
+    await fetchDuDocumentArtifacts(mockSdk, mockData, 42);
+
+    expect(constructedWithSdks).toEqual([mockSdk]);
+    expect(mockGetReadUri).toHaveBeenCalledWith({
+      bucketId: 100,
+      folderId: 42,
+      path: "tax.zip",
+    });
+  });
+
+  it("falls back to data.FolderId when no folderId is passed", async () => {
+    stubBucketReads();
+
+    await fetchDuDocumentArtifacts(mockSdk, { ...mockData, FolderId: 77 });
+
+    expect(mockGetReadUri).toHaveBeenCalledWith({
+      bucketId: 100,
+      folderId: 77,
+      path: "tax.zip",
+    });
+  });
+
+  it("prefers an explicit folderId over data.FolderId", async () => {
+    stubBucketReads();
+
+    await fetchDuDocumentArtifacts(mockSdk, { ...mockData, FolderId: 77 }, 42);
+
+    expect(mockGetReadUri).toHaveBeenCalledWith({
+      bucketId: 100,
+      folderId: 42,
+      path: "tax.zip",
+    });
+  });
+
+  it("throws when neither a folderId nor data.FolderId resolves", async () => {
+    await expect(fetchDuDocumentArtifacts(mockSdk, mockData)).rejects.toThrow(
+      /folderId of Storage bucket is required/,
+    );
+    expect(mockGetReadUri).not.toHaveBeenCalled();
+  });
+
+  it("propagates the missing-paths guard from the underlying fetch", async () => {
+    stubBucketReads();
+
+    await expect(
+      fetchDuDocumentArtifacts(
+        mockSdk,
+        { ...mockData, TaxonomyPath: undefined },
+        42,
+      ),
+    ).rejects.toThrow(/missing required bucket artifact fields/);
   });
 });

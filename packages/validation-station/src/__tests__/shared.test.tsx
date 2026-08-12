@@ -7,7 +7,7 @@ import {
   wcStyle,
   resolveArtifacts,
 } from "../subcomponents/shared";
-import type { BucketArtifacts } from "../types";
+import type { DuDocumentArtifacts } from "../types";
 
 describe("wcStyle", () => {
   it("returns undefined for undefined input", () => {
@@ -50,7 +50,7 @@ describe("renderWcElement", () => {
 });
 
 describe("resolveArtifacts", () => {
-  const artifacts = { taxonomy: {} } as unknown as BucketArtifacts;
+  const artifacts = { taxonomy: {} } as unknown as DuDocumentArtifacts;
 
   it("returns an error fallback when error is set", () => {
     const gate = resolveArtifacts("boom", true, artifacts);

@@ -1,10 +1,10 @@
 import type { CSSProperties } from "react";
 import { convertToPersistentTag } from "../loadValidationStationWc.js";
 import {
-  useSubcomponentArtifacts,
+  useResolvedArtifacts,
   type ResolvedArtifacts,
-  type SubcomponentDataSource,
-} from "../useSubcomponentArtifacts.js";
+  type DuArtifactsSource,
+} from "../useResolvedArtifacts.js";
 import { ValidationStationLanguage } from "../types.js";
 import { useWcReady } from "../useWcReady.js";
 import { wcStyle } from "./shared.js";
@@ -48,7 +48,7 @@ export interface WcElementState extends ResolvedArtifacts {
  */
 export function useWcElement(params: {
   baseTag: string;
-  dataSource: SubcomponentDataSource;
+  dataSource: DuArtifactsSource;
   common: WcElementCommon;
 }): WcElementState {
   const { baseTag, dataSource, common } = params;
@@ -56,7 +56,7 @@ export function useWcElement(params: {
   const tag = persistent ? convertToPersistentTag(baseTag) : baseTag;
 
   const { artifacts, error, documentId, canPersist, resolvedFolderId } =
-    useSubcomponentArtifacts(dataSource);
+    useResolvedArtifacts(dataSource);
   // Gate on the tag actually rendered, not always the base tag.
   const wcReady = useWcReady(tag);
 

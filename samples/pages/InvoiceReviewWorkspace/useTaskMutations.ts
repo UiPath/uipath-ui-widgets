@@ -1,4 +1,9 @@
-import type { SaveValidatedDataResult } from "@uipath/ui-widgets-validation-station";
+import type {
+  IVsSaveExceptionReportRequest,
+  IVsSaveValidatedDataAsDraftRequest,
+  IVsSaveValidatedDataRequest,
+  SaveValidatedDataResult,
+} from "@uipath/ui-widgets-validation-station";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import { OrchestratorDuModule } from "@uipath/uipath-typescript/orchestrator-du-module";
 import type { TaskGetResponse } from "@uipath/uipath-typescript/tasks";
@@ -29,10 +34,13 @@ export function useTaskMutations({
   refetch,
   notify,
 }: TaskMutationsParams) {
-  const handleSubmitComplete = useCallback(
-    async (result: SaveValidatedDataResult) => {
-      if (!result.success) {
-        console.error("Submit failed:", result.error);
+  const handleSubmit = useCallback(
+    async (
+      _request: IVsSaveValidatedDataRequest,
+      result?: SaveValidatedDataResult,
+    ) => {
+      if (!result?.success) {
+        console.error("Submit failed:", result?.error);
         notify("Submit failed", "error");
         return;
       }
@@ -53,10 +61,13 @@ export function useTaskMutations({
     [selectedTask, clearSelection, refetch, notify],
   );
 
-  const handleSaveAsDraftComplete = useCallback(
-    (result: SaveValidatedDataResult) => {
-      if (!result.success) {
-        console.error("Save draft failed:", result.error);
+  const handleSaveAsDraft = useCallback(
+    (
+      _request: IVsSaveValidatedDataAsDraftRequest,
+      result?: SaveValidatedDataResult,
+    ) => {
+      if (!result?.success) {
+        console.error("Save draft failed:", result?.error);
         notify("Failed to save draft", "error");
         return;
       }
@@ -66,8 +77,11 @@ export function useTaskMutations({
   );
 
   const handleReportException = useCallback(
-    async (documentId: string, reason: string) => {
+    async (request: IVsSaveExceptionReportRequest) => {
       if (!selectedTask) return;
+      const documentId = request.documentId;
+      const reason =
+        (request.exceptionReport as { Reason?: string } | null)?.Reason ?? "";
       try {
         const response = await new OrchestratorDuModule(
           uipathSdk,
@@ -94,8 +108,8 @@ export function useTaskMutations({
   );
 
   return {
-    handleSubmitComplete,
-    handleSaveAsDraftComplete,
+    handleSubmit,
+    handleSaveAsDraft,
     handleReportException,
   };
 }

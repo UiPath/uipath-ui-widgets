@@ -1,6 +1,6 @@
 import { createElement, type CSSProperties, type ReactElement } from "react";
 import type { WcRefCallback } from "../bindWcEvents.js";
-import type { BucketArtifacts } from "../types.js";
+import type { DuDocumentArtifacts } from "../types.js";
 
 /**
  * Renders a standalone DU custom element by tag name with the given (typed)
@@ -38,13 +38,13 @@ export function wcStyle(
  * `!` assertion: render `fallback` when not ready, otherwise use `artifacts`.
  */
 export type ArtifactsGate =
-  | { ready: true; artifacts: BucketArtifacts }
+  | { ready: true; artifacts: DuDocumentArtifacts }
   | { ready: false; fallback: ReactElement };
 
 export function resolveArtifacts(
   error: string | null,
   wcReady: boolean,
-  artifacts: BucketArtifacts | null,
+  artifacts: DuDocumentArtifacts | null,
 ): ArtifactsGate {
   if (error) {
     return {
