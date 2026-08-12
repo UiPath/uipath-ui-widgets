@@ -19,6 +19,11 @@ on:
         required: false
         type: boolean
         default: false
+      github_packages_only:
+        description: "Publish only to GitHub Packages (skip npm and Storybook deploy)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -28,7 +33,10 @@ permissions:
 jobs:
   publish-sdk:
     runs-on: uipath-ubuntu-latest
-    environment: production
+    # Dev builds publish to GitHub Packages only and skip the admin-approval
+    # gate by running in an unprotected environment; official releases keep
+    # the protected `production` environment.
+    environment: ${{ inputs.github_packages_only && 'github-packages-dev' || 'production' }}
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -45,10 +53,23 @@ jobs:
       - name: Print publish info
         run: |
           VERSION=$(node -p "require('./packages/${{ inputs.package }}/package.json').version")
-          TAG=$([ "${{ inputs.beta }}" = "true" ] && echo "beta" || echo "latest")
           echo "Package: ${{ inputs.package }}"
           echo "Version: $VERSION"
-          echo "Tag: $TAG"
+          if [ "${{ inputs.github_packages_only }}" = "true" ]; then
+            echo "Mode: GitHub Packages only (npm and Storybook deploy skipped; tag: dev)"
+          else
+            TAG=$([ "${{ inputs.beta }}" = "true" ] && echo "beta" || echo "latest")
+            echo "Tag: $TAG"
+          fi
+
+      - name: Validate prerelease version
+        if: ${{ inputs.github_packages_only }}
+        run: |
+          VERSION=$(node -p "require('./packages/${{ inputs.package }}/package.json').version")
+          if [[ "$VERSION" != *-* ]]; then
+            echo "::error::github_packages_only=true requires a prerelease version (e.g. 1.2.3-dev.0), but packages/${{ inputs.package }} version is $VERSION"
+            exit 1
+          fi
 
       - name: Setup Node.js for GitHub Packages
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -70,9 +91,11 @@ jobs:
         run: npm run build
 
       - name: Build Storybook
+        if: ${{ !inputs.github_packages_only }}
         run: npm run build-storybook
 
       - name: Deploy Storybook to GitHub Pages
+        if: ${{ !inputs.github_packages_only }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -81,9 +104,12 @@ jobs:
 
       - name: Publish to GitHub Packages
         working-directory: packages/${{ inputs.package }}
-        run: npm publish --tag latest
+        run: npm publish --tag "$NPM_TAG"
+        env:
+          NPM_TAG: ${{ inputs.github_packages_only && 'dev' || 'latest' }}
 
       - name: Setup Node.js for npm
+        if: ${{ !inputs.github_packages_only }}
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
@@ -91,6 +117,7 @@ jobs:
           scope: "@uipath"
 
       - name: Publish to npm
+        if: ${{ !inputs.github_packages_only }}
         working-directory: packages/${{ inputs.package }}
         run: |
           if [ "${{ inputs.beta }}" = "true" ]; then
