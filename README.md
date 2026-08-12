@@ -146,7 +146,32 @@ This creates a static build of Storybook in the `storybook-static` directory.
 
 ### Deployment
 
-Storybook is deployed to GitHub Pages by the **Publish SDK package** workflow when a package is published.
+Storybook is deployed to GitHub Pages by the **Publish SDK package** workflow when a package is published officially (dev builds skip it).
+
+## 🚀 Publishing
+
+Packages are published with the **Publish SDK package** workflow (Actions → Publish SDK package → Run workflow):
+
+- **Official release** (no checkboxes): requires `production` environment approval — publishes the selected package to npm as `latest` and to GitHub Packages, and deploys Storybook. Check **beta** to publish to npm under the `beta` dist-tag instead of `latest`.
+- **Dev build** (`github_packages_only`): publishes only to GitHub Packages under the `dev` dist-tag — npm and the Storybook deploy are skipped, and no approval is needed. The package version must be a prerelease (e.g. `1.0.0-beta.2`); the run fails fast otherwise, and `latest` is never moved.
+
+### Installing dev builds
+
+One-time setup: create a **classic** GitHub PAT with the `read:packages` scope, authorize it for the UiPath org (**Configure SSO**), then:
+
+```bash
+# ~/.npmrc (personal — never commit a token)
+//npm.pkg.github.com/:_authToken=YOUR_TOKEN
+
+# project .npmrc (safe to commit)
+@uipath:registry=https://npm.pkg.github.com
+```
+
+Install with the `dev` tag, e.g.:
+
+```bash
+npm install @uipath/ui-widgets-pdf-viewer@dev
+```
 
 ## 📁 Project Structure
 
