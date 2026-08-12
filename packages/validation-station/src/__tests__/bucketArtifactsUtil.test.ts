@@ -201,6 +201,46 @@ describe("fetchBucketArtifacts", () => {
     ).rejects.toThrow();
   });
 
+  it("yields an empty customizationInfo when the payload has no CustomizationInfoPath", async () => {
+    mockGetReadUri.mockResolvedValue({ uri: "https://example.com/f" });
+    vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(new Response("{}")),
+    );
+
+    const result = await fetchBucketArtifacts(mockBucketService, {
+      ...mockData,
+      CustomizationInfoPath: undefined,
+    });
+
+    expect(result.customizationInfo).toEqual({});
+    // Five reads rather than six — nothing was fetched for the absent path.
+    expect(mockGetReadUri).toHaveBeenCalledTimes(5);
+    expect(mockGetReadUri).not.toHaveBeenCalledWith(
+      expect.objectContaining({ path: "custom.zip" }),
+    );
+  });
+
+  it("still loads the other five artifacts without a CustomizationInfoPath", async () => {
+    mockGetReadUri.mockImplementation(({ path }: { path: string }) =>
+      Promise.resolve({ uri: `https://example.com/${path}` }),
+    );
+    vi.spyOn(globalThis, "fetch").mockImplementation((input: any) => {
+      const url = typeof input === "string" ? input : input.url;
+      return Promise.resolve(
+        new Response(url.endsWith("text.zip") ? "some text" : "{}"),
+      );
+    });
+
+    const result = await fetchBucketArtifacts(mockBucketService, {
+      ...mockData,
+      CustomizationInfoPath: null,
+    });
+
+    expect(result.taxonomy).toEqual({});
+    expect(result.text).toBe("some text");
+    expect(result.customizationInfo).toEqual({});
+  });
+
   it("throws when ContentValidationData is missing required fields", async () => {
     await expect(
       fetchBucketArtifacts(mockBucketService, {

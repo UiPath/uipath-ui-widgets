@@ -62,7 +62,6 @@ export async function fetchBucketArtifacts(
     !TextPath ||
     !TaxonomyPath ||
     !EncodedDocumentPath ||
-    !CustomizationInfoPath ||
     !DocumentObjectModelPath ||
     !AutomaticExtractionResultsPath
   ) {
@@ -96,7 +95,7 @@ export async function fetchBucketArtifacts(
       readExtractionResult(),
       readJson(DocumentObjectModelPath),
       readText(TextPath),
-      readJson(CustomizationInfoPath),
+      CustomizationInfoPath ? readJson(CustomizationInfoPath) : {},
       readText(EncodedDocumentPath),
     ]);
 
