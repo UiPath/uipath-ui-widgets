@@ -43,6 +43,7 @@ function ValidationStationPrefetchedPage({
     fetchTasks,
     selectedTaskId,
     selectedTask,
+    contentValidationData: data,
     taskLoading,
     selectTask,
     clearSelection,
@@ -66,18 +67,13 @@ function ValidationStationPrefetchedPage({
     error?: string;
   } | null>(null);
 
-  const folderId = selectedTask?.folderId;
-  const data = selectedTask?.data as
-    | DuFramework.ContentValidationData
-    | undefined;
-
   // One call replaces everything the widget does internally in self-fetching
   // mode: the bucket reads, the unzipping, the validated → automatic fallback.
   useEffect(() => {
     if (!data) return;
 
     let cancelled = false;
-    fetchDuDocumentArtifacts(uipathSdk, data, folderId)
+    fetchDuDocumentArtifacts(uipathSdk, data)
       .then((artifacts) => {
         if (!cancelled) setFetched({ source: data, artifacts });
       })
@@ -93,7 +89,7 @@ function ValidationStationPrefetchedPage({
     return () => {
       cancelled = true;
     };
-  }, [uipathSdk, data, folderId]);
+  }, [uipathSdk, data]);
 
   // Ignore a result that belongs to a document the user has moved on from.
   const current = fetched?.source === data ? fetched : null;
@@ -102,13 +98,8 @@ function ValidationStationPrefetchedPage({
   // `submitValidatedData` is what the widget would have called.
   const handleSubmit = useCallback(
     async (request: IVsSaveValidatedDataRequest) => {
-      if (!selectedTask || !data || folderId == null) return;
-      const result = await submitValidatedData(
-        uipathSdk,
-        data,
-        folderId,
-        request,
-      );
+      if (!selectedTask || !data) return;
+      const result = await submitValidatedData(uipathSdk, data, request);
       if (!result.success) {
         console.error("Submit failed:", result.error);
         return;
@@ -124,22 +115,17 @@ function ValidationStationPrefetchedPage({
         console.error("Failed to complete task:", err);
       }
     },
-    [uipathSdk, selectedTask, data, folderId, fetchTasks, clearSelection],
+    [uipathSdk, selectedTask, data, fetchTasks, clearSelection],
   );
 
   /** Draft saves persist the in-progress values without completing the task. */
   const handleSaveAsDraft = useCallback(
     async (request: IVsSaveValidatedDataAsDraftRequest) => {
-      if (!data || folderId == null) return;
-      const result = await saveValidatedDataAsDraft(
-        uipathSdk,
-        data,
-        folderId,
-        request,
-      );
+      if (!data) return;
+      const result = await saveValidatedDataAsDraft(uipathSdk, data, request);
       if (!result.success) console.error("Draft save failed:", result.error);
     },
-    [uipathSdk, data, folderId],
+    [uipathSdk, data],
   );
 
   const handleReportException = useCallback(
@@ -153,7 +139,9 @@ function ValidationStationPrefetchedPage({
           taskId,
           request.documentId,
           reason || "Reported via Validation Station",
-          { folderId },
+          // Exception reports stay host-owned, so the task's own folder is
+          // what scopes this call.
+          { folderId: selectedTask?.folderId },
         );
         if (!response.IsSuccessful) {
           console.error("submitExceptionReport failed:", response.ErrorMessage);
@@ -164,7 +152,7 @@ function ValidationStationPrefetchedPage({
         console.error("submitExceptionReport threw:", error);
       }
     },
-    [uipathSdk, folderId, fetchTasks, clearSelection],
+    [uipathSdk, selectedTask, fetchTasks, clearSelection],
   );
 
   const renderDocument = () => {

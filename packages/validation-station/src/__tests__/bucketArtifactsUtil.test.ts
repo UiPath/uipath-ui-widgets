@@ -35,6 +35,7 @@ const mockBucketService = { getReadUri: mockGetReadUri } as any;
 
 const mockData = {
   BucketId: 100,
+  FolderId: 42,
   TaxonomyPath: "tax.zip",
   AutomaticExtractionResultsPath: "extraction.zip",
   DocumentObjectModelPath: "dom.zip",
@@ -78,7 +79,7 @@ describe("fetchBucketArtifacts", () => {
       return Promise.resolve(new Response(contentMap[url]));
     });
 
-    const result = await fetchBucketArtifacts(mockBucketService, mockData, 42);
+    const result = await fetchBucketArtifacts(mockBucketService, mockData);
 
     expect(result.taxonomy).toEqual(taxonomy);
     expect(result.extractionResult).toEqual(extraction);
@@ -95,7 +96,10 @@ describe("fetchBucketArtifacts", () => {
       Promise.resolve(new Response("{}")),
     );
 
-    await fetchBucketArtifacts(mockBucketService, mockData, 55);
+    await fetchBucketArtifacts(mockBucketService, {
+      ...mockData,
+      FolderId: 55,
+    });
 
     expect(mockGetReadUri).toHaveBeenCalledTimes(6);
     expect(mockGetReadUri).toHaveBeenCalledWith({
@@ -130,11 +134,50 @@ describe("fetchBucketArtifacts", () => {
     });
   });
 
+  it("scopes the reads by FolderKey when data carries one", async () => {
+    mockGetReadUri.mockResolvedValue({ uri: "https://example.com/f" });
+    vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(new Response("{}")),
+    );
+
+    await fetchBucketArtifacts(mockBucketService, {
+      ...mockData,
+      FolderId: undefined,
+      FolderKey: "folder-key-1",
+    });
+
+    expect(mockGetReadUri).toHaveBeenCalledWith({
+      bucketId: 100,
+      folderKey: "folder-key-1",
+      path: "tax.zip",
+    });
+  });
+
+  it("prefers FolderKey over FolderId when data carries both", async () => {
+    mockGetReadUri.mockResolvedValue({ uri: "https://example.com/f" });
+    vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(new Response("{}")),
+    );
+
+    await fetchBucketArtifacts(mockBucketService, {
+      ...mockData,
+      FolderId: 55,
+      FolderKey: "folder-key-1",
+    });
+
+    // Exact-match assertion: a folderId alongside the key would fail this.
+    expect(mockGetReadUri).toHaveBeenCalledWith({
+      bucketId: 100,
+      folderKey: "folder-key-1",
+      path: "tax.zip",
+    });
+  });
+
   it("rejects when getReadUri fails", async () => {
     mockGetReadUri.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(
-      fetchBucketArtifacts(mockBucketService, mockData, 42),
+      fetchBucketArtifacts(mockBucketService, mockData),
     ).rejects.toThrow("Unauthorized");
   });
 
@@ -143,7 +186,7 @@ describe("fetchBucketArtifacts", () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network error"));
 
     await expect(
-      fetchBucketArtifacts(mockBucketService, mockData, 42),
+      fetchBucketArtifacts(mockBucketService, mockData),
     ).rejects.toThrow("Network error");
   });
 
@@ -154,18 +197,28 @@ describe("fetchBucketArtifacts", () => {
     );
 
     await expect(
-      fetchBucketArtifacts(mockBucketService, mockData, 42),
+      fetchBucketArtifacts(mockBucketService, mockData),
     ).rejects.toThrow();
   });
 
   it("throws when ContentValidationData is missing required fields", async () => {
     await expect(
-      fetchBucketArtifacts(
-        mockBucketService,
-        { ...mockData, TaxonomyPath: undefined },
-        42,
-      ),
-    ).rejects.toThrow(/missing required bucket artifact fields/);
+      fetchBucketArtifacts(mockBucketService, {
+        ...mockData,
+        TaxonomyPath: undefined,
+      }),
+    ).rejects.toThrow(/missing required bucket fields/);
+  });
+
+  it("throws when ContentValidationData names no folder", async () => {
+    await expect(
+      fetchBucketArtifacts(mockBucketService, {
+        ...mockData,
+        FolderId: undefined,
+        FolderKey: undefined,
+      }),
+    ).rejects.toThrow(/FolderId \/ FolderKey/);
+    expect(mockGetReadUri).not.toHaveBeenCalled();
   });
 
   it("falls back to automatic extraction when validated path fails", async () => {
@@ -195,7 +248,6 @@ describe("fetchBucketArtifacts", () => {
     const result = await fetchBucketArtifacts(
       mockBucketService,
       dataWithValidated,
-      42,
     );
 
     expect(result.extractionResult).toEqual(automaticResult);
@@ -226,7 +278,6 @@ describe("fetchBucketArtifacts", () => {
     const result = await fetchBucketArtifacts(
       mockBucketService,
       dataWithValidated,
-      42,
     );
 
     expect(result.extractionResult).toEqual(validatedResult);
@@ -244,24 +295,12 @@ describe("fetchDuDocumentArtifacts", () => {
     );
   };
 
-  it("builds a BucketService from the sdk and fetches with the given folder", async () => {
-    stubBucketReads();
-
-    await fetchDuDocumentArtifacts(mockSdk, mockData, 42);
-
-    expect(constructedWithSdks).toEqual([mockSdk]);
-    expect(mockGetReadUri).toHaveBeenCalledWith({
-      bucketId: 100,
-      folderId: 42,
-      path: "tax.zip",
-    });
-  });
-
-  it("falls back to data.FolderId when no folderId is passed", async () => {
+  it("builds a BucketService from the sdk and fetches with the folder on data", async () => {
     stubBucketReads();
 
     await fetchDuDocumentArtifacts(mockSdk, { ...mockData, FolderId: 77 });
 
+    expect(constructedWithSdks).toEqual([mockSdk]);
     expect(mockGetReadUri).toHaveBeenCalledWith({
       bucketId: 100,
       folderId: 77,
@@ -269,22 +308,14 @@ describe("fetchDuDocumentArtifacts", () => {
     });
   });
 
-  it("prefers an explicit folderId over data.FolderId", async () => {
-    stubBucketReads();
-
-    await fetchDuDocumentArtifacts(mockSdk, { ...mockData, FolderId: 77 }, 42);
-
-    expect(mockGetReadUri).toHaveBeenCalledWith({
-      bucketId: 100,
-      folderId: 42,
-      path: "tax.zip",
-    });
-  });
-
-  it("throws when neither a folderId nor data.FolderId resolves", async () => {
-    await expect(fetchDuDocumentArtifacts(mockSdk, mockData)).rejects.toThrow(
-      /folderId of Storage bucket is required/,
-    );
+  it("throws when data names no folder", async () => {
+    await expect(
+      fetchDuDocumentArtifacts(mockSdk, {
+        ...mockData,
+        FolderId: undefined,
+        FolderKey: undefined,
+      }),
+    ).rejects.toThrow(/FolderId \/ FolderKey/);
     expect(mockGetReadUri).not.toHaveBeenCalled();
   });
 
@@ -292,11 +323,10 @@ describe("fetchDuDocumentArtifacts", () => {
     stubBucketReads();
 
     await expect(
-      fetchDuDocumentArtifacts(
-        mockSdk,
-        { ...mockData, TaxonomyPath: undefined },
-        42,
-      ),
-    ).rejects.toThrow(/missing required bucket artifact fields/);
+      fetchDuDocumentArtifacts(mockSdk, {
+        ...mockData,
+        TaxonomyPath: undefined,
+      }),
+    ).rejects.toThrow(/missing required bucket fields/);
   });
 });

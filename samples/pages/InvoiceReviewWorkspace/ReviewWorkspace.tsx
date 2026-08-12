@@ -12,7 +12,7 @@ import {
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import { type DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import type { TaskGetResponse } from "@uipath/uipath-typescript/tasks";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import CenteredMessage from "./CenteredMessage";
 import Panel from "./Panel";
 
@@ -32,10 +32,10 @@ interface ReviewWorkspaceProps {
  * highlights it in the viewer, selecting the line-items table opens the table
  * editor, and rule clicks focus the offending field — no cross-wiring needed.
  *
- * Only the fields form persists: it receives `sdk` + `data` + `folderId` (in
- * addition to the shared artifacts) so its built-in Submit / Save-draft /
- * Report-exception actions round-trip through the SDK. The other four are
- * fed pre-fetched artifacts only.
+ * Only the fields form persists: it receives `sdk` + `data` (in addition to the
+ * shared artifacts) so its built-in Submit / Save-draft / Report-exception
+ * actions round-trip through the SDK. The other four are fed pre-fetched
+ * artifacts only.
  */
 function ReviewWorkspace({
   sdk,
@@ -44,9 +44,16 @@ function ReviewWorkspace({
   onSaveAsDraft,
   onReportException,
 }: ReviewWorkspaceProps) {
-  const data = task.data as DuFramework.ContentValidationData;
-  const folderId = task.folderId;
-  const { artifacts, error } = useDuDocumentArtifacts(sdk, data, folderId);
+  // The widgets read the bucket folder off `ContentValidationData`. The
+  // activity that produces the payload sets FolderId or FolderKey; these sample
+  // tasks were created without one, so we fall back to the task's own folder.
+  // Memoised so the fetch is not re-triggered on every render.
+  const data = useMemo(() => {
+    const cvd = task.data as DuFramework.ContentValidationData;
+    if (cvd.FolderId || cvd.FolderKey) return cvd;
+    return { ...cvd, FolderId: task.folderId };
+  }, [task]);
+  const { artifacts, error } = useDuDocumentArtifacts(sdk, data);
   const [status, setStatus] = useState<string>("");
 
   if (error)
@@ -107,7 +114,6 @@ function ReviewWorkspace({
             {...shared}
             sdk={sdk}
             data={data}
-            folderId={folderId}
             options={{
               hideBusinessRules: true,
               hideDocumentTypeField: true,

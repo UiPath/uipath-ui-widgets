@@ -16,15 +16,6 @@ import {
 } from "./types.js";
 import { trackTelemetry } from "./utils/telemetryUtils.js";
 
-/** What a widget needs in order to persist a save for itself. */
-export interface SavePersistenceContext {
-  sdk?: UiPath;
-  data?: DuFramework.ContentValidationData;
-  resolvedFolderId?: number;
-  /** True when `sdk`, `data` and a folder id are all present. */
-  canPersist: boolean;
-}
-
 /**
  * Builds the save/draft/exception listeners shared by the two save-capable
  * widgets, `ValidationStation` and `CompactFieldsForm`, so their behaviour
@@ -32,9 +23,13 @@ export interface SavePersistenceContext {
  * request with the outcome attached only when it was the one that saved.
  */
 export function createSaveHandlers(
-  { sdk, data, resolvedFolderId, canPersist }: SavePersistenceContext,
+  { sdk, data }: { sdk?: UiPath; data?: DuFramework.ContentValidationData },
   { onSubmit, onSaveAsDraft, onReportException }: DuSaveCallbacks,
 ) {
+  // Everything a write-back needs: an SDK, a payload, and the folder its
+  // bucket is scoped to.
+  const canPersist = !!sdk && !!data && !!(data.FolderKey || data.FolderId);
+
   return {
     handleSubmit: (request: IVsSaveValidatedDataRequest) => {
       if (!canPersist) {
@@ -43,15 +38,13 @@ export function createSaveHandlers(
         onSubmit?.(request);
         return;
       }
-      submitValidatedData(sdk!, data!, resolvedFolderId!, request).then(
-        (result) => {
-          trackTelemetry(
-            TelemetryEvent.Submit,
-            result.success ? TelemetryStatus.Success : TelemetryStatus.Error,
-          );
-          onSubmit?.(request, result);
-        },
-      );
+      submitValidatedData(sdk!, data!, request).then((result) => {
+        trackTelemetry(
+          TelemetryEvent.Submit,
+          result.success ? TelemetryStatus.Success : TelemetryStatus.Error,
+        );
+        onSubmit?.(request, result);
+      });
     },
 
     handleSaveAsDraft: (request: IVsSaveValidatedDataAsDraftRequest) => {
@@ -59,8 +52,8 @@ export function createSaveHandlers(
         onSaveAsDraft?.(request);
         return;
       }
-      saveValidatedDataAsDraft(sdk!, data!, resolvedFolderId!, request).then(
-        (result) => onSaveAsDraft?.(request, result),
+      saveValidatedDataAsDraft(sdk!, data!, request).then((result) =>
+        onSaveAsDraft?.(request, result),
       );
     },
 

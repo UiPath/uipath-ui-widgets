@@ -107,7 +107,8 @@ const ValidationStationWithSdk = ({
 const mockData: DuFramework.ContentValidationData = {
   BucketName: "",
   BucketId: 0,
-  FolderId: 0,
+  // The folder the bucket lives in — fill in one of the two.
+  FolderId: undefined,
   FolderKey: "",
   DocumentId: "",
   EncodedDocumentPath: "",
@@ -185,7 +186,6 @@ function App() {
     <ValidationStation
       sdk={sdk}
       data={myContentValidationData}
-      folderId={12345}
       theme="light"
       language="en"
       save={{ validate: true }}
@@ -228,13 +228,8 @@ function App() {
     },
     data: {
       description:
-        "ContentValidationData object containing bucket paths, document ID, and folder references.",
+        "ContentValidationData object containing bucket paths, document ID, and the folder they live in (FolderId or FolderKey).",
       control: "object",
-    },
-    folderId: {
-      description:
-        "Storage bucket folder ID. Falls back to data.folderId if not provided.",
-      control: "number",
     },
     theme: {
       description: "Visual theme for the validation station",
@@ -271,7 +266,6 @@ function App() {
     tenantName: "",
     secret: "",
     data: mockData,
-    folderId: 0,
     theme: "light",
     language: ValidationStationLanguage.English,
     isReadonly: false,

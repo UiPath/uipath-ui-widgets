@@ -14,10 +14,10 @@ If the user just wants the standard, self-contained review screen, use the monol
 
 ## Critical Rules
 
-1. **Fetch artifacts once, in the parent — never per subcomponent.** Call `useDuDocumentArtifacts(sdk, data, folderId)` once and pass the resulting `artifacts` to every panel. Each subcomponent _can_ self-fetch if given `sdk` + `data`, but composing N self-fetching panels hits the bucket N times for the same document. Pre-fetch, then hand down `artifacts`. The monolithic `ValidationStation` takes the same `artifacts` / `documentId` pair, so a host that already holds the artifacts (or keeps them somewhere other than a bucket) can feed the all-in-one widget directly — see the package README's _Data sources_ section.
+1. **Fetch artifacts once, in the parent — never per subcomponent.** Call `useDuDocumentArtifacts(sdk, data)` once and pass the resulting `artifacts` to every panel. Each subcomponent _can_ self-fetch if given `sdk` + `data`, but composing N self-fetching panels hits the bucket N times for the same document. Pre-fetch, then hand down `artifacts`. The monolithic `ValidationStation` takes the same `artifacts` / `documentId` pair, so a host that already holds the artifacts (or keeps them somewhere other than a bucket) can feed the all-in-one widget directly — see the package README's _Data sources_ section.
 2. **Give every subcomponent the same `instanceId`.** That is what makes them share one store and mirror each other's selection/edits/document-type. Different (or missing) `instanceId` → isolated stores → no cross-linking. It is immutable once mounted — set it before render, don't change it.
 3. **Set `persistent={false}` for a static layout.** The panels live in a fixed grid and are never re-parented, so they don't need the portal-survival path. Leaving `persistent` on makes React StrictMode's throwaway unmount call `forceDestroy()`, tearing down the Angular element so it never re-renders (blank panel). Only set `persistent={true}` if a panel is genuinely moved across the DOM (e.g. into a portal / tab that unmounts).
-4. **Only `CompactFieldsForm` persists.** Other panels may still be _editable_ — `CompactTableEditor` edits cells/rows, `CompactDocTypeField` changes the type — but none write to Orchestrator. Those edits land in the shared store and are committed when the user saves through the form. Submit / save-as-draft / report-exception all flow through `CompactFieldsForm` — it is the only panel that takes `sdk` + `data` + `folderId`.
+4. **Only `CompactFieldsForm` persists.** Other panels may still be _editable_ — `CompactTableEditor` edits cells/rows, `CompactDocTypeField` changes the type — but none write to Orchestrator. Those edits land in the shared store and are committed when the user saves through the form. Submit / save-as-draft / report-exception all flow through `CompactFieldsForm` — it is the only panel that takes `sdk` + `data`.
 5. **Avoid duplicate surfaces.** If you render standalone `CompactBusinessRules` and/or `CompactDocTypeField` panels, tell the form to drop its built-in ones via `options={{ hideBusinessRules: true, hideDocumentTypeField: true }}` — otherwise the field appears twice.
 6. **Save-as-draft needs a flag.** Set `options={{ emitDtoStateChanges: true }}` on `CompactFieldsForm` or the save-as-draft flow (and `onSaveAsDraft`) never fires.
 
@@ -29,15 +29,15 @@ npm install @uipath/ui-widgets-validation-station
 
 ## The Subcomponents
 
-| Component              | Purpose                                 | Editable?         | Owns save flow? | Key extra props                                                                        |
-| ---------------------- | --------------------------------------- | ----------------- | --------------- | -------------------------------------------------------------------------------------- |
-| `DocumentViewer`       | PDF/text viewer with bounding boxes     | No (read-only)    | No              | `onTokensSelect`, `onCurrentPageChange`, `goToPage`                                    |
-| `CompactFieldsForm`    | Extraction-fields editor + save actions | Yes (fields)      | **Yes**         | `sdk`, `data`, `folderId`, `options`, `onSubmit`, `onSaveAsDraft`, `onReportException` |
-| `CompactTableEditor`   | Line-items / table-field editor         | Yes (cells, rows) | No              | `onClosed`, `isTableSelectionEnabled`                                                  |
-| `CompactBusinessRules` | Evaluated business-rules panel          | No (read-only)    | No              | `onBusinessRuleClick`, `onBusinessRulesToggle`                                         |
-| `CompactDocTypeField`  | Document-type selector                  | Yes (doc-type)    | No              | `onDocumentTypeChanged`, `onPanelOpenChange`                                           |
+| Component              | Purpose                                 | Editable?         | Owns save flow? | Key extra props                                                            |
+| ---------------------- | --------------------------------------- | ----------------- | --------------- | -------------------------------------------------------------------------- |
+| `DocumentViewer`       | PDF/text viewer with bounding boxes     | No (read-only)    | No              | `onTokensSelect`, `onCurrentPageChange`, `goToPage`                        |
+| `CompactFieldsForm`    | Extraction-fields editor + save actions | Yes (fields)      | **Yes**         | `sdk`, `data`, `options`, `onSubmit`, `onSaveAsDraft`, `onReportException` |
+| `CompactTableEditor`   | Line-items / table-field editor         | Yes (cells, rows) | No              | `onClosed`, `isTableSelectionEnabled`                                      |
+| `CompactBusinessRules` | Evaluated business-rules panel          | No (read-only)    | No              | `onBusinessRuleClick`, `onBusinessRulesToggle`                             |
+| `CompactDocTypeField`  | Document-type selector                  | Yes (doc-type)    | No              | `onDocumentTypeChanged`, `onPanelOpenChange`                               |
 
-> **"Editable?" vs "Owns save flow?" — they are different questions.** _Editable_ means the panel lets the user change data in place (edit fields, edit table cells/rows, pick a document type). _Owns save flow_ means the panel writes back to Orchestrator — it takes `sdk` + `data` + `folderId` and exposes submit / save-as-draft / report-exception. Only `CompactFieldsForm` does the latter. Every panel sharing the same `instanceId` mutates **one shared store**, so edits made in `CompactTableEditor` (or `CompactDocTypeField`) are committed when the user saves **through `CompactFieldsForm`** — the table editor deliberately has no save button of its own. It signals its changes via `onDirtyChange` / `onFieldValueChanged` / `onExtractionResultChanged`.
+> **"Editable?" vs "Owns save flow?" — they are different questions.** _Editable_ means the panel lets the user change data in place (edit fields, edit table cells/rows, pick a document type). _Owns save flow_ means the panel writes back to Orchestrator — it takes `sdk` + `data` and exposes submit / save-as-draft / report-exception. Only `CompactFieldsForm` does the latter. Every panel sharing the same `instanceId` mutates **one shared store**, so edits made in `CompactTableEditor` (or `CompactDocTypeField`) are committed when the user saves **through `CompactFieldsForm`** — the table editor deliberately has no save button of its own. It signals its changes via `onDirtyChange` / `onFieldValueChanged` / `onExtractionResultChanged`.
 
 **Shared props** (every subcomponent — `SubcomponentCommonProps`):
 
@@ -184,11 +184,11 @@ export function ReviewWorkspace({
   onSaveAsDraft: CompactFieldsFormProps["onSaveAsDraft"];
   onReportException: (documentId: string, reason: string) => void;
 }) {
+  // The payload names the bucket folder (FolderId / FolderKey) it lives in.
   const data = task.data as DuFramework.ContentValidationData;
-  const folderId = task.folderId;
 
   // FETCH ONCE. All five panels below share this result.
-  const { artifacts, error } = useDuDocumentArtifacts(sdk, data, folderId);
+  const { artifacts, error } = useDuDocumentArtifacts(sdk, data);
   if (error) return <div>Failed to load document: {error}</div>;
   if (!artifacts) return <div>Loading document…</div>;
 
@@ -227,7 +227,6 @@ export function ReviewWorkspace({
           {...shared}
           sdk={sdk}
           data={data}
-          folderId={folderId}
           options={{
             hideBusinessRules: true,
             hideDocumentTypeField: true,

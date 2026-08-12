@@ -18,13 +18,11 @@ import { useWcReady } from "./useWcReady.js";
  * fields form, table editor, business rules and save actions in one element.
  *
  * Takes its document either pre-fetched (`artifacts`) or self-fetched from the
- * bucket paths on `data` (`sdk` + `data` + folder id) — see
- * {@link DuArtifactsSource}.
+ * bucket paths on `data` (`sdk` + `data`) — see {@link DuArtifactsSource}.
  */
 export const ValidationStation: React.FC<ValidationStationProps> = ({
   sdk,
   data,
-  folderId,
   artifacts: providedArtifacts,
   documentId: documentIdProp,
   theme = "light",
@@ -40,19 +38,17 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
   onSaveAsDraft,
   onReportException,
 }) => {
-  const { artifacts, error, documentId, canPersist, resolvedFolderId } =
-    useResolvedArtifacts({
-      sdk,
-      data,
-      folderId,
-      artifacts: providedArtifacts,
-      documentId: documentIdProp,
-    });
+  const { artifacts, error, documentId } = useResolvedArtifacts({
+    sdk,
+    data,
+    artifacts: providedArtifacts,
+    documentId: documentIdProp,
+  });
   const wcReady = useWcReady(VALIDATION_STATION_TAG);
 
   const { handleSubmit, handleSaveAsDraft, handleException } =
     createSaveHandlers(
-      { sdk, data, resolvedFolderId, canPersist },
+      { sdk, data },
       { onSubmit, onSaveAsDraft, onReportException },
     );
 

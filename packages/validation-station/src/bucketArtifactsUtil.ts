@@ -18,84 +18,29 @@ async function fetchAndUnzipJson(uri: string): Promise<unknown> {
   return JSON.parse(text);
 }
 
-/** Get URI then immediately fetch + unzip as JSON. */
-async function fetchArtifactJson(
-  bucketService: BucketService,
-  bucketId: number,
-  folderId: number,
-  path: string,
-): Promise<unknown> {
-  const r = await bucketService.getReadUri({ bucketId, folderId, path });
-  return fetchAndUnzipJson(r.uri);
-}
-
-/**
- * Fetch the validated extraction result if it exists in the bucket, otherwise
- * fall back to the automatic extraction result.
- */
-async function fetchExtractionResult(
-  bucketService: BucketService,
-  bucketId: number,
-  folderId: number,
-  validatedPath: string | null | undefined,
-  automaticPath: string,
-): Promise<unknown> {
-  if (validatedPath) {
-    try {
-      return await fetchArtifactJson(
-        bucketService,
-        bucketId,
-        folderId,
-        validatedPath,
-      );
-    } catch {
-      // Validated result not saved yet — fall through to automatic.
-    }
-  }
-  return fetchArtifactJson(bucketService, bucketId, folderId, automaticPath);
-}
-
-/** Get URI then immediately fetch + unzip as text. */
-async function fetchArtifactText(
-  bucketService: BucketService,
-  bucketId: number,
-  folderId: number,
-  path: string,
-): Promise<string> {
-  const r = await bucketService.getReadUri({ bucketId, folderId, path });
-  return await fetchAndUnzip(r.uri);
-}
-
 /**
  * Fetches a document's artifacts from the storage bucket paths on
  * `ContentValidationData`, ready to pass as the `artifacts` prop. The
  * imperative counterpart of `useDuDocumentArtifacts`.
  *
- * @param folderId Storage-bucket folder id; falls back to `data.FolderId`.
- * @throws if neither resolves to a folder id, or if `data` is missing any of
- * the bucket paths the artifacts are read from.
+ * @throws if `data` is missing any of the bucket fields the artifacts are read
+ * from — the bucket, the paths, or the folder they live in.
  */
 export async function fetchDuDocumentArtifacts(
   sdk: UiPath,
   data: DuFramework.ContentValidationData,
-  folderId?: number,
 ): Promise<DuDocumentArtifacts> {
-  const resolvedFolderId = folderId ?? data.FolderId;
-  if (!resolvedFolderId) {
-    throw new Error(
-      "folderId of Storage bucket is required. Pass it explicitly or ensure data.FolderId is set.",
-    );
-  }
-  return fetchBucketArtifacts(new BucketService(sdk), data, resolvedFolderId);
+  return fetchBucketArtifacts(new BucketService(sdk), data);
 }
 
 export async function fetchBucketArtifacts(
   bucketService: BucketService,
   data: DuFramework.ContentValidationData,
-  folderId: number,
 ): Promise<DuDocumentArtifacts> {
   const {
     BucketId,
+    FolderId,
+    FolderKey,
     TextPath,
     TaxonomyPath,
     EncodedDocumentPath,
@@ -104,8 +49,16 @@ export async function fetchBucketArtifacts(
     AutomaticExtractionResultsPath,
     ValidatedExtractionResultsPath,
   } = data;
+  // The folder every bucket call is scoped to. FolderKey wins when both are
+  // set, matching the server's own precedence.
+  const scope = FolderKey
+    ? { folderKey: FolderKey }
+    : FolderId
+      ? { folderId: FolderId }
+      : undefined;
   if (
     !BucketId ||
+    !scope ||
     !TextPath ||
     !TaxonomyPath ||
     !EncodedDocumentPath ||
@@ -114,34 +67,37 @@ export async function fetchBucketArtifacts(
     !AutomaticExtractionResultsPath
   ) {
     throw new Error(
-      "ContentValidationData is missing required bucket artifact fields.",
+      "ContentValidationData is missing required bucket fields (BucketId, artifact paths, or FolderId / FolderKey).",
     );
   }
 
+  const readUri = async (path: string) =>
+    (await bucketService.getReadUri({ bucketId: BucketId, path, ...scope }))
+      .uri;
+  const readJson = async (path: string) =>
+    fetchAndUnzipJson(await readUri(path));
+  const readText = async (path: string) => fetchAndUnzip(await readUri(path));
+
+  /** The validated result once the reviewer has saved one, else the automatic one. */
+  const readExtractionResult = async () => {
+    if (ValidatedExtractionResultsPath) {
+      try {
+        return await readJson(ValidatedExtractionResultsPath);
+      } catch {
+        // Validated result not saved yet — fall through to automatic.
+      }
+    }
+    return readJson(AutomaticExtractionResultsPath);
+  };
+
   const [taxonomy, extractionResult, dom, text, customizationInfo, original] =
     await Promise.all([
-      fetchArtifactJson(bucketService, BucketId, folderId, TaxonomyPath),
-      fetchExtractionResult(
-        bucketService,
-        BucketId,
-        folderId,
-        ValidatedExtractionResultsPath,
-        AutomaticExtractionResultsPath,
-      ),
-      fetchArtifactJson(
-        bucketService,
-        BucketId,
-        folderId,
-        DocumentObjectModelPath,
-      ),
-      fetchArtifactText(bucketService, BucketId, folderId, TextPath),
-      fetchArtifactJson(
-        bucketService,
-        BucketId,
-        folderId,
-        CustomizationInfoPath,
-      ),
-      fetchArtifactText(bucketService, BucketId, folderId, EncodedDocumentPath),
+      readJson(TaxonomyPath),
+      readExtractionResult(),
+      readJson(DocumentObjectModelPath),
+      readText(TextPath),
+      readJson(CustomizationInfoPath),
+      readText(EncodedDocumentPath),
     ]);
 
   return {
