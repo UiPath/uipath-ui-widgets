@@ -1,6 +1,6 @@
 import { Alert, AlertDescription, Button, Spinner } from "@uipath/apollo-wind";
 import { useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useWidgetTranslation } from "../../i18n/useWidgetTranslation";
 
 import { AgentSchemaForm } from "../AgentSchemaForm";
 import type { AgentSchemaFormHandle } from "../AgentSchemaForm";
@@ -25,7 +25,7 @@ export const InputsSection = ({
   onApplyInputs,
   onApplied,
 }: InputsSectionProps) => {
-  const { t } = useTranslation();
+  const { t } = useWidgetTranslation();
   const formRef = useRef<AgentSchemaFormHandle>(null);
   const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);

@@ -1,6 +1,6 @@
 import { Button, Column, Row } from "@uipath/apollo-wind";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useWidgetTranslation } from "../i18n/useWidgetTranslation";
 
 import PdfJsViewer from "./PdfJsViewer";
 
@@ -46,7 +46,7 @@ const FilePreviewer = ({
   } | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const copyBlobUrl = useRef<string | null>(null);
-  const { t } = useTranslation();
+  const { t } = useWidgetTranslation();
 
   // ── Effects ──
 

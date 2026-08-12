@@ -10,7 +10,7 @@ import {
   cn,
 } from "@uipath/apollo-wind";
 import type { ChangeEvent, ReactNode } from "react";
-import { useTranslation } from "react-i18next";
+import { useWidgetTranslation } from "../../i18n/useWidgetTranslation";
 
 import {
   DataTypesArray,
@@ -143,7 +143,7 @@ export const AgentSchemaField = ({
   errorMap,
   disabled,
 }: AgentSchemaFieldProps) => {
-  const { t } = useTranslation();
+  const { t } = useWidgetTranslation();
   const showRequired = isRequired || hasAnyRequiredDescendant(prop);
   const dateFormat = resolveDateFormat(prop, value);
   const label = (

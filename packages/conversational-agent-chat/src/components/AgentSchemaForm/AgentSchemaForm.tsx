@@ -7,7 +7,7 @@ import {
 
 import { ChevronDown, ChevronRight } from "@uipath/apollo-react/icons";
 import { useCallback, useImperativeHandle, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useWidgetTranslation } from "../../i18n/useWidgetTranslation";
 
 import { AgentSchemaField } from "./AgentSchemaField";
 import type { InputSchemaProperty } from "./AgentSchemaField";
@@ -77,7 +77,7 @@ export function AgentSchemaForm({
   collapsibleOptional = false,
   formRef,
 }: AgentSchemaFormProps) {
-  const { t } = useTranslation();
+  const { t } = useWidgetTranslation();
   const [formData, setFormData] = useState<Record<string, unknown>>(() => {
     const init = { ...(initialValues ?? {}) };
     // Pre-initialize object-type properties to {} so ObjectField

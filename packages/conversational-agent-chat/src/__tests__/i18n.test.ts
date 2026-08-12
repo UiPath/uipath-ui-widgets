@@ -1,27 +1,26 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { initI18n } from "../i18n";
-import i18next from "i18next";
+import { getI18n } from "../i18n";
 
 beforeAll(() => {
-  initI18n();
+  getI18n();
 });
 
 describe("i18n", () => {
   describe("t() translation", () => {
     it("should return English translations by default", () => {
-      const t = i18next.getFixedT("en");
+      const t = getI18n().getFixedT("en");
       expect(t("loading")).toBe("Connecting to agent...");
       expect(t("cancel")).toBe("Cancel");
     });
 
     it("should return key names for keys locale", () => {
-      const t = i18next.getFixedT("keys");
+      const t = getI18n().getFixedT("keys");
       expect(t("loading")).toBe("loading");
       expect(t("cancel")).toBe("cancel");
     });
 
     it("should interpolate values", () => {
-      const t = i18next.getFixedT("en");
+      const t = getI18n().getFixedT("en");
       expect(t("error_send_message", { errorMessage: "timeout" })).toBe(
         "Failed to send message: timeout",
       );
@@ -32,7 +31,7 @@ describe("i18n", () => {
       // today. Asserting other locales here would pass on i18next's English
       // fallback and give a false sense of coverage — add them back as the
       // localization team delivers resource files.
-      const t = i18next.getFixedT("en");
+      const t = getI18n().getFixedT("en");
       const sharedKeys = ["disclaimer_message", "chat_input_placeholder"];
 
       for (const key of sharedKeys) {
@@ -43,7 +42,7 @@ describe("i18n", () => {
     });
 
     it("should have English translations for new SDK keys", () => {
-      const t = i18next.getFixedT("en");
+      const t = getI18n().getFixedT("en");
       const newKeys = [
         "error_generic",
         "error_send_message",
@@ -90,7 +89,7 @@ describe("i18n", () => {
     });
 
     it("should fall back to English for unsupported locale", () => {
-      const t = i18next.getFixedT("xx");
+      const t = getI18n().getFixedT("xx");
       expect(t("loading")).toBe("Connecting to agent...");
     });
   });

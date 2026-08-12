@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
-import i18next from "i18next";
-import { useTranslation } from "react-i18next";
+import { useWidgetTranslation } from "../i18n/useWidgetTranslation";
 import { UiPath } from "@uipath/uipath-typescript/core";
 import type { AgentSummary, Locale } from "../types";
 import { resolveAgent } from "../utils/resolveAgent";
-import { initI18n } from "../i18n";
+import { getI18n } from "../i18n";
 
-// Idempotent. Ensures i18next is initialized when the hook is imported
-// without first mounting the widget.
-initI18n();
+// The widget's own instance, created on first use — never the shared default
+// one, which a host may already own.
+const i18n = getI18n();
 
 // Stable per-instance id for an sdk so a *different* sdk instance changes
 // `inputsKey` (and fires the reset block). A truthy/falsy flag would collapse
@@ -67,10 +66,10 @@ export const useResolvedAgent = (
   const { externalUserId, locale, surfaceName, surfaceVersion } = options;
 
   // Match locale before useTranslation runs to avoid a stale render.
-  if (locale && i18next.language !== locale) {
-    i18next.changeLanguage(locale);
+  if (locale && i18n.language !== locale) {
+    i18n.changeLanguage(locale);
   }
-  const { t } = useTranslation();
+  const { t } = useWidgetTranslation();
 
   const shouldFetch = !!sdk && agentId != null;
   const inputsKey = `${sdkKey(sdk)}|${agentId ?? "_"}|${folderId ?? "_"}|${externalUserId ?? "_"}|${surfaceName ?? "_"}|${surfaceVersion ?? "_"}`;

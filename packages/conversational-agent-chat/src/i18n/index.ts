@@ -1,1 +1,1 @@
-export { initI18n } from "./i18n.config";
+export { initI18n, getI18n } from "./i18n.config";
