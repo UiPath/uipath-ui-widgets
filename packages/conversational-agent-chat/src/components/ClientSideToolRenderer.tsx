@@ -1,24 +1,23 @@
 import { createRoot, type Root } from "react-dom/client";
 import type { AutopilotChatMessage } from "@uipath/apollo-react/material/components";
 import { PortalContainerProvider } from "@uipath/apollo-wind";
-import i18next from "i18next";
-import { initI18n } from "../i18n";
+import { getI18n } from "../i18n";
 import { ClientSideTool, type ClientSideToolLabels } from "./ClientSideTool";
 
-initI18n();
+// The widget's own instance, created on first use — never the shared default
+// one, which a host may already own. Safe when this module is imported directly
+// (i.e. without first importing ConversationalAgentChat).
+const i18n = getI18n();
 
+/** Resolves labels for a separate React root (client-side tool widget). Prefer passing overrides from the chat component where `useWidgetTranslation` runs. */
 export function resolveClientSideToolLabels(
   overrides?: Partial<ClientSideToolLabels>,
 ): ClientSideToolLabels {
   return {
-    submit: overrides?.submit ?? i18next.t("client_side_tool_submit", "Submit"),
-    cancel: overrides?.cancel ?? i18next.t("cancel"),
+    submit: overrides?.submit ?? i18n.t("client_side_tool_submit"),
+    cancel: overrides?.cancel ?? i18n.t("cancel"),
     description:
-      overrides?.description ??
-      i18next.t(
-        "client_side_tool_description",
-        "Fill in the fields below and submit to continue.",
-      ),
+      overrides?.description ?? i18n.t("client_side_tool_description"),
   };
 }
 
