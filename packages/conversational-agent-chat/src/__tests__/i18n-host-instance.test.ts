@@ -17,6 +17,12 @@ import { getI18n } from "../i18n";
  * the host can win the init race here without affecting the rest of the suite.
  */
 describe("widget i18n vs. a host-owned i18next", () => {
+  // Imported below rather than at the top of the file so the host wins the init
+  // race first, as it does in production. Pulling in the renderer drags in React
+  // and the widget tree, which costs seconds under parallel load — hence the
+  // import lives in the hook, clear of the 5s per-test timeout.
+  let resolveClientSideToolLabels: typeof import("../components/ClientSideToolRenderer").resolveClientSideToolLabels;
+
   beforeAll(async () => {
     // The host gets there first, exactly as studio's i18n.config.ts does.
     await i18next.use(initReactI18next).init({
@@ -26,7 +32,10 @@ describe("widget i18n vs. a host-owned i18next", () => {
       ns: ["host"],
       resources: { en: { host: { host_probe_key: "HOST STRING" } } },
     });
-  });
+
+    ({ resolveClientSideToolLabels } =
+      await import("../components/ClientSideToolRenderer"));
+  }, 30_000);
 
   it("keeps the host's instance as react-i18next's default", () => {
     const before = getReactI18nDefault();
@@ -55,5 +64,17 @@ describe("widget i18n vs. a host-owned i18next", () => {
 
   it("reuses one instance across calls", () => {
     expect(getI18n()).toBe(getI18n());
+  });
+
+  // Imperative renderers mount their own React roots, so they resolve labels
+  // through a bare `t()` rather than a hook. Reaching for the shared default
+  // instance there yields `undefined` labels — blank buttons in the widget —
+  // whenever the widget owns its catalog privately, as it does here.
+  it("resolves client-side tool labels off the widget's own instance", () => {
+    expect(resolveClientSideToolLabels()).toEqual({
+      submit: "Submit",
+      cancel: "Cancel",
+      description: "Fill in the fields below and submit to continue.",
+    });
   });
 });
