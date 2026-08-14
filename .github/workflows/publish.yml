@@ -16,9 +16,11 @@ on:
           - pdf-viewer
       tag:
         description: >-
-          Release channel — latest: stable release to npm + GitHub Packages and
-          Storybook deploy (needs approval) · beta: prerelease to npm + GitHub
-          Packages under the beta dist-tag (needs approval) · dev: internal
+          · latest: stable release to npm + GitHub Packages and
+          Storybook deploy (needs approval) 
+          · beta: prerelease to npm + GitHub
+          Packages under the beta dist-tag (needs approval) 
+          · dev: internal
           prerelease to GitHub Packages only, npm and Storybook skipped (no
           approval)
         required: true
