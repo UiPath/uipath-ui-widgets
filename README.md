@@ -150,10 +150,11 @@ Storybook is deployed to GitHub Pages by the **Publish SDK package** workflow wh
 
 ## 🚀 Publishing
 
-Packages are published with the **Publish SDK package** workflow (Actions → Publish SDK package → Run workflow):
+Packages are published with the **Publish SDK package** workflow (Actions → Publish SDK package → Run workflow), picking the release channel with the **tag** dropdown:
 
-- **Official release** (no checkboxes): requires `production` environment approval — publishes the selected package to npm as `latest` and to GitHub Packages, and deploys Storybook. Check **beta** to publish to npm under the `beta` dist-tag instead of `latest`.
-- **Dev build** (`github_packages_only`): publishes only to GitHub Packages under the `dev` dist-tag — npm and the Storybook deploy are skipped, and no approval is needed. The package version must be a prerelease (e.g. `1.0.0-beta.2`); the run fails fast otherwise, and `latest` is never moved.
+- **latest** — stable release; requires `production` environment approval. Publishes the selected package to npm and GitHub Packages as `latest` and deploys Storybook. The version must be stable (no prerelease suffix).
+- **beta** — public prerelease; requires `production` environment approval. Publishes to npm and GitHub Packages under the `beta` dist-tag and deploys Storybook — `latest` is never moved. The version must be a prerelease (e.g. `1.0.0-beta.2`).
+- **dev** — internal build; no approval needed. Publishes only to GitHub Packages under the `dev` dist-tag — npm and the Storybook deploy are skipped. The version must be a prerelease; the run fails fast otherwise.
 
 ### Installing dev builds
 
