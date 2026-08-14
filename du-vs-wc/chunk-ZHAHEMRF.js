@@ -1,0 +1,1 @@
+import"./chunk-GIUW4PYY.js";var i="Saint Martin",r=[{regionCode:"00",regionName:"",city:"Marigot",aliases:""},{regionCode:"00",regionName:"",city:"Grand-Case",aliases:""}],o={countryName:i,records:r};export{i as countryName,o as default,r as records};

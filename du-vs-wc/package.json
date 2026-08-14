@@ -1,0 +1,30 @@
+{
+    "name": "@uipath/du-validation-station-wc",
+    "version": "1.0.0-rc.1",
+    "description": "Validation Station as a web component for UiPath Document Understanding.",
+    "keywords": [
+        "uipath",
+        "document-understanding",
+        "validation-station",
+        "web-component",
+        "wc",
+        "angular"
+    ],
+    "homepage": "https://docs.uipath.com/activities/other/latest/document-understanding/compact-validation-station",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/UiPath/DU-App.git",
+        "directory": "src/frontend/apps/du-validation-station-wc"
+    },
+    "license": "MIT",
+    "main": "./main.js",
+    "types": "./types.d.ts",
+    "peerDependencies": {},
+    "dependencies": {},
+    "sideEffects": true,
+    "publishConfig": {
+        "registry": "https://registry.npmjs.org/",
+        "access": "public",
+        "provenance": false
+    }
+}

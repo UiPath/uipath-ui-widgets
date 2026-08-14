@@ -1,0 +1,1 @@
+import"./chunk-GIUW4PYY.js";var a="Saint Pierre and Miquelon",n=[{regionCode:"97502",regionName:"Saint-Pierre",city:"Saint-Pierre",aliases:""},{regionCode:"97501",regionName:"Miquelon-Langlade",city:"Miquelon",aliases:""}],r={countryName:a,records:n};export{a as countryName,r as default,n as records};

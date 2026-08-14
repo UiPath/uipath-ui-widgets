@@ -1,0 +1,1 @@
+import"./chunk-GIUW4PYY.js";var o="French Southern Territories",a=[{regionCode:"03",regionName:"Kerguelen",city:"Port-aux-Fran\xE7ais",aliases:""}],i={countryName:o,records:a};export{o as countryName,i as default,a as records};

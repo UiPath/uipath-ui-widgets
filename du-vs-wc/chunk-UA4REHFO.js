@@ -1,0 +1,1 @@
+import"./chunk-GIUW4PYY.js";var r="Cook Islands",e=[{regionCode:"11695425",regionName:"Rarotonga",city:"Avarua",aliases:"Avaroua;Avaruo"}],n={countryName:r,records:e};export{r as countryName,n as default,e as records};

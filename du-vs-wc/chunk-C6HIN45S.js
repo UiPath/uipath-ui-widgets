@@ -1,0 +1,1 @@
+import"./chunk-GIUW4PYY.js";var o="Jersey",n=[{regionCode:"3237497",regionName:"St John",city:"Saint John",aliases:""},{regionCode:"3237864",regionName:"St Helier",city:"Saint Helier",aliases:"Sankt' Heliero;Sent-Khel'er"},{regionCode:"3237072",regionName:"St Clement",city:"Le Hocq",aliases:""}],r={countryName:o,records:n};export{o as countryName,r as default,n as records};
