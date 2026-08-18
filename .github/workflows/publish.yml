@@ -14,11 +14,18 @@ on:
           - validation-station
           - external-auth
           - pdf-viewer
-      beta:
-        description: "Check for prerelease/beta versions"
-        required: false
-        type: boolean
-        default: false
+      tag:
+        description: |-
+          · latest: stable release to npm + GitHub Packages and Storybook deploy (needs approval)
+          · beta: prerelease to npm + GitHub Packages under the beta dist-tag (needs approval)
+          · dev: internal prerelease to GitHub Packages only, npm and Storybook skipped (no approval)
+        required: true
+        type: choice
+        default: latest
+        options:
+          - latest
+          - beta
+          - dev
 
 permissions:
   contents: write
@@ -28,7 +35,10 @@ permissions:
 jobs:
   publish-sdk:
     runs-on: uipath-ubuntu-latest
-    environment: production
+    # Dev builds publish to GitHub Packages only and skip the admin-approval
+    # gate by running in an unprotected environment; latest/beta releases
+    # keep the protected `production` environment.
+    environment: ${{ inputs.tag == 'dev' && 'github-packages-dev' || 'production' }}
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -45,10 +55,24 @@ jobs:
       - name: Print publish info
         run: |
           VERSION=$(node -p "require('./packages/${{ inputs.package }}/package.json').version")
-          TAG=$([ "${{ inputs.beta }}" = "true" ] && echo "beta" || echo "latest")
           echo "Package: ${{ inputs.package }}"
           echo "Version: $VERSION"
-          echo "Tag: $TAG"
+          echo "Tag: ${{ inputs.tag }}"
+          if [ "${{ inputs.tag }}" = "dev" ]; then
+            echo "Mode: GitHub Packages only (npm and Storybook deploy skipped)"
+          fi
+
+      - name: Validate version matches the chosen tag
+        run: |
+          VERSION=$(node -p "require('./packages/${{ inputs.package }}/package.json').version")
+          if [ "${{ inputs.tag }}" = "latest" ] && [[ "$VERSION" == *-* ]]; then
+            echo "::error::tag=latest requires a stable version, but packages/${{ inputs.package }} version is $VERSION — publish prereleases under beta or dev"
+            exit 1
+          fi
+          if [ "${{ inputs.tag }}" != "latest" ] && [[ "$VERSION" != *-* ]]; then
+            echo "::error::tag=${{ inputs.tag }} requires a prerelease version (e.g. 1.2.3-beta.0), but packages/${{ inputs.package }} version is $VERSION"
+            exit 1
+          fi
 
       - name: Setup Node.js for GitHub Packages
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -70,9 +94,11 @@ jobs:
         run: npm run build
 
       - name: Build Storybook
+        if: ${{ inputs.tag != 'dev' }}
         run: npm run build-storybook
 
       - name: Deploy Storybook to GitHub Pages
+        if: ${{ inputs.tag != 'dev' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -81,9 +107,12 @@ jobs:
 
       - name: Publish to GitHub Packages
         working-directory: packages/${{ inputs.package }}
-        run: npm publish --tag latest
+        run: npm publish --tag "$NPM_TAG"
+        env:
+          NPM_TAG: ${{ inputs.tag }}
 
       - name: Setup Node.js for npm
+        if: ${{ inputs.tag != 'dev' }}
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
@@ -91,10 +120,8 @@ jobs:
           scope: "@uipath"
 
       - name: Publish to npm
+        if: ${{ inputs.tag != 'dev' }}
         working-directory: packages/${{ inputs.package }}
-        run: |
-          if [ "${{ inputs.beta }}" = "true" ]; then
-            npm publish --provenance --access public --tag beta
-          else
-            npm publish --provenance --access public
-          fi
+        run: npm publish --provenance --access public --tag "$NPM_TAG"
+        env:
+          NPM_TAG: ${{ inputs.tag }}
