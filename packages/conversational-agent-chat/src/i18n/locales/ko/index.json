@@ -2,6 +2,7 @@
   "error_open_conversation": "대화를 열지 못했습니다. {{errorMessage}}",
   "error_generic": "오류가 발생했습니다. 다시 시도하십시오.",
   "error_send_message": "메시지를 보내지 못했습니다. {{errorMessage}}",
+  "error_session_start_timeout": "대화를 위한 세션 시작 시간이 초과되었습니다. 다시 시도하십시오.",
   "error_upload_attachments": "첨부 파일을 업로드하지 못했습니다. 다시 시도하십시오.",
   "error_missing_conversation_params": "conversationId 또는 agentId와 folderId 중 하나를 제공해야 합니다.",
   "error_initialize_chat": "채팅을 초기화하지 못했습니다",

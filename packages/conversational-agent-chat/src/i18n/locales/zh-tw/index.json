@@ -2,6 +2,7 @@
   "error_open_conversation": "無法開啟對話: {{errorMessage}}",
   "error_generic": "發生錯誤。請重試。",
   "error_send_message": "無法傳送訊息: {{errorMessage}}",
+  "error_session_start_timeout": "為對話啟動工作階段時逾時。請重試。",
   "error_upload_attachments": "無法上傳附件，請重試。",
   "error_missing_conversation_params": "必須提供 conversationId，或者同時提供 agentId 與 folderId。",
   "error_initialize_chat": "無法將對話初始化",

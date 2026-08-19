@@ -2,6 +2,7 @@
   "error_open_conversation": "Error al abrir la conversación: {{errorMessage}}",
   "error_generic": "Algo salió mal. Pruebe de nuevo.",
   "error_send_message": "Error al enviar el mensaje: {{errorMessage}}",
+  "error_session_start_timeout": "",
   "error_upload_attachments": "Error al cargar los adjuntos. Pruebe de nuevo.",
   "error_missing_conversation_params": "Se debe proporcionar conversationId o agentId y folderId.",
   "error_initialize_chat": "Error al inicializar el chat",

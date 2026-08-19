@@ -2,6 +2,7 @@
   "error_open_conversation": "Nu s-a putut deschide conversația: {{errorMessage}}",
   "error_generic": "Ceva a mers prost. Vă rog să încercați din nou.",
   "error_send_message": "Trimiterea mesajului a eșuat: {{errorMessage}}",
+  "error_session_start_timeout": "A expirat timpul de pornire a unei sesiuni pentru conversație. Încercați din nou.",
   "error_upload_attachments": "Încărcarea atașamentelor a eșuat. Încercați din nou.",
   "error_missing_conversation_params": "Trebuie să furnizați fie conversationId, fie agentId și folderId.",
   "error_initialize_chat": "Inițializarea chatului a eșuat",
