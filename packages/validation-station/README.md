@@ -443,7 +443,8 @@ resolves these against its own `import.meta.url`:
 ├── styles.css       ← fetched as raw CSS and adopted into the shadow root
 ├── fonts.css        ← Apollo fonts + Material Icons (opt-in via includeFonts)
 ├── media/           ← the font files fonts.css references
-└── du-assets/       ← PDF.js worker, cmaps, wasm, i18n translations
+└── du-assets/       ← pdf.js scripts, cmaps, wasm decoders, translations,
+                       the business-rules executor
 ```
 
 Copying the package directory verbatim satisfies this. In this repo, that is
@@ -457,6 +458,14 @@ which stages it into the gitignored `public/du-vs-wc`.
 - **The returned promise is the error channel.** Components only observe success;
   a bad URL or a 404 surfaces on the promise, so attach a `.catch`. Without it, a
   load failure leaves the widgets showing their loading state.
+- **`du-assets/` and `media/` are outside that promise.** The loader only ever
+  touches `polyfills.js`, `main.js`, `styles.css` and `fonts.css`; the web
+  component fetches those two directories itself, at render time. Without
+  `du-assets/`, PDF rendering and translations 404 silently while business-rules
+  validation rejects outright — its executor is pulled in with a dynamic
+  `import()`, so it fails loudly where the rest degrades quietly. Without
+  `media/`, `fonts.css` resolves but every `url()` inside it 404s, so
+  `includeFonts: true` loads no fonts.
 - **`deploymentUrl` accepts a resolver.** Pass `() => string | Promise<string>`
   instead of a plain string for cases where the URL isn't known synchronously —
   it's called lazily, at most once per load.
