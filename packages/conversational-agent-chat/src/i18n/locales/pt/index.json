@@ -28,6 +28,8 @@
   "tool_confirmation_confirm": "Confirmar",
   "tool_confirmation_status_cancelled": "Cancelada",
   "tool_confirmation_status_confirmed": "Confirmado",
+  "client_side_tool_submit": "Submeter",
+  "client_side_tool_description": "Preencha os campos abaixo e submeta para continuar.",
   "inputs_page_submit_error": "Falha ao iniciar a conversa. Tente novamente.",
   "inputs_page_intro": "Antes de começar, preciso de alguns detalhes.",
   "inputs_page_starting": "A iniciar…",

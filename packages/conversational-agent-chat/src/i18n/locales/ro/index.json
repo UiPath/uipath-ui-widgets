@@ -28,6 +28,8 @@
   "tool_confirmation_confirm": "Confirmă",
   "tool_confirmation_status_cancelled": "Anulat",
   "tool_confirmation_status_confirmed": "Confirmat",
+  "client_side_tool_submit": "Trimiteți",
+  "client_side_tool_description": "Completați câmpurile de mai jos și trimiteți pentru a continua.",
   "inputs_page_submit_error": "Pornirea conversației a eșuat. Încercați din nou.",
   "inputs_page_intro": "Înainte să începem, am nevoie de câteva detalii.",
   "inputs_page_starting": "Începere...",
