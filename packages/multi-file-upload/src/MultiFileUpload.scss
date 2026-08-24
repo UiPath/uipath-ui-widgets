@@ -1,10 +1,6 @@
 @import "@uipath/apollo-wind/tailwind.css";
-// Scan only the apollo-wind modules this widget transitively imports —
-// scanning all of `dist/**` emits utilities for every component in the
-// library instead of the handful this widget renders (JAR-10167). Both
-// node_modules locations are listed because npm hoists differently in the
-// workspace vs a standalone install. Keep in sync with the package's
-// apollo-wind imports.
+// Scan only imported Apollo Wind modules to reduce generated CSS.
+// Both paths support workspace hoisting and standalone installs.
 @source "../node_modules/@uipath/apollo-wind/dist/lib/*.js";
 @source "../node_modules/@uipath/apollo-wind/dist/components/ui/{button,file-upload}.js";
 @source "../../../node_modules/@uipath/apollo-wind/dist/lib/*.js";

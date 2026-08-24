@@ -5,11 +5,8 @@ import { dirname, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * Guardrail for the targeted `@source` globs in ConversationalAgentChat.scss
- * (JAR-10167). The stylesheet scans only the apollo-wind modules this package
- * transitively imports; if a new apollo-wind component is imported without
- * extending the globs, its utility classes silently vanish from the compiled
- * CSS. This test recomputes the import closure and checks glob coverage.
+ * Verifies that every transitively imported Apollo Wind module is covered by
+ * the stylesheet's targeted @source globs.
  */
 
 const pkgDir = resolve(__dirname, "../..");
@@ -45,7 +42,7 @@ const walk = (dir: string, out: string[] = []): string[] => {
   return out;
 };
 
-/** Named imports from `@uipath/apollo-wind` across the package sources. */
+/** Named Apollo Wind imports in package source files. */
 const importedNames = (): Set<string> => {
   const names = new Set<string>();
   const importRe =
@@ -66,7 +63,7 @@ const importedNames = (): Set<string> => {
   return names;
 };
 
-/** Transitive closure of apollo-wind dist modules behind those names. */
+/** Transitively imported Apollo Wind distribution modules. */
 const moduleClosure = (dist: string, names: Set<string>): string[] => {
   const index = readFileSync(join(dist, "index.js"), "utf8");
   const resolveSpec = (from: string, spec: string): string | null => {
@@ -108,7 +105,7 @@ const moduleClosure = (dist: string, names: Set<string>): string[] => {
   return [...seen].map((f) => relative(dist, f)).sort();
 };
 
-/** The scss's apollo-wind @source globs, brace-expanded, as dist-relative regexes. */
+/** @source globs, expanded into dist-relative matchers. */
 const sourceGlobMatchers = (): RegExp[] => {
   const matchers: RegExp[] = [];
   const sourceRe = /@source\s+"[^"]*apollo-wind\/dist\/([^"]+)";/g;
@@ -153,8 +150,7 @@ describe("tailwind @source coverage", () => {
       const uncovered = closure.filter(
         (file) => !matchers.some((m) => m.test(file)),
       );
-      // A failure here means a new apollo-wind import needs its module added
-      // to the @source lists in ConversationalAgentChat.scss.
+      // A new Apollo Wind import requires a matching @source entry.
       expect(uncovered).toEqual([]);
     },
   );

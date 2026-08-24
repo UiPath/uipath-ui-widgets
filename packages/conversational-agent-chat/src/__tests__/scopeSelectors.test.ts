@@ -15,8 +15,7 @@ const run = (css: string): string =>
 describe("postcss-scope-selectors", () => {
   describe("scoping", () => {
     it("scopes a utility class so it cannot outrank a consumer's layered rules", () => {
-      // The regression class of JAR-10167: the widget's unlayered
-      // `.bg-transparent` beat hosts' `@layer utilities` rules document-wide.
+      // This utility previously overrode host styles document-wide.
       expect(run(".bg-transparent{background-color:#0000}")).toBe(
         `${ROOT} .bg-transparent{background-color:#0000}`,
       );
@@ -39,8 +38,7 @@ describe("postcss-scope-selectors", () => {
     });
 
     it("scopes arbitrary-variant utilities, whose class name escapes an ampersand", () => {
-      // Tailwind compiles `hover:[&>td]:bg-x` to a class containing `\&` —
-      // that is a class name, not a nesting selector, and must be scoped.
+      // The escaped ampersand is part of the class name, not nesting syntax.
       expect(
         run(String.raw`.hover\:\[\&\>td\]\:bg-x:hover>td{background:red}`),
       ).toBe(
@@ -66,8 +64,7 @@ describe("postcss-scope-selectors", () => {
     });
 
     it("keeps a qualified document root as an ancestor and re-targets the widget root", () => {
-      // The theme blocks carry ~130 custom properties apiece; the widget root
-      // has no theme class, so a plain prefix would strand the tokens.
+      // Preserve the ancestor condition so theme tokens reach the widget root.
       expect(run("body.light{--color-background:#fff}")).toBe(
         `body.light ${ROOT}{--color-background:#fff}`,
       );
@@ -84,7 +81,7 @@ describe("postcss-scope-selectors", () => {
       expect(run(".wireframe *::before{border:none}")).toBe(
         `.wireframe ${ROOT} *::before{border:none}`,
       );
-      // `.lightbox` is not the `.light` theme.
+      // Avoid treating similarly named classes as themes.
       expect(run(".lightbox{opacity:1}")).toBe(`${ROOT} .lightbox{opacity:1}`);
     });
 
@@ -124,9 +121,7 @@ describe("postcss-scope-selectors", () => {
   });
 
   describe("the built artifact", () => {
-    // A synthetic suite cannot know every selector shape the widget actually
-    // ships. Sweep the compiled stylesheet and require that no top-level
-    // selector escapes the widget root.
+    // Verify the built stylesheet contains no unscoped top-level selectors.
     const distCss = resolve(
       __dirname,
       "../../dist/ConversationalAgentChat.css",
@@ -142,7 +137,7 @@ describe("postcss-scope-selectors", () => {
             node;
             node = node.parent
           ) {
-            // Keyframe offsets aren't selectors; a nested rule rides on its parent.
+            // Keyframe offsets and nested rules are not top-level selectors.
             if (
               node.type === "atrule" &&
               /keyframes/i.test((node as AtRule).name)
@@ -158,8 +153,7 @@ describe("postcss-scope-selectors", () => {
     );
 
     it.skipIf(!existsSync(distCss))("ships no CJK body-font catalogs", () => {
-      // Font *stack* tokens may still name Noto Sans; what must not ship is
-      // the ~914 KB of @font-face catalogs the old font.css import inlined.
+      // Font stacks may name Noto Sans; the removed @font-face catalogs must not ship.
       const css = readFileSync(distCss, "utf8");
       const cjkFaces: string[] = [];
       postcss.parse(css).walkAtRules("font-face", (rule) => {
