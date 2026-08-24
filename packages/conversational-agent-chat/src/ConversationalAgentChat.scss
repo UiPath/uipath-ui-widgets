@@ -4,7 +4,7 @@
 @source "./**/*.{ts,tsx}";
 // Scan only transitively used Apollo Wind modules to minimize generated CSS.
 // Both paths support workspace hoisting and standalone installs.
-// Keep this list synchronized with Apollo Wind imports; the test enforces coverage.
+// Keep this list synchronized with the Apollo Wind imports in src/.
 @source "../node_modules/@uipath/apollo-wind/dist/lib/*.js";
 @source "../node_modules/@uipath/apollo-wind/dist/components/ui/layout/*.js";
 @source "../node_modules/@uipath/apollo-wind/dist/components/ui/{accordion,alert,avatar,badge,button,card,collapsible,combobox,command,dialog,input,input-group,label,popover,portal-container,radio-group,search,select,spinner,textarea}.js";

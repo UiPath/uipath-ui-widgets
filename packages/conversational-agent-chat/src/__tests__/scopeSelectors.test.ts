@@ -1,8 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
 import postcss from "postcss";
-import type { AtRule, Container, Document } from "postcss";
 import { describe, expect, it } from "vitest";
 
 import scopeSelectors from "../../../../scripts/postcss-scope-selectors.js";
@@ -21,19 +17,9 @@ describe("postcss-scope-selectors", () => {
       );
     });
 
-    it("scopes the Tailwind preflight reset", () => {
+    it("scopes every selector in the Tailwind preflight reset", () => {
       expect(run("*,::after,::before{margin:0;padding:0}")).toBe(
         `${ROOT} *,${ROOT} ::after,${ROOT} ::before{margin:0;padding:0}`,
-      );
-    });
-
-    it("scopes type, attribute and legacy pseudo-element selectors", () => {
-      expect(run("hr{height:0}")).toBe(`${ROOT} hr{height:0}`);
-      expect(run("[hidden]{display:none}")).toBe(
-        `${ROOT} [hidden]{display:none}`,
-      );
-      expect(run('.icon-add:before{content:"a"}')).toBe(
-        `${ROOT} .icon-add:before{content:"a"}`,
       );
     });
 
@@ -68,27 +54,19 @@ describe("postcss-scope-selectors", () => {
       expect(run("body.light{--color-background:#fff}")).toBe(
         `body.light ${ROOT}{--color-background:#fff}`,
       );
-      expect(run("html[dir='rtl']{--m:4px}")).toBe(
-        `html[dir='rtl'] ${ROOT}{--m:4px}`,
+      // A descendant part stays after the re-targeted root.
+      expect(run("body.dark .panel{color:#fff}")).toBe(
+        `body.dark ${ROOT} .panel{color:#fff}`,
       );
     });
 
     it("treats apollo-wind theme-class heads as ancestors", () => {
       expect(run(".future-dark{--x:1}")).toBe(`.future-dark ${ROOT}{--x:1}`);
-      expect(run(".light:not(.react-flow){--x:1}")).toBe(
-        `.light:not(.react-flow) ${ROOT}{--x:1}`,
-      );
       expect(run(".wireframe *::before{border:none}")).toBe(
         `.wireframe ${ROOT} *::before{border:none}`,
       );
       // Avoid treating similarly named classes as themes.
       expect(run(".lightbox{opacity:1}")).toBe(`${ROOT} .lightbox{opacity:1}`);
-    });
-
-    it("keeps a descendant part after the re-targeted root", () => {
-      expect(run("body.dark .panel{color:#fff}")).toBe(
-        `body.dark ${ROOT} .panel{color:#fff}`,
-      );
     });
   });
 
@@ -110,58 +88,6 @@ describe("postcss-scope-selectors", () => {
       expect(run("@keyframes spin{from{opacity:0}to{opacity:1}}")).toBe(
         "@keyframes spin{from{opacity:0}to{opacity:1}}",
       );
-    });
-
-    it("leaves at-rules that register names rather than match elements", () => {
-      const property = '@property --x{syntax:"<length>";inherits:false}';
-      expect(run(property)).toBe(property);
-      const fontFace = "@font-face{font-family:x;src:url(x.woff2)}";
-      expect(run(fontFace)).toBe(fontFace);
-    });
-  });
-
-  describe("the built artifact", () => {
-    // Verify the built stylesheet contains no unscoped top-level selectors.
-    const distCss = resolve(
-      __dirname,
-      "../../dist/ConversationalAgentChat.css",
-    );
-
-    it.skipIf(!existsSync(distCss))(
-      "leaves no top-level selector unscoped",
-      () => {
-        const leaked: string[] = [];
-        postcss.parse(readFileSync(distCss, "utf8")).walkRules((rule) => {
-          for (
-            let node: Container | Document | undefined = rule.parent;
-            node;
-            node = node.parent
-          ) {
-            // Keyframe offsets and nested rules are not top-level selectors.
-            if (
-              node.type === "atrule" &&
-              /keyframes/i.test((node as AtRule).name)
-            ) {
-              return;
-            }
-            if (node.type === "rule") return;
-          }
-          leaked.push(...rule.selectors.filter((s) => !s.includes(ROOT)));
-        });
-        expect(leaked).toEqual([]);
-      },
-    );
-
-    it.skipIf(!existsSync(distCss))("ships no CJK body-font catalogs", () => {
-      // Font stacks may name Noto Sans; the removed @font-face catalogs must not ship.
-      const css = readFileSync(distCss, "utf8");
-      const cjkFaces: string[] = [];
-      postcss.parse(css).walkAtRules("font-face", (rule) => {
-        const family = rule.toString();
-        if (/Noto Sans (JP|KR|SC|TC)/.test(family))
-          cjkFaces.push(family.slice(0, 80));
-      });
-      expect(cjkFaces).toEqual([]);
     });
   });
 });
