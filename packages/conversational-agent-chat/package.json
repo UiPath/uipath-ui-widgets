@@ -1,6 +1,6 @@
 {
   "name": "@uipath/ui-widgets-conversational-agent-chat",
-  "version": "1.1.2",
+  "version": "1.1.3-dev.0",
   "description": "A React conversational agent chat component",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",

@@ -5,7 +5,13 @@
 // at the repo root.
 import apolloWindPostcss from "@uipath/apollo-wind/postcss";
 import flattenLayers from "../../scripts/postcss-flatten-layers.js";
+import scopeSelectors from "../../scripts/postcss-scope-selectors.js";
 
+// Scope flattened CSS to the widget root so it cannot affect host pages.
 export default {
-  plugins: [...apolloWindPostcss.plugins, flattenLayers()],
+  plugins: [
+    ...apolloWindPostcss.plugins,
+    flattenLayers(),
+    scopeSelectors(".uipath-conversational-agent-chat"),
+  ],
 };

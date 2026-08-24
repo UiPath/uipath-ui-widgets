@@ -1,8 +1,16 @@
-@import "@uipath/apollo-react/core/fonts/font.css";
+// Import icon glyphs only; the full font bundle adds ~914 KB of CJK fonts.
+@import "@uipath/apollo-react/core/fonts/apollo/apollo.css";
 @import "@uipath/apollo-wind/tailwind.css";
 @source "./**/*.{ts,tsx}";
-@source "../node_modules/@uipath/apollo-wind/dist/**/*.js";
-@source "../../../node_modules/@uipath/apollo-wind/dist/**/*.js";
+// Scan only transitively used Apollo Wind modules to minimize generated CSS.
+// Both paths support workspace hoisting and standalone installs.
+// Keep this list synchronized with the Apollo Wind imports in src/.
+@source "../node_modules/@uipath/apollo-wind/dist/lib/*.js";
+@source "../node_modules/@uipath/apollo-wind/dist/components/ui/layout/*.js";
+@source "../node_modules/@uipath/apollo-wind/dist/components/ui/{accordion,alert,avatar,badge,button,card,collapsible,combobox,command,dialog,input,input-group,label,popover,portal-container,radio-group,search,select,spinner,textarea}.js";
+@source "../../../node_modules/@uipath/apollo-wind/dist/lib/*.js";
+@source "../../../node_modules/@uipath/apollo-wind/dist/components/ui/layout/*.js";
+@source "../../../node_modules/@uipath/apollo-wind/dist/components/ui/{accordion,alert,avatar,badge,button,card,collapsible,combobox,command,dialog,input,input-group,label,popover,portal-container,radio-group,search,select,spinner,textarea}.js";
 @source "../dist/**/*.{js,css}";
 
 .uipath-conversational-agent-chat {
