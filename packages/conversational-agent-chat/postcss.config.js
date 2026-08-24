@@ -5,7 +5,15 @@
 // at the repo root.
 import apolloWindPostcss from "@uipath/apollo-wind/postcss";
 import flattenLayers from "../../scripts/postcss-flatten-layers.js";
+import scopeSelectors from "../../scripts/postcss-scope-selectors.js";
 
+// Scoping (JAR-10167) makes the flattened, unlayered output inert outside
+// the widget's DOM: every selector is confined to the root container the
+// widget renders (`PortalContainerProvider` keeps overlays inside it too).
 export default {
-  plugins: [...apolloWindPostcss.plugins, flattenLayers()],
+  plugins: [
+    ...apolloWindPostcss.plugins,
+    flattenLayers(),
+    scopeSelectors(".uipath-conversational-agent-chat"),
+  ],
 };

@@ -1,6 +1,14 @@
 @import "@uipath/apollo-wind/tailwind.css";
-@source "../node_modules/@uipath/apollo-wind/dist/**/*.js";
-@source "../../../node_modules/@uipath/apollo-wind/dist/**/*.js";
+// Scan only the apollo-wind modules this widget transitively imports —
+// scanning all of `dist/**` emits utilities for every component in the
+// library instead of the handful this widget renders (JAR-10167). Both
+// node_modules locations are listed because npm hoists differently in the
+// workspace vs a standalone install. Keep in sync with the package's
+// apollo-wind imports.
+@source "../node_modules/@uipath/apollo-wind/dist/lib/*.js";
+@source "../node_modules/@uipath/apollo-wind/dist/components/ui/{button,dialog,dropdown-menu,label,portal-container,select,sonner,table}.js";
+@source "../../../node_modules/@uipath/apollo-wind/dist/lib/*.js";
+@source "../../../node_modules/@uipath/apollo-wind/dist/components/ui/{button,dialog,dropdown-menu,label,portal-container,select,sonner,table}.js";
 @source "../dist/components/**/*.{js,css}";
 
 .uipath-datatable-container {

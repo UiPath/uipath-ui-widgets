@@ -1,8 +1,23 @@
-@import "@uipath/apollo-react/core/fonts/font.css";
+// Icon glyphs only (JAR-10167). The full `core/fonts/font.css` also inlines
+// ~914 KB of CJK body-font catalogs (Noto Sans JP/KR/SC/TC) — host-page
+// typography that must never ship in a widget bundle. Apollo hosts already
+// load the icon font too; this import only covers standalone consumers.
+@import "@uipath/apollo-react/core/fonts/apollo/apollo.css";
 @import "@uipath/apollo-wind/tailwind.css";
 @source "./**/*.{ts,tsx}";
-@source "../node_modules/@uipath/apollo-wind/dist/**/*.js";
-@source "../../../node_modules/@uipath/apollo-wind/dist/**/*.js";
+// Scan only the apollo-wind modules this widget transitively imports.
+// Scanning all of `dist/**` (apollo-wind's README recipe, meant for apps)
+// emits utilities for every component in the library (~239 KB) instead of
+// the handful the widget renders. Both node_modules locations are listed
+// because npm hoists differently in the workspace vs a standalone install.
+// Keep in sync with the package's apollo-wind imports — guarded by
+// `src/__tests__/tailwindSources.test.ts`.
+@source "../node_modules/@uipath/apollo-wind/dist/lib/*.js";
+@source "../node_modules/@uipath/apollo-wind/dist/components/ui/layout/*.js";
+@source "../node_modules/@uipath/apollo-wind/dist/components/ui/{accordion,alert,avatar,badge,button,card,collapsible,combobox,command,dialog,input,input-group,label,popover,portal-container,radio-group,search,select,spinner,textarea}.js";
+@source "../../../node_modules/@uipath/apollo-wind/dist/lib/*.js";
+@source "../../../node_modules/@uipath/apollo-wind/dist/components/ui/layout/*.js";
+@source "../../../node_modules/@uipath/apollo-wind/dist/components/ui/{accordion,alert,avatar,badge,button,card,collapsible,combobox,command,dialog,input,input-group,label,popover,portal-container,radio-group,search,select,spinner,textarea}.js";
 @source "../dist/**/*.{js,css}";
 
 .uipath-conversational-agent-chat {
