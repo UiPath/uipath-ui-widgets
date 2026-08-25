@@ -84,9 +84,12 @@ The four exported helpers lost the same parameter:
 + saveValidatedDataAsDraft(sdk, data, request)
 ```
 
-If a folder reaches you from somewhere other than the payload, put it on the
-payload before handing it over — and memoise the result, so the widget is not
-handed a new object on every render.
+The activity that produces a `ContentValidationData` should normally set
+`FolderId` or `FolderKey`. If you construct the object yourself, set one of them
+accordingly — for example from the Action Center task's folder, which the SDK
+surfaces as `task.folderId` (`OrganizationUnitId` in Orchestrator). Memoise the
+object you pass in, or the widget takes a new reference on every render and
+refetches the document each time.
 
 ## Data sources
 

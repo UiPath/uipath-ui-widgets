@@ -144,7 +144,6 @@ describe.each(cases)("$name", ({ Component, tag }) => {
 
 describe("CompactFieldsForm save wiring", () => {
   const sdk = {} as any;
-  // `sdk` + `data` naming a folder is what makes the form persist for itself.
   const data = { DocumentId: "doc-123", FolderId: 42 } as any;
 
   const submitDetail = { documentId: "doc-123", validatedData: { s: 1 } };

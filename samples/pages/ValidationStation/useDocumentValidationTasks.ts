@@ -40,7 +40,7 @@ export function useDocumentValidationTasks(uipathSdk: UiPath) {
       // type, and only document-validation ones open in this widget.
       const result = await tasksService.getAll({
         filter: `Type eq '${TaskType.DocumentValidation}'`,
-        orderby: "CreationTime desc",
+        orderby: "CreationTime asc",
         pageSize: 100,
       });
       setTaskList(result.items);
