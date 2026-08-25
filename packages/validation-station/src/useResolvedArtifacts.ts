@@ -19,16 +19,18 @@ import { trackTelemetry } from "./utils/telemetryUtils.js";
  *    hands the same artifacts to a linked viewer + fields-form + table-editor,
  *    and the mode to use when the host already holds the taxonomy / extraction
  *    result / DOM in memory rather than in a storage bucket.
- * 2. **Self-fetching** — pass `sdk` + `data` (+ optional `folderId`). The hook
- *    fetches the bucket artifacts itself from the paths on `data`.
+ * 2. **Self-fetching** — pass `sdk` + `data`. The hook fetches the bucket
+ *    artifacts itself from the paths on `data`, scoped to the folder `data`
+ *    names.
  */
 export interface DuArtifactsSource {
   /** SDK instance — required for self-fetching mode. */
   sdk?: UiPath;
-  /** Content-validation descriptor — required for self-fetching mode. */
+  /**
+   * Content-validation descriptor — required for self-fetching mode. Carries
+   * the bucket paths and the folder they live in (`FolderId` or `FolderKey`).
+   */
   data?: DuFramework.ContentValidationData;
-  /** Storage-bucket folder id. Falls back to `data.FolderId`. */
-  folderId?: number;
   /** Pre-fetched artifacts. When supplied, no fetch is performed. */
   artifacts?: DuDocumentArtifacts;
   /** Document id. Falls back to `data.DocumentId`. */
@@ -39,14 +41,6 @@ export interface ResolvedArtifacts {
   artifacts: DuDocumentArtifacts | null;
   error: string | null;
   documentId: string | undefined;
-  /**
-   * True when a full self-fetching / persistence context (`sdk` + `data` +
-   * resolved folder id) is available — i.e. the fields-form can round-trip
-   * submit / save-as-draft through the SDK.
-   */
-  canPersist: boolean;
-  /** Folder id used for fetch/persist, resolved from the prop or `data.FolderId`. */
-  resolvedFolderId: number | undefined;
 }
 
 /**
@@ -57,19 +51,17 @@ export interface ResolvedArtifacts {
 export function useResolvedArtifacts({
   sdk,
   data,
-  folderId,
   artifacts: provided,
   documentId,
 }: DuArtifactsSource): ResolvedArtifacts {
   const [fetched, setFetched] = useState<DuDocumentArtifacts | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const resolvedFolderId = folderId ?? data?.FolderId;
   const resolvedDocumentId = documentId ?? data?.DocumentId;
-  const canPersist = !!sdk && !!data && !!resolvedFolderId;
+  const hasFolder = !!(data?.FolderKey || data?.FolderId);
   // Fetch only when the caller did not supply artifacts and a full context is
-  // present (the missing-folderId case is surfaced at render).
-  const shouldFetch = !provided && canPersist;
+  // present (the missing-folder case is surfaced at render).
+  const shouldFetch = !provided && !!sdk && !!data && hasFolder;
 
   // Keep the latest sdk reachable so each fetch uses the current instance (token
   // refresh / tenant switch) without making sdk identity a fetch trigger.
@@ -86,7 +78,7 @@ export function useResolvedArtifacts({
     // would pin the original sdk's auth/base URL.
     const bucketService = new BucketService(sdkRef.current!);
 
-    fetchBucketArtifacts(bucketService, data!, resolvedFolderId!)
+    fetchBucketArtifacts(bucketService, data!)
       .then((result) => {
         if (!cancelled) {
           setFetched(result);
@@ -108,20 +100,17 @@ export function useResolvedArtifacts({
     return () => {
       cancelled = true;
     };
-    // Keyed on `data` identity (as useDuDocumentArtifacts always has) + folder: the
-    // fetch reads the bucket PATH fields off `data`, not just DocumentId, so a
-    // new payload with the same DocumentId but different paths must refetch.
-    // Callers pass a stable `data` reference (React state) so this does not
-    // refetch on unrelated re-renders.
-  }, [shouldFetch, data, resolvedFolderId]);
+    // Keyed on `data` identity: the fetch reads the bucket PATH fields off it,
+    // not just DocumentId, so a new payload with the same DocumentId but
+    // different paths must refetch. Callers pass a stable `data` reference
+    // (React state) so this does not refetch on unrelated re-renders.
+  }, [shouldFetch, data]);
 
   if (provided) {
     return {
       artifacts: provided,
       error: null,
       documentId: resolvedDocumentId,
-      canPersist,
-      resolvedFolderId,
     };
   }
 
@@ -131,19 +120,15 @@ export function useResolvedArtifacts({
       error:
         "No data source provided. Pass `artifacts` (pre-fetched) or `sdk` + `data` (to fetch).",
       documentId: resolvedDocumentId,
-      canPersist,
-      resolvedFolderId,
     };
   }
 
-  if (!resolvedFolderId) {
+  if (!hasFolder) {
     return {
       artifacts: null,
       error:
-        "folderId of Storage bucket is required. Provide it as a prop or ensure data.FolderId is set.",
+        "ContentValidationData must carry FolderId or FolderKey (the storage bucket's folder).",
       documentId: resolvedDocumentId,
-      canPersist,
-      resolvedFolderId,
     };
   }
 
@@ -151,7 +136,5 @@ export function useResolvedArtifacts({
     artifacts: fetched,
     error,
     documentId: resolvedDocumentId,
-    canPersist,
-    resolvedFolderId,
   };
 }

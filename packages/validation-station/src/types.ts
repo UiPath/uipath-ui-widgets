@@ -84,7 +84,7 @@ export interface DuSaveCallbacks {
    * carries the request the web component produced.
    *
    * `result` is present only when the widget persisted the data itself, i.e.
-   * when it has `sdk` + `data` + a resolved folder id. Otherwise the write-back
+   * when it has `sdk` + `data` naming a folder. Otherwise the write-back
    * is yours — the exported `submitValidatedData` does what the widget would
    * have done for a bucket-backed document.
    */

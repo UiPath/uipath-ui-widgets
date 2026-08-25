@@ -13,13 +13,42 @@ export interface SaveValidatedDataResult {
   error?: string;
 }
 
+/**
+ * Where a validated result is written, as described by `data`: the bucket, the
+ * path, and the folder both are scoped to. Throws when a piece is missing, so
+ * the two save flows report it through their own `SaveValidatedDataResult`.
+ */
+function bucketTarget(data: DuFramework.ContentValidationData) {
+  const {
+    BucketId,
+    ValidatedExtractionResultsPath,
+    DocumentId,
+    FolderId,
+    FolderKey,
+  } = data;
+  // FolderKey wins when both are set, matching the server's own precedence.
+  const scope = FolderKey
+    ? { folderKey: FolderKey }
+    : FolderId
+      ? { folderId: FolderId }
+      : undefined;
+  if (!BucketId || !ValidatedExtractionResultsPath || !scope) {
+    throw new Error(
+      "ContentValidationData is missing BucketId, ValidatedExtractionResultsPath, or a folder (FolderId / FolderKey).",
+    );
+  }
+  return {
+    bucketId: BucketId,
+    path: ValidatedExtractionResultsPath,
+    scope,
+    documentId: DocumentId,
+  };
+}
+
 async function uploadResultToBucket(
   bucketService: BucketService,
-  bucketId: number,
-  folderId: number,
-  path: string,
-  data: unknown,
-  documentId?: string,
+  { bucketId, path, scope, documentId }: ReturnType<typeof bucketTarget>,
+  payload: unknown,
 ): Promise<void> {
   // The bucket stores a .zip containing a single JSON file. The inner
   // filename is derived from the upload path's basename (e.g.
@@ -33,13 +62,13 @@ async function uploadResultToBucket(
   const fileName = basename
     ? basename.replace(/\.zip$/i, ".json")
     : fallbackFileName;
-  const zipped = zipSync({ [fileName]: strToU8(JSON.stringify(data)) });
+  const zipped = zipSync({ [fileName]: strToU8(JSON.stringify(payload)) });
   const blob = new Blob([new Uint8Array(zipped)], { type: "application/zip" });
   const result = await bucketService.uploadFile({
     bucketId,
-    folderId,
     path,
     content: blob,
+    ...scope,
   });
   if (!result.success) {
     throw new Error(`Bucket upload failed with status ${result.statusCode}`);
@@ -49,18 +78,10 @@ async function uploadResultToBucket(
 export async function submitValidatedData(
   sdk: UiPath,
   data: DuFramework.ContentValidationData,
-  folderId: number,
   request: IVsSaveValidatedDataRequest,
 ): Promise<SaveValidatedDataResult> {
-  const { BucketId, ValidatedExtractionResultsPath, DocumentId } = data;
-  if (!BucketId || !ValidatedExtractionResultsPath) {
-    return {
-      success: false,
-      error:
-        "ContentValidationData is missing BucketId or ValidatedExtractionResultsPath.",
-    };
-  }
   try {
+    const target = bucketTarget(data);
     const du = new OrchestratorDuModule(sdk);
     const processedResult = await du.processExtractedData(
       {
@@ -70,16 +91,9 @@ export async function submitValidatedData(
           request.validatedData as DuFramework.ExtractionResult,
         Taxonomy: request.taxonomy as DuFramework.DocumentTaxonomy,
       },
-      { folderId },
+      target.scope,
     );
-    await uploadResultToBucket(
-      new BucketService(sdk),
-      BucketId,
-      folderId,
-      ValidatedExtractionResultsPath,
-      processedResult,
-      DocumentId,
-    );
+    await uploadResultToBucket(new BucketService(sdk), target, processedResult);
     return { success: true };
   } catch (error) {
     return {
@@ -92,25 +106,13 @@ export async function submitValidatedData(
 export async function saveValidatedDataAsDraft(
   sdk: UiPath,
   data: DuFramework.ContentValidationData,
-  folderId: number,
   request: IVsSaveValidatedDataAsDraftRequest,
 ): Promise<SaveValidatedDataResult> {
-  const { BucketId, ValidatedExtractionResultsPath, DocumentId } = data;
-  if (!BucketId || !ValidatedExtractionResultsPath) {
-    return {
-      success: false,
-      error:
-        "ContentValidationData is missing BucketId or ValidatedExtractionResultsPath.",
-    };
-  }
   try {
     await uploadResultToBucket(
       new BucketService(sdk),
-      BucketId,
-      folderId,
-      ValidatedExtractionResultsPath,
+      bucketTarget(data),
       request.validatedData,
-      DocumentId,
     );
     return { success: true };
   } catch (error) {

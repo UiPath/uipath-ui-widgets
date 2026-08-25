@@ -36,21 +36,17 @@ const baseProps: any = {
   sdk: {},
   data: {
     DocumentId: "doc-123",
+    FolderId: 42,
   },
 };
 
-/** Mirrors the real hook's resolution rules so `canPersist` tracks the props. */
-const resolved = (source: any = {}, overrides: any = {}) => {
-  const resolvedFolderId = source.folderId ?? source.data?.FolderId;
-  return {
-    artifacts: mockArtifacts,
-    error: null,
-    documentId: source.documentId ?? source.data?.DocumentId,
-    resolvedFolderId,
-    canPersist: !!source.sdk && !!source.data && !!resolvedFolderId,
-    ...overrides,
-  };
-};
+/** Mirrors the real hook's resolution rules. */
+const resolved = (source: any = {}, overrides: any = {}) => ({
+  artifacts: mockArtifacts,
+  error: null,
+  documentId: source.documentId ?? source.data?.DocumentId,
+  ...overrides,
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -132,7 +128,7 @@ describe("ValidationStation", () => {
       mockSubmitValidatedData.mockResolvedValue({ success: true });
       const onSubmit = vi.fn();
       const { container } = render(
-        <ValidationStation {...baseProps} folderId={42} onSubmit={onSubmit} />,
+        <ValidationStation {...baseProps} onSubmit={onSubmit} />,
       );
       const el = await waitForWc(container);
 
@@ -143,7 +139,6 @@ describe("ValidationStation", () => {
         expect(mockSubmitValidatedData).toHaveBeenCalledWith(
           baseProps.sdk,
           baseProps.data,
-          42,
           detail,
         );
       });
@@ -156,11 +151,7 @@ describe("ValidationStation", () => {
       mockSaveValidatedDataAsDraft.mockResolvedValue({ success: true });
       const onSaveAsDraft = vi.fn();
       const { container } = render(
-        <ValidationStation
-          {...baseProps}
-          folderId={42}
-          onSaveAsDraft={onSaveAsDraft}
-        />,
+        <ValidationStation {...baseProps} onSaveAsDraft={onSaveAsDraft} />,
       );
       const el = await waitForWc(container);
 
@@ -173,7 +164,6 @@ describe("ValidationStation", () => {
         expect(mockSaveValidatedDataAsDraft).toHaveBeenCalledWith(
           baseProps.sdk,
           baseProps.data,
-          42,
           detail,
         );
       });
@@ -187,7 +177,6 @@ describe("ValidationStation", () => {
       const { container } = render(
         <ValidationStation
           {...baseProps}
-          folderId={42}
           onReportException={onReportException}
         />,
       );
@@ -209,9 +198,7 @@ describe("ValidationStation", () => {
       mockSubmitValidatedData.mockResolvedValue({ success: true });
       mockSaveValidatedDataAsDraft.mockResolvedValue({ success: true });
 
-      const { container } = render(
-        <ValidationStation {...baseProps} folderId={42} />,
-      );
+      const { container } = render(<ValidationStation {...baseProps} />);
       const el = await waitForWc(container);
 
       // None of these should throw despite no callbacks being wired.

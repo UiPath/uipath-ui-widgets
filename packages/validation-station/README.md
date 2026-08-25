@@ -47,27 +47,58 @@ function App() {
     <ValidationStation
       sdk={sdk}
       data={selectedTask.data as DuFramework.ContentValidationData}
-      folderId={12345}
     />
   );
 }
 ```
 
-> `theme` defaults to `"light"` and `language` defaults to `ValidationStationLanguage.English`, so the minimal mount just needs `sdk`, `data`, and a folder.
+> `theme` defaults to `"light"` and `language` defaults to `ValidationStationLanguage.English`, so the minimal mount just needs `sdk` and `data`.
 
 > You must call `configureValidationStationWc` once before rendering any widget
 > from this package, and host the web component's files where it expects them
 > (a `deploymentUrl` default handles this for most hosts — override it if
 > yours doesn't). See [Hosting the web component](#hosting-the-web-component).
 
+## Migrating from 1.0
+
+The `folderId` prop is gone. The folder now travels on `ContentValidationData`
+itself, as `FolderId` or `FolderKey` — the activity that produces the payload
+sets one of them, so in the common case there is nothing to pass and nothing to
+wire up.
+
+```diff
+- <ValidationStation sdk={sdk} data={data} folderId={folderId} />
++ <ValidationStation sdk={sdk} data={data} />
+```
+
+The four exported helpers lost the same parameter:
+
+```diff
+- fetchDuDocumentArtifacts(sdk, data, folderId)
+- useDuDocumentArtifacts(sdk, data, folderId)
+- submitValidatedData(sdk, data, folderId, request)
+- saveValidatedDataAsDraft(sdk, data, folderId, request)
++ fetchDuDocumentArtifacts(sdk, data)
++ useDuDocumentArtifacts(sdk, data)
++ submitValidatedData(sdk, data, request)
++ saveValidatedDataAsDraft(sdk, data, request)
+```
+
+The activity that produces a `ContentValidationData` should normally set
+`FolderId` or `FolderKey`. If you construct the object yourself, set one of them
+accordingly — for example from the Action Center task's folder, which the SDK
+surfaces as `task.folderId` (`OrganizationUnitId` in Orchestrator). Memoise the
+object you pass in, or the widget takes a new reference on every render and
+refetches the document each time.
+
 ## Data sources
 
 The widget needs a taxonomy, an extraction result and a document DOM. There are two mutually-exclusive ways to give it those:
 
-| Mode              | Pass                          | Who fetches                                                   | Who writes back                                 |
-| ----------------- | ----------------------------- | ------------------------------------------------------------- | ----------------------------------------------- |
-| **Self-fetching** | `sdk` + `data` (+ `folderId`) | The widget, from the bucket paths on `ContentValidationData`  | The widget, to `ValidatedExtractionResultsPath` |
-| **Pre-fetched**   | `artifacts` (+ `documentId`)  | You — hand it a `DuDocumentArtifacts` object you already hold | You, from the request the widget emits          |
+| Mode              | Pass                         | Who fetches                                                   | Who writes back                                 |
+| ----------------- | ---------------------------- | ------------------------------------------------------------- | ----------------------------------------------- |
+| **Self-fetching** | `sdk` + `data`               | The widget, from the bucket paths on `ContentValidationData`  | The widget, to `ValidatedExtractionResultsPath` |
+| **Pre-fetched**   | `artifacts` (+ `documentId`) | You — hand it a `DuDocumentArtifacts` object you already hold | You, from the request the widget emits          |
 
 **The outputs do not change with the mode.** `onSubmit`, `onSaveAsDraft` and `onReportException` fire for every user action either way, and always carry the request the web component produced. The only difference is a second argument: when the widget persisted the data itself, it passes the outcome too.
 
@@ -90,7 +121,9 @@ function App({ artifacts }: { artifacts: DuDocumentArtifacts }) {
 }
 ```
 
-The two modes can be mixed: pass `artifacts` **and** `sdk` + `data` + a folder id to skip the fetch while keeping the built-in write-back — `onSubmit` then receives the outcome as well.
+Every bucket call is scoped to the folder `data` names — `FolderId`, or `FolderKey` when both are present. The activity that produces the `ContentValidationData` sets one of them; if neither is there, the widget renders an error instead of fetching.
+
+The two modes can be mixed: pass `artifacts` **and** `sdk` + `data` to skip the fetch while keeping the built-in write-back — `onSubmit` then receives the outcome as well.
 
 > `DuDocumentArtifacts` is `{ taxonomy, extractionResult, dom, text, customizationInfo, original }` — `original` is the base64-encoded document the viewer renders.
 
@@ -98,12 +131,12 @@ The two modes can be mixed: pass `artifacts` **and** `sdk` + `data` + a folder i
 
 Pre-fetched mode does not mean writing the bucket plumbing yourself. Everything the widget does internally is exported, so a host can drive the same flow:
 
-| Export                                                   | Use                                                                                                                                 |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `fetchDuDocumentArtifacts(sdk, data, folderId?)`         | Fetch `DuDocumentArtifacts` imperatively — outside render, ahead of time, or in a loader. `folderId` falls back to `data.FolderId`. |
-| `useDuDocumentArtifacts(sdk, data, folderId)`            | The same fetch as a hook, for when the fetch belongs to a component's lifecycle.                                                    |
-| `submitValidatedData(sdk, data, folderId, request)`      | The submit flow: `ProcessExtractedData`, then upload to `ValidatedExtractionResultsPath`.                                           |
-| `saveValidatedDataAsDraft(sdk, data, folderId, request)` | The draft flow: upload `validatedData` straight to the bucket.                                                                      |
+| Export                                         | Use                                                                                       |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `fetchDuDocumentArtifacts(sdk, data)`          | Fetch `DuDocumentArtifacts` imperatively — outside render, ahead of time, or in a loader. |
+| `useDuDocumentArtifacts(sdk, data)`            | The same fetch as a hook, for when the fetch belongs to a component's lifecycle.          |
+| `submitValidatedData(sdk, data, request)`      | The submit flow: `ProcessExtractedData`, then upload to `ValidatedExtractionResultsPath`. |
+| `saveValidatedDataAsDraft(sdk, data, request)` | The draft flow: upload `validatedData` straight to the bucket.                            |
 
 ```tsx
 import {
@@ -114,12 +147,12 @@ import {
   type DuDocumentArtifacts,
 } from "@uipath/ui-widgets-validation-station";
 
-function HostOwnedReview({ sdk, data, folderId }) {
+function HostOwnedReview({ sdk, data }) {
   const [artifacts, setArtifacts] = useState<DuDocumentArtifacts | null>(null);
 
   useEffect(() => {
-    fetchDuDocumentArtifacts(sdk, data, folderId).then(setArtifacts);
-  }, [sdk, data, folderId]);
+    fetchDuDocumentArtifacts(sdk, data).then(setArtifacts);
+  }, [sdk, data]);
 
   if (!artifacts) return <div>Loading document…</div>;
 
@@ -129,12 +162,10 @@ function HostOwnedReview({ sdk, data, folderId }) {
       documentId={data.DocumentId}
       // no sdk / data — the host loads and persists
       onSubmit={async (request) => {
-        const result = await submitValidatedData(sdk, data, folderId, request);
+        const result = await submitValidatedData(sdk, data, request);
         afterSubmit(result);
       }}
-      onSaveAsDraft={(request) =>
-        saveValidatedDataAsDraft(sdk, data, folderId, request)
-      }
+      onSaveAsDraft={(request) => saveValidatedDataAsDraft(sdk, data, request)}
     />
   );
 }
@@ -151,10 +182,9 @@ A full working example lives in the repo's sample app under `samples/pages/Valid
 | Prop                             | Type                                           | Required | Default   | Description                                                                                                                                                                                                                                                                                                                                       |
 | -------------------------------- | ---------------------------------------------- | -------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `sdk`                            | `UiPath`                                       | No\*     | —         | UiPath SDK instance for authentication and API calls. Required for self-fetching / persistence                                                                                                                                                                                                                                                    |
-| `data`                           | `ContentValidationData`                        | No\*     | —         | Document data containing bucket paths, document ID, and folder references. Required for self-fetching / persistence                                                                                                                                                                                                                               |
+| `data`                           | `ContentValidationData`                        | No\*     | —         | Document data containing the bucket paths, document ID, and the folder they live in — `FolderId` or `FolderKey`, whichever the producing activity set. Required for self-fetching / persistence                                                                                                                                                   |
 | `artifacts`                      | `DuDocumentArtifacts`                          | No\*     | —         | Pre-fetched document artifacts. When supplied, no bucket fetch is performed. \*Either `artifacts` or `sdk` + `data` must be provided                                                                                                                                                                                                              |
 | `documentId`                     | `string`                                       | No       | —         | Document id forwarded to the web component. Falls back to `data.DocumentId` — pass it in pre-fetched mode, where there is no `data`                                                                                                                                                                                                               |
-| `folderId`                       | `number`                                       | No\*     | —         | Storage bucket folder ID. Falls back to `data.FolderId`. **In self-fetching mode one of the two must resolve to a value** — otherwise the widget shows an error.                                                                                                                                                                                  |
 | `theme`                          | `'light' \| 'dark' \| 'light-hc' \| 'dark-hc'` | No       | `'light'` | Visual theme                                                                                                                                                                                                                                                                                                                                      |
 | `language`                       | `ValidationStationLanguage`                    | No       | `English` | UI language (see enum below)                                                                                                                                                                                                                                                                                                                      |
 | `isReadonly`                     | `boolean`                                      | No       | `false`   | When `true`, renders in read-only mode                                                                                                                                                                                                                                                                                                            |
@@ -220,7 +250,6 @@ function App({ sdk, data, task }) {
     <ValidationStation
       sdk={sdk}
       data={data}
-      folderId={task.folderId}
       onSubmit={handleSubmit}
       onSaveAsDraft={handleSaveAsDraft}
       onReportException={handleReportException}
@@ -322,7 +351,6 @@ function App({ sdk, data }) {
       <ValidationStation
         sdk={sdk}
         data={data}
-        folderId={67}
         setFieldValueByPath={fieldValueByPath}
       />
     </>
@@ -361,7 +389,6 @@ function App({ sdk, data }) {
       <ValidationStation
         sdk={sdk}
         data={data}
-        folderId={67}
         selectAndFocusFieldValueByPath={focus}
       />
     </>
@@ -375,7 +402,7 @@ function App({ sdk, data }) {
 const [save, setSave] = useState<{ validate: boolean } | undefined>(undefined);
 
 <button onClick={() => setSave({ validate: true })}>Save</button>
-<ValidationStation sdk={sdk} data={data} folderId={1} save={save} />
+<ValidationStation sdk={sdk} data={data} save={save} />
 ```
 
 ## Hosting the web component

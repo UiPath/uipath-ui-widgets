@@ -51,6 +51,7 @@ const makeSdk = (overrides: Record<string, any> = {}) =>
 const makeData = (overrides: Record<string, any> = {}) =>
   ({
     BucketId: 100,
+    FolderId: 42,
     ValidatedExtractionResultsPath: "results/output.zip",
     DocumentId: "doc-abc",
     ...overrides,
@@ -75,7 +76,6 @@ describe("submitValidatedData", () => {
       const result = await submitValidatedData(
         makeSdk(),
         makeData({ BucketId: undefined }),
-        42,
         makeRequest(),
       );
       expect(result.success).toBe(false);
@@ -86,22 +86,66 @@ describe("submitValidatedData", () => {
       const result = await submitValidatedData(
         makeSdk(),
         makeData({ ValidatedExtractionResultsPath: undefined }),
-        42,
         makeRequest(),
       );
       expect(result.success).toBe(false);
       expect(result.error).toContain("ValidatedExtractionResultsPath");
     });
 
+    it("returns error when data names no folder", async () => {
+      const result = await submitValidatedData(
+        makeSdk(),
+        makeData({ FolderId: undefined, FolderKey: undefined }),
+        makeRequest(),
+      );
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("FolderId / FolderKey");
+    });
+
     it("does not call SDK or upload when validation fails", async () => {
       await submitValidatedData(
         makeSdk(),
         makeData({ BucketId: undefined }),
-        42,
         makeRequest(),
       );
       expect(mockProcessExtractedData).not.toHaveBeenCalled();
       expect(mockUploadFile).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("folder scoping", () => {
+    it("scopes both the SDK call and the upload by FolderKey when set", async () => {
+      mockProcessExtractedData.mockResolvedValue({});
+      mockUploadFile.mockResolvedValue({ success: true });
+
+      await submitValidatedData(
+        makeSdk(),
+        makeData({ FolderId: undefined, FolderKey: "folder-key-1" }),
+        makeRequest(),
+      );
+
+      expect(mockProcessExtractedData).toHaveBeenCalledWith(expect.anything(), {
+        folderKey: "folder-key-1",
+      });
+      const uploadArg = mockUploadFile.mock.calls[0][0];
+      expect(uploadArg.folderKey).toBe("folder-key-1");
+      expect(uploadArg.folderId).toBeUndefined();
+    });
+
+    it("prefers FolderKey over FolderId when data carries both", async () => {
+      mockProcessExtractedData.mockResolvedValue({});
+      mockUploadFile.mockResolvedValue({ success: true });
+
+      await submitValidatedData(
+        makeSdk(),
+        makeData({ FolderId: 42, FolderKey: "folder-key-1" }),
+        makeRequest(),
+      );
+
+      expect(mockProcessExtractedData).toHaveBeenCalledWith(expect.anything(), {
+        folderKey: "folder-key-1",
+      });
+      expect(mockUploadFile.mock.calls[0][0].folderId).toBeUndefined();
     });
   });
 
@@ -110,7 +154,7 @@ describe("submitValidatedData", () => {
       mockProcessExtractedData.mockResolvedValue({ processed: true });
       mockUploadFile.mockResolvedValue({ success: true });
 
-      await submitValidatedData(makeSdk(), makeData(), 42, makeRequest());
+      await submitValidatedData(makeSdk(), makeData(), makeRequest());
 
       expect(mockProcessExtractedData).toHaveBeenCalledTimes(1);
       expect(mockProcessExtractedData).toHaveBeenCalledWith(
@@ -130,7 +174,6 @@ describe("submitValidatedData", () => {
       const result = await submitValidatedData(
         makeSdk(),
         makeData(),
-        42,
         makeRequest(),
       );
 
@@ -153,7 +196,6 @@ describe("submitValidatedData", () => {
       await submitValidatedData(
         makeSdk(),
         makeData({ ValidatedExtractionResultsPath: "a/b/c/output.zip" }),
-        42,
         makeRequest(),
       );
 
@@ -167,7 +209,6 @@ describe("submitValidatedData", () => {
       await submitValidatedData(
         makeSdk(),
         makeData({ ValidatedExtractionResultsPath: "results/output.bin" }),
-        42,
         makeRequest(),
       );
 
@@ -184,7 +225,6 @@ describe("submitValidatedData", () => {
           ValidatedExtractionResultsPath: "results/",
           DocumentId: "doc-xyz",
         }),
-        42,
         makeRequest(),
       );
 
@@ -201,7 +241,6 @@ describe("submitValidatedData", () => {
           ValidatedExtractionResultsPath: "results/",
           DocumentId: undefined,
         }),
-        42,
         makeRequest(),
       );
 
@@ -218,7 +257,6 @@ describe("submitValidatedData", () => {
       const result = await submitValidatedData(
         makeSdk(),
         makeData(),
-        42,
         makeRequest(),
       );
 
@@ -235,7 +273,6 @@ describe("submitValidatedData", () => {
       const result = await submitValidatedData(
         makeSdk(),
         makeData(),
-        42,
         makeRequest(),
       );
 
@@ -250,7 +287,6 @@ describe("submitValidatedData", () => {
       const result = await submitValidatedData(
         makeSdk(),
         makeData(),
-        42,
         makeRequest(),
       );
 
@@ -264,7 +300,6 @@ describe("submitValidatedData", () => {
       const result = await submitValidatedData(
         makeSdk(),
         makeData(),
-        42,
         makeRequest(),
       );
 
@@ -286,7 +321,6 @@ describe("saveValidatedDataAsDraft", () => {
     const result = await saveValidatedDataAsDraft(
       makeSdk(),
       makeData({ BucketId: undefined }),
-      42,
       makeDraftRequest(),
     );
     expect(result.success).toBe(false);
@@ -297,21 +331,39 @@ describe("saveValidatedDataAsDraft", () => {
     const result = await saveValidatedDataAsDraft(
       makeSdk(),
       makeData({ ValidatedExtractionResultsPath: undefined }),
-      42,
       makeDraftRequest(),
     );
     expect(result.success).toBe(false);
     expect(result.error).toContain("ValidatedExtractionResultsPath");
   });
 
-  it("does NOT call processExtractedData — draft skips the SDK", async () => {
-    mockUploadFile.mockResolvedValue({ success: true });
-    await saveValidatedDataAsDraft(
+  it("returns error when data names no folder", async () => {
+    const result = await saveValidatedDataAsDraft(
       makeSdk(),
-      makeData(),
-      42,
+      makeData({ FolderId: undefined, FolderKey: undefined }),
       makeDraftRequest(),
     );
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("FolderId / FolderKey");
+  });
+
+  it("scopes the upload by FolderKey when set", async () => {
+    mockUploadFile.mockResolvedValue({ success: true });
+
+    await saveValidatedDataAsDraft(
+      makeSdk(),
+      makeData({ FolderId: undefined, FolderKey: "folder-key-1" }),
+      makeDraftRequest(),
+    );
+
+    const uploadArg = mockUploadFile.mock.calls[0][0];
+    expect(uploadArg.folderKey).toBe("folder-key-1");
+    expect(uploadArg.folderId).toBeUndefined();
+  });
+
+  it("does NOT call processExtractedData — draft skips the SDK", async () => {
+    mockUploadFile.mockResolvedValue({ success: true });
+    await saveValidatedDataAsDraft(makeSdk(), makeData(), makeDraftRequest());
     expect(mockProcessExtractedData).not.toHaveBeenCalled();
   });
 
@@ -321,7 +373,6 @@ describe("saveValidatedDataAsDraft", () => {
     const result = await saveValidatedDataAsDraft(
       makeSdk(),
       makeData(),
-      42,
       makeDraftRequest({ validatedData: { hello: "world" } }),
     );
 
@@ -345,7 +396,6 @@ describe("saveValidatedDataAsDraft", () => {
     const result = await saveValidatedDataAsDraft(
       makeSdk(),
       makeData(),
-      42,
       makeDraftRequest(),
     );
 
@@ -359,7 +409,6 @@ describe("saveValidatedDataAsDraft", () => {
     const result = await saveValidatedDataAsDraft(
       makeSdk(),
       makeData(),
-      42,
       makeDraftRequest(),
     );
 

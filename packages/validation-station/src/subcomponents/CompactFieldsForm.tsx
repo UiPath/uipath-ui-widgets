@@ -12,14 +12,13 @@ import { useWcElement } from "./useWcElement.js";
 /**
  * React wrapper for `<ui-du-compact-fields-form-standalone-wc-element>` — the
  * extraction-fields panel without a document viewer. The only save-capable
- * subcomponent: given `sdk` + `data` + a folder id it persists the submit and
- * draft flows itself, exactly as `ValidationStation` does, and reports through
- * the same callbacks either way.
+ * subcomponent: given `sdk` + `data` it persists the submit and draft flows
+ * itself, exactly as `ValidationStation` does, and reports through the same
+ * callbacks either way.
  */
 export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
   sdk,
   data,
-  folderId,
   artifacts: providedArtifacts,
   documentId: documentIdProp,
   instanceId,
@@ -51,20 +50,11 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
   onSaveAsDraft,
   onReportException,
 }) => {
-  const {
-    artifacts,
-    error,
-    wcReady,
-    tag,
-    commonProps,
-    canPersist,
-    resolvedFolderId,
-  } = useWcElement({
+  const { artifacts, error, wcReady, tag, commonProps } = useWcElement({
     baseTag: DU_WC_TAGS.compactFieldsForm,
     dataSource: {
       sdk,
       data,
-      folderId,
       artifacts: providedArtifacts,
       documentId: documentIdProp,
     },
@@ -81,7 +71,7 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
 
   const { handleSubmit, handleSaveAsDraft, handleException } =
     createSaveHandlers(
-      { sdk, data, resolvedFolderId, canPersist },
+      { sdk, data },
       { onSubmit, onSaveAsDraft, onReportException },
     );
 

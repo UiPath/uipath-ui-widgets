@@ -10,12 +10,7 @@ import { useResolvedArtifacts } from "./useResolvedArtifacts.js";
 export function useDuDocumentArtifacts(
   sdk: UiPath,
   data: DuFramework.ContentValidationData,
-  folderId: number | undefined,
 ) {
-  const { artifacts, error } = useResolvedArtifacts({
-    sdk,
-    data,
-    folderId,
-  });
+  const { artifacts, error } = useResolvedArtifacts({ sdk, data });
   return { artifacts, error };
 }

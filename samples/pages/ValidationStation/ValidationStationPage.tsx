@@ -8,7 +8,6 @@ import {
   type SetFieldValueByPath,
 } from "@uipath/ui-widgets-validation-station";
 import type { UiPath } from "@uipath/uipath-typescript/core";
-import { type DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import { OrchestratorDuModule } from "@uipath/uipath-typescript/orchestrator-du-module";
 import { TaskType } from "@uipath/uipath-typescript/tasks";
 import { useCallback, useEffect, useState } from "react";
@@ -25,7 +24,8 @@ interface ValidationStationPageProps {
 /**
  * Validation Station in **self-fetching** mode: the widget receives `sdk` +
  * `data` and reads the document straight from the storage-bucket paths on
- * `ContentValidationData`, then owns submit and save-as-draft itself.
+ * `ContentValidationData`, scoped to the folder that payload names, then owns
+ * submit and save-as-draft itself.
  *
  * See `ValidationStationPrefetchedPage` for the same screen with the fetch and
  * the write-back moved into the host.
@@ -37,6 +37,7 @@ function ValidationStationPage({ uipathSdk }: ValidationStationPageProps) {
     fetchTasks,
     selectedTaskId,
     selectedTask,
+    contentValidationData,
     taskLoading,
     selectTask,
     clearSelection,
@@ -104,7 +105,7 @@ function ValidationStationPage({ uipathSdk }: ValidationStationPageProps) {
 
   const renderDocument = () => {
     if (taskLoading) return <CenteredText>Loading task...</CenteredText>;
-    if (!selectedTask) {
+    if (!selectedTask || !contentValidationData) {
       return <CenteredText>Select a task from the list</CenteredText>;
     }
 
@@ -149,8 +150,7 @@ function ValidationStationPage({ uipathSdk }: ValidationStationPageProps) {
         <Box sx={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
           <ValidationStation
             sdk={uipathSdk}
-            data={selectedTask.data as DuFramework.ContentValidationData}
-            folderId={selectedTask.folderId}
+            data={contentValidationData}
             selectAndFocusFieldValueByPath={selectAndFocusFieldValueByPath}
             setFieldValueByPath={setFieldValueByPath}
             onSubmit={handleSubmit}

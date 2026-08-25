@@ -41,7 +41,7 @@ describe("useDuDocumentArtifacts", () => {
     mockFetchBucketArtifacts.mockResolvedValue(mockArtifacts);
 
     const { result } = renderHook(() =>
-      useDuDocumentArtifacts(mockSdk, makeData(), 42),
+      useDuDocumentArtifacts(mockSdk, makeData()),
     );
 
     expect(result.current.artifacts).toBeNull();
@@ -55,47 +55,45 @@ describe("useDuDocumentArtifacts", () => {
     expect(mockFetchBucketArtifacts).toHaveBeenCalled();
   });
 
-  it("uses folderId prop over data.FolderId", async () => {
+  it("hands the whole payload to the fetch — the folder travels on it", async () => {
     mockFetchBucketArtifacts.mockResolvedValue(mockArtifacts);
+    const data = makeData({ FolderId: 55 });
 
-    renderHook(() =>
-      useDuDocumentArtifacts(mockSdk, makeData({ FolderId: 10 }), 99),
-    );
+    renderHook(() => useDuDocumentArtifacts(mockSdk, data));
 
     await waitFor(() => {
       expect(mockFetchBucketArtifacts).toHaveBeenCalledTimes(1);
     });
 
-    const callArgs = mockFetchBucketArtifacts.mock.calls[0];
-    expect(callArgs[2]).toBe(99);
+    expect(mockFetchBucketArtifacts.mock.calls[0][1]).toBe(data);
   });
 
-  it("falls back to data.FolderId when folderId prop is undefined", async () => {
+  it("fetches when data carries only a FolderKey", async () => {
     mockFetchBucketArtifacts.mockResolvedValue(mockArtifacts);
 
-    renderHook(() =>
-      useDuDocumentArtifacts(mockSdk, makeData({ FolderId: 55 }), undefined),
-    );
-
-    await waitFor(() => {
-      expect(mockFetchBucketArtifacts).toHaveBeenCalledTimes(1);
-    });
-
-    const callArgs = mockFetchBucketArtifacts.mock.calls[0];
-    expect(callArgs[2]).toBe(55);
-  });
-
-  it("returns error when folderId is missing from both prop and data", () => {
     const { result } = renderHook(() =>
       useDuDocumentArtifacts(
         mockSdk,
-        makeData({ FolderId: undefined }),
-        undefined,
+        makeData({ FolderId: undefined, FolderKey: "folder-key-1" }),
+      ),
+    );
+
+    await waitFor(() => {
+      expect(result.current.artifacts).toEqual(mockArtifacts);
+    });
+    expect(result.current.error).toBeNull();
+  });
+
+  it("returns error when data carries neither FolderId nor FolderKey", () => {
+    const { result } = renderHook(() =>
+      useDuDocumentArtifacts(
+        mockSdk,
+        makeData({ FolderId: undefined, FolderKey: undefined }),
       ),
     );
 
     expect(result.current.error).toBe(
-      "folderId of Storage bucket is required. Provide it as a prop or ensure data.FolderId is set.",
+      "ContentValidationData must carry FolderId or FolderKey (the storage bucket's folder).",
     );
     expect(result.current.artifacts).toBeNull();
     expect(mockFetchBucketArtifacts).not.toHaveBeenCalled();
@@ -105,7 +103,7 @@ describe("useDuDocumentArtifacts", () => {
     mockFetchBucketArtifacts.mockRejectedValue(new Error("Network failure"));
 
     const { result } = renderHook(() =>
-      useDuDocumentArtifacts(mockSdk, makeData(), 42),
+      useDuDocumentArtifacts(mockSdk, makeData()),
     );
 
     await waitFor(() => {
@@ -119,7 +117,7 @@ describe("useDuDocumentArtifacts", () => {
     mockFetchBucketArtifacts.mockRejectedValue("string error");
 
     const { result } = renderHook(() =>
-      useDuDocumentArtifacts(mockSdk, makeData(), 42),
+      useDuDocumentArtifacts(mockSdk, makeData()),
     );
 
     await waitFor(() => {
@@ -127,12 +125,12 @@ describe("useDuDocumentArtifacts", () => {
     });
   });
 
-  it("does not re-fetch when re-rendered with same data and folderId", async () => {
+  it("does not re-fetch when re-rendered with the same data", async () => {
     mockFetchBucketArtifacts.mockResolvedValue(mockArtifacts);
     const data = makeData();
 
     const { result, rerender } = renderHook(() =>
-      useDuDocumentArtifacts(mockSdk, data, 42),
+      useDuDocumentArtifacts(mockSdk, data),
     );
 
     await waitFor(() => {
@@ -149,7 +147,7 @@ describe("useDuDocumentArtifacts", () => {
     let data = makeData({ DocumentId: "doc-1" });
 
     const { result, rerender } = renderHook(() =>
-      useDuDocumentArtifacts(mockSdk, data, 42),
+      useDuDocumentArtifacts(mockSdk, data),
     );
 
     await waitFor(() => {

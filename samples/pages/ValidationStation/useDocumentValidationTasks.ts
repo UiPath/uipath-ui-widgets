@@ -1,10 +1,11 @@
 import type { UiPath } from "@uipath/uipath-typescript/core";
+import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import type {
   RawTaskGetResponse,
   TaskGetResponse,
 } from "@uipath/uipath-typescript/tasks";
 import { Tasks, TaskType } from "@uipath/uipath-typescript/tasks";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * The document-validation task queue and the currently open task, shared by the
@@ -39,7 +40,7 @@ export function useDocumentValidationTasks(uipathSdk: UiPath) {
       // type, and only document-validation ones open in this widget.
       const result = await tasksService.getAll({
         filter: `Type eq '${TaskType.DocumentValidation}'`,
-        orderby: "CreationTime desc",
+        orderby: "CreationTime asc",
         pageSize: 100,
       });
       setTaskList(result.items);
@@ -92,12 +93,27 @@ export function useDocumentValidationTasks(uipathSdk: UiPath) {
     };
   }, [uipathSdk, selectedTaskId]);
 
+  // The widgets read the bucket folder off `ContentValidationData`. The
+  // activity that produces the payload sets FolderId or FolderKey; these sample
+  // tasks were created without one, so we fall back to the task's own folder.
+  // Memoised on the task, which is state replaced once per selection, so the
+  // widgets see a stable reference and do not refetch on every render.
+  const contentValidationData = useMemo(() => {
+    if (!selectedTask) return undefined;
+    const cvd = selectedTask.data as
+      | DuFramework.ContentValidationData
+      | undefined;
+    if (!cvd || cvd.FolderId || cvd.FolderKey) return cvd;
+    return { ...cvd, FolderId: selectedTask.folderId };
+  }, [selectedTask]);
+
   return {
     taskList,
     tasksLoading,
     fetchTasks,
     selectedTaskId,
     selectedTask,
+    contentValidationData,
     taskLoading,
     selectTask,
     clearSelection,

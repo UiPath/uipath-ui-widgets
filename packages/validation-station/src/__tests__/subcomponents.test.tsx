@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, waitFor } from "@testing-library/react";
+import type { UiPath } from "@uipath/uipath-typescript/core";
+import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 // Avoid the heavy Angular-bundle side effects of the real module; keep the tag
@@ -56,8 +58,6 @@ function readyState(overrides: Record<string, any> = {}) {
     artifacts: mockArtifacts,
     error: null,
     documentId: "doc-123",
-    canPersist: false,
-    resolvedFolderId: undefined,
     ...overrides,
   };
 }
@@ -146,41 +146,103 @@ describe("CompactFieldsForm save wiring", () => {
   const sdk = {} as any;
   const data = { DocumentId: "doc-123", FolderId: 42 } as any;
 
-  beforeEach(() => {
-    mockUseSubcomponentArtifacts.mockReturnValue(
-      readyState({ canPersist: true, resolvedFolderId: 42 }),
-    );
-  });
+  const submitDetail = { documentId: "doc-123", validatedData: { s: 1 } };
+  const draftDetail = { documentId: "doc-123", validatedData: { d: 2 } };
 
-  it("persists a submit itself and emits the request plus the outcome", async () => {
-    mockSubmitValidatedData.mockResolvedValue({ success: true });
+  /** Fires both save flows at a freshly rendered form and returns their spies. */
+  function dispatchSaves(props: {
+    sdk?: UiPath;
+    data?: DuFramework.ContentValidationData;
+  }) {
     const onSubmit = vi.fn();
+    const onSaveAsDraft = vi.fn();
     const { container } = render(
       <CompactFieldsForm
-        sdk={sdk}
-        data={data}
-        folderId={42}
+        sdk={props.sdk}
+        data={props.data}
         onSubmit={onSubmit}
+        onSaveAsDraft={onSaveAsDraft}
       />,
     );
     const el = container.querySelector(
       "ui-du-compact-fields-form-standalone-wc-element",
     )!;
+    el.dispatchEvent(
+      new CustomEvent("saveValidatedDataRequest", { detail: submitDetail }),
+    );
+    el.dispatchEvent(
+      new CustomEvent("saveValidatedDataAsDraftRequest", {
+        detail: draftDetail,
+      }),
+    );
+    return { onSubmit, onSaveAsDraft };
+  }
 
-    const detail = { documentId: "doc-123", validatedData: { v: 1 } };
-    el.dispatchEvent(new CustomEvent("saveValidatedDataRequest", { detail }));
+  // `canPersist` in saveHandlers — an sdk, a payload, and a folder named on that
+  // payload — decides whether the widget writes back itself. Both tables below
+  // drive every shape of that decision, so no folder form can quietly stop being
+  // recognised.
+
+  it.each<{ shape: string; data: DuFramework.ContentValidationData }>([
+    { shape: "FolderId", data: { DocumentId: "doc-123", FolderId: 42 } },
+    {
+      shape: "FolderKey",
+      data: { DocumentId: "doc-123", FolderKey: "folder-key-1" },
+    },
+    {
+      shape: "FolderId + FolderKey",
+      data: { DocumentId: "doc-123", FolderId: 42, FolderKey: "key" },
+    },
+  ])("$shape → persists itself", async ({ data: payload }) => {
+    mockSubmitValidatedData.mockResolvedValue({ success: true });
+    mockSaveValidatedDataAsDraft.mockResolvedValue({ success: true });
+
+    const { onSubmit, onSaveAsDraft } = dispatchSaves({ sdk, data: payload });
 
     await waitFor(() =>
       expect(mockSubmitValidatedData).toHaveBeenCalledWith(
         sdk,
-        data,
-        42,
-        detail,
+        payload,
+        submitDetail,
       ),
     );
     await waitFor(() =>
-      expect(onSubmit).toHaveBeenCalledWith(detail, { success: true }),
+      expect(mockSaveValidatedDataAsDraft).toHaveBeenCalledWith(
+        sdk,
+        payload,
+        draftDetail,
+      ),
     );
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(submitDetail, { success: true }),
+    );
+    await waitFor(() =>
+      expect(onSaveAsDraft).toHaveBeenCalledWith(draftDetail, {
+        success: true,
+      }),
+    );
+  });
+
+  it.each<{
+    shape: string;
+    sdk?: UiPath;
+    data?: DuFramework.ContentValidationData;
+  }>([
+    {
+      shape: "no folder on the payload",
+      sdk,
+      data: { DocumentId: "doc-123" },
+    },
+    { shape: "no sdk or data at all" },
+  ])("$shape → hands the save back", (row) => {
+    const { onSubmit, onSaveAsDraft } = dispatchSaves(row);
+
+    // Nowhere to write, so both flows emit the raw request — no SDK round-trip,
+    // and no outcome for the host to misread as "already saved".
+    expect(mockSubmitValidatedData).not.toHaveBeenCalled();
+    expect(mockSaveValidatedDataAsDraft).not.toHaveBeenCalled();
+    expect(onSubmit).toHaveBeenCalledWith(submitDetail);
+    expect(onSaveAsDraft).toHaveBeenCalledWith(draftDetail);
   });
 
   it("forwards a failed submit result verbatim to onSubmit", async () => {
@@ -190,12 +252,7 @@ describe("CompactFieldsForm save wiring", () => {
     mockSubmitValidatedData.mockResolvedValue(failure);
     const onSubmit = vi.fn();
     const { container } = render(
-      <CompactFieldsForm
-        sdk={sdk}
-        data={data}
-        folderId={42}
-        onSubmit={onSubmit}
-      />,
+      <CompactFieldsForm sdk={sdk} data={data} onSubmit={onSubmit} />,
     );
     const el = container.querySelector(
       "ui-du-compact-fields-form-standalone-wc-element",
@@ -212,46 +269,12 @@ describe("CompactFieldsForm save wiring", () => {
     );
   });
 
-  it("forwards saveValidatedDataAsDraftRequest to saveValidatedDataAsDraft", async () => {
-    mockSaveValidatedDataAsDraft.mockResolvedValue({ success: true });
-    const onSaveAsDraft = vi.fn();
-    const { container } = render(
-      <CompactFieldsForm
-        sdk={sdk}
-        data={data}
-        folderId={42}
-        onSaveAsDraft={onSaveAsDraft}
-      />,
-    );
-    const el = container.querySelector(
-      "ui-du-compact-fields-form-standalone-wc-element",
-    )!;
-
-    const detail = { documentId: "doc-123", validatedData: { d: 2 } };
-    el.dispatchEvent(
-      new CustomEvent("saveValidatedDataAsDraftRequest", { detail }),
-    );
-
-    await waitFor(() =>
-      expect(mockSaveValidatedDataAsDraft).toHaveBeenCalledWith(
-        sdk,
-        data,
-        42,
-        detail,
-      ),
-    );
-    await waitFor(() =>
-      expect(onSaveAsDraft).toHaveBeenCalledWith(detail, { success: true }),
-    );
-  });
-
   it("emits the exception request untouched", () => {
     const onReportException = vi.fn();
     const { container } = render(
       <CompactFieldsForm
         sdk={sdk}
         data={data}
-        folderId={42}
         onReportException={onReportException}
       />,
     );
@@ -266,41 +289,5 @@ describe("CompactFieldsForm save wiring", () => {
     el.dispatchEvent(new CustomEvent("saveExceptionReportRequest", { detail }));
 
     expect(onReportException).toHaveBeenCalledWith(detail);
-  });
-
-  it("emits the request with no outcome when it cannot persist", () => {
-    mockUseSubcomponentArtifacts.mockReturnValue(
-      readyState({ canPersist: false, resolvedFolderId: undefined }),
-    );
-    const onSubmit = vi.fn();
-    const onSaveAsDraft = vi.fn();
-    const { container } = render(
-      <CompactFieldsForm
-        instanceId="i1"
-        onSubmit={onSubmit}
-        onSaveAsDraft={onSaveAsDraft}
-      />,
-    );
-    const el = container.querySelector(
-      "ui-du-compact-fields-form-standalone-wc-element",
-    )!;
-
-    const submitDetail = { documentId: "d", validatedData: { s: 1 } };
-    const draftDetail = { documentId: "d", validatedData: { d: 1 } };
-    el.dispatchEvent(
-      new CustomEvent("saveValidatedDataRequest", { detail: submitDetail }),
-    );
-    el.dispatchEvent(
-      new CustomEvent("saveValidatedDataAsDraftRequest", {
-        detail: draftDetail,
-      }),
-    );
-
-    // No SDK round-trip without a persist context...
-    expect(mockSubmitValidatedData).not.toHaveBeenCalled();
-    expect(mockSaveValidatedDataAsDraft).not.toHaveBeenCalled();
-    // ...and the same callbacks fire, minus the outcome, so the host can persist.
-    expect(onSubmit).toHaveBeenCalledWith(submitDetail);
-    expect(onSaveAsDraft).toHaveBeenCalledWith(draftDetail);
   });
 });
