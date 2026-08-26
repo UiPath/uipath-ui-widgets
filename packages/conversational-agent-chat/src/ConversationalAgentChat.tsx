@@ -1115,14 +1115,22 @@ export const ConversationalAgentChat = ({
       // TODO: if Apollo adds more renderer slots (footer, first-run, etc.),
       // extract this mount/unmount plumbing into a `useApolloRenderer` hook.
       const renderSettings = (element: HTMLElement) => {
-        // Apollo clears `element.innerHTML` before every call to the renderer.
-        // Reusing a React root would leave its virtual DOM out of sync with the
-        // wiped real DOM, so we unmount and recreate on every invocation.
+        // Apollo clears `element.innerHTML` on every settings toggle, including
+        // close — where it returns without calling the renderer back. So we
+        // never mount the root on `element` itself: that wipe would detach the
+        // root's DOM behind React's back, and the next unmount() would throw
+        // `NotFoundError: The node to be removed is not a child of this node`.
+        // React defers that throw out of Apollo's try/catch around the renderer,
+        // so it escapes as an uncaught error and takes down the host app.
+        // Mounting on our own child element keeps unmount() valid: the wipe
+        // detaches the wrapper wholesale and its subtree stays attached to it.
         if (settingsRootRef.current) {
           settingsRootRef.current.unmount();
           settingsRootRef.current = null;
         }
-        const root = createRoot(element);
+        const mount = document.createElement("div");
+        element.appendChild(mount);
+        const root = createRoot(mount);
         settingsRootRef.current = root;
         const profileResetKey =
           agentId != null && folderId != null
