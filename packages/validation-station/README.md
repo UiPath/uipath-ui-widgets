@@ -188,15 +188,16 @@ A full working example lives in the repo's sample app under `samples/pages/Valid
 | `theme`                          | `'light' \| 'dark' \| 'light-hc' \| 'dark-hc'` | No       | `'light'` | Visual theme                                                                                                                                                                                                                                                                                                                                      |
 | `language`                       | `ValidationStationLanguage`                    | No       | `English` | UI language (see enum below)                                                                                                                                                                                                                                                                                                                      |
 | `isReadonly`                     | `boolean`                                      | No       | `false`   | When `true`, renders in read-only mode                                                                                                                                                                                                                                                                                                            |
-| `options`                        | `IValidationStationOptions`                    | No       | —         | Fine-grained UI feature flags                                                                                                                                                                                                                                                                                                                     |
-| `save={{ validate: false }}`     | `{ validate: boolean }`                        | No       | —         | Trigger **save as draft**. ⚠ Requires `options.emitDtoStateChanges: true` — otherwise the web component won't surface the latest in-memory extraction state and the save will be a no-op.                                                                                                                                                         |
+| `persistent`                     | `boolean`                                      | No       | `false`   | Render the persistent element variant, which survives portal/DOM detachment (e.g. tab switches)                                                                                                                                                                                                                                                   |
+| `options`                        | `IValidationStationOptions`                    | No       | —         | Fine-grained UI feature flags, passed through to the element as given                                                                                                                                                                                                                                                                             |
+| `save={{ validate: false }}`     | `{ validate: boolean }`                        | No       | —         | Trigger **save as draft**                                                                                                                                                                                                                                                                                                                         |
 | `save={{ validate: true }}`      | `{ validate: boolean }`                        | No       | —         | Trigger **submit** — runs validation first, then saves.                                                                                                                                                                                                                                                                                           |
 | `discardChanges`                 | `{ value: boolean }`                           | No       | —         | Trigger a discard-changes operation. Call `setDiscardChanges({ value: true })` (or `false` — the boolean is ignored) every time you want it to fire. Each call creates a brand-new object even if the content looks identical, and that's what the widget watches for — so calling it repeatedly with the same `{ value: true }` works just fine. |
 | `setFieldValueByPath`            | `SetFieldValueByPath`                          | No       | —         | Set a field value addressed by a path of `{ fieldName, valueIndex }` segments                                                                                                                                                                                                                                                                     |
 | `selectAndFocusFieldValueByPath` | `SelectAndFocusFieldValueByPath`               | No       | —         | Select and focus a field value addressed by a path; focuses the document reference if any                                                                                                                                                                                                                                                         |
 | `deleteFieldValueByPath`         | `DeleteFieldValueByPath`                       | No       | —         | Delete a field value addressed by a path                                                                                                                                                                                                                                                                                                          |
 
-> The three callback props (`onSubmit`, `onSaveAsDraft`, `onReportException`) are documented in the next section.
+> The three save callbacks (`onSubmit`, `onSaveAsDraft`, `onReportException`) are documented in [the next section](#reacting-to-save--draft--exception-flows); the state callbacks in [Reading the document state](#reading-the-document-state).
 
 ### Reacting to save / draft / exception flows
 
@@ -260,6 +261,38 @@ function App({ sdk, data, task }) {
 
 > All three callbacks are optional, but failures are silent if you skip them — the widget surfaces no errors on its own. `onReportException` is the only place the report goes; without it the user's "Report as exception" click is a no-op.
 
+## Reading the document state
+
+These callbacks report the rest of the element's
+`IValidationStationStandaloneWcEventMap`; the three save flows are above.
+
+| Prop                                     | Fires when                                                                            |
+| ---------------------------------------- | ------------------------------------------------------------------------------------- |
+| `onExtractionResultChanged`              | any change to the extraction result — needs `options={{ emitDtoStateChanges: true }}` |
+| `onLoaded`                               | the element finished loading                                                          |
+| `onDirtyChange`                          | unsaved changes appear or are cleared                                                 |
+| `onIsValidChange`                        | validity flips (`true` = no Must rule broken, no invalid values)                      |
+| `onDocumentTypeChanged`                  | the user picks another document type                                                  |
+| `onFieldValueSelected`                   | the user selects a field value                                                        |
+| `onFieldValueChanged`                    | the user edits a field value                                                          |
+| `onBusinessRulesEvaluated`               | validation errors and business rules are re-evaluated                                 |
+| `onSaveResult`                           | a `save` command completes                                                            |
+| `onSetFieldValueByPathResult`            | a `setFieldValueByPath` command completes                                             |
+| `onSelectAndFocusFieldValueByPathResult` | a `selectAndFocusFieldValueByPath` command completes                                  |
+| `onDeleteFieldValueByPathResult`         | a `deleteFieldValueByPath` command completes                                          |
+| `onFieldsPanelWidthChanged`              | the fields panel is resized (width in px)                                             |
+| `onFieldsPanelSideChanged`               | the panel moves to the other side of the viewer                                       |
+
+**Commands need a loaded document.** `setFieldValueByPath`,
+`selectAndFocusFieldValueByPath` and `deleteFieldValueByPath` resolve their
+`path` against the taxonomy and the current extraction result, so one issued
+before those arrive fails to resolve. Gate on `onLoaded`, and wire the matching
+`*Result` callback — it carries the reason (`No field value found at path …`),
+which is otherwise invisible.
+
+The subcomponents report subsets of this set — see
+[subcomponents](./docs/validation-station-subcomponents.md).
+
 ## Language enum
 
 `ValidationStationLanguage` provides all supported locales:
@@ -308,6 +341,15 @@ import type {
   SetFieldValueByPath,
   SelectAndFocusFieldValueByPath,
   DeleteFieldValueByPath,
+  ValidationStationEventProps,
+  VsStateEventProps,
+  VsSaveResultEventProps,
+  IFieldValueDetailsDto,
+  EvaluatedBusinessRulesForFieldValueDto,
+  ISaveResult,
+  SetFieldValueByPathResult,
+  SelectAndFocusFieldValueByPathResult,
+  DeleteFieldValueByPathResult,
 } from "@uipath/ui-widgets-validation-station";
 ```
 
@@ -320,6 +362,8 @@ tests. The wrappers in this package render them for you.
 ### Setting a field value by path
 
 Address fields by path when you have nested groups or table rows. Each segment is `{ fieldName, valueIndex }`.
+
+> A path only resolves once the document has loaded — see [Reading the document state](#reading-the-document-state). Wire `onSetFieldValueByPathResult` while you are building this, or a mistimed command fails silently.
 
 ```tsx
 import { useState } from "react";

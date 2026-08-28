@@ -1,32 +1,29 @@
 import type {
   BusinessRuleModel,
   DeleteFieldValueByPath,
-  DeleteFieldValueByPathResult,
   DocumentViewerOptions,
-  EvaluatedBusinessRulesForFieldValueDto,
   GoToPage,
   GoToPageResult,
-  IFieldValueDetailsDto,
-  ISaveResult,
   IValidationStationOptions,
   SelectAndFocusFieldValueByPath,
   SelectAndFocusFieldValueByPathResult,
   SetFieldValueByPath,
-  SetFieldValueByPathResult,
 } from "@uipath/du-validation-station-wc";
-import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import type { CSSProperties } from "react";
 import type { DuArtifactsSource } from "../useResolvedArtifacts.js";
-import type { DuSaveCallbacks, ValidationStationLanguage } from "../types.js";
-
-/** Theme variants accepted by every DU standalone element. */
-export type WcTheme = "light" | "dark" | "light-hc" | "dark-hc";
+import type {
+  DuCommonProps,
+  DuSaveCallbacks,
+  VsSaveResultEventProps,
+  VsStateEventProps,
+} from "../types.js";
 
 /**
  * Props common to every subcomponent wrapper: a data source (see
  * {@link DuArtifactsSource}), shared-store linking, and presentation.
  */
-export interface SubcomponentCommonProps extends DuArtifactsSource {
+export interface SubcomponentCommonProps
+  extends DuArtifactsSource, DuCommonProps {
   /**
    * Links this element's store to sibling standalone elements. Elements sharing
    * the same `instanceId` mirror each other's edits, selection, and document
@@ -35,15 +32,7 @@ export interface SubcomponentCommonProps extends DuArtifactsSource {
    * before the element connects). Omit for an isolated store.
    */
   instanceId?: string;
-  theme?: WcTheme;
-  language?: ValidationStationLanguage;
-  isReadonly?: boolean;
-  /**
-   * Render the persistent element variant, which survives portal/DOM
-   * detachment (e.g. tab switches) and is torn down via `forceDestroy()` when
-   * this React component unmounts. Defaults to `false`.
-   */
-  persistent?: boolean;
+
   className?: string;
   style?: CSSProperties;
 }
@@ -56,50 +45,24 @@ export interface SubcomponentCommandProps {
   discardChanges?: { value: boolean };
 }
 
-/** Callbacks for the edit/state events shared by the compact VS-family elements. */
-export interface SubcomponentStateEventProps {
-  onLoaded?: (loaded: boolean) => void;
-  onDirtyChange?: (dirty: boolean) => void;
-  onDocumentTypeChanged?: (documentTypeId: string) => void;
-  onExtractionResultChanged?: (result: DuFramework.ExtractionResult) => void;
-  onFieldValueSelected?: (details: IFieldValueDetailsDto) => void;
-  onFieldValueChanged?: (details: IFieldValueDetailsDto) => void;
-  onBusinessRulesEvaluated?: (
-    rules: EvaluatedBusinessRulesForFieldValueDto[],
-  ) => void;
-  onSetFieldValueByPathResult?: (result: SetFieldValueByPathResult) => void;
-  onSelectAndFocusFieldValueByPathResult?: (
-    result: SelectAndFocusFieldValueByPathResult,
-  ) => void;
-  onDeleteFieldValueByPathResult?: (
-    result: DeleteFieldValueByPathResult,
-  ) => void;
-}
-
 // ─── Compact fields form ──────────────────────────────────────────────────────
 
 export interface CompactFieldsFormProps
   extends
     SubcomponentCommonProps,
     SubcomponentCommandProps,
-    SubcomponentStateEventProps,
+    VsStateEventProps,
+    VsSaveResultEventProps,
     DuSaveCallbacks {
   options?: IValidationStationOptions;
-  /** Trigger a save; `{ validate: true }` validates before saving. */
   save?: { validate: boolean };
-  /** Expose a "Save as draft" action. */
   enableSaveAsDraft?: boolean;
-  /** Result of a `save` command. */
-  onSaveResult?: (result: ISaveResult) => void;
 }
 
 // ─── Compact table editor ─────────────────────────────────────────────────────
 
 export interface CompactTableEditorProps
-  extends
-    SubcomponentCommonProps,
-    SubcomponentCommandProps,
-    SubcomponentStateEventProps {
+  extends SubcomponentCommonProps, SubcomponentCommandProps, VsStateEventProps {
   options?: IValidationStationOptions;
   /** Enable the PDF table-selection round-trip controls. */
   isTableSelectionEnabled?: boolean;
@@ -115,10 +78,7 @@ export interface CompactTableEditorProps
 // ─── Compact business rules ───────────────────────────────────────────────────
 
 export interface CompactBusinessRulesProps
-  extends
-    SubcomponentCommonProps,
-    SubcomponentCommandProps,
-    SubcomponentStateEventProps {
+  extends SubcomponentCommonProps, SubcomponentCommandProps, VsStateEventProps {
   options?: IValidationStationOptions;
   /** Fires when the user expands (true) / collapses (false) the panel. */
   onBusinessRulesToggle?: (expanded: boolean) => void;
