@@ -28,6 +28,8 @@
   "tool_confirmation_confirm": "確認",
   "tool_confirmation_status_cancelled": "キャンセル済み",
   "tool_confirmation_status_confirmed": "確認済み",
+  "client_side_tool_submit": "",
+  "client_side_tool_description": "",
   "inputs_page_submit_error": "会話を開始できませんでした。もう一度お試しください。",
   "inputs_page_intro": "開始する前に、詳細を入力してください。",
   "inputs_page_starting": "開始しています...",

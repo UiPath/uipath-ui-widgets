@@ -28,6 +28,8 @@
   "tool_confirmation_confirm": "Onayla",
   "tool_confirmation_status_cancelled": "İptal edildi",
   "tool_confirmation_status_confirmed": "Onaylandı",
+  "client_side_tool_submit": "Gönder",
+  "client_side_tool_description": "Aşağıdaki alanları doldurun ve devam etmek için gönderin.",
   "inputs_page_submit_error": "Sohbet başlatılamadı. Lütfen tekrar deneyin.",
   "inputs_page_intro": "Başlamadan önce birkaç ayrıntıya ihtiyacım var.",
   "inputs_page_starting": "Başlatılıyor...",

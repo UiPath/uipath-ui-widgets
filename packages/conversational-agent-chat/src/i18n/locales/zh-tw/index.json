@@ -28,6 +28,8 @@
   "tool_confirmation_confirm": "確認",
   "tool_confirmation_status_cancelled": "已取消",
   "tool_confirmation_status_confirmed": "已確認",
+  "client_side_tool_submit": "提交",
+  "client_side_tool_description": "填寫以下欄位並提交以繼續。",
   "inputs_page_submit_error": "無法開始對話，請重試。",
   "inputs_page_intro": "在開始之前，我需要了解一些詳細資訊。",
   "inputs_page_starting": "正在啟動...",

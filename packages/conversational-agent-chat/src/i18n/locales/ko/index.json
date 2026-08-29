@@ -28,6 +28,8 @@
   "tool_confirmation_confirm": "확인",
   "tool_confirmation_status_cancelled": "취소됨",
   "tool_confirmation_status_confirmed": "확인됨",
+  "client_side_tool_submit": "제출",
+  "client_side_tool_description": "계속하려면 아래 필드를 작성하고 제출하십시오.",
   "inputs_page_submit_error": "대화를 시작하지 못했습니다 다시 시도하십시오.",
   "inputs_page_intro": "시작하기 전에 몇 가지 세부 정보가 필요합니다.",
   "inputs_page_starting": "시작 중...",

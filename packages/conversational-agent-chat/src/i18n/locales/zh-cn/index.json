@@ -28,6 +28,8 @@
   "tool_confirmation_confirm": "确认",
   "tool_confirmation_status_cancelled": "已取消",
   "tool_confirmation_status_confirmed": "已确认",
+  "client_side_tool_submit": "提交",
+  "client_side_tool_description": "填写以下字段并提交以继续操作。",
   "inputs_page_submit_error": "无法启动对话。请重试。",
   "inputs_page_intro": "在开始之前，我需要了解一些详细信息。",
   "inputs_page_starting": "正在启动...",
