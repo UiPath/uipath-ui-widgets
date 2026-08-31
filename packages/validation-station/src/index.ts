@@ -2,16 +2,27 @@ export { ValidationStationLanguage } from "./types.js";
 export type { DuArtifactsSource } from "./useResolvedArtifacts.js";
 export type {
   DeleteFieldValueByPath,
+  DeleteFieldValueByPathResult,
+  DuCommonProps,
   DuDocumentArtifacts,
   DuSaveCallbacks,
+  DuTheme,
+  EvaluatedBusinessRulesForFieldValueDto,
+  IFieldValueDetailsDto,
+  ISaveResult,
   IValidationStationOptions,
   IVsSaveExceptionReportRequest,
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveValidatedDataRequest,
   SaveValidatedDataResult,
   SelectAndFocusFieldValueByPath,
+  SelectAndFocusFieldValueByPathResult,
   SetFieldValueByPath,
+  SetFieldValueByPathResult,
+  ValidationStationEventProps,
   ValidationStationProps,
+  VsSaveResultEventProps,
+  VsStateEventProps,
 } from "./types.js";
 export { ValidationStation } from "./ValidationStation.js";
 export { useDuDocumentArtifacts } from "./useDuDocumentArtifacts.js";
@@ -46,5 +57,4 @@ export type {
   DocumentViewerProps,
   SubcomponentCommandProps,
   SubcomponentCommonProps,
-  SubcomponentStateEventProps,
 } from "./subcomponents/types.js";

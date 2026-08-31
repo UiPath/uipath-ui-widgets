@@ -5,15 +5,14 @@ import {
   type ResolvedArtifacts,
   type DuArtifactsSource,
 } from "../useResolvedArtifacts.js";
-import { ValidationStationLanguage } from "../types.js";
+import { ValidationStationLanguage, type DuTheme } from "../types.js";
 import { useWcReady } from "../useWcReady.js";
 import { wcStyle } from "./shared.js";
-import type { WcTheme } from "./types.js";
 
 /** Presentation + linking props common to every subcomponent wrapper. */
 export interface WcElementCommon {
   instanceId?: string;
-  theme?: WcTheme;
+  theme?: DuTheme;
   language?: ValidationStationLanguage;
   isReadonly?: boolean;
   persistent?: boolean;
@@ -27,7 +26,7 @@ interface WcCommonProps {
   style?: Record<string, string | number>;
   "instance-id"?: string;
   documentId?: string;
-  theme: WcTheme;
+  theme: DuTheme;
   language: ValidationStationLanguage;
   isReadonly: boolean;
 }

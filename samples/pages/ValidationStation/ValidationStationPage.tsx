@@ -1,4 +1,4 @@
-import { Box, Button, Grid } from "@mui/material";
+import { Alert, Box, Button, Grid, Stack, TextField } from "@mui/material";
 import {
   ValidationStation,
   type IVsSaveExceptionReportRequest,
@@ -6,16 +6,110 @@ import {
   type SaveValidatedDataResult,
   type SelectAndFocusFieldValueByPath,
   type SetFieldValueByPath,
+  type SetFieldValueByPathResult,
 } from "@uipath/ui-widgets-validation-station";
 import type { UiPath } from "@uipath/uipath-typescript/core";
+import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import { OrchestratorDuModule } from "@uipath/uipath-typescript/orchestrator-du-module";
 import { TaskType } from "@uipath/uipath-typescript/tasks";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { loadValidationStationWcOnDemand } from "../../duWcLoader";
 import CenteredText from "./CenteredText";
 import PageHeader from "../PageHeader";
 import TaskQueueRail from "./TaskQueueRail";
 import { useDocumentValidationTasks } from "./useDocumentValidationTasks";
+
+type PathSegment = SetFieldValueByPath["path"][number];
+
+/**
+ * The DTO nests a table's rows inside a synthetic `.Body` field, one level
+ * below the table field's single value — whereas the element's own path
+ * resolution treats a table field's values *as* the rows. So a table segment
+ * has to hop through `.Body` to land on the row its `valueIndex` names.
+ */
+function tableRows(
+  field: DuFramework.ResultsDataPoint,
+): DuFramework.ResultsValue[] | undefined {
+  return (
+    field.Values?.[0]?.Components?.find((component) =>
+      component.FieldId?.endsWith(".Body"),
+    )?.Values ?? undefined
+  );
+}
+
+/**
+ * Reads the value at a path out of an `ExtractionResult`.
+ *
+ * Each segment names a field and its `valueIndex` picks one of that field's
+ * values; the next segment then looks inside that value's `Components`. Tables,
+ * field groups and simple fields all resolve this way — only the row lookup
+ * differs, see {@link tableRows}.
+ *
+ * `ResultsDocument.Tables` is not part of this: the element clears it when it
+ * builds the DTO and puts tables in `Fields` instead.
+ */
+function readValueAtPath(
+  result: DuFramework.ExtractionResult | undefined,
+  path: PathSegment[],
+): string | undefined {
+  let fields = result?.ResultsDocument?.Fields;
+  let value: DuFramework.ResultsValue | undefined;
+
+  for (const segment of path) {
+    const field = fields?.find(
+      (candidate) => candidate.FieldName === segment.fieldName,
+    );
+    if (!field) return undefined;
+    value =
+      field.FieldType === "Table"
+        ? tableRows(field)?.[segment.valueIndex]
+        : (field.Values?.[segment.valueIndex] ?? undefined);
+    if (!value) return undefined;
+    fields = value.Components ?? undefined;
+  }
+
+  return value?.Value ?? undefined;
+}
+
+// Hoisted so the element is not handed a new options object every render.
+// `emitDtoStateChanges` is what makes `onExtractionResultChanged` fire at all.
+const VS_OPTIONS = { emitDtoStateChanges: true };
+
+/**
+ * Reads a typed `ExtractedPathSegment[]`, which the commands take verbatim.
+ *
+ * Segments are shape-checked because {@link readValueAtPath} walks the path
+ * during render — a malformed one would throw there and take the page down.
+ * Whether a well-formed path *resolves* is still the element's answer to give,
+ * reported through `on*ByPathResult`.
+ */
+function parsePathSegments(
+  input: string,
+): { path: PathSegment[] } | { error: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(input);
+  } catch (error) {
+    return { error: `Invalid JSON: ${String(error)}` };
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    return { error: "Expected a non-empty array of segments." };
+  }
+  for (const [index, segment] of parsed.entries()) {
+    const { fieldName, valueIndex } = (segment ?? {}) as Partial<PathSegment>;
+    if (typeof fieldName !== "string" || typeof valueIndex !== "number") {
+      return {
+        error: `Segment ${index} needs a string "fieldName" and a numeric "valueIndex".`,
+      };
+    }
+  }
+  return { path: parsed as PathSegment[] };
+}
+
+const PATH_PLACEHOLDER = `[
+  { "fieldName": "Paystubs In File", "valueIndex": 3 },
+  { "fieldName": "Pay Date", "valueIndex": 0 }
+]`;
 
 interface ValidationStationPageProps {
   uipathSdk: UiPath;
@@ -47,11 +141,64 @@ function ValidationStationPage({ uipathSdk }: ValidationStationPageProps) {
     loadValidationStationWcOnDemand();
   }, []);
 
-  const [selectAndFocusFieldValueByPath, setSelectAndFocusFieldValueByPath] =
-    useState<SelectAndFocusFieldValueByPath | undefined>(undefined);
   const [setFieldValueByPath, setSetFieldValueByPath] = useState<
     SetFieldValueByPath | undefined
   >(undefined);
+  const [selectAndFocusFieldValueByPath, setSelectAndFocusFieldValueByPath] =
+    useState<SelectAndFocusFieldValueByPath | undefined>(undefined);
+  const [fieldPath, setFieldPath] = useState("");
+  const [fieldValue, setFieldValue] = useState("");
+  // `onExtractionResultChanged` is the host's view of the user's edits, so the
+  // value shown below tracks what the document holds right now.
+  const [extraction, setExtraction] = useState<
+    DuFramework.ExtractionResult | undefined
+  >(undefined);
+  const [feedback, setFeedback] = useState<{
+    ok: boolean;
+    text: string;
+  } | null>(null);
+  // Commands need the taxonomy and extraction result, so gate on `onLoaded`.
+  // Tracked per task: selecting another document reloads the element, which
+  // re-arms the gate on its own.
+  const [loadedTaskId, setLoadedTaskId] = useState<number | null>(null);
+  const wcLoaded = loadedTaskId !== null && loadedTaskId === selectedTaskId;
+  // Taxonomy field names do not always match the labels shown in the document,
+  // so `onFieldValueSelected` is how you learn what to type.
+  const [selectedSegment, setSelectedSegment] = useState<string | null>(null);
+
+  const report = (done: string) => (result: SetFieldValueByPathResult) =>
+    setFeedback({
+      ok: result.success,
+      text: result.success ? done : (result.error ?? "Command rejected."),
+    });
+
+  const parsedPath = useMemo(() => parsePathSegments(fieldPath), [fieldPath]);
+
+  const currentValue =
+    "path" in parsedPath
+      ? readValueAtPath(extraction, parsedPath.path)
+      : undefined;
+
+  const selectAnotherTask = useCallback(
+    (taskId: number) => {
+      setSetFieldValueByPath(undefined);
+      setSelectAndFocusFieldValueByPath(undefined);
+      setExtraction(undefined);
+      setSelectedSegment(null);
+      setFeedback(null);
+      selectTask(taskId);
+    },
+    [selectTask],
+  );
+
+  const runCommand = (dispatch: (path: PathSegment[]) => void) => {
+    if ("error" in parsedPath) {
+      setFeedback({ ok: false, text: parsedPath.error });
+      return;
+    }
+    setFeedback(null);
+    dispatch(parsedPath.path);
+  };
 
   // `result` is set because the widget has `sdk` + `data` and persisted it.
   const handleSubmit = useCallback(
@@ -119,40 +266,109 @@ function ValidationStationPage({ uipathSdk }: ValidationStationPageProps) {
           minHeight: 0,
         }}
       >
-        <Box sx={{ mb: 2, display: "flex", gap: 1, flexShrink: 0 }}>
-          <Button
-            variant="contained"
-            size="small"
-            onClick={() =>
-              setSelectAndFocusFieldValueByPath({
-                path: [
-                  { fieldName: "items", valueIndex: 1 },
-                  { fieldName: "Items - Quantities", valueIndex: 0 },
-                ],
-              })
-            }
-          >
-            Focus Item Quantity By Path
-          </Button>
-          <Button
-            variant="contained"
-            size="small"
-            onClick={() =>
-              setSetFieldValueByPath({
-                path: [{ fieldName: "Vendor Name", valueIndex: 0 }],
-                update: { Value: "correct value" },
-              })
-            }
-          >
-            Set Vendor Name
-          </Button>
+        <Box sx={{ mb: 2, flexShrink: 0 }}>
+          <Stack direction="row" spacing={1} alignItems="flex-start">
+            <TextField
+              size="small"
+              multiline
+              minRows={4}
+              label="Path segments (ExtractedPathSegment[])"
+              placeholder={PATH_PLACEHOLDER}
+              helperText={
+                selectedSegment
+                  ? `Selected in the document: ${selectedSegment} — click to use`
+                  : "The array is passed to setFieldValueByPath verbatim"
+              }
+              FormHelperTextProps={
+                selectedSegment
+                  ? {
+                      onClick: () => setFieldPath(`[${selectedSegment}]`),
+                      sx: { cursor: "pointer", textDecoration: "underline" },
+                    }
+                  : undefined
+              }
+              value={fieldPath}
+              onChange={(event) => setFieldPath(event.target.value)}
+              sx={{
+                flex: 2,
+                "& textarea": { fontFamily: "monospace", fontSize: 12 },
+              }}
+            />
+            <Stack spacing={1} sx={{ flex: 1 }}>
+              <TextField
+                size="small"
+                label="Value"
+                helperText={
+                  "path" in parsedPath
+                    ? `Current: ${currentValue ?? "not found"}`
+                    : undefined
+                }
+                value={fieldValue}
+                onChange={(event) => setFieldValue(event.target.value)}
+              />
+              <Button
+                variant="contained"
+                size="small"
+                disabled={!wcLoaded || !fieldPath.trim()}
+                onClick={() =>
+                  runCommand((path) =>
+                    setSetFieldValueByPath({
+                      path,
+                      update: { Value: fieldValue },
+                    }),
+                  )
+                }
+              >
+                Set value
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={!wcLoaded || !fieldPath.trim()}
+                onClick={() =>
+                  runCommand((path) =>
+                    setSelectAndFocusFieldValueByPath({ path }),
+                  )
+                }
+              >
+                Select &amp; focus
+              </Button>
+            </Stack>
+          </Stack>
+          {feedback && (
+            <Alert
+              severity={feedback.ok ? "success" : "error"}
+              onClose={() => setFeedback(null)}
+              sx={{ mt: 1 }}
+            >
+              {feedback.text}
+            </Alert>
+          )}
         </Box>
         <Box sx={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
           <ValidationStation
             sdk={uipathSdk}
             data={contentValidationData}
-            selectAndFocusFieldValueByPath={selectAndFocusFieldValueByPath}
+            options={VS_OPTIONS}
             setFieldValueByPath={setFieldValueByPath}
+            selectAndFocusFieldValueByPath={selectAndFocusFieldValueByPath}
+            onLoaded={(loaded) => {
+              setLoadedTaskId(loaded ? selectedTask.id : null);
+              if (loaded) setFeedback(null);
+            }}
+            onExtractionResultChanged={setExtraction}
+            onSetFieldValueByPathResult={report("Value set")}
+            onSelectAndFocusFieldValueByPathResult={report(
+              "Field selected and focused",
+            )}
+            onFieldValueSelected={(details) =>
+              setSelectedSegment(
+                JSON.stringify({
+                  fieldName: details.Field.FieldName ?? "",
+                  valueIndex: details.FieldValueIndex,
+                }),
+              )
+            }
             onSubmit={handleSubmit}
             onReportException={(request) =>
               handleReportException(selectedTask.id, request)
@@ -182,7 +398,7 @@ function ValidationStationPage({ uipathSdk }: ValidationStationPageProps) {
               tasks={taskList}
               tasksLoading={tasksLoading}
               selectedTaskId={selectedTaskId}
-              onSelectTask={selectTask}
+              onSelectTask={selectAnotherTask}
               onReload={fetchTasks}
               onStatusChange={clearSelection}
             />

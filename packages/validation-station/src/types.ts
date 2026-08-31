@@ -1,11 +1,17 @@
 import type {
   DeleteFieldValueByPath,
+  DeleteFieldValueByPathResult,
+  EvaluatedBusinessRulesForFieldValueDto,
+  IFieldValueDetailsDto,
+  ISaveResult,
   IValidationStationOptions,
   IVsSaveExceptionReportRequest,
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveValidatedDataRequest,
   SelectAndFocusFieldValueByPath,
+  SelectAndFocusFieldValueByPathResult,
   SetFieldValueByPath,
+  SetFieldValueByPathResult,
 } from "@uipath/du-validation-station-wc";
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import type { SaveValidatedDataResult } from "./saveValidatedDataUtil.js";
@@ -13,6 +19,12 @@ import type { DuArtifactsSource } from "./useResolvedArtifacts.js";
 
 export type {
   DeleteFieldValueByPath,
+  // Payloads of the state/command-result callbacks, so handlers declared
+  // outside JSX can name their parameter.
+  DeleteFieldValueByPathResult,
+  EvaluatedBusinessRulesForFieldValueDto,
+  IFieldValueDetailsDto,
+  ISaveResult,
   IValidationStationOptions,
   // Payloads of the save callbacks, for handlers declared outside JSX.
   IVsSaveExceptionReportRequest,
@@ -20,7 +32,9 @@ export type {
   IVsSaveValidatedDataRequest,
   SaveValidatedDataResult,
   SelectAndFocusFieldValueByPath,
+  SelectAndFocusFieldValueByPathResult,
   SetFieldValueByPath,
+  SetFieldValueByPathResult,
 };
 
 export enum TelemetryEvent {
@@ -53,6 +67,25 @@ export enum ValidationStationLanguage {
   Turkish = "tr",
   ChineseSimplified = "zh-CN",
   ChineseTraditional = "zh-TW",
+}
+
+export type DuTheme = "light" | "dark" | "light-hc" | "dark-hc";
+
+/**
+ * The inputs every DU element takes, whichever one you render — as opposed to
+ * the data, commands and outputs that differ between them.
+ */
+export interface DuCommonProps {
+  theme?: DuTheme;
+  language?: ValidationStationLanguage;
+  /** Render the document without editing affordances. */
+  isReadonly?: boolean;
+  /**
+   * Render the persistent element variant, which survives portal/DOM
+   * detachment (e.g. tab switches) and is torn down via `forceDestroy()` when
+   * the React component unmounts. Defaults to `false`.
+   */
+  persistent?: boolean;
 }
 
 /**
@@ -111,6 +144,85 @@ export interface DuSaveCallbacks {
 }
 
 /**
+ * Callbacks for the edit/state events reported by the four widgets that share
+ * the Validation Station's extraction store: the full `ValidationStation`, the
+ * compact fields form, the table editor and the business-rules panel. One store
+ * means one set of events — an edit or selection driven through any of them
+ * reaches the others — so a host swapping one for another keeps its handlers.
+ *
+ * `DocumentViewer` (`loaded`, `selectAndFocusFieldValueByPathResult`) and
+ * `CompactDocTypeField` (`loaded`, `documentTypeChanged`) overlap on a few of
+ * these and declare them on their own props instead.
+ *
+ * Mirrors the web component's `IVsWcCommonStateEventMap`.
+ */
+export interface VsStateEventProps {
+  /**
+   * The element finished loading. The path-addressed command props need the
+   * taxonomy and extraction result this signals, so gate them on it.
+   */
+  onLoaded?: (loaded: boolean) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  onDocumentTypeChanged?: (documentTypeId: string) => void;
+  /**
+   * Every change to the extraction result, i.e. the host's window onto the
+   * user's edits.
+   *
+   * Requires `options={{ emitDtoStateChanges: true }}`; the element defaults
+   * the flag to `false`.
+   */
+  onExtractionResultChanged?: (result: DuFramework.ExtractionResult) => void;
+  onFieldValueSelected?: (details: IFieldValueDetailsDto) => void;
+  onFieldValueChanged?: (details: IFieldValueDetailsDto) => void;
+  /** Field validation errors and business rules, re-evaluated. */
+  onBusinessRulesEvaluated?: (
+    rules: EvaluatedBusinessRulesForFieldValueDto[],
+  ) => void;
+  /** Outcome of the `setFieldValueByPath` command. */
+  onSetFieldValueByPathResult?: (result: SetFieldValueByPathResult) => void;
+  /** Outcome of the `selectAndFocusFieldValueByPath` command. */
+  onSelectAndFocusFieldValueByPathResult?: (
+    result: SelectAndFocusFieldValueByPathResult,
+  ) => void;
+  /** Outcome of the `deleteFieldValueByPath` command. */
+  onDeleteFieldValueByPathResult?: (
+    result: DeleteFieldValueByPathResult,
+  ) => void;
+}
+
+/**
+ * Reported by the two widgets that have a `save` command: `ValidationStation`
+ * and `CompactFieldsForm`. Composed alongside {@link VsStateEventProps} rather
+ * than extending it, so the table editor and business-rules panel can take the
+ * state events on their own.
+ *
+ * Together the two make up the web component's `IVsWcCommonEventMap`.
+ */
+export interface VsSaveResultEventProps {
+  /** Outcome of a `save` command. */
+  onSaveResult?: (result: ISaveResult) => void;
+}
+
+/**
+ * The output surface unique to the full `ValidationStation` element: overall
+ * validity plus the document-viewer panel layout. Mirrors the web component's
+ * `IVsWcSharedEventMap`.
+ */
+export interface ValidationStationEventProps
+  extends VsStateEventProps, VsSaveResultEventProps {
+  /**
+   * Validity changed. `true` when no critical (Must) business rule is broken and
+   * no field value fails validation — the element weighs both, and counts every
+   * validation error as Must.
+   */
+  onIsValidChange?: (isValid: boolean) => void;
+  /** The fields panel was resized. Detail is the width in pixels. */
+  onFieldsPanelWidthChanged?: (width: number) => void;
+  /** The fields panel moved to the other side of the document viewer. */
+  onFieldsPanelSideChanged?: (side: "left" | "right") => void;
+}
+
+/**
  * Props for the monolithic `ValidationStation`.
  *
  * The document data comes from a {@link DuArtifactsSource}: either
@@ -118,10 +230,11 @@ export interface DuSaveCallbacks {
  * to fetch from the bucket paths on `ContentValidationData`.
  */
 export interface ValidationStationProps
-  extends DuArtifactsSource, DuSaveCallbacks {
-  theme?: "light" | "dark" | "light-hc" | "dark-hc";
-  language?: ValidationStationLanguage;
-  isReadonly?: boolean;
+  extends
+    DuArtifactsSource,
+    DuCommonProps,
+    DuSaveCallbacks,
+    ValidationStationEventProps {
   options?: IValidationStationOptions;
   save?: { validate: boolean };
   discardChanges?: { value: boolean };
