@@ -53,6 +53,9 @@ export const ConversationalAgentPickerChat = ({
   readOnly = false,
   overrideLabels,
   onAgentSelected,
+  onUserMessageSent,
+  surfaceName,
+  surfaceVersion,
 }: ConversationalAgentPickerChatProps) => {
   const [agents, setAgents] = useState<AgentSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -163,6 +166,9 @@ export const ConversationalAgentPickerChat = ({
             theme={theme}
             readOnly={readOnly}
             overrideLabels={overrideLabels}
+            onUserMessageSent={onUserMessageSent}
+            surfaceName={surfaceName}
+            surfaceVersion={surfaceVersion}
           />
         </div>
       </div>
