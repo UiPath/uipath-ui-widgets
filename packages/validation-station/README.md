@@ -59,38 +59,6 @@ function App() {
 > (a `deploymentUrl` default handles this for most hosts — override it if
 > yours doesn't). See [Hosting the web component](#hosting-the-web-component).
 
-## Migrating from 1.0
-
-The `folderId` prop is gone. The folder now travels on `ContentValidationData`
-itself, as `FolderId` or `FolderKey` — the activity that produces the payload
-sets one of them, so in the common case there is nothing to pass and nothing to
-wire up.
-
-```diff
-- <ValidationStation sdk={sdk} data={data} folderId={folderId} />
-+ <ValidationStation sdk={sdk} data={data} />
-```
-
-The four exported helpers lost the same parameter:
-
-```diff
-- fetchDuDocumentArtifacts(sdk, data, folderId)
-- useDuDocumentArtifacts(sdk, data, folderId)
-- submitValidatedData(sdk, data, folderId, request)
-- saveValidatedDataAsDraft(sdk, data, folderId, request)
-+ fetchDuDocumentArtifacts(sdk, data)
-+ useDuDocumentArtifacts(sdk, data)
-+ submitValidatedData(sdk, data, request)
-+ saveValidatedDataAsDraft(sdk, data, request)
-```
-
-The activity that produces a `ContentValidationData` should normally set
-`FolderId` or `FolderKey`. If you construct the object yourself, set one of them
-accordingly — for example from the Action Center task's folder, which the SDK
-surfaces as `task.folderId` (`OrganizationUnitId` in Orchestrator). Memoise the
-object you pass in, or the widget takes a new reference on every render and
-refetches the document each time.
-
 ## Data sources
 
 The widget needs a taxonomy, an extraction result and a document DOM. There are two mutually-exclusive ways to give it those:
@@ -552,6 +520,117 @@ which stages it into the gitignored `public/du-vs-wc`.
 - **Version skew.** The URL decides which web component version actually runs, and
   it is not checked against the installed `@uipath/du-validation-station-wc`. Keep
   the hosted copy in step with the version this package's types are built against.
+
+## Migrating from 1.0.x
+
+Four things changed since `1.0.1`, ordered by how loudly they fail.
+
+### The web component now loads from a URL
+
+`1.0.x` imported the web component as a bare module specifier, which put a
+prebuilt Angular bundle into your module graph and made its assets your
+bundler's problem. It now loads at runtime from a hosted URL, so you must call
+`configureValidationStationWc` once before rendering any widget from this
+package:
+
+```diff
++ import { configureValidationStationWc } from "@uipath/ui-widgets-validation-station";
++
++ configureValidationStationWc();
+```
+
+Miss it and nothing renders. See [Hosting the web component](#hosting-the-web-component)
+for the `deploymentUrl` default and when to override it.
+
+**Delete your 1.0.x bundler setup.** None of it applies any more, and what it
+produces is no longer read:
+
+- the build-time `du-assets` / `media` / CSS copy plugin
+- `optimizeDeps.exclude` for `@uipath/du-validation-station-wc`
+- any dev-server middleware that intercepted the component's raw
+  `fetch("styles.css")` by sniffing `Sec-Fetch-Dest`
+
+### Save callbacks are unified
+
+`1.0.x` had one pair of callbacks meaning "the widget persisted it" and another
+meaning "over to you", chosen by an unrelated input. There is now one callback
+per user action. It always carries the request, and takes the outcome as an
+optional second argument, present exactly when the widget did the write-back
+itself:
+
+```diff
+- onSubmitComplete={(result) => …}
+- onSaveAsDraftComplete={(result) => …}
+- onReportExceptionComplete={(documentId, reason) => …}
+- onSaveValidatedDataRequest={(request) => …}
+- onSaveValidatedDataAsDraftRequest={(request) => …}
++ onSubmit={(request, result) => …}
++ onSaveAsDraft={(request, result) => …}
++ onReportException={(request) => …}
+```
+
+> **Check the first parameter, not just the name.** The old callbacks took the
+> result first, the new ones take the request. A rename that leaves the body
+> alone reads `success` off the wrong object — and does it silently wherever the
+> handler isn't type-checked.
+
+`onReportException` no longer receives `(documentId, reason)`; the reason is at
+`request.exceptionReport.Reason`. The widget still never persists that flow, so
+it has no `result` argument at all.
+
+The full contract is in
+[Reacting to save / draft / exception flows](#reacting-to-save--draft--exception-flows).
+
+### The folder comes from `ContentValidationData`
+
+The `folderId` prop is gone. The folder now travels on `ContentValidationData`
+itself, as `FolderId` or `FolderKey` — the activity that produces the payload
+sets one of them, so in the common case there is nothing to pass and nothing to
+wire up.
+
+```diff
+- <ValidationStation sdk={sdk} data={data} folderId={folderId} />
++ <ValidationStation sdk={sdk} data={data} />
+```
+
+The four exported helpers lost the same parameter:
+
+```diff
+- fetchDuDocumentArtifacts(sdk, data, folderId)
+- useDuDocumentArtifacts(sdk, data, folderId)
+- submitValidatedData(sdk, data, folderId, request)
+- saveValidatedDataAsDraft(sdk, data, folderId, request)
++ fetchDuDocumentArtifacts(sdk, data)
++ useDuDocumentArtifacts(sdk, data)
++ submitValidatedData(sdk, data, request)
++ saveValidatedDataAsDraft(sdk, data, request)
+```
+
+The activity that produces a `ContentValidationData` should normally set
+`FolderId` or `FolderKey`. If you construct the object yourself, set one of them
+accordingly — for example from the Action Center task's folder, which the SDK
+surfaces as `task.folderId` (`OrganizationUnitId` in Orchestrator). Memoise the
+object you pass in, or the widget takes a new reference on every render and
+refetches the document each time.
+
+### Renamed exports
+
+Same shapes, new names — a find-and-replace:
+
+| 1.0.x                         | Now                      |
+| ----------------------------- | ------------------------ |
+| `useBucketArtifacts`          | `useDuDocumentArtifacts` |
+| `BucketArtifacts`             | `DuDocumentArtifacts`    |
+| `SubcomponentDataSource`      | `DuArtifactsSource`      |
+| `SubcomponentStateEventProps` | `VsStateEventProps`      |
+
+### Nothing to do
+
+`sdk` and `data` became optional, alongside the new `artifacts` / `documentId`
+props — existing calls that pass both keep working. See
+[Data sources](#data-sources). `ValidationStation` also gained `persistent` and
+the fourteen state, command-result and panel callbacks the compact
+subcomponents already had; all are additive.
 
 ## Development
 
