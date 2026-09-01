@@ -138,6 +138,27 @@ export interface ConversationalAgentPickerChatProps {
   readOnly?: boolean;
   overrideLabels?: OverrideLabels;
   onAgentSelected?: (agent: AgentSummary) => void;
+  /**
+   * Called when the user sends a message. Used by debug-mode consumers that need to gate agent execution on the
+   * first user message.
+   * @internal
+   */
+  onUserMessageSent?: (message: { content: string }) => void;
+  /**
+   * Optional identifier used in UiPath logs to identify the implementing service
+   * of requests. External consumers do not need to set it; the server logs
+   * missing values as "unknown".
+   *
+   * @internal Intended for UiPath first-party surfaces.
+   */
+  surfaceName?: string;
+  /**
+   * Optional version of the implementing service of requests. Paired with
+   * `surfaceName` for internal telemetry.
+   *
+   * @internal Intended for UiPath first-party surfaces.
+   */
+  surfaceVersion?: string;
 }
 
 export interface AgentSummary {

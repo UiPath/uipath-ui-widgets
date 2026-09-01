@@ -13,16 +13,33 @@ vi.mock("../utils/telemetryUtils", () => ({
   trackTelemetry: (...args: any[]) => mockTrackTelemetry(...args),
 }));
 
+// Every render of the inner chat pushes its props here, so prop-forwarding
+// assertions can read what the picker actually handed down. The mock also
+// exposes a Send button that fires `onUserMessageSent`, which is a callback
+// rather than a value and so cannot be asserted from the recorded props alone.
+const innerChatProps: any[] = [];
+
+const latestInnerChatProps = () => innerChatProps[innerChatProps.length - 1];
+
 vi.mock("../ConversationalAgentChat", () => ({
-  ConversationalAgentChat: ({ agentId, folderId }: any) => (
-    <div
-      data-testid="inner-chat"
-      data-agent-id={agentId}
-      data-folder-id={folderId}
-    >
-      Chat for agent {agentId}
-    </div>
-  ),
+  ConversationalAgentChat: (props: any) => {
+    innerChatProps.push(props);
+    return (
+      <div
+        data-testid="inner-chat"
+        data-agent-id={props.agentId}
+        data-folder-id={props.folderId}
+      >
+        Chat for agent {props.agentId}
+        <button
+          type="button"
+          onClick={() => props.onUserMessageSent?.({ content: "hello there" })}
+        >
+          Send
+        </button>
+      </div>
+    );
+  },
 }));
 
 const SAMPLE_AGENTS = [
@@ -73,8 +90,17 @@ describe("ConversationalAgentPickerChat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    innerChatProps.length = 0;
     getAllMock = vi.fn().mockResolvedValue(SAMPLE_AGENTS);
   });
+
+  const selectSalesAgent = async () => {
+    await waitFor(() =>
+      expect(screen.getByText("Sales Agent")).toBeInTheDocument(),
+    );
+    await userEvent.click(screen.getByText("Sales Agent"));
+    await screen.findByTestId("inner-chat");
+  };
 
   const renderPicker = (props: Partial<any> = {}) =>
     render(<ConversationalAgentPickerChat sdk={createMockSdk()} {...props} />);
@@ -238,5 +264,50 @@ describe("ConversationalAgentPickerChat", () => {
       "CAC.Success",
       { agentCount: 3 },
     );
+  });
+
+  it("forwards surfaceName and surfaceVersion to the inner chat", async () => {
+    renderPicker({
+      surfaceName: "teams_agent_chat",
+      surfaceVersion: "2.0.1",
+    });
+    await selectSalesAgent();
+
+    expect(latestInnerChatProps()).toMatchObject({
+      surfaceName: "teams_agent_chat",
+      surfaceVersion: "2.0.1",
+    });
+  });
+
+  it("forwards surfaceName alone when surfaceVersion is omitted", async () => {
+    renderPicker({ surfaceName: "teams_agent_chat" });
+    await selectSalesAgent();
+
+    expect(latestInnerChatProps()).toMatchObject({
+      surfaceName: "teams_agent_chat",
+      surfaceVersion: undefined,
+    });
+  });
+
+  it("leaves the surface props undefined on the inner chat when the host omits them", async () => {
+    renderPicker();
+    await selectSalesAgent();
+
+    const props = latestInnerChatProps();
+    expect(props.surfaceName).toBeUndefined();
+    expect(props.surfaceVersion).toBeUndefined();
+    expect(props.onUserMessageSent).toBeUndefined();
+  });
+
+  it("forwards onUserMessageSent and invokes it when a message is sent", async () => {
+    const onUserMessageSent = vi.fn();
+    renderPicker({ onUserMessageSent });
+    await selectSalesAgent();
+
+    expect(latestInnerChatProps().onUserMessageSent).toBe(onUserMessageSent);
+    expect(onUserMessageSent).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(onUserMessageSent).toHaveBeenCalledWith({ content: "hello there" });
   });
 });
