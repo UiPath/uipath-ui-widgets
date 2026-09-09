@@ -833,6 +833,8 @@ export const ConversationalAgentChat = ({
         onUserMessageSentRef.current?.({ content: data.content });
         const sessionHelper = await getSessionHelper();
         const exchange = sessionHelper.startExchange();
+        chatService?.setWaiting(true);
+        chatService?.setShowLoading(true);
         activeExchange.current = exchange;
         setupExchangeHandlers(exchange);
         const message = exchange.startMessage({});

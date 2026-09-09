@@ -1358,6 +1358,33 @@ describe("ConversationalAgentChat", () => {
       });
     });
 
+    it("latches Apollo's waiting and loading state when the exchange starts", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Hello", attachments: [] });
+
+      // Apollo clears both flags on the first streamed chunk unless the host
+      // has taken them over. Opting in at exchange start keeps "Generating..."
+      // and the stop button visible until onExchangeEnd / onStopResponse.
+      expect(mockChatService.setWaiting).toHaveBeenCalledWith(true);
+      expect(mockChatService.setShowLoading).toHaveBeenCalledWith(true);
+      expect(mockChatService.setWaiting).not.toHaveBeenCalledWith(false);
+      expect(mockChatService.setShowLoading).not.toHaveBeenCalledWith(false);
+    });
+
     it("should send message with attachments", async () => {
       render(<ConversationalAgentChat {...defaultProps} />);
 
