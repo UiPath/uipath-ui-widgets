@@ -1255,6 +1255,13 @@ export const ConversationalAgentChat = ({
 
       chatServiceRef.current = chatServiceInstance;
 
+      // Instantiate() reuses the singleton for this agent, and Apollo's
+      // initialize() never touches the stored prompt, so the previous
+      // conversation's unsent draft (typed, or picked from the starting prompts)
+      // would carry over. Clear it now, before the awaits below, so only the old
+      // draft is dropped and anything typed after this switch began is kept.
+      chatServiceInstance.setPrompt("");
+
       if (!disabledFeaturesRef.current?.attachments) {
         chatServiceInstance.setAllowedAttachments(ALLOWED_ATTACHMENTS);
       }

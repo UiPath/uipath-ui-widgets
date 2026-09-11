@@ -35,6 +35,7 @@ const createMockChatService = () => ({
   setError: vi.fn(),
   setHistory: vi.fn(),
   setConversation: vi.fn(),
+  setPrompt: vi.fn(),
   stopResponse: vi.fn(),
   clearError: vi.fn(),
   appendOlderHistoryItems: vi.fn(),
@@ -3105,6 +3106,50 @@ describe("ConversationalAgentChat", () => {
       expect(
         await screen.findByText("Failed to load file preview."),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("composer draft reset", () => {
+    // AutopilotChatService is a singleton keyed by agent + folder, and Apollo's
+    // initialize() never touches the stored prompt. A draft typed (or picked from
+    // the starting prompts) in one conversation must not survive into the next.
+    it("clears the stale composer draft before loading an existing conversation", async () => {
+      render(
+        <ConversationalAgentChat
+          sdk={mockSdk as UiPath}
+          existingConversationId="conv-1"
+        />,
+      );
+
+      await waitFor(
+        () => {
+          expect(mockChatService.setPrompt).toHaveBeenCalledWith("");
+        },
+        { timeout: 3000 },
+      );
+
+      // The reset must land before the conversation is (re)loaded: it drops
+      // only the previous conversation's draft, never text typed while the
+      // switch is still fetching.
+      await waitFor(() => {
+        expect(mockChatService.setConversation).toHaveBeenCalled();
+      });
+      const conversationOrder =
+        mockChatService.setConversation.mock.invocationCallOrder[0] ?? 0;
+      const promptOrder =
+        mockChatService.setPrompt.mock.invocationCallOrder[0] ?? 0;
+      expect(promptOrder).toBeLessThan(conversationOrder);
+    });
+
+    it("clears the composer draft when initializing a fresh agent chat", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.setPrompt).toHaveBeenCalledWith("");
+        },
+        { timeout: 3000 },
+      );
     });
   });
 });
