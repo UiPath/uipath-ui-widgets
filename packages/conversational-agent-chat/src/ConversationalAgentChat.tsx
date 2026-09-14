@@ -1255,8 +1255,9 @@ export const ConversationalAgentChat = ({
 
       chatServiceRef.current = chatServiceInstance;
 
-      // Singleton keeps the previous conversation's unsent draft; drop it before the awaits.
+      // Singleton keeps the previous conversation's unsent draft and error banner; drop both before the awaits.
       chatServiceInstance.setPrompt("");
+      chatServiceInstance.clearError();
 
       if (!disabledFeaturesRef.current?.attachments) {
         chatServiceInstance.setAllowedAttachments(ALLOWED_ATTACHMENTS);

@@ -3109,11 +3109,11 @@ describe("ConversationalAgentChat", () => {
     });
   });
 
-  describe("composer draft reset", () => {
+  describe("stale singleton state reset", () => {
     // AutopilotChatService is a singleton keyed by agent + folder, and Apollo's
     // initialize() never touches the stored prompt. A draft typed (or picked from
     // the starting prompts) in one conversation must not survive into the next.
-    it("clears the stale composer draft before loading an existing conversation", async () => {
+    it("clears the stale composer draft and error banner before loading an existing conversation", async () => {
       render(
         <ConversationalAgentChat
           sdk={mockSdk as UiPath}
@@ -3124,29 +3124,32 @@ describe("ConversationalAgentChat", () => {
       await waitFor(
         () => {
           expect(mockChatService.setPrompt).toHaveBeenCalledWith("");
+          expect(mockChatService.clearError).toHaveBeenCalled();
         },
         { timeout: 3000 },
       );
 
-      // The reset must land before the conversation is (re)loaded: it drops
-      // only the previous conversation's draft, never text typed while the
-      // switch is still fetching.
+      // Both resets land before the conversation (re)loads, so only the previous conversation's state is dropped.
       await waitFor(() => {
         expect(mockChatService.setConversation).toHaveBeenCalled();
       });
       const conversationOrder =
         mockChatService.setConversation.mock.invocationCallOrder[0] ?? 0;
-      const promptOrder =
-        mockChatService.setPrompt.mock.invocationCallOrder[0] ?? 0;
-      expect(promptOrder).toBeLessThan(conversationOrder);
+      expect(
+        mockChatService.setPrompt.mock.invocationCallOrder[0],
+      ).toBeLessThan(conversationOrder);
+      expect(
+        mockChatService.clearError.mock.invocationCallOrder[0],
+      ).toBeLessThan(conversationOrder);
     });
 
-    it("clears the composer draft when initializing a fresh agent chat", async () => {
+    it("clears the composer draft and error banner when initializing a fresh agent chat", async () => {
       render(<ConversationalAgentChat {...defaultProps} />);
 
       await waitFor(
         () => {
           expect(mockChatService.setPrompt).toHaveBeenCalledWith("");
+          expect(mockChatService.clearError).toHaveBeenCalled();
         },
         { timeout: 3000 },
       );
