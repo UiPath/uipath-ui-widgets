@@ -1,6 +1,10 @@
 import {
   Box,
+  ButtonBase,
   CircularProgress,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   Grid,
   IconButton,
   Paper,
@@ -19,6 +23,8 @@ import { Buckets } from "@uipath/uipath-typescript/buckets";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import { MultiFileUpload } from "@uipath/ui-widgets-multi-file-upload";
 import "@uipath/ui-widgets-multi-file-upload/MultiFileUpload.css";
+import { PdfViewer } from "@uipath/ui-widgets-pdf-viewer";
+import "@uipath/ui-widgets-pdf-viewer/PdfViewer.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "./PageHeader";
 
@@ -42,6 +48,13 @@ function fileNameFromPath(path: string) {
   return path.split("/").filter(Boolean).pop() || path;
 }
 
+function isPdf(file: BucketFile) {
+  return (
+    file.contentType === "application/pdf" ||
+    fileNameFromPath(file.path).toLowerCase().endsWith(".pdf")
+  );
+}
+
 function MultiFileUploadPage({ uipathSdk }: MultiFileUploadPageProps) {
   const bucketId = useMemo(
     () => parseInt(import.meta.env.VITE_MFU_BUCKET_ID),
@@ -57,12 +70,17 @@ function MultiFileUploadPage({ uipathSdk }: MultiFileUploadPageProps) {
   const [files, setFiles] = useState<BucketFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyPath, setBusyPath] = useState<string | null>(null);
+  const [previewPath, setPreviewPath] = useState<string | null>(null);
 
   const fetchFiles = useCallback(async () => {
     try {
       setLoading(true);
       const result = await bucketsService.getFiles(bucketId, { folderId });
-      setFiles(result.items.filter((f) => !f.isDirectory));
+      const nextFiles = result.items.filter((f) => !f.isDirectory);
+      setFiles(nextFiles);
+      setPreviewPath((current) =>
+        current && nextFiles.some((f) => f.path === current) ? current : null,
+      );
     } catch (error) {
       console.error("Failed to fetch bucket files:", error);
     } finally {
@@ -116,10 +134,15 @@ function MultiFileUploadPage({ uipathSdk }: MultiFileUploadPageProps) {
     }
   };
 
+  const previewFile = useMemo(
+    () => files.find((f) => f.path === previewPath) ?? null,
+    [files, previewPath],
+  );
+
   return (
     <>
       <PageHeader widgetId="multi-file-upload" />
-      <Box sx={{ flex: 1, overflow: "hidden", p: 2 }}>
+      <Box sx={{ flex: 1, overflow: "auto", p: 2 }}>
         <Grid container spacing={2} sx={{ height: "100%" }}>
           <Grid size={8} sx={{ height: "100%" }}>
             <Paper
@@ -189,7 +212,26 @@ function MultiFileUploadPage({ uipathSdk }: MultiFileUploadPageProps) {
                           return (
                             <TableRow key={file.path} hover>
                               <TableCell sx={{ wordBreak: "break-all" }}>
-                                {fileNameFromPath(file.path)}
+                                {isPdf(file) ? (
+                                  <Tooltip title="Open in PDF viewer">
+                                    <ButtonBase
+                                      onClick={() => setPreviewPath(file.path)}
+                                      sx={{
+                                        textAlign: "left",
+                                        color: "primary.main",
+                                        fontWeight:
+                                          previewPath === file.path ? 600 : 400,
+                                        textDecoration: "underline",
+                                        fontSize: "inherit",
+                                        lineHeight: "inherit",
+                                      }}
+                                    >
+                                      {fileNameFromPath(file.path)}
+                                    </ButtonBase>
+                                  </Tooltip>
+                                ) : (
+                                  fileNameFromPath(file.path)
+                                )}
                               </TableCell>
                               <TableCell>
                                 <Typography
@@ -277,7 +319,7 @@ function MultiFileUploadPage({ uipathSdk }: MultiFileUploadPageProps) {
                   bucketId={bucketId}
                   folderId={folderId}
                   maxFileSizeInMb={2}
-                  accept="image/*"
+                  accept="image/*,application/pdf"
                   onUploadSuccess={(uploaded: File[]) => {
                     console.log("Files uploaded:", uploaded);
                     fetchFiles();
@@ -290,8 +332,92 @@ function MultiFileUploadPage({ uipathSdk }: MultiFileUploadPageProps) {
             </Paper>
           </Grid>
         </Grid>
+
+        <Dialog
+          open={Boolean(previewFile)}
+          onClose={() => setPreviewPath(null)}
+          fullWidth
+          maxWidth="lg"
+          slotProps={{
+            paper: {
+              sx: {
+                m: 4,
+                height: "100%",
+                maxHeight: "calc(100% - 64px)",
+              },
+            },
+          }}
+        >
+          <DialogTitle
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 2,
+              px: 2,
+              py: 1.5,
+              borderBottom: 1,
+              borderColor: "divider",
+            }}
+          >
+            <Typography
+              variant="subtitle1"
+              fontWeight={600}
+              sx={{ wordBreak: "break-all" }}
+            >
+              {previewFile ? fileNameFromPath(previewFile.path) : "PDF viewer"}
+            </Typography>
+            <IconButton
+              size="small"
+              onClick={() => setPreviewPath(null)}
+              aria-label="Close"
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent
+            sx={{
+              p: 2,
+              display: "flex",
+              minHeight: 0,
+              "& .uipath-pdf-viewer": { height: "100%" },
+            }}
+          >
+            {previewFile && (
+              <PdfViewer
+                key={previewFile.path}
+                sdk={uipathSdk}
+                source={{ bucketId, folderId, path: previewFile.path }}
+                fileName={fileNameFromPath(previewFile.path)}
+                maxHeight="100%"
+                onLoadError={(error: Error) => {
+                  console.error("Failed to load PDF:", error);
+                }}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </Box>
     </>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
   );
 }
 
