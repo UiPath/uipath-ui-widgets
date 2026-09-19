@@ -1,7 +1,22 @@
 import i18next, { type i18n as I18nInstance } from "i18next";
 
+// Locale JSON lives in lower-case folders (as the localization pipeline writes
+// them), but is registered under the BCP-47 casing Apollo's SupportedLocale and
+// the portal use (e.g. `zh-CN`), so the `locale` prop can be forwarded verbatim.
+import de from "./locales/de/index.json";
 import en from "./locales/en/index.json";
+import es from "./locales/es/index.json";
+import esMX from "./locales/es-mx/index.json";
+import fr from "./locales/fr/index.json";
+import ja from "./locales/ja/index.json";
 import keys from "./locales/keys/index.json";
+import ko from "./locales/ko/index.json";
+import pt from "./locales/pt/index.json";
+import ptBR from "./locales/pt-br/index.json";
+import ro from "./locales/ro/index.json";
+import tr from "./locales/tr/index.json";
+import zhCN from "./locales/zh-cn/index.json";
+import zhTW from "./locales/zh-tw/index.json";
 
 let instance: I18nInstance | undefined;
 
@@ -32,6 +47,18 @@ export const getI18n = (): I18nInstance => {
       },
       resources: {
         en: { translation: en },
+        de: { translation: de },
+        es: { translation: es },
+        "es-MX": { translation: esMX },
+        fr: { translation: fr },
+        ja: { translation: ja },
+        ko: { translation: ko },
+        pt: { translation: pt },
+        "pt-BR": { translation: ptBR },
+        ro: { translation: ro },
+        tr: { translation: tr },
+        "zh-CN": { translation: zhCN },
+        "zh-TW": { translation: zhTW },
         keys: { translation: keys },
       },
     },
