@@ -1,3 +1,4 @@
+import { AutopilotChatMode } from "@uipath/apollo-react/material/components";
 import { UiPath } from "@uipath/uipath-typescript/core";
 import type { ConversationJobStartOverrides } from "@uipath/uipath-typescript/conversational-agent";
 import type { InputSchema } from "./components/AgentSchemaForm/types";
@@ -67,6 +68,11 @@ export interface ConversationalAgentChatProps {
   externalUserId?: string;
   locale?: Locale;
   theme?: "light" | "dark" | "light-hc" | "dark-hc";
+  /**
+   * Chat presentation mode. Defaults to `Embedded`; full-page hosts (e.g.
+   * standalone chat) pass `FullScreen`.
+   */
+  mode?: AutopilotChatMode;
   readOnly?: boolean;
   overrideLabels?: OverrideLabels;
   /**
