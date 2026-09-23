@@ -2,9 +2,24 @@ import { UiPath } from "@uipath/uipath-typescript/core";
 import type { ConversationJobStartOverrides } from "@uipath/uipath-typescript/conversational-agent";
 import type { InputSchema } from "./components/AgentSchemaForm/types";
 
+// Locales with bundled translations. Values use BCP-47 casing matching Apollo's
+// SupportedLocale and the portal, so a host can forward its locale verbatim.
 // "keys" is a dev-debug mode that renders raw translation keys instead of resolved strings.
-// Additional locales will be bundled once the localization team delivers translations.
-export type Locale = "en" | "keys";
+export type Locale =
+  | "en"
+  | "de"
+  | "es"
+  | "es-MX"
+  | "fr"
+  | "ja"
+  | "ko"
+  | "pt"
+  | "pt-BR"
+  | "ro"
+  | "tr"
+  | "zh-CN"
+  | "zh-TW"
+  | "keys";
 
 export interface OverrideLabels {
   title?: string;
