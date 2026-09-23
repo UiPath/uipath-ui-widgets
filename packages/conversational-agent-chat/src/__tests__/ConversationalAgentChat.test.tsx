@@ -42,6 +42,7 @@ const createMockChatService = () => ({
   prependOlderMessages: vi.fn(),
   setLocale: vi.fn(),
   setTheme: vi.fn(),
+  setChatMode: vi.fn(),
   getLocale: vi.fn().mockReturnValue("en"),
   injectMessageRenderer: vi.fn(),
   sendOutputStreamEvent: vi.fn(),
@@ -62,6 +63,7 @@ vi.mock("@uipath/apollo-react/material/components", () => ({
   ),
   AutopilotChatMode: {
     Embedded: "embedded",
+    FullScreen: "full-screen",
   },
   AutopilotChatEvent: {
     NewChat: "newChat",
@@ -397,6 +399,29 @@ describe("ConversationalAgentChat", () => {
                 description: "This is a test agent",
               }),
             }),
+          }),
+        );
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it("should pass a non-default mode through to the chat service config", async () => {
+    const { AutopilotChatService, AutopilotChatMode } =
+      await import("@uipath/apollo-react/material/components");
+
+    render(
+      <ConversationalAgentChat
+        {...defaultProps}
+        mode={AutopilotChatMode.FullScreen}
+      />,
+    );
+
+    await waitFor(
+      () => {
+        expect(AutopilotChatService.Instantiate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            config: expect.objectContaining({ mode: "full-screen" }),
           }),
         );
       },

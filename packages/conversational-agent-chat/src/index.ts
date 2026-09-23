@@ -1,5 +1,6 @@
 export { ConversationalAgentChat } from "./ConversationalAgentChat";
 export { ConversationalAgentPickerChat } from "./ConversationalAgentPickerChat";
+export { AutopilotChatMode } from "@uipath/apollo-react/material/components";
 export type {
   AgentSummary,
   ConversationalAgentChatProps,
