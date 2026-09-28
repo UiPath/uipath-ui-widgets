@@ -1,6 +1,6 @@
 {
   "name": "@uipath/ui-widgets-external-auth",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0",
   "description": "A provider-agnostic React sign-in widget that renders a list of configurable authentication providers",
   "main": "dist/index.js",
   "module": "dist/index.js",
