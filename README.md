@@ -156,6 +156,21 @@ Packages are published with the **Publish SDK package** workflow (Actions → Pu
 - **beta** — public prerelease; requires `production` environment approval. Publishes to npm and GitHub Packages under the `beta` dist-tag and deploys Storybook — `latest` is never moved. The version must be a prerelease (e.g. `1.0.0-beta.2`).
 - **dev** — internal build; no approval needed. Publishes only to GitHub Packages under the `dev` dist-tag — npm and the Storybook deploy are skipped. The version must be a prerelease; the run fails fast otherwise.
 
+### First release of a new widget
+
+The workflow publishes to npm with Trusted Publishing (OIDC), and npm only lets you configure a trusted publisher on a package that **already exists**. So the very first npm release of a new widget cannot go through the workflow — the `npm publish` step fails with a `404` on `PUT https://registry.npmjs.org/@uipath%2f…`. Do it by hand once:
+
+1. Bump the widget to a stable version (e.g. `1.0.0`) and merge that to `develop`.
+2. An owner of the `@uipath` npm org runs, from the repo root:
+   ```bash
+   npm login
+   npm run build -w packages/<widget>
+   npm publish -w packages/<widget> --access public
+   ```
+   Any other account gets a `404`/`403` — that means no publish rights on the `@uipath` scope, not a broken package.
+
+Every later version of that widget goes through the workflow as usual.
+
 ### Installing a published widget
 
 Each channel is installed by its dist-tag — no version numbers needed:
