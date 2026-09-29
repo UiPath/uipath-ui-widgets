@@ -1,18 +1,18 @@
 # @uipath/ui-widgets-datatable
 
-A powerful and flexible React datatable component built with ag-Grid, designed for UiPath entity management.
+A powerful and flexible React datatable built with ag-Grid, designed for managing [Data Fabric entity](https://uipath.github.io/uipath-typescript/api/interfaces/entity/) records.
 
 ## Features
 
-- CRUD Operations: Full support for Create, Read, Update, Delete operations
-- Master-Detail View: Group data by foreign key relationships
-- Inline Editing: Edit cells directly with support for different field types
-- Choice Set Support: Single and multi-select choice set fields
-- Foreign Key Display: Resolved display names for reference fields
-- Filtering & Sorting: Built-in filtering and sorting capabilities
-- Pagination: Efficient data pagination via ag-Grid
-- Diff Viewer: Review changes before committing
-- Customizable: Flexible column configuration and styling
+- **CRUD operations** — create, read, update and delete records
+- **Master-detail view** — group data by foreign key relationships
+- **Inline editing** — edit cells directly, with an editor per field type
+- **Choice set support** — single and multi-select choice set fields
+- **Foreign key display** — resolved display names for reference fields
+- **Filtering & sorting** — built in
+- **Pagination** — efficient paging via ag-Grid
+- **Diff viewer** — review changes before committing
+- **Customizable** — flexible column configuration and styling
 
 ## Installation
 
@@ -20,17 +20,16 @@ A powerful and flexible React datatable component built with ag-Grid, designed f
 npm install @uipath/ui-widgets-datatable
 ```
 
-## Peer Dependencies
-
-This package requires the following peer dependencies:
+### Peer dependencies
 
 ```bash
-npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript@^1.3.10
+npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript@^1.4.1
 ```
 
 ## Usage
 
-> **Note:** Add either `light` or `dark` class to your HTML `<body>` element to enable proper theming.
+> **Note: Theming**
+> Add either a `light` or `dark` class to your HTML `<body>` element to enable proper theming.
 
 ```tsx
 import { DataTable } from "@uipath/ui-widgets-datatable";
@@ -44,10 +43,12 @@ function App() {
   useEffect(() => {
     const init = async () => {
       const uipath = new UiPath({
-        baseUrl: "https://cloud.uipath.com",
+        baseUrl: "https://api.uipath.com",
         orgName: "your-org",
         tenantName: "your-tenant",
-        secret: "your-secret",
+        clientId: "your-client-id",
+        redirectUri: "http://localhost:3000/callback",
+        scope: "DataFabric.Schema.Read DataFabric.Data.Read DataFabric.Data.Write",
       });
       await uipath.initialize();
       setSdk(uipath);
@@ -68,70 +69,78 @@ function App() {
 }
 ```
 
+> **Tip: Finding the entity ID**
+> `entityId` is the UUID of a Data Fabric entity. List the ones available to you with the Entities service — see the [Entity service reference](https://uipath.github.io/uipath-typescript/api/interfaces/entity/):
+>
+> ```ts
+> import { Entities } from "@uipath/uipath-typescript/entities";
+>
+> const entities = await new Entities(sdk).getAll();
+> ```
+
 ## Props
 
-| Prop                          | Type                     | Required | Default | Description                                                   |
-| ----------------------------- | ------------------------ | -------- | ------- | ------------------------------------------------------------- |
-| `sdk`                         | `UiPath`                 | Yes      | -       | UiPath SDK instance                                           |
-| `entityId`                    | `string`                 | Yes      | -       | The UUID of the Data Fabric entity to display                 |
-| `pageSize`                    | `number`                 | No       | `50`    | Number of rows per page                                       |
-| `showIdColumn`                | `boolean`                | No       | -       | Whether to show the Id column in the grid                     |
-| `columnConfig`                | `Record<string, ColDef>` | No       | -       | Column configuration overrides keyed by display name          |
-| `rowClassRules`               | `RowClassRules`          | No       | -       | ag-Grid row class rules for conditional row styling           |
-| `customPaddingForExpandedRow` | `number`                 | No       | -       | Custom padding (in pixels) for expanded rows in group-by mode |
+| Prop | Type | Required | Default | Description |
+| ---- | ---- | -------- | ------- | ----------- |
+| `sdk` | `UiPath` | Yes | — | UiPath SDK instance |
+| `entityId` | `string` | Yes | — | The UUID of the Data Fabric entity to display |
+| `pageSize` | `number` | No | `50` | Number of rows per page |
+| `showIdColumn` | `boolean` | No | — | Whether to show the Id column in the grid |
+| `columnConfig` | `Record<string, ColDef>` | No | — | Column configuration overrides, keyed by display name |
+| `rowClassRules` | `RowClassRules` | No | — | ag-Grid row class rules for conditional row styling |
+| `customPaddingForExpandedRow` | `number` | No | — | Custom padding (in pixels) for expanded rows in group-by mode |
 
-## Features in Detail
+## Features in detail
 
-### CRUD Operations
+### CRUD operations
 
-#### Create
+<!-- tabs -->
+<!-- tab: Create -->
+1. Click **Add Row** to add a new row
+2. Fill in the data
+3. Click **Insert Records** to save
 
-- Click "Add Row" to add a new row
-- Fill in the data
-- Click "Insert Records" to save
+<!-- tab: Read -->
+Data is loaded automatically on mount. Click **Refresh** to reload.
 
-#### Read
+<!-- tab: Update -->
+1. Click any cell to edit (when not in master-detail mode)
+2. Changes are tracked automatically
+3. Click **Show Diff** to review changes
+4. Click **Commit Changes** to save
 
-- Data is automatically loaded on mount
-- Click "Refresh" to reload data
+<!-- tab: Delete -->
+1. Select rows using the checkboxes
+2. Click **Delete Records**
+3. Confirm the deletion
+<!-- /tabs -->
 
-#### Update
-
-- Click any cell to edit (when not in master-detail mode)
-- Changes are tracked automatically
-- Click "Show Diff" to review changes
-- Click "Commit Changes" to save
-
-#### Delete
-
-- Select rows using checkboxes
-- Click "Delete Records"
-- Confirm deletion
-
-### Master-Detail View
+### Master-detail view
 
 Group records by foreign key relationships:
 
-1. Select a groupable column from the "Group by" dropdown
+1. Select a groupable column from the **Group by** dropdown
 2. Click the expand button to view related records
 3. Related records are displayed in a nested grid
 
-### Field Types
+### Field types
 
-The datatable automatically handles different field types:
+The datatable handles each entity field type automatically:
 
-- **Text**: Standard text input
-- **Multiline Text**: Textarea editor with Shift+Enter for new lines
-- **Number**: Numeric input (Integer, Decimal, Float, Double, Big Integer)
-- **Date**: Date picker
-- **DateTime**: Date-time display (read-only)
-- **Boolean**: Yes/No/None select
-- **Choice Set (Single)**: Dropdown with choice set values
-- **Choice Set (Multiple)**: Multi-select with choice set values
-- **Foreign Key**: Dropdown with reference entity records
-- **File**: File upload, download, and removal
+| Field type | Editor |
+| ---------- | ------ |
+| Text | Standard text input |
+| Multiline Text | Textarea editor, `Shift+Enter` for a new line |
+| Number | Numeric input (Integer, Decimal, Float, Double, Big Integer) |
+| Date | Date picker |
+| DateTime | Date-time display (read-only) |
+| Boolean | Yes / No / None select |
+| Choice Set (single) | Dropdown with choice set values |
+| Choice Set (multiple) | Multi-select with choice set values |
+| Foreign Key | Dropdown with reference entity records |
+| File | File upload, download and removal |
 
-### Custom Column Configuration
+### Custom column configuration
 
 ```tsx
 <DataTable
@@ -147,7 +156,7 @@ The datatable automatically handles different field types:
 />
 ```
 
-### Custom Row Styling
+### Custom row styling
 
 ```tsx
 <DataTable
@@ -162,13 +171,21 @@ The datatable automatically handles different field types:
 
 ## Styling
 
-The component comes with default styles. Import the CSS file in your application:
+The component ships default styles. Import the stylesheet once in your application:
 
 ```tsx
 import "@uipath/ui-widgets-datatable/DataTable.css";
 ```
 
-The interface supports both light and dark themes through the UiPath Apollo design system.
+Both light and dark themes are supported through the UiPath Apollo design system.
+
+## TypeScript
+
+```tsx
+import type { DataTableProps } from "@uipath/ui-widgets-datatable";
+```
+
+<!-- docs:ignore -->
 
 ## Development
 
@@ -194,14 +211,8 @@ npm run test:coverage
 npm run build
 ```
 
-## TypeScript Support
-
-This package is written in TypeScript and includes type definitions. Import types as needed:
-
-```tsx
-import type { DataTableProps } from "@uipath/ui-widgets-datatable";
-```
-
 ## License
 
 MIT
+
+<!-- /docs:ignore -->
