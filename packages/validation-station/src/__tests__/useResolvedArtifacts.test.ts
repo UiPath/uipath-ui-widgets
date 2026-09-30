@@ -1,6 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
+import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
+import type { ProcessedDocument } from "../processedDocument/types";
+import type {
+  DuDocumentArtifacts,
+  DuFrameworkDocumentArtifacts,
+} from "../types";
 import { useResolvedArtifacts } from "../useResolvedArtifacts";
 
 const mockFetchBucketArtifacts = vi.fn();
@@ -144,5 +150,35 @@ describe("useResolvedArtifacts with a processedDocument", () => {
 
     expect(mockFetchProcessedDocumentArtifacts).not.toHaveBeenCalled();
     expect(result.current.artifacts).toBe(ixpArtifacts);
+  });
+});
+
+// Checked by `tsc`. A bucket source must stay typed as the UiPath
+// representation, or hosts reading `artifacts.taxonomy` break.
+describe("useResolvedArtifacts result type", () => {
+  it("is the UiPath representation for a bucket source", () => {
+    const { result } = renderHook(() =>
+      useResolvedArtifacts({
+        sdk,
+        data: data as DuFramework.ContentValidationData,
+      }),
+    );
+
+    expectTypeOf(
+      result.current.artifacts,
+    ).toEqualTypeOf<DuFrameworkDocumentArtifacts | null>();
+  });
+
+  it("is either representation for a processedDocument source", () => {
+    const { result } = renderHook(() =>
+      useResolvedArtifacts({
+        sdk,
+        processedDocument: processedDocument as ProcessedDocument,
+      }),
+    );
+
+    expectTypeOf(
+      result.current.artifacts,
+    ).toEqualTypeOf<DuDocumentArtifacts | null>();
   });
 });

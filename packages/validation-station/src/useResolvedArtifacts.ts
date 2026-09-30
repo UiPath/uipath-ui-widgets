@@ -57,10 +57,11 @@ export interface DuArtifactsSource extends DuArtifactsSourceBase {
   processedDocument?: ProcessedDocument;
 }
 
-/** The artifacts a source can resolve to — narrowed by the `artifacts` it accepts. */
-export type ArtifactsOf<S extends DuArtifactsSource> = NonNullable<
-  S["artifacts"]
->;
+/** A source that can carry neither a `processedDocument` nor IXP `artifacts` only resolves to the UiPath representation. */
+export type ArtifactsOf<S extends DuArtifactsSource> =
+  S extends DuFrameworkArtifactsSource & { processedDocument?: undefined }
+    ? DuFrameworkDocumentArtifacts
+    : DuDocumentArtifacts;
 
 export interface ResolvedArtifacts<
   A extends DuDocumentArtifacts = DuDocumentArtifacts,
