@@ -39,6 +39,8 @@
   "error_upload_attachments": "error_upload_attachments",
   "error_initialize_chat": "error_initialize_chat",
   "error_load_history": "error_load_history",
+  "error_rename_conversation": "error_rename_conversation",
+  "error_rename_conversation_too_long": "error_rename_conversation_too_long",
   "loading": "loading",
   "agent_loading_label": "agent_loading_label",
   "reload": "reload",
