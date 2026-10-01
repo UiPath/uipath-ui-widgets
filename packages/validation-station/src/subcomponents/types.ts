@@ -10,7 +10,7 @@ import type {
   SetFieldValueByPath,
 } from "@uipath/du-validation-station-wc";
 import type { CSSProperties } from "react";
-import type { DuArtifactsSource } from "../useResolvedArtifacts.js";
+import type { DuFrameworkArtifactsSource } from "../useResolvedArtifacts.js";
 import type {
   DuCommonProps,
   DuSaveCallbacks,
@@ -20,10 +20,10 @@ import type {
 
 /**
  * Props common to every subcomponent wrapper: a data source (see
- * {@link DuArtifactsSource}), shared-store linking, and presentation.
+ * {@link DuFrameworkArtifactsSource}), shared-store linking, and presentation.
  */
 export interface SubcomponentCommonProps
-  extends DuArtifactsSource, DuCommonProps {
+  extends DuFrameworkArtifactsSource, DuCommonProps {
   /**
    * Links this element's store to sibling standalone elements. Elements sharing
    * the same `instanceId` mirror each other's edits, selection, and document

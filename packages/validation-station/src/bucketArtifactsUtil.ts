@@ -2,7 +2,7 @@ import type { DuFramework } from "@uipath/uipath-typescript/document-understandi
 import { BucketService } from "@uipath/uipath-typescript/buckets";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import { unzipSync } from "fflate";
-import type { DuDocumentArtifacts } from "./types.js";
+import type { DuFrameworkDocumentArtifacts } from "./types.js";
 
 /** Fetch a URI, unzip the first file in the archive, and return the raw text. */
 async function fetchAndUnzip(uri: string): Promise<string> {
@@ -29,14 +29,14 @@ async function fetchAndUnzipJson(uri: string): Promise<unknown> {
 export async function fetchDuDocumentArtifacts(
   sdk: UiPath,
   data: DuFramework.ContentValidationData,
-): Promise<DuDocumentArtifacts> {
+): Promise<DuFrameworkDocumentArtifacts> {
   return fetchBucketArtifacts(new BucketService(sdk), data);
 }
 
 export async function fetchBucketArtifacts(
   bucketService: BucketService,
   data: DuFramework.ContentValidationData,
-): Promise<DuDocumentArtifacts> {
+): Promise<DuFrameworkDocumentArtifacts> {
   const {
     BucketId,
     FolderId,

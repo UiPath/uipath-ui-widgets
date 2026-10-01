@@ -37,15 +37,15 @@ export function wcStyle(
  * discriminated result so the caller narrows `artifacts` to non-null without a
  * `!` assertion: render `fallback` when not ready, otherwise use `artifacts`.
  */
-export type ArtifactsGate =
-  | { ready: true; artifacts: DuDocumentArtifacts }
+export type ArtifactsGate<A extends DuDocumentArtifacts = DuDocumentArtifacts> =
+  | { ready: true; artifacts: A }
   | { ready: false; fallback: ReactElement };
 
-export function resolveArtifacts(
+export function resolveArtifacts<A extends DuDocumentArtifacts>(
   error: string | null,
   wcReady: boolean,
-  artifacts: DuDocumentArtifacts | null,
-): ArtifactsGate {
+  artifacts: A | null,
+): ArtifactsGate<A> {
   if (error) {
     return {
       ready: false,

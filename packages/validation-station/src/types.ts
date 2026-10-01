@@ -9,6 +9,8 @@ import type {
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveValidatedDataRequest,
   IVsWcMessage,
+  IXPExtraction,
+  IXPTaxonomy,
   SelectAndFocusFieldValueByPath,
   SelectAndFocusFieldValueByPathResult,
   SetFieldValueByPath,
@@ -33,6 +35,8 @@ export type {
   IVsSaveValidatedDataRequest,
   // The message-bus payload of `onWcMessage`.
   IVsWcMessage,
+  IXPExtraction,
+  IXPTaxonomy,
   SaveValidatedDataResult,
   SelectAndFocusFieldValueByPath,
   SelectAndFocusFieldValueByPathResult,
@@ -91,23 +95,43 @@ export interface DuCommonProps {
   persistent?: boolean;
 }
 
-/**
- * Everything the Validation Station elements need to render one document:
- * the taxonomy, the extraction result to edit, the digitised document model,
- * and the document itself.
- *
- * Storage-agnostic — `fetchDuDocumentArtifacts` produces one of these from an
- * Orchestrator storage bucket, but a host holding the same pieces anywhere
- * else can build one by hand and pass it as the `artifacts` prop.
- */
-export interface DuDocumentArtifacts {
-  taxonomy: DuFramework.DocumentTaxonomy;
-  extractionResult: DuFramework.ExtractionResult;
+interface DuDocumentArtifactsBase {
   dom: DuFramework.DocumentEntity;
   text: string | undefined;
   customizationInfo: unknown;
   original: string | undefined;
 }
+
+/** A document whose taxonomy and extraction result are UiPath DU SDK contracts. */
+export interface DuFrameworkDocumentArtifacts extends DuDocumentArtifactsBase {
+  taxonomy: DuFramework.DocumentTaxonomy;
+  extractionResult: DuFramework.ExtractionResult;
+}
+
+/**
+ * A document whose taxonomy and extraction result are in the IXP (JSON Schema)
+ * representation. Only `ValidationStation` takes it; the subcomponents take
+ * the UiPath representation.
+ */
+export interface IxpDocumentArtifacts extends DuDocumentArtifactsBase {
+  taxonomy: IXPTaxonomy;
+  extractionResult: IXPExtraction;
+}
+
+/**
+ * Everything the Validation Station elements need to render one document:
+ * the taxonomy, the extraction result to edit, the digitised document model,
+ * and the document itself. The taxonomy and the extraction result are always
+ * in the same representation.
+ *
+ * Storage-agnostic — `fetchDuDocumentArtifacts` produces one of these from an
+ * Orchestrator storage bucket and `fetchProcessedDocumentArtifacts` from a
+ * Flow `ProcessedDocument`, but a host holding the same pieces anywhere else
+ * can build one by hand and pass it as the `artifacts` prop.
+ */
+export type DuDocumentArtifacts =
+  | DuFrameworkDocumentArtifacts
+  | IxpDocumentArtifacts;
 
 /**
  * The save flows every save-capable widget reports — `ValidationStation` and
@@ -120,9 +144,14 @@ export interface DuSaveCallbacks {
    * carries the request the web component produced.
    *
    * `result` is present only when the widget persisted the data itself, i.e.
-   * when it has `sdk` + `data` naming a folder. Otherwise the write-back
-   * is yours — the exported `submitValidatedData` does what the widget would
-   * have done for a bucket-backed document.
+   * when it has `sdk` + `data` naming a folder, or (`ValidationStation` only)
+   * `sdk` + `processedDocument`.
+   * Otherwise the write-back is yours — the exported `submitValidatedData`
+   * (bucket-backed document) and `submitProcessedDocument` (Flow document) do
+   * what the widget would have done.
+   *
+   * For a `processedDocument`, `request.validatedData` is an `IXPExtraction`:
+   * complete the task with it whatever `result` says.
    */
   onSubmit?: (
     request: IVsSaveValidatedDataRequest,
@@ -130,20 +159,27 @@ export interface DuSaveCallbacks {
   ) => void;
   /**
    * The user saved a draft (`save={{ validate: false }}`). Same contract as
-   * {@link DuSaveCallbacks.onSubmit}; the host-side equivalent is
-   * `saveValidatedDataAsDraft`.
+   * {@link DuSaveCallbacks.onSubmit}; the host-side equivalents are
+   * `saveValidatedDataAsDraft` and `saveProcessedDocumentAsDraft`.
    */
   onSaveAsDraft?: (
     request: IVsSaveValidatedDataAsDraftRequest,
     result?: SaveValidatedDataResult,
   ) => void;
   /**
-   * The user reported the document as an exception. The widget never persists
-   * this in either mode, so there is no `result` — the host owns it, typically
-   * via `OrchestratorDuModule.submitExceptionReport(...)`. The reason lives at
+   * The user reported the document as an exception. The reason lives at
    * `request.exceptionReport.Reason`.
+   *
+   * Given `sdk` + `processedDocument` (`ValidationStation` only), the widget
+   * records the rejection and
+   * passes the outcome as `result` (host-side: `reportProcessedDocumentException`).
+   * Otherwise there is no `result` and the host owns it, typically via
+   * `OrchestratorDuModule.submitExceptionReport(...)`.
    */
-  onReportException?: (request: IVsSaveExceptionReportRequest) => void;
+  onReportException?: (
+    request: IVsSaveExceptionReportRequest,
+    result?: SaveValidatedDataResult,
+  ) => void;
 }
 
 /**

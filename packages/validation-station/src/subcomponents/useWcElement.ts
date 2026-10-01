@@ -3,9 +3,13 @@ import { convertToPersistentTag } from "../loadValidationStationWc.js";
 import {
   useResolvedArtifacts,
   type ResolvedArtifacts,
-  type DuArtifactsSource,
+  type DuFrameworkArtifactsSource,
 } from "../useResolvedArtifacts.js";
-import { ValidationStationLanguage, type DuTheme } from "../types.js";
+import {
+  ValidationStationLanguage,
+  type DuFrameworkDocumentArtifacts,
+  type DuTheme,
+} from "../types.js";
 import { useWcReady } from "../useWcReady.js";
 import { wcStyle } from "./shared.js";
 
@@ -31,7 +35,7 @@ interface WcCommonProps {
   isReadonly: boolean;
 }
 
-export interface WcElementState extends ResolvedArtifacts {
+export interface WcElementState extends ResolvedArtifacts<DuFrameworkDocumentArtifacts> {
   wcReady: boolean;
   /** Tag actually rendered — the base tag, or its persistent variant. */
   tag: string;
@@ -47,7 +51,7 @@ export interface WcElementState extends ResolvedArtifacts {
  */
 export function useWcElement(params: {
   baseTag: string;
-  dataSource: DuArtifactsSource;
+  dataSource: DuFrameworkArtifactsSource;
   common: WcElementCommon;
 }): WcElementState {
   const { baseTag, dataSource, common } = params;

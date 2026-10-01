@@ -6,6 +6,13 @@ import type {
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import {
+  reportProcessedDocumentException,
+  saveProcessedDocumentAsDraft,
+  submitProcessedDocument,
+} from "./processedDocument/save.js";
+import type { ProcessedDocument } from "./processedDocument/types.js";
+import {
+  type SaveValidatedDataResult,
   saveValidatedDataAsDraft,
   submitValidatedData,
 } from "./saveValidatedDataUtil.js";
@@ -16,6 +23,48 @@ import {
 } from "./types.js";
 import { trackTelemetry } from "./utils/telemetryUtils.js";
 
+interface Persistence {
+  submit: (
+    request: IVsSaveValidatedDataRequest,
+  ) => Promise<SaveValidatedDataResult>;
+  saveAsDraft: (
+    request: IVsSaveValidatedDataAsDraftRequest,
+  ) => Promise<SaveValidatedDataResult>;
+  /** Only a Flow document records an exception. */
+  reportException?: (
+    request: IVsSaveExceptionReportRequest,
+  ) => Promise<SaveValidatedDataResult>;
+}
+
+function resolvePersistence(
+  sdk: UiPath | undefined,
+  data: DuFramework.ContentValidationData | undefined,
+  processedDocument: ProcessedDocument | undefined,
+): Persistence | null {
+  if (!sdk) return null;
+  // `data` wins when both payloads are set, matching the web component.
+  if (data) {
+    return data.FolderKey || data.FolderId
+      ? {
+          submit: (request) => submitValidatedData(sdk, data, request),
+          saveAsDraft: (request) =>
+            saveValidatedDataAsDraft(sdk, data, request),
+        }
+      : null;
+  }
+  if (processedDocument) {
+    return {
+      submit: (request) =>
+        submitProcessedDocument(sdk, processedDocument, request),
+      saveAsDraft: (request) =>
+        saveProcessedDocumentAsDraft(sdk, processedDocument, request),
+      reportException: (request) =>
+        reportProcessedDocumentException(sdk, processedDocument, request),
+    };
+  }
+  return null;
+}
+
 /**
  * Builds the save/draft/exception listeners shared by the two save-capable
  * widgets, `ValidationStation` and `CompactFieldsForm`, so their behaviour
@@ -23,22 +72,28 @@ import { trackTelemetry } from "./utils/telemetryUtils.js";
  * request with the outcome attached only when it was the one that saved.
  */
 export function createSaveHandlers(
-  { sdk, data }: { sdk?: UiPath; data?: DuFramework.ContentValidationData },
+  {
+    sdk,
+    data,
+    processedDocument,
+  }: {
+    sdk?: UiPath;
+    data?: DuFramework.ContentValidationData;
+    processedDocument?: ProcessedDocument;
+  },
   { onSubmit, onSaveAsDraft, onReportException }: DuSaveCallbacks,
 ) {
-  // Everything a write-back needs: an SDK, a payload, and the folder its
-  // bucket is scoped to.
-  const canPersist = !!sdk && !!data && !!(data.FolderKey || data.FolderId);
+  const persistence = resolvePersistence(sdk, data, processedDocument);
 
   return {
     handleSubmit: (request: IVsSaveValidatedDataRequest) => {
-      if (!canPersist) {
+      if (!persistence) {
         // No outcome to wait for, so the event records the attempt.
         trackTelemetry(TelemetryEvent.Submit, TelemetryStatus.Success);
         onSubmit?.(request);
         return;
       }
-      submitValidatedData(sdk!, data!, request).then((result) => {
+      persistence.submit(request).then((result) => {
         trackTelemetry(
           TelemetryEvent.Submit,
           result.success ? TelemetryStatus.Success : TelemetryStatus.Error,
@@ -48,19 +103,31 @@ export function createSaveHandlers(
     },
 
     handleSaveAsDraft: (request: IVsSaveValidatedDataAsDraftRequest) => {
-      if (!canPersist) {
+      if (!persistence) {
         onSaveAsDraft?.(request);
         return;
       }
-      saveValidatedDataAsDraft(sdk!, data!, request).then((result) =>
-        onSaveAsDraft?.(request, result),
-      );
+      persistence
+        .saveAsDraft(request)
+        .then((result) => onSaveAsDraft?.(request, result));
     },
 
-    // Never persisted by either widget — the host owns it.
     handleException: (request: IVsSaveExceptionReportRequest) => {
-      trackTelemetry(TelemetryEvent.ExceptionRequest, TelemetryStatus.Success);
-      onReportException?.(request);
+      if (!persistence?.reportException) {
+        trackTelemetry(
+          TelemetryEvent.ExceptionRequest,
+          TelemetryStatus.Success,
+        );
+        onReportException?.(request);
+        return;
+      }
+      persistence.reportException(request).then((result) => {
+        trackTelemetry(
+          TelemetryEvent.ExceptionRequest,
+          result.success ? TelemetryStatus.Success : TelemetryStatus.Error,
+        );
+        onReportException?.(request, result);
+      });
     },
   };
 }
