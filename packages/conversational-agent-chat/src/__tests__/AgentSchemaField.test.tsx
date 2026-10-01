@@ -61,9 +61,70 @@ describe("AgentSchemaField — date/time", () => {
     expect(document.querySelector('input[type="time"]')).toBeInTheDocument();
   });
 
-  it("infers a date input from an ISO date value when no format is given", () => {
-    renderField({ type: "string" } as InputSchemaProperty, "2026-06-09");
-    expect(document.querySelector('input[type="date"]')).toBeInTheDocument();
+  it.each([
+    ["date", "date", "9999-12-31"],
+    ["date-time", "datetime-local", "9999-12-31T23:59:59"],
+  ])(
+    "caps the year at four digits for format: %s",
+    (format, inputType, max) => {
+      renderField({ type: "string", format } as InputSchemaProperty);
+      expect(
+        document.querySelector(`input[type="${inputType}"]`),
+      ).toHaveAttribute("max", max);
+    },
+  );
+
+  it("sets no max on a time input", () => {
+    renderField({ type: "string", format: "time" } as InputSchemaProperty);
+    expect(document.querySelector('input[type="time"]')).not.toHaveAttribute(
+      "max",
+    );
+  });
+
+  it.each([
+    "2026-06-09",
+    "2026-06-09T10:30",
+    "2026-06-09T10:30:00Z",
+    "my number 5",
+    "Answer: 12345",
+    "12/12/2026",
+  ])(
+    "renders a text input showing the value when no format is declared (%s)",
+    (value) => {
+      renderField({ type: "string" } as InputSchemaProperty, value);
+      const input = screen.getByPlaceholderText("Enter a value...");
+      expect(input).toHaveAttribute("type", "text");
+      expect(input).toHaveValue(value);
+    },
+  );
+
+  it("does not switch to a date picker while the user types", async () => {
+    const user = userEvent.setup();
+    const prop = { type: "string" } as InputSchemaProperty;
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <AgentSchemaField
+        prop={prop}
+        fieldKey="field"
+        value=""
+        onChange={onChange}
+      />,
+    );
+    const input = screen.getByPlaceholderText("Enter a value...");
+    await user.type(input, "5");
+    rerender(
+      <AgentSchemaField
+        prop={prop}
+        fieldKey="field"
+        value="2026-06-09"
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getByPlaceholderText("Enter a value...")).toHaveAttribute(
+      "type",
+      "text",
+    );
+    expect(document.querySelector('input[type="date"]')).toBeNull();
   });
 
   it("emits the raw value on date change", async () => {
