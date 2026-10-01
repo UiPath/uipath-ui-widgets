@@ -7,6 +7,7 @@ import {
   AutopilotChatMessage,
   AutopilotChatMode,
   AutopilotChatPreHookAction,
+  type AutopilotChatRenameConversationPayload,
   AutopilotChatService,
   type SupportedLocale,
 } from "@uipath/apollo-react/material/components";
@@ -105,6 +106,8 @@ const EXCHANGES_PAGE_SIZE = 15;
 // `sessionStarted`, so if it never arrives, surface an error instead of
 // leaving the send silently pending.
 const SESSION_START_TIMEOUT_MS = 30_000;
+// Backend limit on ConversationSchema.label.
+const CONVERSATION_LABEL_MAX_LENGTH = 100;
 type ConversationCreateOptionsArg = Parameters<
   ConversationalAgent["conversations"]["create"]
 >[2];
@@ -223,6 +226,8 @@ export const ConversationalAgentChat = ({
   }, [sdk, externalUserId]);
   const session = useRef<SessionStream | null>(null);
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
+  // Last rename error shown, so a successful rename clears only its own banner.
+  const renameError = useRef<string | null>(null);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
   const conversationsCursor = useRef<{ value: string } | undefined>(undefined);
   // Cursor for the active conversation's exchange history. Reset whenever a
@@ -826,6 +831,39 @@ export const ConversationalAgentChat = ({
     [chatService, onNewChat, setConversationHistory],
   );
 
+  const onRenameConversation = useCallback(
+    async ({
+      conversationId,
+      name,
+    }: AutopilotChatRenameConversationPayload) => {
+      if (!chatService) return;
+      try {
+        // Stop the server's auto-labeling from overwriting the user's name.
+        const updated = await agentService.current.conversations.updateById(
+          conversationId,
+          { label: name.trim(), autogenerateLabel: false },
+        );
+        setConversationHistory(
+          pastConversations.current.map((c) =>
+            c.id === conversationId ? { ...c, label: updated.label } : c,
+          ),
+        );
+        if (
+          renameError.current &&
+          chatService.getError()?.message === renameError.current
+        ) {
+          chatService.clearError();
+        }
+        renameError.current = null;
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        renameError.current = t("error_rename_conversation", { errorMessage });
+        chatService.setError(renameError.current);
+      }
+    },
+    [chatService, setConversationHistory, t],
+  );
+
   const onSendMessage = useCallback(
     async (data: AutopilotChatMessage) => {
       try {
@@ -1180,6 +1218,20 @@ export const ConversationalAgentChat = ({
           paginatedMessages: true,
           settingsRenderer: renderSettings,
           preHooks: {
+            [AutopilotChatPreHookAction.RenameConversation]: async ({
+              name,
+            }: AutopilotChatRenameConversationPayload) => {
+              const trimmed = name.trim();
+              if (trimmed.length === 0) return false;
+              if (trimmed.length > CONVERSATION_LABEL_MAX_LENGTH) {
+                renameError.current = t("error_rename_conversation_too_long", {
+                  max: CONVERSATION_LABEL_MAX_LENGTH,
+                });
+                chatServiceRef.current?.setError(renameError.current);
+                return false;
+              }
+              return true;
+            },
             [AutopilotChatPreHookAction.CitationClick]: async (
               citationData,
             ) => {
@@ -1247,6 +1299,8 @@ export const ConversationalAgentChat = ({
             // Apollo defaults `settings: true`; flip it so our gear renders
             // by default. Consumers can still opt out via `disabledFeatures`.
             settings: false,
+            // Apollo disables rename by default; enable it to match the react-sdk.
+            renameChat: false,
             ...(!agentId ? { newChat: true, history: true } : {}),
             ...disabledFeaturesRef.current,
           },
@@ -1436,6 +1490,10 @@ export const ConversationalAgentChat = ({
             AutopilotChatEvent.DeleteConversation,
             onClickDeleteConversation,
           ),
+          chatService.on(
+            AutopilotChatEvent.RenameConversation,
+            onRenameConversation,
+          ),
           chatService.on(AutopilotChatEvent.HistoryLoadMore, onHistoryLoadMore),
           chatService.on(
             AutopilotChatEvent.ConversationLoadMore,
@@ -1484,6 +1542,7 @@ export const ConversationalAgentChat = ({
     onHistoryLoadMore,
     onHistorySearch,
     onNewChat,
+    onRenameConversation,
     onSendMessage,
     onSetAttachments,
     onStopResponse,
