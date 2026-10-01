@@ -58,6 +58,7 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
   onSetFieldValueByPathResult,
   onSelectAndFocusFieldValueByPathResult,
   onDeleteFieldValueByPathResult,
+  onWcMessage,
   onFieldsPanelWidthChanged,
   onFieldsPanelSideChanged,
 }) => {
@@ -94,6 +95,7 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
       selectAndFocusFieldValueByPathResult:
         onSelectAndFocusFieldValueByPathResult,
       deleteFieldValueByPathResult: onDeleteFieldValueByPathResult,
+      "ui-du-vs-wc-message": onWcMessage,
       fieldsPanelWidthChanged: onFieldsPanelWidthChanged,
       fieldsPanelSideChanged: onFieldsPanelSideChanged,
       saveValidatedDataRequest: handleSubmit,

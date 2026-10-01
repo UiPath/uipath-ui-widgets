@@ -121,6 +121,10 @@ const STATE_EVENTS: Record<
   },
   fieldsPanelWidthChanged: { prop: "onFieldsPanelWidthChanged", detail: 420 },
   fieldsPanelSideChanged: { prop: "onFieldsPanelSideChanged", detail: "right" },
+  "ui-du-vs-wc-message": {
+    prop: "onWcMessage",
+    detail: { type: "indicator-overlay-hide", instanceId: 1 },
+  },
 };
 
 const STATE_EVENT_CASES = Object.entries(STATE_EVENTS).map(

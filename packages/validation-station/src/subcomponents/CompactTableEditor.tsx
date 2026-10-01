@@ -42,6 +42,7 @@ export const CompactTableEditor: React.FC<CompactTableEditorProps> = ({
   onSetFieldValueByPathResult,
   onSelectAndFocusFieldValueByPathResult,
   onDeleteFieldValueByPathResult,
+  onWcMessage,
   onTableSelectionEvent,
   onClosed,
   ...dataSource
@@ -72,6 +73,7 @@ export const CompactTableEditor: React.FC<CompactTableEditorProps> = ({
       selectAndFocusFieldValueByPathResult:
         onSelectAndFocusFieldValueByPathResult,
       deleteFieldValueByPathResult: onDeleteFieldValueByPathResult,
+      "ui-du-vs-wc-message": onWcMessage,
       tableSelectionEvent: onTableSelectionEvent,
       closed: onClosed,
     },

@@ -8,6 +8,7 @@ import type {
   IVsSaveExceptionReportRequest,
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveValidatedDataRequest,
+  IVsWcMessage,
   SelectAndFocusFieldValueByPath,
   SelectAndFocusFieldValueByPathResult,
   SetFieldValueByPath,
@@ -30,6 +31,8 @@ export type {
   IVsSaveExceptionReportRequest,
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveValidatedDataRequest,
+  // The message-bus payload of `onWcMessage`.
+  IVsWcMessage,
   SaveValidatedDataResult,
   SelectAndFocusFieldValueByPath,
   SelectAndFocusFieldValueByPathResult,
@@ -188,6 +191,11 @@ export interface VsStateEventProps {
   onDeleteFieldValueByPathResult?: (
     result: DeleteFieldValueByPathResult,
   ) => void;
+  /**
+   * A message on the web component's message bus — today the value-indicator
+   * overlay opening and closing, for hosts that render their own overlay.
+   */
+  onWcMessage?: (message: IVsWcMessage) => void;
 }
 
 /**

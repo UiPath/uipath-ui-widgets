@@ -67,7 +67,7 @@
   },
   "dependencies": {
     "@uipath/du-utils": "^1.0.0-rc.1",
-    "@uipath/du-validation-station-wc": "1.0.0-rc.1",
+    "@uipath/du-validation-station-wc": "./uipath-du-validation-station-wc-1.0.0-rc.3.tgz",
     "fflate": "^0.8.2"
   }
 }

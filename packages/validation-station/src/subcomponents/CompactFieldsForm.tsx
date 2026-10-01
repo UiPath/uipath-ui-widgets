@@ -45,6 +45,7 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
   onSetFieldValueByPathResult,
   onSelectAndFocusFieldValueByPathResult,
   onDeleteFieldValueByPathResult,
+  onWcMessage,
   onSaveResult,
   onSubmit,
   onSaveAsDraft,
@@ -88,6 +89,7 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
       selectAndFocusFieldValueByPathResult:
         onSelectAndFocusFieldValueByPathResult,
       deleteFieldValueByPathResult: onDeleteFieldValueByPathResult,
+      "ui-du-vs-wc-message": onWcMessage,
       saveResult: onSaveResult,
       saveValidatedDataRequest: handleSubmit,
       saveValidatedDataAsDraftRequest: handleSaveAsDraft,

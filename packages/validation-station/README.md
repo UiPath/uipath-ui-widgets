@@ -250,6 +250,7 @@ These callbacks report the rest of the element's
 | `onDeleteFieldValueByPathResult`         | a `deleteFieldValueByPath` command completes                                          |
 | `onFieldsPanelWidthChanged`              | the fields panel is resized (width in px)                                             |
 | `onFieldsPanelSideChanged`               | the panel moves to the other side of the viewer                                       |
+| `onWcMessage`                            | a message arrives on the element's message bus (the value-indicator overlay today)    |
 
 **Commands need a loaded document.** `setFieldValueByPath`,
 `selectAndFocusFieldValueByPath` and `deleteFieldValueByPath` resolve their
@@ -305,6 +306,7 @@ import type {
   IVsSaveValidatedDataRequest,
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveExceptionReportRequest,
+  IVsWcMessage,
   SaveValidatedDataResult,
   SetFieldValueByPath,
   SelectAndFocusFieldValueByPath,
