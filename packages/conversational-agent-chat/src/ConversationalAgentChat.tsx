@@ -58,6 +58,10 @@ import type { InputSchema } from "./components/AgentSchemaForm/types";
 import { FeedbackDialog } from "./components/FeedbackDialog";
 import { Loader } from "./components/Loader";
 import { SettingsDialog } from "./components/SettingsDialog";
+import {
+  ConnectionReadinessCard,
+  type ConnectorReadiness,
+} from "./components/ConnectionReadinessCard";
 import type { ToolConfirmationLabels } from "./components/ToolConfirmation";
 import {
   createToolConfirmationRenderer,
@@ -254,6 +258,9 @@ export const ConversationalAgentChat = ({
   } | null>(null);
   const citationPreviewRef = useRef(citationPreview);
   const [hasMessages, setHasMessages] = useState(false);
+  const [connectionReadiness, setConnectionReadiness] = useState<
+    ConnectorReadiness[] | null
+  >(null);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
   const onUserMessageSentRef = useRef(onUserMessageSent);
   const chatServiceRef = useRef<AutopilotChatService | null>(null);
@@ -831,6 +838,8 @@ export const ConversationalAgentChat = ({
       try {
         // required for debug-mode hosts that need to gate agent execution on the first user message
         onUserMessageSentRef.current?.({ content: data.content });
+        setHasMessages(true);
+        setConnectionReadiness(null);
         const sessionHelper = await getSessionHelper();
         const exchange = sessionHelper.startExchange();
         chatService?.setWaiting(true);
@@ -1059,6 +1068,7 @@ export const ConversationalAgentChat = ({
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
     try {
       initializedFor.current = initKey;
+      setConnectionReadiness(null);
 
       const agentRelease = await resolveAgent();
       agentIdRef.current = agentRelease?.id;
@@ -1097,6 +1107,82 @@ export const ConversationalAgentChat = ({
         firstRunExperienceRef.current,
         agentRelease?.appearance,
       );
+
+      // Fetch connection readiness (fire-and-forget; card is optional)
+      // TODO(sdk-typing): Remove `as unknown as { ... }` casts and hardcoded state strings
+      // once @uipath/uipath-typescript exposes connection methods and types on ConversationalAgent.
+      if (
+        agentRelease &&
+        agentIdRef.current != null &&
+        folderIdRef.current != null
+      ) {
+        const capturedKey = initKey;
+        const capturedAgentId = agentIdRef.current;
+        const capturedFolderId = folderIdRef.current;
+        const ca = agentService.current as unknown as {
+          getAvailableConnections(
+            a: number,
+            f: number,
+          ): Promise<
+            Array<{
+              connectorKey: string;
+              connectorName?: string;
+              connectorImage?: string;
+              currentConnectionId: string | null;
+              currentConnectionName: string | null;
+              isConfigurable?: boolean;
+              connectionsUrl?: string;
+              connections: Array<{ id: string; state: string }>;
+            }>
+          >;
+        };
+        const applyReadiness = (
+          items: Awaited<ReturnType<typeof ca.getAvailableConnections>>,
+        ) => {
+          if (initializedFor.current !== capturedKey) return;
+          if (items.length === 0) {
+            setConnectionReadiness(null);
+            return;
+          }
+          const readiness: ConnectorReadiness[] = items.map((item) => {
+            const selectedConn = item.currentConnectionId
+              ? item.connections?.find((c) => c.id === item.currentConnectionId)
+              : undefined;
+            return {
+              connectorKey: item.connectorKey,
+              connectorName: item.connectorName ?? item.connectorKey,
+              connectorImage: item.connectorImage,
+              isConfigurable: item.isConfigurable !== false,
+              currentConnectionId: item.currentConnectionId,
+              currentConnectionName: item.currentConnectionName,
+              currentConnectionState:
+                (selectedConn?.state as ConnectorReadiness["currentConnectionState"]) ??
+                (item.currentConnectionId ? "Expired" : undefined),
+              connectionsUrl: item.connectionsUrl,
+            };
+          });
+          const hasUnresolved = readiness.some(
+            (c) =>
+              c.isConfigurable &&
+              (!c.currentConnectionId ||
+                c.currentConnectionState !== "Enabled"),
+          );
+          setConnectionReadiness(hasUnresolved ? readiness : null);
+        };
+        ca.getAvailableConnections(capturedAgentId, capturedFolderId)
+          .then(applyReadiness)
+          .catch(() => {
+            if (initializedFor.current !== capturedKey) return;
+            setConnectionReadiness(null);
+          });
+        // Re-fetch after a delay to pick up server-side auto-bind results
+        setTimeout(() => {
+          if (initializedFor.current !== capturedKey) return;
+          ca.getAvailableConnections(capturedAgentId, capturedFolderId)
+            .then(applyReadiness)
+            .catch(() => {});
+        }, 1500);
+      }
 
       // Persists agent inputs against the active conversation via
       // updateConversation. Server-side this applies to all subsequent
@@ -1150,6 +1236,8 @@ export const ConversationalAgentChat = ({
               initialInputs={storedAgentInputs.current}
               onApplyInputs={handleApplySettingsInputs}
               inputsResetKey={inputsResetKey}
+              agentId={agentIdRef.current}
+              folderId={folderIdRef.current}
             />
           </PortalContainerProvider>,
         );
@@ -1585,13 +1673,30 @@ export const ConversationalAgentChat = ({
         )}
 
         {!error && chatService && !showInputPage && (
-          <ApChat
-            key={locale}
-            chatServiceInstance={chatService}
-            locale={toApolloSupportedLocale(locale)}
-            theme={theme}
-            enableInternalThemeProvider
-          />
+          <>
+            {connectionReadiness &&
+              agentIdRef.current != null &&
+              folderIdRef.current != null && (
+                <ConnectionReadinessCard
+                  connectors={connectionReadiness}
+                  conversationalAgent={agentService.current}
+                  agentId={agentIdRef.current}
+                  folderId={folderIdRef.current}
+                  onAllConnected={() => setConnectionReadiness(null)}
+                  onOpenSettings={() =>
+                    chatServiceRef.current?.toggleSettings(true)
+                  }
+                  defaultCollapsed={hasMessages}
+                />
+              )}
+            <ApChat
+              key={locale}
+              chatServiceInstance={chatService}
+              locale={toApolloSupportedLocale(locale)}
+              theme={theme}
+              enableInternalThemeProvider
+            />
+          </>
         )}
 
         <FeedbackDialog
