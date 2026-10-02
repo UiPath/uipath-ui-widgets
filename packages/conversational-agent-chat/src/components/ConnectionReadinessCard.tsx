@@ -54,6 +54,7 @@ export const ConnectionReadinessCard = ({
   const [localConnectors, setLocalConnectors] =
     useState<ConnectorReadiness[]>(connectors);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const oauthSessionRef = useRef(0);
 
   // Sync when prop changes
   useEffect(() => {
@@ -91,7 +92,7 @@ export const ConnectionReadinessCard = ({
               currentConnectionName: string | null;
               isConfigurable?: boolean;
               connectionsUrl?: string;
-              connections: Array<{ connectionId: string; state: string }>;
+              connections: Array<{ id: string; state: string }>;
             }>
           >;
         }
@@ -101,7 +102,7 @@ export const ConnectionReadinessCard = ({
           setLocalConnectors(
             items.map((item) => {
               const selectedConn = item.currentConnectionId
-                ? item.connections?.find((c) => c.connectionId === item.currentConnectionId)
+                ? item.connections?.find((c) => c.id === item.currentConnectionId)
                 : undefined;
               return {
               connectorKey: item.connectorKey,
@@ -110,11 +111,8 @@ export const ConnectionReadinessCard = ({
               isConfigurable: item.isConfigurable !== false,
               currentConnectionId: item.currentConnectionId,
               currentConnectionName: item.currentConnectionName,
-              currentConnectionState: item.currentConnectionId
-                ? ((selectedConn?.state === "Enabled"
-                    ? "Enabled"
-                    : "Expired") as ConnectorReadiness["currentConnectionState"])
-                : undefined,
+              currentConnectionState: selectedConn?.state as ConnectorReadiness["currentConnectionState"]
+                ?? (item.currentConnectionId ? "Expired" : undefined),
               connectionsUrl: item.connectionsUrl,
             };
             }),
@@ -139,6 +137,12 @@ export const ConnectionReadinessCard = ({
       c.currentConnectionState &&
       c.currentConnectionState !== "Enabled",
   );
+  const healthy = localConnectors.filter(
+    (c) =>
+      c.isConfigurable &&
+      c.currentConnectionId &&
+      c.currentConnectionState === "Enabled",
+  );
   const allConnected =
     unconnected.length === 0 && broken.length === 0;
 
@@ -149,8 +153,14 @@ export const ConnectionReadinessCard = ({
     }
   }, [allConnected, onAllConnected]);
 
-  const startOAuthFlow = useCallback(
+  const startOAuthConnect = useCallback(
     async (connectorKey: string) => {
+      // Cancel any previous OAuth connection
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      const oauthSession = ++oauthSessionRef.current;
       setConnectingKey(connectorKey);
 
       try {
@@ -164,23 +174,24 @@ export const ConnectionReadinessCard = ({
           }
         ).getConnectionAuthUrl(connectorKey);
 
+        // Stale — a newer OAuth connection started while we awaited the auth URL
+        if (oauthSessionRef.current !== oauthSession) return;
+
         const { authUrl, sessionId, expiresTime } = result;
 
         window.open(authUrl, "_blank", "noopener,noreferrer,width=600,height=700");
 
-        // Poll for session status
-        if (pollingRef.current) {
-          clearInterval(pollingRef.current);
-        }
-
         pollingRef.current = setInterval(async () => {
+          // Another OAuth connection replaced this one
+          if (oauthSessionRef.current !== oauthSession) return;
+
           try {
             if (Date.now() > expiresTime) {
               if (pollingRef.current) {
                 clearInterval(pollingRef.current);
                 pollingRef.current = null;
               }
-              setConnectingKey(null);
+              if (oauthSessionRef.current === oauthSession) setConnectingKey(null);
               return;
             }
 
@@ -194,6 +205,9 @@ export const ConnectionReadinessCard = ({
               }
             ).getConnectionSessionStatus(sessionId);
 
+            // Ignore if a newer OAuth connection started while the request was in-flight
+            if (oauthSessionRef.current !== oauthSession) return;
+
             if (status.status === "success" && status.connectionId) {
               if (pollingRef.current) {
                 clearInterval(pollingRef.current);
@@ -201,7 +215,7 @@ export const ConnectionReadinessCard = ({
               }
               setConnectingKey(null);
 
-              // Persist via SDK first, then update local state on success
+              // Persist via SDK first, then rebuild local state from the response
               try {
                 const updatedSelections = localConnectors.map((c) => ({
                   connectorKey: c.connectorKey,
@@ -210,7 +224,7 @@ export const ConnectionReadinessCard = ({
                       ? status.connectionId
                       : c.currentConnectionId,
                 }));
-                await (
+                const updated = await (
                   conversationalAgent as unknown as {
                     updateConnectionSelections: (
                       agentId: number,
@@ -221,22 +235,42 @@ export const ConnectionReadinessCard = ({
                           connectionId: string | null;
                         }[];
                       },
-                    ) => Promise<void>;
+                    ) => Promise<
+                      Array<{
+                        connectorKey: string;
+                        connectorName?: string;
+                        connectorImage?: string;
+                        currentConnectionId: string | null;
+                        currentConnectionName: string | null;
+                        isConfigurable?: boolean;
+                        connectionsUrl?: string;
+                        connections: Array<{ id: string; state: string }>;
+                      }>
+                    >;
                   }
                 ).updateConnectionSelections(agentId, folderId, {
                   selections: updatedSelections,
                 });
-                setLocalConnectors((prev) =>
-                  prev.map((c) =>
-                    c.connectorKey === connectorKey
-                      ? {
-                          ...c,
-                          currentConnectionId: status.connectionId,
-                          currentConnectionState: "Enabled",
-                        }
-                      : c,
-                  ),
-                );
+                if (oauthSessionRef.current === oauthSession) {
+                  setLocalConnectors(
+                    updated.map((item) => {
+                      const sel = item.currentConnectionId
+                        ? item.connections?.find((c) => c.id === item.currentConnectionId)
+                        : undefined;
+                      return {
+                        connectorKey: item.connectorKey,
+                        connectorName: item.connectorName ?? item.connectorKey,
+                        connectorImage: item.connectorImage,
+                        isConfigurable: item.isConfigurable !== false,
+                        currentConnectionId: item.currentConnectionId,
+                        currentConnectionName: item.currentConnectionName,
+                        currentConnectionState: sel?.state as ConnectorReadiness["currentConnectionState"]
+                          ?? (item.currentConnectionId ? "Expired" : undefined),
+                        connectionsUrl: item.connectionsUrl,
+                      };
+                    }),
+                  );
+                }
               } catch {
                 // Persistence failed — do not update local state so the
                 // card continues to show the connector as unresolved.
@@ -246,14 +280,14 @@ export const ConnectionReadinessCard = ({
                 clearInterval(pollingRef.current);
                 pollingRef.current = null;
               }
-              setConnectingKey(null);
+              if (oauthSessionRef.current === oauthSession) setConnectingKey(null);
             }
           } catch {
             // Polling error; keep trying until expired
           }
         }, 500);
       } catch {
-        setConnectingKey(null);
+        if (oauthSessionRef.current === oauthSession) setConnectingKey(null);
       }
     },
     [conversationalAgent, agentId, folderId, localConnectors],
@@ -282,7 +316,7 @@ export const ConnectionReadinessCard = ({
 
   // --- Collapsed bar state ---
   if (collapsed || allConnected) {
-    const neededCount = unconnected.length + broken.length;
+    const neededCount = broken.length;
     if (neededCount === 0) return null;
 
     return (
@@ -360,7 +394,7 @@ export const ConnectionReadinessCard = ({
                 variant="default"
                 size="sm"
                 disabled={connectingKey === connector.connectorKey}
-                onClick={() => startOAuthFlow(connector.connectorKey)}
+                onClick={() => startOAuthConnect(connector.connectorKey)}
               >
                 {connectingKey === connector.connectorKey ? (
                   <Spinner size="sm" />
@@ -401,7 +435,7 @@ export const ConnectionReadinessCard = ({
                   variant="default"
                   size="sm"
                   disabled={connectingKey === connector.connectorKey}
-                  onClick={() => startOAuthFlow(connector.connectorKey)}
+                  onClick={() => startOAuthConnect(connector.connectorKey)}
                 >
                   {connectingKey === connector.connectorKey ? (
                     <Spinner size="sm" />
@@ -409,6 +443,36 @@ export const ConnectionReadinessCard = ({
                     t("connection_readiness_connect")
                   )}
                 </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Show healthy connections for full picture */}
+        {healthy.length > 0 && (
+          <div className="mt-3 flex flex-col gap-2">
+            {healthy.map((connector) => (
+              <div
+                key={connector.connectorKey}
+                className="flex items-center justify-between rounded-md border px-3 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  {connector.connectorImage && (
+                    <img
+                      src={connector.connectorImage}
+                      alt=""
+                      className="h-5 w-5 rounded"
+                    />
+                  )}
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">
+                      {connector.connectorName}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {getStatusText(connector)}
+                    </span>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -513,7 +577,7 @@ export const ConnectionReadinessCard = ({
                     variant="default"
                     size="sm"
                     disabled={connectingKey === connector.connectorKey}
-                    onClick={() => startOAuthFlow(connector.connectorKey)}
+                    onClick={() => startOAuthConnect(connector.connectorKey)}
                   >
                     {isThisConnecting ? (
                       <Spinner size="sm" />

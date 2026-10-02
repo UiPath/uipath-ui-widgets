@@ -131,6 +131,7 @@ export const ConnectionsSection = ({
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollInFlightRef = useRef(false);
   const fetchingRef = useRef(false);
+  const oauthSessionRef = useRef(0);
 
   const clearPoll = useCallback(() => {
     if (pollingRef.current) {
@@ -239,24 +240,33 @@ export const ConnectionsSection = ({
     setSaveResult(null);
   };
 
-  const startOAuthFlow = async (connectorKey: string) => {
+  const startOAuthConnect = async (connectorKey: string) => {
+    clearPoll();
+    const oauthSession = ++oauthSessionRef.current;
+
     try {
       const { authUrl, sessionId, expiresTime } =
         await api.getConnectionAuthUrl(connectorKey);
+
+      // Stale — a newer OAuth connection started while we awaited the auth URL
+      if (oauthSessionRef.current !== oauthSession) return;
+
       window.open(authUrl, "_blank", "noopener,noreferrer");
       setConnectingKey(connectorKey);
-      clearPoll();
 
       pollingRef.current = setInterval(async () => {
+        if (oauthSessionRef.current !== oauthSession) return;
         if (pollInFlightRef.current) return;
         pollInFlightRef.current = true;
         try {
           if (Date.now() > expiresTime) {
             clearPoll();
-            setConnectingKey(null);
+            if (oauthSessionRef.current === oauthSession) setConnectingKey(null);
             return;
           }
           const status = await api.getConnectionSessionStatus(sessionId);
+          if (oauthSessionRef.current !== oauthSession) return;
+
           if (status.status === "success" && status.connectionId) {
             clearPoll();
             setConnectingKey(null);
@@ -271,35 +281,41 @@ export const ConnectionsSection = ({
                   ],
                 },
               );
-              const sels = getInitialSelections(updated);
-              setItems(updated);
-              setInitialSelections(sels);
-              setStagedSelections(sels);
+              if (oauthSessionRef.current === oauthSession) {
+                const sels = getInitialSelections(updated);
+                setItems(updated);
+                setInitialSelections(sels);
+                setStagedSelections(sels);
+              }
             } catch {
               // Fallback: at least update the local selection
-              setStagedSelections((prev) => ({
-                ...prev,
-                [connectorKey]: status.connectionId,
-              }));
+              if (oauthSessionRef.current === oauthSession) {
+                setStagedSelections((prev) => ({
+                  ...prev,
+                  [connectorKey]: status.connectionId,
+                }));
+              }
             }
             setOpenPicker(null);
             setSearchQuery("");
           } else if (status.status === "failed") {
             clearPoll();
-            setConnectingKey(null);
+            if (oauthSessionRef.current === oauthSession) setConnectingKey(null);
           }
         } catch {
           clearPoll();
-          setConnectingKey(null);
+          if (oauthSessionRef.current === oauthSession) setConnectingKey(null);
         } finally {
           pollInFlightRef.current = false;
         }
       }, POLL_INTERVAL_MS);
     } catch {
       // Auth URL failed — fall back to connectionsUrl
-      const item = items.find((i) => i.connectorKey === connectorKey);
-      const fallback = item?.connectionsUrl ?? item?.configurationUrl;
-      if (fallback) window.open(fallback, "_blank", "noopener,noreferrer");
+      if (oauthSessionRef.current === oauthSession) {
+        const item = items.find((i) => i.connectorKey === connectorKey);
+        const fallback = item?.connectionsUrl ?? item?.configurationUrl;
+        if (fallback) window.open(fallback, "_blank", "noopener,noreferrer");
+      }
     }
   };
 
@@ -369,7 +385,7 @@ export const ConnectionsSection = ({
                         setOpenPicker(isPickerOpen ? null : item.connectorKey);
                         setSearchQuery("");
                       } else {
-                        startOAuthFlow(item.connectorKey);
+                        startOAuthConnect(item.connectorKey);
                       }
                     }}
                     className={
@@ -481,7 +497,7 @@ export const ConnectionsSection = ({
                     onClick={() => {
                       setOpenPicker(null);
                       setSearchQuery("");
-                      startOAuthFlow(item.connectorKey);
+                      startOAuthConnect(item.connectorKey);
                     }}
                     className="shrink-0 text-xs text-primary hover:underline"
                   >

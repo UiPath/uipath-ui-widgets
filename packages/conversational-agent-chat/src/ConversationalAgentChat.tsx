@@ -1110,6 +1110,8 @@ export const ConversationalAgentChat = ({
       // Fetch connection readiness (fire-and-forget; card is optional)
       if (agentRelease && agentIdRef.current != null && folderIdRef.current != null) {
         const capturedKey = initKey;
+        const capturedAgentId = agentIdRef.current;
+        const capturedFolderId = folderIdRef.current;
         const ca = agentService.current as unknown as {
           getAvailableConnections(a: number, f: number): Promise<
             Array<{
@@ -1120,38 +1122,46 @@ export const ConversationalAgentChat = ({
               currentConnectionName: string | null;
               isConfigurable?: boolean;
               connectionsUrl?: string;
-              connections: Array<{ connectionId: string; state: string }>;
+              connections: Array<{ id: string; state: string }>;
             }>
           >;
         };
-        ca.getAvailableConnections(agentIdRef.current, folderIdRef.current)
-          .then((items) => {
-            if (initializedFor.current !== capturedKey) return;
-            if (items.length === 0) { setConnectionReadiness(null); return; }
-            const readiness: ConnectorReadiness[] = items.map((item) => {
-              const selectedConn = item.currentConnectionId
-                ? item.connections?.find((c) => c.connectionId === item.currentConnectionId)
-                : undefined;
-              return {
-                connectorKey: item.connectorKey,
-                connectorName: item.connectorName ?? item.connectorKey,
-                connectorImage: item.connectorImage,
-                isConfigurable: item.isConfigurable !== false,
-                currentConnectionId: item.currentConnectionId,
-                currentConnectionName: item.currentConnectionName,
-                currentConnectionState: selectedConn?.state === "Enabled" ? "Enabled" : item.currentConnectionId ? "Expired" : undefined,
-                connectionsUrl: item.connectionsUrl,
-              };
-            });
-            const hasUnresolved = readiness.some(
-              (c) => c.isConfigurable && (!c.currentConnectionId || c.currentConnectionState !== "Enabled"),
-            );
-            setConnectionReadiness(hasUnresolved ? readiness : null);
-          })
+        const applyReadiness = (items: Awaited<ReturnType<typeof ca.getAvailableConnections>>) => {
+          if (initializedFor.current !== capturedKey) return;
+          if (items.length === 0) { setConnectionReadiness(null); return; }
+          const readiness: ConnectorReadiness[] = items.map((item) => {
+            const selectedConn = item.currentConnectionId
+              ? item.connections?.find((c) => c.id === item.currentConnectionId)
+              : undefined;
+            return {
+              connectorKey: item.connectorKey,
+              connectorName: item.connectorName ?? item.connectorKey,
+              connectorImage: item.connectorImage,
+              isConfigurable: item.isConfigurable !== false,
+              currentConnectionId: item.currentConnectionId,
+              currentConnectionName: item.currentConnectionName,
+              currentConnectionState: selectedConn?.state as ConnectorReadiness["currentConnectionState"] ?? (item.currentConnectionId ? "Expired" : undefined),
+              connectionsUrl: item.connectionsUrl,
+            };
+          });
+          const hasUnresolved = readiness.some(
+            (c) => c.isConfigurable && (!c.currentConnectionId || c.currentConnectionState !== "Enabled"),
+          );
+          setConnectionReadiness(hasUnresolved ? readiness : null);
+        };
+        ca.getAvailableConnections(capturedAgentId, capturedFolderId)
+          .then(applyReadiness)
           .catch(() => {
             if (initializedFor.current !== capturedKey) return;
             setConnectionReadiness(null);
           });
+        // Re-fetch after a delay to pick up server-side auto-bind results
+        setTimeout(() => {
+          if (initializedFor.current !== capturedKey) return;
+          ca.getAvailableConnections(capturedAgentId, capturedFolderId)
+            .then(applyReadiness)
+            .catch(() => {});
+        }, 1500);
       }
 
       // Persists agent inputs against the active conversation via
