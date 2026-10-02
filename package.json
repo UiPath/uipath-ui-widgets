@@ -12,7 +12,8 @@
     "packages/conversational-agent-chat",
     "packages/validation-station",
     "packages/external-auth",
-    "packages/pdf-viewer"
+    "packages/pdf-viewer",
+    "packages/decisions-and-reasons"
   ],
   "scripts": {
     "stage-du-wc": "node scripts/copy-du-wc-assets.mjs",
@@ -43,6 +44,7 @@
     "@uipath/ui-widgets-external-auth": "file:./packages/external-auth/dist",
     "@uipath/ui-widgets-conversational-agent-chat": "file:./packages/conversational-agent-chat/dist",
     "@uipath/ui-widgets-datatable": "file:./packages/datatable/dist",
+    "@uipath/ui-widgets-decisions-and-reasons": "file:./packages/decisions-and-reasons/dist",
     "@uipath/ui-widgets-multi-file-upload": "file:./packages/multi-file-upload/dist",
     "@uipath/ui-widgets-pdf-viewer": "file:./packages/pdf-viewer/dist",
     "@uipath/ui-widgets-validation-station": "file:./packages/validation-station/dist",

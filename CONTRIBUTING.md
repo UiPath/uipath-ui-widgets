@@ -40,6 +40,7 @@ packages/
   multi-file-upload/         # Multi-file upload component
   conversational-agent-chat/ # Conversational agent chat component
   external-auth/             # Provider-agnostic sign-in widget
+  decisions-and-reasons/     # HITL decision-capture widget
 ```
 
 ## Available Scripts
