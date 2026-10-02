@@ -1068,6 +1068,7 @@ export const ConversationalAgentChat = ({
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
     try {
       initializedFor.current = initKey;
+      setConnectionReadiness(null);
 
       const agentRelease = await resolveAgent();
       agentIdRef.current = agentRelease?.id;
