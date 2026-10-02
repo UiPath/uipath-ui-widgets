@@ -65,13 +65,11 @@ const makeAgent = (
     sessionId: "sess-1",
     expiresTime: Date.now() + 300_000,
   });
-  const getConnectionSessionStatus = vi
-    .fn()
-    .mockResolvedValue({
-      status: "pending",
-      connectionId: null,
-      expiresTime: Date.now() + 300_000,
-    });
+  const getConnectionSessionStatus = vi.fn().mockResolvedValue({
+    status: "pending",
+    connectionId: null,
+    expiresTime: Date.now() + 300_000,
+  });
 
   const agent = {
     getAvailableConnections,
