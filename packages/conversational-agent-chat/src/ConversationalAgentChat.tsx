@@ -123,6 +123,7 @@ export const ConversationalAgentChat = ({
   inputSchema: inputSchemaProp,
   locale = "en",
   theme = "light",
+  mode = AutopilotChatMode.Embedded,
   readOnly = false,
   overrideLabels,
   firstRunExperience,
@@ -161,6 +162,7 @@ export const ConversationalAgentChat = ({
   const currentConversation = useRef<ConversationCreateResponse | null>(null);
   const initializedFor = useRef<string | null>(null);
   const themeRef = useRef(theme);
+  const modeRef = useRef(mode);
   const overrideLabelsRef = useRef(overrideLabels);
   const disabledFeaturesRef = useRef(disabledFeatures);
   const firstRunExperienceRef = useRef(firstRunExperience);
@@ -182,6 +184,7 @@ export const ConversationalAgentChat = ({
 
   useLayoutEffect(() => {
     themeRef.current = theme;
+    modeRef.current = mode;
     overrideLabelsRef.current = overrideLabels;
     disabledFeaturesRef.current = disabledFeatures;
     firstRunExperienceRef.current = firstRunExperience;
@@ -197,6 +200,7 @@ export const ConversationalAgentChat = ({
     };
   }, [
     theme,
+    mode,
     overrideLabels,
     disabledFeatures,
     firstRunExperience,
@@ -1158,7 +1162,7 @@ export const ConversationalAgentChat = ({
       const chatServiceInstance = AutopilotChatService.Instantiate({
         instanceName: `agent-${agentId}-${folderId}`,
         config: {
-          mode: AutopilotChatMode.Embedded,
+          mode: modeRef.current,
           locale: toApolloSupportedLocale(locale),
           theme: themeRef.current,
           readOnly,
@@ -1394,6 +1398,10 @@ export const ConversationalAgentChat = ({
   useEffect(() => {
     chatService?.setTheme(theme);
   }, [chatService, theme]);
+
+  useEffect(() => {
+    chatService?.setChatMode(mode);
+  }, [chatService, mode]);
 
   // Close the SDK session on unmount so the WebSocket doesn't linger.
   useEffect(() => {
