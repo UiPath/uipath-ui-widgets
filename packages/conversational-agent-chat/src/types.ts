@@ -68,10 +68,6 @@ export interface ConversationalAgentChatProps {
   externalUserId?: string;
   locale?: Locale;
   theme?: "light" | "dark" | "light-hc" | "dark-hc";
-  /**
-   * Chat presentation mode. Defaults to `Embedded`; full-page hosts (e.g.
-   * standalone chat) pass `FullScreen`.
-   */
   mode?: AutopilotChatMode;
   readOnly?: boolean;
   overrideLabels?: OverrideLabels;
