@@ -20,6 +20,7 @@ const config: StorybookConfig = {
     "../packages/validation-station/src/*.stories.tsx",
     "../packages/external-auth/src/*.stories.tsx",
     "../packages/pdf-viewer/src/*.stories.tsx",
+    "../packages/decisions-and-reasons/src/*.stories.tsx",
   ],
   addons: [getAbsolutePath("@storybook/addon-docs")],
   framework: getAbsolutePath("@storybook/react-vite"),

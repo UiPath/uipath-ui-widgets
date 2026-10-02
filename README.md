@@ -81,6 +81,17 @@ A PDF viewer widget for UiPath coded apps.
 - 🧰 Prop-toggleable toolbar, selectable text, built-in loading/error states
 - 📦 pdf.js worker ships inside the package — no CDN or bundler configuration, works behind enterprise CSP/firewalls
 
+### [@uipath/ui-widgets-decisions-and-reasons](./packages/decisions-and-reasons)
+
+A HITL decision-capture widget: a task's recommended resolution, its evidence, amount, rationale, and resolution options.
+
+**Features:**
+
+- 🧾 Evidence table with per-row Relevance/Decision dropdowns, expand/collapse, and "Add evidence"
+- 💰 Amount card, shown only when the task has an amount
+- 📶 Derived interaction signals submitted alongside the decision, no raw keystrokes or text
+- 🪪 Two flavors: a full card with a Signals tab, and a compact inline disclosure for a task banner
+
 ## 🚀 Getting Started
 
 ### Installation
@@ -201,7 +212,8 @@ uipath-ui-widgets/
 │   ├── external-auth/              # Provider-agnostic sign-in widget
 │   ├── multi-file-upload/          # Multi-file upload to storage buckets
 │   ├── pdf-viewer/                 # PDF viewer widget
-│   └── validation-station/         # Document Understanding Validation Station wrapper
+│   ├── validation-station/         # Document Understanding Validation Station wrapper
+│   └── decisions-and-reasons/      # HITL decision-capture widget
 ├── samples/                        # Sample applications
 └── package.json
 ```
