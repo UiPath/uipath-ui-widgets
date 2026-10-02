@@ -85,23 +85,30 @@ const MOCK_CONNECTIONS = [
   },
 ];
 
-const createMockAgent = (
-  connections = MOCK_CONNECTIONS,
-  delay = 300,
-) => {
+const createMockAgent = (connections = MOCK_CONNECTIONS, delay = 300) => {
   return {
     getAvailableConnections: () =>
       new Promise((resolve) =>
         setTimeout(() => resolve([...connections]), delay),
       ),
-    updateConnectionSelections: (_a: number, _f: number, payload: { selections: Array<{ connectorKey: string; connectionId: string | null }> }) =>
+    updateConnectionSelections: (
+      _a: number,
+      _f: number,
+      payload: {
+        selections: Array<{
+          connectorKey: string;
+          connectionId: string | null;
+        }>;
+      },
+    ) =>
       new Promise((resolve) =>
         setTimeout(
           () =>
             resolve(
               connections.map((c) => {
                 const sel = payload.selections.find(
-                  (s: { connectorKey: string }) => s.connectorKey === c.connectorKey,
+                  (s: { connectorKey: string }) =>
+                    s.connectorKey === c.connectorKey,
                 );
                 return sel
                   ? {
@@ -109,7 +116,8 @@ const createMockAgent = (
                       currentConnectionId: sel.connectionId,
                       currentConnectionName:
                         c.connections.find(
-                          (conn: { id: string }) => conn.id === sel.connectionId,
+                          (conn: { id: string }) =>
+                            conn.id === sel.connectionId,
                         )?.name ?? null,
                     }
                   : c;
@@ -161,7 +169,15 @@ const sectionMeta = {
   },
   decorators: [
     (Story) => (
-      <div style={{ width: 400, padding: 16, background: "var(--background)", borderRadius: 8, border: "1px solid var(--border)" }}>
+      <div
+        style={{
+          width: 400,
+          padding: 16,
+          background: "var(--background)",
+          borderRadius: 8,
+          border: "1px solid var(--border)",
+        }}
+      >
         <Story />
       </div>
     ),

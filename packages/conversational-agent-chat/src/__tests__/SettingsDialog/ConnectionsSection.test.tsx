@@ -54,13 +54,12 @@ const MOCK_CONNECTIONS = [
 
 const makeAgent = (
   connectionsData = MOCK_CONNECTIONS,
-): { agent: ConversationalAgent; mocks: Record<string, ReturnType<typeof vi.fn>> } => {
-  const getAvailableConnections = vi
-    .fn()
-    .mockResolvedValue(connectionsData);
-  const updateConnectionSelections = vi
-    .fn()
-    .mockResolvedValue(connectionsData);
+): {
+  agent: ConversationalAgent;
+  mocks: Record<string, ReturnType<typeof vi.fn>>;
+} => {
+  const getAvailableConnections = vi.fn().mockResolvedValue(connectionsData);
+  const updateConnectionSelections = vi.fn().mockResolvedValue(connectionsData);
   const getConnectionAuthUrl = vi.fn().mockResolvedValue({
     authUrl: "https://auth.example.com",
     sessionId: "sess-1",
@@ -68,7 +67,11 @@ const makeAgent = (
   });
   const getConnectionSessionStatus = vi
     .fn()
-    .mockResolvedValue({ status: "pending", connectionId: null, expiresTime: Date.now() + 300_000 });
+    .mockResolvedValue({
+      status: "pending",
+      connectionId: null,
+      expiresTime: Date.now() + 300_000,
+    });
 
   const agent = {
     getAvailableConnections,
@@ -104,7 +107,10 @@ describe("ConnectionsSection", () => {
     );
 
     // Loading state
-    expect(document.querySelector("[class*=spinner]") ?? document.querySelector("svg")).toBeTruthy();
+    expect(
+      document.querySelector("[class*=spinner]") ??
+        document.querySelector("svg"),
+    ).toBeTruthy();
 
     // Wait for data
     await waitFor(() => {
@@ -185,7 +191,9 @@ describe("ConnectionsSection", () => {
       expect(screen.getByText("john@example.com")).toBeInTheDocument();
     });
     await user.click(screen.getByText("john@example.com"));
-    expect(screen.getByPlaceholderText("Search connections")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Search connections"),
+    ).toBeInTheDocument();
     expect(screen.getByText("work@company.com")).toBeInTheDocument();
   });
 
