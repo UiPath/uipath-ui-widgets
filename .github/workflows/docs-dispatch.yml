@@ -1,0 +1,58 @@
+name: Refresh SDK Docs Site
+
+# The React Widgets pages on the UiPath TypeScript SDK docs site are these
+# READMEs -- UiPath/uipath-typescript fetches them at docs build time rather
+# than keeping a second copy. Tell it to rebuild when one of them changes, so
+# the site does not wait for the next SDK release.
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'packages/*/README.md'
+  workflow_dispatch:
+
+# Nothing in this repo is read or written: the job only calls the other repo's
+# API, with a credential of its own.
+permissions: {}
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger the docs build
+        # A repository_dispatch to another repo needs a token carrying
+        # `contents: write` there -- the default GITHUB_TOKEN is scoped to this
+        # repo alone. SDK_DOCS_DISPATCH_TOKEN is a fine-grained PAT restricted
+        # to UiPath/uipath-typescript.
+        env:
+          GH_TOKEN: ${{ secrets.SDK_DOCS_DISPATCH_TOKEN }}
+        run: |
+          set -uo pipefail
+
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::warning::SDK_DOCS_DISPATCH_TOKEN is not set -- the docs site will pick these READMEs up on its next build instead."
+            exit 0
+          fi
+
+          # gh reports the reason on stderr. It names the URL and the status,
+          # never the token, so it is safe to echo back.
+          if reason=$(gh api repos/UiPath/uipath-typescript/dispatches \
+               --field event_type=react-widgets-docs-updated 2>&1); then
+            echo "Asked UiPath/uipath-typescript to rebuild its docs site."
+            exit 0
+          fi
+
+          case "${reason}" in
+            *401*|*"Bad credentials"*)
+              echo "::error::SDK_DOCS_DISPATCH_TOKEN was rejected. Fine-grained PATs expire -- mint a replacement scoped to UiPath/uipath-typescript with Contents: write, then update this repo's secret. The site still refreshes on its next build, so these pages are stale rather than broken."
+              ;;
+            *403*|*404*)
+              # A fine-grained PAT without access to the target repo gets a 404
+              # rather than a 403, so both land on the same advice.
+              echo "::error::SDK_DOCS_DISPATCH_TOKEN cannot dispatch to UiPath/uipath-typescript. Check it still grants Contents: write on that repo, and that the organization has not revoked its approval."
+              ;;
+            *)
+              echo "::error::Dispatch to UiPath/uipath-typescript failed: ${reason}"
+              ;;
+          esac
+          exit 1

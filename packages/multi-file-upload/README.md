@@ -1,6 +1,15 @@
 # @uipath/ui-widgets-multi-file-upload
 
-A React multi-file-upload widget for uploading multiple files simultaneously to UiPath Orchestrator's Storage bucket.
+A React widget for uploading multiple files simultaneously to an [Orchestrator Storage Bucket](https://uipath.github.io/uipath-typescript/api/interfaces/BucketServiceModel/).
+
+## Features
+
+- Upload multiple files simultaneously
+- Drag and drop support
+- File type validation via the `accept` attribute
+- File size validation
+- Error handling
+- Built on the Apollo Wind `FileUpload` component
 
 ## Installation
 
@@ -8,28 +17,45 @@ A React multi-file-upload widget for uploading multiple files simultaneously to 
 npm install @uipath/ui-widgets-multi-file-upload
 ```
 
-## Features
+### Peer dependencies
 
-- Upload multiple files simultaneously
-- Drag and drop support
-- File type validation via accept attribute
-- File size validation
-- Error handling
-- Built on Apollo Wind FileUpload component
+```bash
+npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript@^1.4.1
+```
+
+> **Warning: The published 1.0.0 pins an older SDK**
+> `@uipath/ui-widgets-multi-file-upload@1.0.0` — currently the only published version — declares an exact peer of `@uipath/uipath-typescript@1.1.1`, which the range above does not satisfy, so npm reports an unmet peer dependency. The `^1.4.1` above is what the widget is built against today and what the next release will carry.
 
 ## Usage
 
-> **Note:** Add either `light` or `dark` class to your HTML `<body>` element to enable proper theming.
+> **Note: Theming**
+> Add either a `light` or `dark` class to your HTML `<body>` element to enable proper theming.
 
 ```tsx
 import { MultiFileUpload } from "@uipath/ui-widgets-multi-file-upload";
 import "@uipath/ui-widgets-multi-file-upload/MultiFileUpload.css";
 import { UiPath } from "@uipath/uipath-typescript/core";
+import { useEffect, useState } from "react";
 
 function App() {
-  const sdk = new UiPath({
-    // SDK configuration
-  });
+  const [sdk, setSdk] = useState<UiPath | null>(null);
+
+  useEffect(() => {
+    const init = async () => {
+      const uipath = new UiPath({
+        baseUrl: "https://api.uipath.com",
+        orgName: "your-org",
+        tenantName: "your-tenant",
+        clientId: "your-client-id",
+        redirectUri: "http://localhost:3000/callback",
+        // Uploading needs the full `OR.Buckets` scope
+        scope: "OR.Buckets",
+      });
+      await uipath.initialize();
+      setSdk(uipath);
+    };
+    init();
+  }, []);
 
   const handleUploadError = (error: Error) => {
     console.error("Upload failed:", error);
@@ -41,6 +67,8 @@ function App() {
       uploadedFiles.map((f) => f.name),
     );
   };
+
+  if (!sdk) return <div>Loading...</div>;
 
   return (
     <MultiFileUpload
@@ -57,22 +85,29 @@ function App() {
 }
 ```
 
+> **Tip: Finding the bucket and folder IDs**
+> List the buckets you can reach with the Buckets service — the cross-folder `getAll()` response carries the bucket `id` alongside its `folderId`. See the [Bucket service reference](https://uipath.github.io/uipath-typescript/api/interfaces/BucketServiceModel/):
+>
+> ```ts
+> import { Buckets } from "@uipath/uipath-typescript/buckets";
+>
+> const buckets = await new Buckets(sdk).getAll();
+> ```
+
 ## Props
 
-### MultiFileUpload
+| Prop | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `sdk` | `UiPath` | Yes | UiPath SDK instance |
+| `bucketId` | `number` | Yes | The ID of the Orchestrator Storage Bucket to upload files to |
+| `folderId` | `number` | Yes | The ID of the folder containing the Storage Bucket |
+| `path` | `string` | No | Path prefix for uploaded files (e.g. `"uploads/"`) |
+| `onUploadError` | `(error: Error) => void` | No | Called when an upload fails |
+| `onUploadSuccess` | `(uploadedFiles: File[]) => void` | No | Called when files are successfully uploaded |
+| `maxFileSizeInMb` | `number` | No | Maximum file size in megabytes |
+| `accept` | `string` | No | Accepted file types (comma-separated MIME types or extensions). See the [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/accept) |
 
-| Prop              | Type                              | Required | Description                                                                                                                                                                        |
-| ----------------- | --------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sdk`             | `UiPath`                          | Yes      | UiPath SDK instance                                                                                                                                                                |
-| `bucketId`        | `number`                          | Yes      | The ID of the Orchestrator Storage Bucket to upload files to                                                                                                                       |
-| `folderId`        | `number`                          | Yes      | The ID of the folder containing the Storage Bucket                                                                                                                                 |
-| `path`            | `string`                          | No       | Path prefix for uploaded files (e.g., "uploads/")                                                                                                                                  |
-| `onUploadError`   | `(error: Error) => void`          | No       | Callback function called when upload fails                                                                                                                                         |
-| `onUploadSuccess` | `(uploadedFiles: File[]) => void` | No       | Callback function called when files are successfully uploaded                                                                                                                      |
-| `maxFileSizeInMb` | `number`                          | No       | Maximum file size in megabytes                                                                                                                                                     |
-| `accept`          | `string`                          | No       | Accepted file types (comma-separated MIME types or extensions). See [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/accept) for details |
-
-## Example with Options
+## Example with options
 
 ```tsx
 <MultiFileUpload
@@ -87,13 +122,18 @@ function App() {
 />
 ```
 
-## Requirements
+## TypeScript
 
-- React 19.2.0+
-- React DOM 19.2.0+
-- @uipath/uipath-typescript ^1.3.10
-- @uipath/apollo-wind
+This package is written in TypeScript and ships its own type definitions — prop types are exported for use in your own component signatures:
+
+```tsx
+import type { MultiFileUploadProps } from "@uipath/ui-widgets-multi-file-upload";
+```
+
+<!-- docs:ignore -->
 
 ## License
 
 MIT
+
+<!-- /docs:ignore -->

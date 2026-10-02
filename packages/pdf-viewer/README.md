@@ -1,8 +1,8 @@
 # @uipath/ui-widgets-pdf-viewer
 
-A React PDF viewer widget for UiPath coded apps. Renders PDFs from **Orchestrator Storage Buckets**, **Data Fabric entity attachments**, or plain **URLs/Blobs** — with a prop-toggleable toolbar, selectable text, and built-in loading/error states.
+A React PDF viewer for UiPath coded apps. Renders PDFs from **Orchestrator Storage Buckets**, **Data Fabric entity attachments**, or plain **URLs / Blobs** — with a prop-toggleable toolbar, selectable text, and built-in loading and error states.
 
-Built on [react-pdf](https://www.npmjs.com/package/react-pdf) (Mozilla pdf.js). The pdf.js worker **ships inside this package** (no CDN, no bundler configuration), so the widget works behind enterprise CSP/firewalls — e.g. coded apps deployed on `*.uipath.host` — and UiPath owns the dependency update cadence. The packaged worker is byte-exact the `pdfjs-dist` version this widget pins, so the pdf.js API and worker can never mismatch regardless of what the consumer's dependency tree hoists.
+Built on [react-pdf](https://www.npmjs.com/package/react-pdf) (Mozilla pdf.js). The pdf.js worker **ships inside the package** — no CDN, no bundler configuration — so the widget works behind enterprise CSP and firewalls, including coded apps deployed on `*.uipath.host`. The packaged worker is byte-exact to the `pdfjs-dist` version the widget pins, so the pdf.js API and the worker can never mismatch regardless of what your dependency tree hoists.
 
 ## Installation
 
@@ -10,17 +10,48 @@ Built on [react-pdf](https://www.npmjs.com/package/react-pdf) (Mozilla pdf.js). 
 npm install @uipath/ui-widgets-pdf-viewer
 ```
 
+### Peer dependencies
+
+```bash
+npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript@^1.4.1
+```
+
 ## Usage
+
+<!-- tabs -->
+<!-- tab: Standalone React app -->
+OAuth is the flow for a browser app, so the instance is built once in an
+effect and `initialize()` is awaited before anything renders — see
+[Pass an initialized SDK instance](https://uipath.github.io/uipath-typescript/react-widgets/#pass-an-initialized-sdk-instance).
 
 ```tsx
 import { PdfViewer } from "@uipath/ui-widgets-pdf-viewer";
 import "@uipath/ui-widgets-pdf-viewer/PdfViewer.css";
 import { UiPath } from "@uipath/uipath-typescript/core";
+import { useEffect, useState } from "react";
 
 function App() {
-  const sdk = new UiPath({
-    // SDK configuration (or `new UiPath()` inside a coded app)
-  });
+  const [sdk, setSdk] = useState<UiPath | null>(null);
+
+  useEffect(() => {
+    const init = async () => {
+      const uipath = new UiPath({
+        baseUrl: "https://api.uipath.com",
+        orgName: "your-org",
+        tenantName: "your-tenant",
+        clientId: "your-client-id",
+        redirectUri: "http://localhost:3000/callback",
+        // Bucket sources need `OR.Buckets`; entity sources need
+        // `DataFabric.Data.Read`. URL and byte sources need no scope.
+        scope: "OR.Buckets",
+      });
+      await uipath.initialize();
+      setSdk(uipath);
+    };
+    init();
+  }, []);
+
+  if (!sdk) return <div>Loading...</div>;
 
   return (
     <PdfViewer
@@ -35,13 +66,52 @@ function App() {
 }
 ```
 
-> **Note:** Add either `light` or `dark` class to your HTML `<body>` element to enable proper theming.
+<!-- tab: Coded app -->
+Inside a [Coded App](https://uipath.github.io/uipath-typescript/coded-apps/getting-started/), `new UiPath()` reads
+`clientId`, `orgName`, `tenantName`, `baseUrl`, `scope` and `redirectUri`
+from the platform's `uipath:*` meta tags, so there is nothing to pass — but
+`initialize()` still drives the OAuth flow and must be awaited.
 
-### Sources
+```tsx
+import { PdfViewer } from "@uipath/ui-widgets-pdf-viewer";
+import "@uipath/ui-widgets-pdf-viewer/PdfViewer.css";
+import { UiPath } from "@uipath/uipath-typescript/core";
+import { useEffect, useState } from "react";
 
-One `source` prop, four shapes. **The widget selects the adapter from the
-fields you pass** — `bucketId` → storage bucket, `entityId` → Data Fabric
-entity, `url` → direct URL, `data` → pre-fetched bytes.
+function App() {
+  const [sdk, setSdk] = useState<UiPath | null>(null);
+
+  useEffect(() => {
+    const init = async () => {
+      const uipath = new UiPath();
+      await uipath.initialize();
+      setSdk(uipath);
+    };
+    init();
+  }, []);
+
+  if (!sdk) return <div>Loading...</div>;
+
+  return (
+    <PdfViewer
+      sdk={sdk}
+      source={{
+        bucketId: 123,
+        folderKey: "<folder-guid>", // or folderId / folderPath
+        path: "invoices/inv-0714.pdf",
+      }}
+    />
+  );
+}
+```
+<!-- /tabs -->
+
+> **Note: Theming**
+> Add either a `light` or `dark` class to your HTML `<body>` element to enable proper theming.
+
+## Sources
+
+One `source` prop, four shapes. **The widget selects the adapter from the fields you pass** — `bucketId` → storage bucket, `entityId` → Data Fabric entity, `url` → direct URL, `data` → pre-fetched bytes.
 
 ```tsx
 // Orchestrator storage bucket (requires `sdk`).
@@ -65,40 +135,36 @@ entity, `url` → direct URL, `data` → pre-fetched bytes.
 
 ## Props
 
-| Prop            | Type                                   | Required | Description                                                                                                                |
-| --------------- | -------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `source`        | `PdfViewerSource`                      | Yes      | Where the PDF lives (see Sources above)                                                                                    |
-| `sdk`           | `UiPath`                               | No\*     | Initialized UiPath SDK instance. \*Required for `bucket`/`entity` sources                                                  |
-| `toolbar`       | `PdfViewerToolbarOptions`              | No       | Per-feature toggles: `pagination`, `zoom`, `rotate`, `download` (all default `true`); disable all four to hide the toolbar |
-| `fileName`      | `string`                               | No       | Name shown in the toolbar and used for downloads                                                                           |
-| `maxHeight`     | `number \| string`                     | No       | Max canvas height (default `640`); the canvas scrolls internally                                                           |
-| `onLoadSuccess` | `(info: { numPages: number }) => void` | No       | Called when the document loads                                                                                             |
-| `onLoadError`   | `(error: Error) => void`               | No       | Called when fetching or rendering fails                                                                                    |
+| Prop | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| `source` | `PdfViewerSource` | Yes | Where the PDF lives (see [Sources](#sources)) |
+| `sdk` | `UiPath` | No\* | Initialized UiPath SDK instance. \*Required for `bucket` and `entity` sources |
+| `toolbar` | `PdfViewerToolbarOptions` | No | Per-feature toggles: `pagination`, `zoom`, `rotate`, `download` (all default `true`); disable all four to hide the toolbar |
+| `fileName` | `string` | No | Name shown in the toolbar and used for downloads |
+| `maxHeight` | `number \| string` | No | Max canvas height (default `640`); the canvas scrolls internally |
+| `onLoadSuccess` | `(info: { numPages: number }) => void` | No | Called when the document loads |
+| `onLoadError` | `(error: Error) => void` | No | Called when fetching or rendering fails |
 
 ## Features
 
-- Page navigation (prev/next + direct page entry)
+- Page navigation (previous / next, plus direct page entry)
 - Zoom 50%–300%, fit-to-width, 90° rotation
 - Download the original file
-- Selectable/copyable text (pdf.js text layer) and clickable in-PDF links
-- Password-protected PDFs — an in-viewer password prompt (with retry on a wrong
-  password), replacing the browser-native `window.prompt`
-- Loading, error (with Retry), and empty states built in
-- Container-sized: fills its parent and scrolls internally — designed for
-  embedding beside other content (e.g. an approval form in a coded action app)
+- Selectable and copyable text (pdf.js text layer) and clickable in-PDF links
+- Password-protected PDFs — an in-viewer password prompt with retry on a wrong password, replacing the browser-native `window.prompt`
+- Loading, error (with **Retry**) and empty states built in
+- Container-sized: fills its parent and scrolls internally — designed for embedding beside other content, such as an approval form in a coded action app
 - Telemetry (`Widget.PdfViewer`) for document load success/failure and downloads
 
 ## Worker configuration (advanced)
 
-No configuration is needed: the widget points pdf.js at the worker file shipped
-in this package (`new URL("./pdf.worker.min.mjs", import.meta.url)`), which
-production bundlers emit into the app build and dev servers serve straight from
-`node_modules`. If your toolchain resolves neither (e.g. a dev server that
-pre-bundles dependencies and rewrites `import.meta.url`), override it once in
-your app after importing the widget:
+No configuration is needed: the widget points pdf.js at the worker file shipped in the package (`new URL("./pdf.worker.min.mjs", import.meta.url)`), which production bundlers emit into the app build and dev servers serve straight from `node_modules`.
+
+If your toolchain resolves neither — for example a dev server that pre-bundles dependencies and rewrites `import.meta.url` — override it once in your app after importing the widget:
 
 ```ts
 import { pdfjs } from "react-pdf";
+
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
   import.meta.url,
@@ -107,9 +173,18 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 
 ## Limitations (v1)
 
-- **Non-Latin / CJK PDFs may render blank glyphs** — pdf.js needs cMap assets to
-  render some non-Latin (e.g. Chinese / Japanese / Korean) scripts, which v1
-  does not bundle.
+> **Warning: Non-Latin / CJK PDFs may render blank glyphs**
+> pdf.js needs cMap assets to render some non-Latin scripts (for example Chinese, Japanese and Korean), which v1 does not bundle.
+
+## TypeScript
+
+This package is written in TypeScript and ships its own type definitions — prop types are exported for use in your own component signatures:
+
+```tsx
+import type { PdfViewerProps } from "@uipath/ui-widgets-pdf-viewer";
+```
+
+<!-- docs:ignore -->
 
 ## Development
 
@@ -118,3 +193,9 @@ npm run test        # vitest unit tests
 npm run build       # tsc + compiled CSS → dist/
 npm run storybook   # from the repo root — see Components/PdfViewer
 ```
+
+## License
+
+MIT
+
+<!-- /docs:ignore -->
