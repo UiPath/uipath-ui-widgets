@@ -33,6 +33,11 @@ type ConnectingKey = string | null;
  * 1. Collapsed bar - all connected or user collapsed. Shows count + Show button.
  * 2. Expanded broken card - connections expired/failed. Red border, reconnect.
  * 3. Expanded setup card - connections need initial setup. Warning border, connect.
+ *
+ * TODO(sdk-typing): Remove `as unknown as { ... }` casts and hardcoded state strings
+ * once @uipath/uipath-typescript exposes connection methods and types
+ * (getAvailableConnections, getConnectionAuthUrl, getConnectionSessionStatus,
+ * updateConnectionSelections, connection state enum) on ConversationalAgent.
  */
 export const ConnectionReadinessCard = ({
   connectors,

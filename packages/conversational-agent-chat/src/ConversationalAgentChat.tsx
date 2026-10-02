@@ -1108,6 +1108,8 @@ export const ConversationalAgentChat = ({
       );
 
       // Fetch connection readiness (fire-and-forget; card is optional)
+      // TODO(sdk-typing): Remove `as unknown as { ... }` casts and hardcoded state strings
+      // once @uipath/uipath-typescript exposes connection methods and types on ConversationalAgent.
       if (
         agentRelease &&
         agentIdRef.current != null &&

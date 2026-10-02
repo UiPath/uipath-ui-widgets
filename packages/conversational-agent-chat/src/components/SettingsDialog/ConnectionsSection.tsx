@@ -71,7 +71,14 @@ const STATUS_LABEL: Record<string, string> = {
   Failed: "connections_status_failed",
 };
 
-/** Casts the ConversationalAgent to access connection methods that are pending in the SDK. */
+/**
+ * Casts the ConversationalAgent to access connection methods that are pending in the SDK.
+ *
+ * TODO(sdk-typing): Remove this cast and hardcoded state strings once @uipath/uipath-typescript
+ * exposes connection methods and types (getAvailableConnections, getConnectionAuthUrl,
+ * getConnectionSessionStatus, updateConnectionSelections, connection state enum) on
+ * ConversationalAgent.
+ */
 const asConnections = (ca: ConversationalAgent) =>
   ca as unknown as {
     getAvailableConnections(
