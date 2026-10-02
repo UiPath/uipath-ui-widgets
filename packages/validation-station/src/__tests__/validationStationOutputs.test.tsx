@@ -52,6 +52,7 @@ if (!customElements.get(TAG)) {
     TAG,
     class extends HTMLElement {
       options: unknown = undefined;
+      predictedExtractionResult: unknown = undefined;
     },
   );
 }
@@ -121,6 +122,10 @@ const STATE_EVENTS: Record<
   },
   fieldsPanelWidthChanged: { prop: "onFieldsPanelWidthChanged", detail: 420 },
   fieldsPanelSideChanged: { prop: "onFieldsPanelSideChanged", detail: "right" },
+  "ui-du-vs-wc-message": {
+    prop: "onWcMessage",
+    detail: { type: "indicator-overlay-hide", instanceId: 1 },
+  },
 };
 
 const STATE_EVENT_CASES = Object.entries(STATE_EVENTS).map(
@@ -229,5 +234,25 @@ describe("options pass-through", () => {
     await waitForWc(container);
 
     expect(optionsOf(container)).toBeUndefined();
+  });
+});
+
+describe("prediction pass-through", () => {
+  it("hands the element the artifacts' predictedExtractionResult", async () => {
+    const predictedExtractionResult = {
+      DocumentId: "doc-123",
+      predicted: true,
+    };
+    mockUseResolvedArtifacts.mockReturnValue({
+      artifacts: { ...mockArtifacts, predictedExtractionResult },
+      error: null,
+      documentId: "doc-123",
+    });
+    const { container } = render(<ValidationStation {...baseProps} />);
+    await waitForWc(container);
+
+    expect(
+      (container.querySelector(TAG) as any).predictedExtractionResult,
+    ).toBe(predictedExtractionResult);
   });
 });

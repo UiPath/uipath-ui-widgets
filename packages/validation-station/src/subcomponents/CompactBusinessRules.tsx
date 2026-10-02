@@ -36,6 +36,7 @@ export const CompactBusinessRules: React.FC<CompactBusinessRulesProps> = ({
   onSetFieldValueByPathResult,
   onSelectAndFocusFieldValueByPathResult,
   onDeleteFieldValueByPathResult,
+  onWcMessage,
   onBusinessRulesToggle,
   onBusinessRuleClick,
   ...dataSource
@@ -66,6 +67,7 @@ export const CompactBusinessRules: React.FC<CompactBusinessRulesProps> = ({
       selectAndFocusFieldValueByPathResult:
         onSelectAndFocusFieldValueByPathResult,
       deleteFieldValueByPathResult: onDeleteFieldValueByPathResult,
+      "ui-du-vs-wc-message": onWcMessage,
       businessRulesToggle: onBusinessRulesToggle,
       businessRuleClick: onBusinessRuleClick,
     },

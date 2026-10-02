@@ -11,7 +11,9 @@ import { joinDeploymentUrl } from "./urlUtil.js";
  * Configuration for {@link configureValidationStationWc} — the deployment URL
  * plus every option the underlying loader accepts (currently `includeFonts`:
  * inject the web component's `fonts.css` as a light-DOM stylesheet, needed
- * unless the host already loads Apollo fonts and Material Icons globally).
+ * unless the host already loads Material Icons globally). A base served from
+ * the npm package carries Material Icons only, not the Apollo text fonts — see
+ * the README's "Fonts".
  */
 export interface ValidationStationWcConfig extends LoadWebComponentOptions {
   /**
@@ -42,21 +44,6 @@ let loadFailed = false;
 let warnedUnconfigured = false;
 
 /**
- * zone.js — loaded by the web component's `polyfills.js` — replaces the global
- * `Promise` with `ZoneAwarePromise`, which lacks `Promise.try()`. The web
- * component calls it at render time rather than at module init, so restoring it
- * once the bundle has loaded is early enough. Remove when the web component
- * upgrades zone.js.
- */
-function restorePromiseTry(): void {
-  if (typeof Promise.try === "function") return;
-  Promise.try = <T, U extends unknown[]>(
-    fn: (...args: U) => T | PromiseLike<T>,
-    ...args: U
-  ) => new Promise<T>((resolve) => resolve(fn(...args))) as Promise<Awaited<T>>;
-}
-
-/**
  * Loads the Validation Station web component from `deploymentUrl` (or its
  * default — see {@link ValidationStationWcConfig.deploymentUrl}) and registers
  * every custom element in {@link DU_WC_TAGS}. Call this once at app startup,
@@ -85,16 +72,19 @@ export function configureValidationStationWc(
   } = config;
 
   loadFailed = false;
-  loadPromise = loadWebComponent(vsAppName, document, deploymentUrl, options)
-    .then(restorePromiseTry)
-    .catch((error: unknown) => {
-      // Flag rather than clear: `waitForWcElementReady` must still see this
-      // rejection (clearing it would look indistinguishable from "never
-      // configured" and hang every waiter), while a later configure call is
-      // still free to start a new attempt.
-      loadFailed = true;
-      throw error;
-    });
+  loadPromise = loadWebComponent(
+    vsAppName,
+    document,
+    deploymentUrl,
+    options,
+  ).catch((error: unknown) => {
+    // Flag rather than clear: `waitForWcElementReady` must still see this
+    // rejection (clearing it would look indistinguishable from "never
+    // configured" and hang every waiter), while a later configure call is
+    // still free to start a new attempt.
+    loadFailed = true;
+    throw error;
+  });
   return loadPromise;
 }
 

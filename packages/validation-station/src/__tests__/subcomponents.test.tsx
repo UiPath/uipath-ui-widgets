@@ -291,3 +291,58 @@ describe("CompactFieldsForm save wiring", () => {
     expect(onReportException).toHaveBeenCalledWith(detail);
   });
 });
+
+// The three subcomponents sharing the extraction store with `ValidationStation`.
+const storeCases = cases.filter(({ name }) =>
+  ["CompactFieldsForm", "CompactTableEditor", "CompactBusinessRules"].includes(
+    name,
+  ),
+);
+
+describe.each(storeCases)("$name message bus", ({ Component, tag }) => {
+  it("forwards `ui-du-vs-wc-message` to onWcMessage", () => {
+    const onWcMessage = vi.fn();
+    const { container } = render(<Component onWcMessage={onWcMessage} />);
+    const el = container.querySelector(tag)!;
+
+    const detail = { type: "indicator-overlay-hide", instanceId: 7 };
+    el.dispatchEvent(new CustomEvent("ui-du-vs-wc-message", { detail }));
+
+    expect(onWcMessage).toHaveBeenCalledExactlyOnceWith(detail);
+  });
+});
+
+describe.each(
+  cases.filter(({ name }) =>
+    ["CompactFieldsForm", "CompactTableEditor"].includes(name),
+  ),
+)("$name prediction", ({ Component, tag }) => {
+  // React assigns an object prop as a property only when the element already
+  // declares one (otherwise it stringifies it into an attribute), so stand in
+  // for the real element's input.
+  const persistentTag = tag.replace(/-element$/, "-persistent-element");
+  for (const t of [tag, persistentTag]) {
+    if (!customElements.get(t)) {
+      customElements.define(
+        t,
+        class extends HTMLElement {
+          predictedExtractionResult: unknown = undefined;
+        },
+      );
+    }
+  }
+
+  it("hands the element the artifacts' predictedExtractionResult", () => {
+    const predictedExtractionResult = { predicted: true };
+    mockUseSubcomponentArtifacts.mockReturnValue(
+      readyState({
+        artifacts: { ...mockArtifacts, predictedExtractionResult },
+      }),
+    );
+    const { container } = render(<Component />);
+
+    expect(
+      (container.querySelector(tag) as any).predictedExtractionResult,
+    ).toBe(predictedExtractionResult);
+  });
+});
