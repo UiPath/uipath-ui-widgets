@@ -77,6 +77,175 @@ describe("ClientSideTool", () => {
     );
   });
 
+  describe("optional fields and empty values", () => {
+    const mixedSchema = {
+      type: "object",
+      required: ["name"],
+      properties: {
+        name: { type: "string", title: "Name" },
+        nickname: { type: "string", title: "Nickname" },
+        age: { type: "integer", title: "Age" },
+      },
+    };
+
+    it("hides optional fields behind Show more when some fields are required", async () => {
+      const user = userEvent.setup();
+      render(
+        <ClientSideTool
+          toolName="lookup_user"
+          inputSchema={mixedSchema}
+          labels={labels}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText("Name")).toBeInTheDocument();
+      expect(screen.queryByText("Nickname")).not.toBeInTheDocument();
+      await user.click(screen.getByText("Show more"));
+      expect(screen.getByText("Nickname")).toBeInTheDocument();
+    });
+
+    it("shows every field when none are required", () => {
+      render(
+        <ClientSideTool
+          toolName="lookup_user"
+          inputSchema={inputSchema}
+          labels={labels}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText("Name")).toBeInTheDocument();
+      expect(screen.queryByText("Show more")).not.toBeInTheDocument();
+    });
+
+    it("omits untouched and blank fields from the submitted output", async () => {
+      const user = userEvent.setup();
+      const onSubmit = vi.fn();
+      render(
+        <ClientSideTool
+          toolName="lookup_user"
+          inputSchema={mixedSchema}
+          defaultValues={{ nickname: null, age: "" }}
+          labels={labels}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+        />,
+      );
+      await user.type(screen.getByRole("textbox"), "Alice");
+      await user.click(screen.getByText("Submit"));
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith({ name: "Alice" }),
+      );
+    });
+
+    it("omits an untouched optional object instead of sending {}", async () => {
+      const user = userEvent.setup();
+      const onSubmit = vi.fn();
+      render(
+        <ClientSideTool
+          toolName="lookup_user"
+          inputSchema={{
+            type: "object",
+            required: ["name"],
+            properties: {
+              name: { type: "string", title: "Name" },
+              address: {
+                type: "object",
+                title: "Address",
+                properties: { city: { type: "string", title: "City" } },
+              },
+            },
+          }}
+          defaultValues={{ name: "Alice" }}
+          labels={labels}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+        />,
+      );
+      await user.click(screen.getByText("Submit"));
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith({ name: "Alice" }),
+      );
+    });
+
+    it("omits an optional object whose required child was typed then cleared", async () => {
+      const user = userEvent.setup();
+      const onSubmit = vi.fn();
+      render(
+        <ClientSideTool
+          toolName="lookup_user"
+          inputSchema={{
+            type: "object",
+            properties: {
+              address: {
+                type: "object",
+                title: "Address",
+                required: ["city"],
+                properties: { city: { type: "string", title: "City" } },
+              },
+            },
+          }}
+          labels={labels}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+        />,
+      );
+      const city = screen.getByRole("textbox");
+      await user.type(city, "Paris");
+      await user.clear(city);
+      await user.click(screen.getByText("Submit"));
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({}));
+    });
+
+    it("keeps 0 and false as real answers", async () => {
+      const user = userEvent.setup();
+      const onSubmit = vi.fn();
+      render(
+        <ClientSideTool
+          toolName="lookup_user"
+          inputSchema={{
+            type: "object",
+            properties: {
+              count: { type: "integer", title: "Count" },
+              enabled: { type: "boolean", title: "Enabled" },
+            },
+          }}
+          defaultValues={{ count: 0, enabled: false }}
+          labels={labels}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+        />,
+      );
+      await user.click(screen.getByText("Submit"));
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith({ count: 0, enabled: false }),
+      );
+    });
+
+    it("reads required fields through $ref schemas", () => {
+      render(
+        <ClientSideTool
+          toolName="lookup_user"
+          inputSchema={{
+            type: "object",
+            required: ["name"],
+            properties: {
+              name: { $ref: "#/$defs/Name" },
+              nickname: { type: "string", title: "Nickname" },
+            },
+            $defs: { Name: { type: "string", title: "Name" } },
+          }}
+          labels={labels}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText("Show more")).toBeInTheDocument();
+      expect(screen.queryByText("Nickname")).not.toBeInTheDocument();
+    });
+  });
+
   it("calls onCancel when Cancel is clicked", async () => {
     const user = userEvent.setup();
     const onCancel = vi.fn();

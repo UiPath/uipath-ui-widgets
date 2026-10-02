@@ -486,16 +486,10 @@ export const ConversationalAgentChat = ({
 
               const clientSideWidgetId = `client-side-tool-${toolCall.toolCallId}`;
 
-              // Build default values from output schema properties
               const outputSchemaObj = (outputSchema ?? {
                 type: "object",
                 properties: {},
               }) as Record<string, unknown>;
-              const outputSchemaProps = outputSchemaObj.properties ?? {};
-              const defaultValues: Record<string, unknown> = {};
-              for (const key of Object.keys(outputSchemaProps)) {
-                defaultValues[key] = null;
-              }
 
               chatService.sendResponse({
                 id: clientSideWidgetId,
@@ -509,7 +503,6 @@ export const ConversationalAgentChat = ({
                 meta: {
                   toolName: startEvent.toolName,
                   inputSchema: outputSchemaObj,
-                  defaultValues,
                   isCompleted: false,
                   onSubmit: (formData: Record<string, unknown>) => {
                     const conversation = chatService.getConversation();
