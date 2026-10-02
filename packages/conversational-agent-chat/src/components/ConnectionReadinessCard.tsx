@@ -455,6 +455,7 @@ export const ConnectionReadinessCard = ({
               : t("connection_readiness_mixed_title", {
                   connected: connectedCount,
                   total: totalConfigurable,
+                  remaining: totalConfigurable - connectedCount,
                 })}
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">

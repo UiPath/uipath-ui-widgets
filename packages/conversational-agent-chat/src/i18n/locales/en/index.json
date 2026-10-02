@@ -338,7 +338,7 @@
   "connections_cancel": "Cancel",
   "connection_readiness_setup_title": "One-time setup before I can help",
   "connection_readiness_setup_description": "Only the tools this agent actually uses are listed. Connect what you need now, the rest can wait.",
-  "connection_readiness_mixed_title": "{{connected}} of {{total}} connections still needed",
+  "connection_readiness_mixed_title": "{{remaining}} of {{total}} connections still needed",
   "connection_readiness_connected_as": "Connected as {{name}}",
   "connection_readiness_connect": "Connect",
   "connection_readiness_hide": "Hide",
