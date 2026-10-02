@@ -102,19 +102,22 @@ export const ConnectionReadinessCard = ({
           setLocalConnectors(
             items.map((item) => {
               const selectedConn = item.currentConnectionId
-                ? item.connections?.find((c) => c.id === item.currentConnectionId)
+                ? item.connections?.find(
+                    (c) => c.id === item.currentConnectionId,
+                  )
                 : undefined;
               return {
-              connectorKey: item.connectorKey,
-              connectorName: item.connectorName ?? item.connectorKey,
-              connectorImage: item.connectorImage,
-              isConfigurable: item.isConfigurable !== false,
-              currentConnectionId: item.currentConnectionId,
-              currentConnectionName: item.currentConnectionName,
-              currentConnectionState: selectedConn?.state as ConnectorReadiness["currentConnectionState"]
-                ?? (item.currentConnectionId ? "Expired" : undefined),
-              connectionsUrl: item.connectionsUrl,
-            };
+                connectorKey: item.connectorKey,
+                connectorName: item.connectorName ?? item.connectorKey,
+                connectorImage: item.connectorImage,
+                isConfigurable: item.isConfigurable !== false,
+                currentConnectionId: item.currentConnectionId,
+                currentConnectionName: item.currentConnectionName,
+                currentConnectionState:
+                  (selectedConn?.state as ConnectorReadiness["currentConnectionState"]) ??
+                  (item.currentConnectionId ? "Expired" : undefined),
+                connectionsUrl: item.connectionsUrl,
+              };
             }),
           );
         })
@@ -143,8 +146,7 @@ export const ConnectionReadinessCard = ({
       c.currentConnectionId &&
       c.currentConnectionState === "Enabled",
   );
-  const allConnected =
-    unconnected.length === 0 && broken.length === 0;
+  const allConnected = unconnected.length === 0 && broken.length === 0;
 
   // Notify parent when everything is connected
   useEffect(() => {
@@ -179,7 +181,11 @@ export const ConnectionReadinessCard = ({
 
         const { authUrl, sessionId, expiresTime } = result;
 
-        window.open(authUrl, "_blank", "noopener,noreferrer,width=600,height=700");
+        window.open(
+          authUrl,
+          "_blank",
+          "noopener,noreferrer,width=600,height=700",
+        );
 
         pollingRef.current = setInterval(async () => {
           // Another OAuth connection replaced this one
@@ -191,7 +197,8 @@ export const ConnectionReadinessCard = ({
                 clearInterval(pollingRef.current);
                 pollingRef.current = null;
               }
-              if (oauthSessionRef.current === oauthSession) setConnectingKey(null);
+              if (oauthSessionRef.current === oauthSession)
+                setConnectingKey(null);
               return;
             }
 
@@ -255,7 +262,9 @@ export const ConnectionReadinessCard = ({
                   setLocalConnectors(
                     updated.map((item) => {
                       const sel = item.currentConnectionId
-                        ? item.connections?.find((c) => c.id === item.currentConnectionId)
+                        ? item.connections?.find(
+                            (c) => c.id === item.currentConnectionId,
+                          )
                         : undefined;
                       return {
                         connectorKey: item.connectorKey,
@@ -264,8 +273,9 @@ export const ConnectionReadinessCard = ({
                         isConfigurable: item.isConfigurable !== false,
                         currentConnectionId: item.currentConnectionId,
                         currentConnectionName: item.currentConnectionName,
-                        currentConnectionState: sel?.state as ConnectorReadiness["currentConnectionState"]
-                          ?? (item.currentConnectionId ? "Expired" : undefined),
+                        currentConnectionState:
+                          (sel?.state as ConnectorReadiness["currentConnectionState"]) ??
+                          (item.currentConnectionId ? "Expired" : undefined),
                         connectionsUrl: item.connectionsUrl,
                       };
                     }),
@@ -280,7 +290,8 @@ export const ConnectionReadinessCard = ({
                 clearInterval(pollingRef.current);
                 pollingRef.current = null;
               }
-              if (oauthSessionRef.current === oauthSession) setConnectingKey(null);
+              if (oauthSessionRef.current === oauthSession)
+                setConnectingKey(null);
             }
           } catch {
             // Polling error; keep trying until expired
@@ -328,11 +339,7 @@ export const ConnectionReadinessCard = ({
                 count: neededCount,
               })}
         </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setCollapsed(false)}
-        >
+        <Button variant="ghost" size="sm" onClick={() => setCollapsed(false)}>
           {t("connection_readiness_show")}
         </Button>
       </div>
@@ -358,11 +365,7 @@ export const ConnectionReadinessCard = ({
               {t("connection_readiness_broken_description")}
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCollapsed(true)}
-          >
+          <Button variant="ghost" size="sm" onClick={() => setCollapsed(true)}>
             {t("connection_readiness_hide")}
           </Button>
         </div>
@@ -526,11 +529,7 @@ export const ConnectionReadinessCard = ({
             {t("connection_readiness_setup_description")}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setCollapsed(true)}
-        >
+        <Button variant="ghost" size="sm" onClick={() => setCollapsed(true)}>
           {t("connection_readiness_hide")}
         </Button>
       </div>
@@ -540,8 +539,7 @@ export const ConnectionReadinessCard = ({
           .filter((c) => c.isConfigurable)
           .map((connector) => {
             const isConnected = !!connector.currentConnectionId;
-            const isThisConnecting =
-              connectingKey === connector.connectorKey;
+            const isThisConnecting = connectingKey === connector.connectorKey;
 
             return (
               <div

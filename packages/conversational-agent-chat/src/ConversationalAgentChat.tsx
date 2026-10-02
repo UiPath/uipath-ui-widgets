@@ -1108,12 +1108,19 @@ export const ConversationalAgentChat = ({
       );
 
       // Fetch connection readiness (fire-and-forget; card is optional)
-      if (agentRelease && agentIdRef.current != null && folderIdRef.current != null) {
+      if (
+        agentRelease &&
+        agentIdRef.current != null &&
+        folderIdRef.current != null
+      ) {
         const capturedKey = initKey;
         const capturedAgentId = agentIdRef.current;
         const capturedFolderId = folderIdRef.current;
         const ca = agentService.current as unknown as {
-          getAvailableConnections(a: number, f: number): Promise<
+          getAvailableConnections(
+            a: number,
+            f: number,
+          ): Promise<
             Array<{
               connectorKey: string;
               connectorName?: string;
@@ -1126,9 +1133,14 @@ export const ConversationalAgentChat = ({
             }>
           >;
         };
-        const applyReadiness = (items: Awaited<ReturnType<typeof ca.getAvailableConnections>>) => {
+        const applyReadiness = (
+          items: Awaited<ReturnType<typeof ca.getAvailableConnections>>,
+        ) => {
           if (initializedFor.current !== capturedKey) return;
-          if (items.length === 0) { setConnectionReadiness(null); return; }
+          if (items.length === 0) {
+            setConnectionReadiness(null);
+            return;
+          }
           const readiness: ConnectorReadiness[] = items.map((item) => {
             const selectedConn = item.currentConnectionId
               ? item.connections?.find((c) => c.id === item.currentConnectionId)
@@ -1140,12 +1152,17 @@ export const ConversationalAgentChat = ({
               isConfigurable: item.isConfigurable !== false,
               currentConnectionId: item.currentConnectionId,
               currentConnectionName: item.currentConnectionName,
-              currentConnectionState: selectedConn?.state as ConnectorReadiness["currentConnectionState"] ?? (item.currentConnectionId ? "Expired" : undefined),
+              currentConnectionState:
+                (selectedConn?.state as ConnectorReadiness["currentConnectionState"]) ??
+                (item.currentConnectionId ? "Expired" : undefined),
               connectionsUrl: item.connectionsUrl,
             };
           });
           const hasUnresolved = readiness.some(
-            (c) => c.isConfigurable && (!c.currentConnectionId || c.currentConnectionState !== "Enabled"),
+            (c) =>
+              c.isConfigurable &&
+              (!c.currentConnectionId ||
+                c.currentConnectionState !== "Enabled"),
           );
           setConnectionReadiness(hasUnresolved ? readiness : null);
         };

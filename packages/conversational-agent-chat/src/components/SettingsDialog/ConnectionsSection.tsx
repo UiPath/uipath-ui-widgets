@@ -210,18 +210,14 @@ export const ConnectionsSection = ({
     setSaveResult(null);
     setSaveError(null);
     try {
-      const updated = await api.updateConnectionSelections(
-        agentId,
-        folderId,
-        {
-          selections: Object.entries(stagedSelections)
-            .filter(([, v]) => v !== "")
-            .map(([connectorKey, connectionId]) => ({
-              connectorKey,
-              connectionId,
-            })),
-        },
-      );
+      const updated = await api.updateConnectionSelections(agentId, folderId, {
+        selections: Object.entries(stagedSelections)
+          .filter(([, v]) => v !== "")
+          .map(([connectorKey, connectionId]) => ({
+            connectorKey,
+            connectionId,
+          })),
+      });
       const sels = getInitialSelections(updated);
       setItems(updated);
       setInitialSelections(sels);
@@ -261,7 +257,8 @@ export const ConnectionsSection = ({
         try {
           if (Date.now() > expiresTime) {
             clearPoll();
-            if (oauthSessionRef.current === oauthSession) setConnectingKey(null);
+            if (oauthSessionRef.current === oauthSession)
+              setConnectingKey(null);
             return;
           }
           const status = await api.getConnectionSessionStatus(sessionId);
@@ -300,7 +297,8 @@ export const ConnectionsSection = ({
             setSearchQuery("");
           } else if (status.status === "failed") {
             clearPoll();
-            if (oauthSessionRef.current === oauthSession) setConnectingKey(null);
+            if (oauthSessionRef.current === oauthSession)
+              setConnectingKey(null);
           }
         } catch {
           clearPoll();
@@ -349,9 +347,7 @@ export const ConnectionsSection = ({
     <div className="flex flex-col gap-4">
       {items.map((item) => {
         const selectedId = stagedSelections[item.connectorKey];
-        const selectedConn = item.connections.find(
-          (c) => c.id === selectedId,
-        );
+        const selectedConn = item.connections.find((c) => c.id === selectedId);
         const isConfigurable = item.isConfigurable !== false;
         const hasSelection = selectedId && selectedId !== "";
         const isPickerOpen = openPicker === item.connectorKey;
@@ -514,8 +510,7 @@ export const ConnectionsSection = ({
                     >((groups, conn) => {
                       const groupName = conn.personalWorkspace
                         ? t("connections_personal_workspace")
-                        : (conn.folderName ??
-                          t("connections_unknown_folder"));
+                        : (conn.folderName ?? t("connections_unknown_folder"));
                       if (
                         query &&
                         !conn.name.toLowerCase().includes(query) &&
@@ -553,9 +548,7 @@ export const ConnectionsSection = ({
                               conn.id === selectedId && "bg-muted",
                             )}
                           >
-                            <span className="flex-1 truncate">
-                              {conn.name}
-                            </span>
+                            <span className="flex-1 truncate">{conn.name}</span>
                           </button>
                         ))}
                       </div>
