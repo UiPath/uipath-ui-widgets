@@ -42,6 +42,7 @@ export const CompactTableEditor: React.FC<CompactTableEditorProps> = ({
   onSetFieldValueByPathResult,
   onSelectAndFocusFieldValueByPathResult,
   onDeleteFieldValueByPathResult,
+  onWcMessage,
   onTableSelectionEvent,
   onClosed,
   ...dataSource
@@ -72,6 +73,7 @@ export const CompactTableEditor: React.FC<CompactTableEditorProps> = ({
       selectAndFocusFieldValueByPathResult:
         onSelectAndFocusFieldValueByPathResult,
       deleteFieldValueByPathResult: onDeleteFieldValueByPathResult,
+      "ui-du-vs-wc-message": onWcMessage,
       tableSelectionEvent: onTableSelectionEvent,
       closed: onClosed,
     },
@@ -80,7 +82,12 @@ export const CompactTableEditor: React.FC<CompactTableEditorProps> = ({
 
   const gate = resolveArtifacts(error, wcReady, artifacts);
   if (!gate.ready) return gate.fallback;
-  const { taxonomy, extractionResult, customizationInfo } = gate.artifacts;
+  const {
+    taxonomy,
+    extractionResult,
+    predictedExtractionResult,
+    customizationInfo,
+  } = gate.artifacts;
 
   const props: ICompactTableEditorStandaloneWcJsxProps = {
     ...commonProps,
@@ -94,6 +101,7 @@ export const CompactTableEditor: React.FC<CompactTableEditorProps> = ({
     deleteFieldValueByPath,
     taxonomy,
     extractionResult,
+    predictedExtractionResult,
     customizationInfo,
   };
 

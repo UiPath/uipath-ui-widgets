@@ -23,7 +23,7 @@ const wcManifest =
   require.resolve("@uipath/du-validation-station-wc/package.json");
 const wcRoot = dirname(wcManifest);
 const destination = resolve(repoRoot, "public/du-vs-wc");
-// Records which version is staged so repeat `npm run dev` doesn't re-copy ~74 MB.
+// Records which version is staged so repeat `npm run dev` doesn't re-copy ~34 MB.
 const stamp = resolve(destination, ".version");
 
 const { version } = JSON.parse(await readFile(wcManifest, "utf8"));
