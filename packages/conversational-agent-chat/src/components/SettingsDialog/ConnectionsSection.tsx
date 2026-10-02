@@ -166,7 +166,12 @@ export const ConnectionsSection = ({
       fetchingRef.current = true;
       api
         .getAvailableConnections(agentId, folderId)
-        .then((data) => setItems(data))
+        .then((data) => {
+          setItems(data);
+          const sels = getInitialSelections(data);
+          setInitialSelections(sels);
+          setStagedSelections(sels);
+        })
         .catch(() => {})
         .finally(() => {
           fetchingRef.current = false;

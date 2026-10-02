@@ -763,7 +763,6 @@ export const ConversationalAgentChat = ({
       setInputsInstance((n) => n + 1);
       setShowInputPage(true);
     }
-    setConnectionReadiness(null);
     trackTelemetry(TelemetryEvent.NewChat, TelemetryStatus.Success);
   }, [endActiveSession, inputSchemaState]);
 
@@ -1110,6 +1109,7 @@ export const ConversationalAgentChat = ({
 
       // Fetch connection readiness (fire-and-forget; card is optional)
       if (agentRelease && agentIdRef.current != null && folderIdRef.current != null) {
+        const capturedKey = initKey;
         const ca = agentService.current as unknown as {
           getAvailableConnections(a: number, f: number): Promise<
             Array<{
@@ -1120,15 +1120,18 @@ export const ConversationalAgentChat = ({
               currentConnectionName: string | null;
               isConfigurable?: boolean;
               connectionsUrl?: string;
-              connections: Array<{ state: string }>;
+              connections: Array<{ connectionId: string; state: string }>;
             }>
           >;
         };
         ca.getAvailableConnections(agentIdRef.current, folderIdRef.current)
           .then((items) => {
+            if (initializedFor.current !== capturedKey) return;
             if (items.length === 0) { setConnectionReadiness(null); return; }
             const readiness: ConnectorReadiness[] = items.map((item) => {
-              const enabledConn = item.connections?.find((c) => c.state === "Enabled");
+              const selectedConn = item.currentConnectionId
+                ? item.connections?.find((c) => c.connectionId === item.currentConnectionId)
+                : undefined;
               return {
                 connectorKey: item.connectorKey,
                 connectorName: item.connectorName ?? item.connectorKey,
@@ -1136,7 +1139,7 @@ export const ConversationalAgentChat = ({
                 isConfigurable: item.isConfigurable !== false,
                 currentConnectionId: item.currentConnectionId,
                 currentConnectionName: item.currentConnectionName,
-                currentConnectionState: enabledConn ? "Enabled" : item.currentConnectionId ? "Expired" : undefined,
+                currentConnectionState: selectedConn?.state === "Enabled" ? "Enabled" : item.currentConnectionId ? "Expired" : undefined,
                 connectionsUrl: item.connectionsUrl,
               };
             });
@@ -1145,7 +1148,10 @@ export const ConversationalAgentChat = ({
             );
             setConnectionReadiness(hasUnresolved ? readiness : null);
           })
-          .catch(() => setConnectionReadiness(null));
+          .catch(() => {
+            if (initializedFor.current !== capturedKey) return;
+            setConnectionReadiness(null);
+          });
       }
 
       // Persists agent inputs against the active conversation via

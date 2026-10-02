@@ -91,7 +91,7 @@ export const ConnectionReadinessCard = ({
               currentConnectionName: string | null;
               isConfigurable?: boolean;
               connectionsUrl?: string;
-              connections: Array<{ state: string }>;
+              connections: Array<{ connectionId: string; state: string }>;
             }>
           >;
         }
@@ -99,7 +99,11 @@ export const ConnectionReadinessCard = ({
         .getAvailableConnections(agentId, folderId)
         .then((items) => {
           setLocalConnectors(
-            items.map((item) => ({
+            items.map((item) => {
+              const selectedConn = item.currentConnectionId
+                ? item.connections?.find((c) => c.connectionId === item.currentConnectionId)
+                : undefined;
+              return {
               connectorKey: item.connectorKey,
               connectorName: item.connectorName ?? item.connectorKey,
               connectorImage: item.connectorImage,
@@ -107,12 +111,13 @@ export const ConnectionReadinessCard = ({
               currentConnectionId: item.currentConnectionId,
               currentConnectionName: item.currentConnectionName,
               currentConnectionState: item.currentConnectionId
-                ? ((item.connections?.find((c) => c.state === "Enabled")
+                ? ((selectedConn?.state === "Enabled"
                     ? "Enabled"
                     : "Expired") as ConnectorReadiness["currentConnectionState"])
                 : undefined,
               connectionsUrl: item.connectionsUrl,
-            })),
+            };
+            }),
           );
         })
         .catch(() => {})
@@ -129,6 +134,7 @@ export const ConnectionReadinessCard = ({
   );
   const broken = localConnectors.filter(
     (c) =>
+      c.isConfigurable &&
       c.currentConnectionId &&
       c.currentConnectionState &&
       c.currentConnectionState !== "Enabled",
@@ -160,7 +166,7 @@ export const ConnectionReadinessCard = ({
 
         const { authUrl, sessionId, expiresTime } = result;
 
-        window.open(authUrl, "_blank", "width=600,height=700");
+        window.open(authUrl, "_blank", "noopener,noreferrer,width=600,height=700");
 
         // Poll for session status
         if (pollingRef.current) {
@@ -195,20 +201,7 @@ export const ConnectionReadinessCard = ({
               }
               setConnectingKey(null);
 
-              // Update local state
-              setLocalConnectors((prev) =>
-                prev.map((c) =>
-                  c.connectorKey === connectorKey
-                    ? {
-                        ...c,
-                        currentConnectionId: status.connectionId,
-                        currentConnectionState: "Enabled",
-                      }
-                    : c,
-                ),
-              );
-
-              // Auto-save via SDK
+              // Persist via SDK first, then update local state on success
               try {
                 const updatedSelections = localConnectors.map((c) => ({
                   connectorKey: c.connectorKey,
@@ -233,8 +226,20 @@ export const ConnectionReadinessCard = ({
                 ).updateConnectionSelections(agentId, folderId, {
                   selections: updatedSelections,
                 });
+                setLocalConnectors((prev) =>
+                  prev.map((c) =>
+                    c.connectorKey === connectorKey
+                      ? {
+                          ...c,
+                          currentConnectionId: status.connectionId,
+                          currentConnectionState: "Enabled",
+                        }
+                      : c,
+                  ),
+                );
               } catch {
-                // Save error is non-critical; local state already updated
+                // Persistence failed — do not update local state so the
+                // card continues to show the connector as unresolved.
               }
             } else if (status.status === "failed") {
               if (pollingRef.current) {
@@ -506,7 +511,7 @@ export const ConnectionReadinessCard = ({
                   <Button
                     variant="default"
                     size="sm"
-                    disabled={isThisConnecting}
+                    disabled={connectingKey === connector.connectorKey}
                     onClick={() => startOAuthFlow(connector.connectorKey)}
                   >
                     {isThisConnecting ? (
