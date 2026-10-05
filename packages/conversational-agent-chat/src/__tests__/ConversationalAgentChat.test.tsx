@@ -10,6 +10,7 @@ import {
 import { getI18n } from "../i18n";
 import { ConversationalAgentChat } from "../ConversationalAgentChat";
 import { UiPath } from "@uipath/uipath-typescript/core";
+import { toast } from "@uipath/apollo-wind";
 
 // Mock @uipath/apollo-react
 vi.mock("@uipath/apollo-react/core/fonts/font.css", () => ({}));
@@ -38,7 +39,6 @@ const createMockChatService = () => ({
   setPrompt: vi.fn(),
   stopResponse: vi.fn(),
   clearError: vi.fn(),
-  getError: vi.fn(),
   appendOlderHistoryItems: vi.fn(),
   prependOlderMessages: vi.fn(),
   setLocale: vi.fn(),
@@ -2485,6 +2485,11 @@ describe("ConversationalAgentChat", () => {
   });
 
   describe("onRenameConversation", () => {
+    let toastError: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      toastError = vi.spyOn(toast, "error");
+    });
+
     const getRenameHandler = async () => {
       await waitFor(
         () => {
@@ -2539,7 +2544,7 @@ describe("ConversationalAgentChat", () => {
       );
     });
 
-    it("should surface an error and keep history when the update fails", async () => {
+    it("should show an error toast and keep history when the update fails", async () => {
       mockUpdateById.mockRejectedValue(new Error("boom"));
       render(<ConversationalAgentChat {...defaultProps} />);
 
@@ -2550,79 +2555,12 @@ describe("ConversationalAgentChat", () => {
         await onRenameConversation?.({ conversationId: "conv-1", name: "X" });
       });
 
-      expect(mockChatService.setError).toHaveBeenCalledWith(
-        expect.stringContaining("boom"),
+      expect(toastError).toHaveBeenCalledWith(
+        "Failed to rename conversation",
+        expect.objectContaining({ description: "boom" }),
       );
+      expect(mockChatService.setError).not.toHaveBeenCalled();
       expect(mockChatService.setHistory).not.toHaveBeenCalled();
-    });
-
-    it("should clear its own error banner when a retry succeeds", async () => {
-      mockUpdateById.mockRejectedValueOnce(new Error("boom"));
-      render(<ConversationalAgentChat {...defaultProps} />);
-
-      const onRenameConversation = await getRenameHandler();
-      await act(async () => {
-        await onRenameConversation?.({ conversationId: "conv-1", name: "X" });
-      });
-      const [shownError] = mockChatService.setError.mock.calls.at(-1)!;
-      mockChatService.getError.mockReturnValue({
-        message: shownError,
-        level: "error",
-      });
-
-      mockUpdateById.mockResolvedValueOnce({ id: "conv-1", label: "X" });
-      await act(async () => {
-        await onRenameConversation?.({ conversationId: "conv-1", name: "X" });
-      });
-
-      expect(mockChatService.clearError).toHaveBeenCalled();
-    });
-
-    it("should clear a too-long error when the next rename succeeds", async () => {
-      render(<ConversationalAgentChat {...defaultProps} />);
-      const preHook = await getRenamePreHook();
-      const onRenameConversation = await getRenameHandler();
-
-      await preHook({ conversationId: "conv-1", name: "a".repeat(101) });
-      const [shownError] = mockChatService.setError.mock.calls.at(-1)!;
-      mockChatService.getError.mockReturnValue({
-        message: shownError,
-        level: "error",
-      });
-      mockChatService.clearError.mockClear();
-
-      mockUpdateById.mockResolvedValueOnce({ id: "conv-1", label: "Short" });
-      await act(async () => {
-        await onRenameConversation?.({
-          conversationId: "conv-1",
-          name: "Short",
-        });
-      });
-
-      expect(mockChatService.clearError).toHaveBeenCalled();
-    });
-
-    it("should not clear an unrelated error when a rename succeeds", async () => {
-      render(<ConversationalAgentChat {...defaultProps} />);
-      const preHook = await getRenamePreHook();
-      const onRenameConversation = await getRenameHandler();
-
-      await preHook({ conversationId: "conv-1", name: "a".repeat(101) });
-      mockChatService.getError.mockReturnValue({
-        message: "Failed to send message: offline",
-        level: "error",
-      });
-      mockChatService.clearError.mockClear();
-
-      mockUpdateById.mockResolvedValueOnce({ id: "conv-1", label: "Short" });
-      await act(async () => {
-        await onRenameConversation?.({
-          conversationId: "conv-1",
-          name: "Short",
-        });
-      });
-
-      expect(mockChatService.clearError).not.toHaveBeenCalled();
     });
 
     it("should accept a valid name in the pre-hook", async () => {
@@ -2632,7 +2570,7 @@ describe("ConversationalAgentChat", () => {
       await expect(
         preHook({ conversationId: "conv-1", name: "a".repeat(100) }),
       ).resolves.toBe(true);
-      expect(mockChatService.setError).not.toHaveBeenCalled();
+      expect(toastError).not.toHaveBeenCalled();
     });
 
     it("should reject a blank name in the pre-hook", async () => {
@@ -2644,14 +2582,20 @@ describe("ConversationalAgentChat", () => {
       ).resolves.toBe(false);
     });
 
-    it("should reject a name over 100 characters and show an error", async () => {
+    it("should reject a name over 100 characters and show an error toast", async () => {
       render(<ConversationalAgentChat {...defaultProps} />);
       const preHook = await getRenamePreHook();
 
       await expect(
         preHook({ conversationId: "conv-1", name: "a".repeat(101) }),
       ).resolves.toBe(false);
-      expect(mockChatService.setError).toHaveBeenCalled();
+      expect(toastError).toHaveBeenCalledWith(
+        "Name too long",
+        expect.objectContaining({
+          description: "Conversation name must be 100 characters or less.",
+        }),
+      );
+      expect(mockChatService.setError).not.toHaveBeenCalled();
       expect(mockUpdateById).not.toHaveBeenCalled();
     });
 

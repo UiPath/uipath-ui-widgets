@@ -7,10 +7,10 @@
 // Keep this list synchronized with the Apollo Wind imports in src/.
 @source "../node_modules/@uipath/apollo-wind/dist/lib/*.js";
 @source "../node_modules/@uipath/apollo-wind/dist/components/ui/layout/*.js";
-@source "../node_modules/@uipath/apollo-wind/dist/components/ui/{accordion,alert,avatar,badge,button,card,collapsible,combobox,command,dialog,input,input-group,label,popover,portal-container,radio-group,search,select,spinner,textarea}.js";
+@source "../node_modules/@uipath/apollo-wind/dist/components/ui/{accordion,alert,avatar,badge,button,card,collapsible,combobox,command,dialog,input,input-group,label,popover,portal-container,radio-group,search,select,sonner,spinner,textarea}.js";
 @source "../../../node_modules/@uipath/apollo-wind/dist/lib/*.js";
 @source "../../../node_modules/@uipath/apollo-wind/dist/components/ui/layout/*.js";
-@source "../../../node_modules/@uipath/apollo-wind/dist/components/ui/{accordion,alert,avatar,badge,button,card,collapsible,combobox,command,dialog,input,input-group,label,popover,portal-container,radio-group,search,select,spinner,textarea}.js";
+@source "../../../node_modules/@uipath/apollo-wind/dist/components/ui/{accordion,alert,avatar,badge,button,card,collapsible,combobox,command,dialog,input,input-group,label,popover,portal-container,radio-group,search,select,sonner,spinner,textarea}.js";
 @source "../dist/**/*.{js,css}";
 
 .uipath-conversational-agent-chat {

@@ -22,6 +22,8 @@ import {
   DialogHeader,
   DialogTitle,
   PortalContainerProvider,
+  Toaster,
+  toast,
 } from "@uipath/apollo-wind";
 import {
   ContentPartChunkEvent,
@@ -47,6 +49,7 @@ import type {
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -154,6 +157,8 @@ export const ConversationalAgentChat = ({
     i18n.changeLanguage(locale);
   }
   const { t } = useWidgetTranslation();
+  // Scopes our toasts to our own <Toaster> so a host's Toaster doesn't render them too.
+  const toasterId = useId();
   const agentService = useRef(
     new ConversationalAgent(sdk, {
       ...(externalUserId ? { externalUserId } : {}),
@@ -226,8 +231,6 @@ export const ConversationalAgentChat = ({
   }, [sdk, externalUserId]);
   const session = useRef<SessionStream | null>(null);
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
-  // Last rename error shown, so a successful rename clears only its own banner.
-  const renameError = useRef<string | null>(null);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
   const conversationsCursor = useRef<{ value: string } | undefined>(undefined);
   // Cursor for the active conversation's exchange history. Reset whenever a
@@ -848,20 +851,14 @@ export const ConversationalAgentChat = ({
             c.id === conversationId ? { ...c, label: updated.label } : c,
           ),
         );
-        if (
-          renameError.current &&
-          chatService.getError()?.message === renameError.current
-        ) {
-          chatService.clearError();
-        }
-        renameError.current = null;
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        renameError.current = t("error_rename_conversation", { errorMessage });
-        chatService.setError(renameError.current);
+        toast.error(t("error_rename_conversation"), {
+          description: err instanceof Error ? err.message : String(err),
+          toasterId,
+        });
       }
     },
-    [chatService, setConversationHistory, t],
+    [chatService, setConversationHistory, t, toasterId],
   );
 
   const onSendMessage = useCallback(
@@ -1224,10 +1221,12 @@ export const ConversationalAgentChat = ({
               const trimmed = name.trim();
               if (trimmed.length === 0) return false;
               if (trimmed.length > CONVERSATION_LABEL_MAX_LENGTH) {
-                renameError.current = t("error_rename_conversation_too_long", {
-                  max: CONVERSATION_LABEL_MAX_LENGTH,
+                toast.error(t("error_rename_conversation_too_long_title"), {
+                  description: t("error_rename_conversation_too_long", {
+                    max: CONVERSATION_LABEL_MAX_LENGTH,
+                  }),
+                  toasterId,
                 });
-                chatServiceRef.current?.setError(renameError.current);
                 return false;
               }
               return true;
@@ -1350,6 +1349,7 @@ export const ConversationalAgentChat = ({
     getConversation,
     fetchExchanges,
     t,
+    toasterId,
   ]);
 
   const handleReload = useCallback(() => {
@@ -1691,6 +1691,7 @@ export const ConversationalAgentChat = ({
             </DialogContent>
           )}
         </Dialog>
+        <Toaster id={toasterId} position="top-right" richColors />
       </PortalContainerProvider>
     </div>
   );
