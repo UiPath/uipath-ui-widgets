@@ -77,31 +77,53 @@ export async function fetchBucketArtifacts(
     fetchAndUnzipJson(await readUri(path));
   const readText = async (path: string) => fetchAndUnzip(await readUri(path));
 
-  /** The validated result once the reviewer has saved one, else the automatic one. */
-  const readExtractionResult = async () => {
-    if (ValidatedExtractionResultsPath) {
-      try {
-        return await readJson(ValidatedExtractionResultsPath);
-      } catch {
-        // Validated result not saved yet — fall through to automatic.
-      }
+  /**
+   * The result to review — the validated one once the reviewer has saved one,
+   * else the automatic one — and the automatic one as the prediction.
+   */
+  const readExtractionResults = async () => {
+    const [automatic, validated] = await Promise.allSettled([
+      readJson(AutomaticExtractionResultsPath),
+      ValidatedExtractionResultsPath
+        ? readJson(ValidatedExtractionResultsPath)
+        : undefined,
+    ]);
+    if (validated.status === "fulfilled" && validated.value != null) {
+      return {
+        extractionResult: validated.value,
+        // Optional — a missing prediction must not block the review.
+        predicted: automatic.status === "fulfilled" ? automatic.value : null,
+      };
     }
-    return readJson(AutomaticExtractionResultsPath);
+    // Validated result not saved yet — review the automatic one.
+    if (automatic.status === "rejected") throw automatic.reason;
+    return {
+      extractionResult: automatic.value,
+      // A separate copy, so the two inputs never alias each other.
+      predicted: structuredClone(automatic.value),
+    };
   };
 
-  const [taxonomy, extractionResult, dom, text, customizationInfo, original] =
-    await Promise.all([
-      readJson(TaxonomyPath),
-      readExtractionResult(),
-      readJson(DocumentObjectModelPath),
-      readText(TextPath),
-      CustomizationInfoPath ? readJson(CustomizationInfoPath) : {},
-      readText(EncodedDocumentPath),
-    ]);
+  const [
+    taxonomy,
+    { extractionResult, predicted },
+    dom,
+    text,
+    customizationInfo,
+    original,
+  ] = await Promise.all([
+    readJson(TaxonomyPath),
+    readExtractionResults(),
+    readJson(DocumentObjectModelPath),
+    readText(TextPath),
+    CustomizationInfoPath ? readJson(CustomizationInfoPath) : {},
+    readText(EncodedDocumentPath),
+  ]);
 
   return {
     taxonomy: taxonomy as DuFramework.DocumentTaxonomy,
     extractionResult: extractionResult as DuFramework.ExtractionResult,
+    predictedExtractionResult: predicted as DuFramework.ExtractionResult | null,
     dom: dom as DuFramework.DocumentEntity,
     text,
     customizationInfo,

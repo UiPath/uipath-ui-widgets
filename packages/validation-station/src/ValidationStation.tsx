@@ -60,6 +60,7 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
   onDeleteFieldValueByPathResult,
   onFieldsPanelWidthChanged,
   onFieldsPanelSideChanged,
+  onWcMessage,
 }) => {
   const { artifacts, error, documentId } = useResolvedArtifacts({
     sdk,
@@ -96,6 +97,7 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
       deleteFieldValueByPathResult: onDeleteFieldValueByPathResult,
       fieldsPanelWidthChanged: onFieldsPanelWidthChanged,
       fieldsPanelSideChanged: onFieldsPanelSideChanged,
+      "ui-du-vs-wc-message": onWcMessage,
       saveValidatedDataRequest: handleSubmit,
       saveValidatedDataAsDraftRequest: handleSaveAsDraft,
       saveExceptionReportRequest: handleException,
@@ -114,6 +116,7 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
     documentId,
     taxonomy: gate.artifacts.taxonomy,
     extractionResult: gate.artifacts.extractionResult,
+    predictedExtractionResult: gate.artifacts.predictedExtractionResult,
     dom: gate.artifacts.dom,
     text: gate.artifacts.text,
     customizationInfo: gate.artifacts.customizationInfo,

@@ -13,7 +13,7 @@ npm install @uipath/ui-widgets-validation-station
 ```
 react >= 19.2.0
 react-dom >= 19.2.0
-@uipath/uipath-typescript >= 1.4.2
+@uipath/uipath-typescript >= 1.5.1
 ```
 
 ## Quick start
@@ -93,7 +93,32 @@ Every bucket call is scoped to the folder `data` names — `FolderId`, or `Folde
 
 The two modes can be mixed: pass `artifacts` **and** `sdk` + `data` to skip the fetch while keeping the built-in write-back — `onSubmit` then receives the outcome as well.
 
-> `DuDocumentArtifacts` is `{ taxonomy, extractionResult, dom, text, customizationInfo, original }` — `original` is the base64-encoded document the viewer renders.
+> `DuDocumentArtifacts` is `{ taxonomy, extractionResult, predictedExtractionResult?, dom, text, customizationInfo, original }` — `original` is the base64-encoded document the viewer renders.
+
+### Comparing against the prediction
+
+`predictedExtractionResult` is the model's prediction — the extraction output nobody edited — as opposed to `extractionResult`, the result the user reviews. Self-fetching fills it from `AutomaticExtractionResultsPath`; in pre-fetched mode it is optional, and a hand-built `DuDocumentArtifacts` without it is still valid.
+
+By itself it changes nothing visible. It drives the `EnablePredictionDiff` customization flag (compact mode, on `ValidationStation`, `CompactFieldsForm` and `CompactTableEditor`): where the prediction differs from the current values, the element shows the predicted value with a button that takes it over. Like every customization flag, it lives under `FeatureCustomization` in `customizationInfo` — typed by the exported `ICustomizationInfoDTO` / `IFeatureCustomization`:
+
+```ts
+import type { ICustomizationInfoDTO } from "@uipath/ui-widgets-validation-station";
+
+// Merge over what the bucket supplied rather than replacing it.
+const fetched = artifacts.customizationInfo as
+  | ICustomizationInfoDTO
+  | undefined;
+const withDiff = {
+  ...artifacts,
+  customizationInfo: {
+    ...fetched,
+    FeatureCustomization: {
+      ...fetched?.FeatureCustomization,
+      EnablePredictionDiff: true,
+    },
+  } satisfies ICustomizationInfoDTO,
+};
+```
 
 ### Owning the round-trip
 
@@ -250,6 +275,7 @@ These callbacks report the rest of the element's
 | `onDeleteFieldValueByPathResult`         | a `deleteFieldValueByPath` command completes                                          |
 | `onFieldsPanelWidthChanged`              | the fields panel is resized (width in px)                                             |
 | `onFieldsPanelSideChanged`               | the panel moves to the other side of the viewer                                       |
+| `onWcMessage`                            | the element publishes a message on its bus (`ui-du-vs-wc-message`) — see below        |
 
 **Commands need a loaded document.** `setFieldValueByPath`,
 `selectAndFocusFieldValueByPath` and `deleteFieldValueByPath` resolve their
@@ -257,6 +283,36 @@ These callbacks report the rest of the element's
 before those arrive fails to resolve. Gate on `onLoaded`, and wire the matching
 `*Result` callback — it carries the reason (`No field value found at path …`),
 which is otherwise invisible.
+
+### Rendering your own value-indicator overlay
+
+Hovering a value's confidence indicator opens a built-in popover. `onWcMessage`
+receives an `IVsWcMessage`, discriminated on `type`: `indicator-overlay-show`
+carries the value's confidence, thresholds, confirmation and broken-rule state
+(`IVsIndicatorOverlayContext`) plus the trigger's viewport rect to position
+against, and `indicator-overlay-hide` closes it. Hide the built-in popover with
+CSS, then render your own:
+
+```css
+ui-du-validation-station-standalone-wc-element::part(indicator-overlay) {
+  display: none;
+}
+```
+
+```tsx
+<ValidationStation
+  sdk={sdk}
+  data={data}
+  onWcMessage={(message) => {
+    if (message.type === "indicator-overlay-show") showPopover(message.context);
+    else hidePopover();
+  }}
+/>
+```
+
+`message.instanceId` tells elements apart when several report to one handler.
+`CompactFieldsForm`, `CompactTableEditor` and `CompactBusinessRules` take
+`onWcMessage` too.
 
 The subcomponents report subsets of this set — see
 [subcomponents](./docs/validation-station-subcomponents.md).
@@ -302,6 +358,12 @@ import type {
   DuArtifactsSource,
   DuDocumentArtifacts,
   IValidationStationOptions,
+  FieldFilterOptions,
+  DocumentViewerOptions,
+  ICustomizationInfoDTO,
+  IFeatureCustomization,
+  IVsWcMessage,
+  IVsIndicatorOverlayContext,
   IVsSaveValidatedDataRequest,
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveExceptionReportRequest,
@@ -436,8 +498,8 @@ That means there is no bundler configuration to write. You need two things:
 import { configureValidationStationWc } from "@uipath/ui-widgets-validation-station";
 
 configureValidationStationWc({
-  // Set true unless your app already loads Apollo fonts + Material Icons
-  // globally — otherwise icon glyphs render as empty boxes.
+  // Set true unless your app already loads Material Icons globally —
+  // otherwise every icon renders as its ligature text. See "Fonts" below.
   includeFonts: true,
 }).catch((error) => {
   console.error("Validation Station web component failed to load", error);
@@ -478,9 +540,9 @@ resolves these against its own `import.meta.url`:
 ```
 /du-vs-wc/
 ├── main.js          ← entry, plus its hashed chunk-*.js siblings
-├── polyfills.js     ← zone.js; must load before main.js (the loader handles ordering)
+├── polyfills.js     ← must load before main.js (the loader handles ordering)
 ├── styles.css       ← fetched as raw CSS and adopted into the shadow root
-├── fonts.css        ← Apollo fonts + Material Icons (opt-in via includeFonts)
+├── fonts.css        ← Material Icons only (opt-in via includeFonts)
 ├── media/           ← the font files fonts.css references
 └── du-assets/       ← pdf.js scripts, cmaps, wasm decoders, translations,
                        the business-rules executor
@@ -489,6 +551,20 @@ resolves these against its own `import.meta.url`:
 Copying the package directory verbatim satisfies this. In this repo, that is
 `npm run stage-du-wc` (see `scripts/copy-du-wc-assets.mjs`), wired to `predev`,
 which stages it into the gitignored `public/du-vs-wc`.
+
+### Fonts
+
+The `fonts.css` in `@uipath/du-validation-station-wc` carries **Material Icons
+only** — the one font the component cannot do without. The Apollo text fonts
+(Poppins, Noto Sans, Inconsolata) are not in the package, so the component's
+text inherits your app's own font stack. A UiPath-styled host already loads
+them; to get the UiPath typography otherwise, install
+[`@uipath/apollo-fonts`](https://www.npmjs.com/package/@uipath/apollo-fonts) and
+import its `font.css` in your app. That file contains Material Icons as well, so
+`includeFonts` can then stay off.
+
+A UiPath-hosted deployment of the web component is built with the full font set,
+so `includeFonts: true` against one of those links the Apollo fonts too.
 
 ### Notes
 
@@ -520,6 +596,31 @@ which stages it into the gitignored `public/du-vs-wc`.
 - **Version skew.** The URL decides which web component version actually runs, and
   it is not checked against the installed `@uipath/du-validation-station-wc`. Keep
   the hosted copy in step with the version this package's types are built against.
+
+## Web component 1.0.0-rc.2
+
+The widgets now render `@uipath/du-validation-station-wc` `1.0.0-rc.2`. Keep the
+hosted copy in step (see _Version skew_ above). No prop of this package was
+removed or renamed, but the web component changes a few things you will see:
+
+- **New compact UI, on by default:** a field-filter toolbar (trim or remove it
+  with `options.fieldFilterOptions`), expandable field groups, a line-number
+  column in the table editor, and a _Waiting for input_ screen until the
+  document data arrives.
+- **`HideConfidence` now applies in compact mode too**, and is deprecated in
+  favour of `IgnoreConfidence` (either one takes confidence out of the
+  experience). A `customizationInfo` that already sets it will now hide the
+  confidence indicator in compact.
+- **`fonts.css` carries Material Icons only** — see [Fonts](#fonts).
+- **New options:** `fieldFilterOptions`, `defaultFieldsAreaPercentage` /
+  `defaultFieldsAreaWidth`, and `documentViewerOptions` for the embedded viewer
+  (with the new `hideExtractedTokensToggle` / `hideLanguageSelect` flags).
+- **New outputs and inputs on this package:** `onWcMessage` (see
+  [Rendering your own value-indicator overlay](#rendering-your-own-value-indicator-overlay))
+  and `predictedExtractionResult` (see
+  [Comparing against the prediction](#comparing-against-the-prediction)).
+- **`@uipath/uipath-typescript` `>= 1.5.1`** is now required — the web component
+  declares it as a peer dependency.
 
 ## Migrating from 1.0.x
 
