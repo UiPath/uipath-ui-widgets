@@ -1,0 +1,1 @@
+import"./chunk-D4-ktzGU.js";var r=`Turks and Caicos Islands`;var a=[{regionCode:`00`,regionName:``,city:`Cockburn Town`,aliases:``},{regionCode:`00`,regionName:``,city:`Cockburn Harbour`,aliases:``}];var n={countryName:r,records:a};export{r as countryName,n as default,a as records};

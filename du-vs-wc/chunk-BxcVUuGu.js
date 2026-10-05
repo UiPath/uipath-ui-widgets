@@ -1,0 +1,1 @@
+import"./chunk-D4-ktzGU.js";var s=`Christmas Island`;var a=[{regionCode:`00`,regionName:``,city:`Flying Fish Cove`,aliases:``}];var o={countryName:s,records:a};export{s as countryName,o as default,a as records};

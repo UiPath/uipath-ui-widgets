@@ -1,0 +1,1 @@
+import"./chunk-D4-ktzGU.js";var o=`South Georgia and the South Sandwich Islands`;var i=[{regionCode:`00`,regionName:``,city:`Grytviken`,aliases:``}];var n={countryName:o,records:i};export{o as countryName,n as default,i as records};

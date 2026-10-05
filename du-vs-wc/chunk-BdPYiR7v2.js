@@ -1,0 +1,1 @@
+import"./chunk-D4-ktzGU.js";var o=`Niue`;var r=[{regionCode:`00`,regionName:``,city:`Alofi`,aliases:``}];var a={countryName:o,records:r};export{o as countryName,a as default,r as records};

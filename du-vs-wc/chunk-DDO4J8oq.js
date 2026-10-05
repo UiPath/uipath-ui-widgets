@@ -1,0 +1,1 @@
+import"./chunk-D4-ktzGU.js";import"./chunk-BSFMe_YW.js";import"./chunk-B3xuZQ28.js";import{h as Ug}from"./main.js";export{Ug as UiCompactFieldsFormComponent};

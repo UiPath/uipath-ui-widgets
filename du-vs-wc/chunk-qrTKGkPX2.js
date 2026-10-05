@@ -1,0 +1,1 @@
+import"./chunk-D4-ktzGU.js";var a=`Bermuda`;var o=[{regionCode:`GC`,regionName:`Saint George`,city:`Saint George`,aliases:``},{regionCode:`HC`,regionName:`Hamilton city`,city:`Hamilton`,aliases:``}];var r={countryName:a,records:o};export{a as countryName,r as default,o as records};

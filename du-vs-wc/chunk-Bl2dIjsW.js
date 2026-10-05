@@ -1,0 +1,1 @@
+import"./chunk-D4-ktzGU.js";var o=`British Virgin Islands`;var r=[{regionCode:`00`,regionName:``,city:`Road Town`,aliases:``}];var a={countryName:o,records:r};export{o as countryName,a as default,r as records};

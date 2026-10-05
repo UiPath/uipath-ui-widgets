@@ -1,0 +1,1 @@
+import"./chunk-D4-ktzGU.js";var i=`Saint Barthelemy`;var r=[{regionCode:`00`,regionName:``,city:`Gustavia`,aliases:``}];var o={countryName:i,records:r};export{i as countryName,o as default,r as records};

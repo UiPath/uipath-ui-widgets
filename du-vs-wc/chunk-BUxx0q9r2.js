@@ -1,0 +1,1 @@
+import{i as _,n as Q}from"./chunk-BSFMe_YW.js";function n(a,m,e){let[f,i]=_(e?.in,a,m);return+Q(f,e)==+Q(i,e)}export{n as t};

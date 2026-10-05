@@ -108,9 +108,100 @@ export interface BusinessRuleModel {
 
 // ─── Configuration inputs ─────────────────────────────────────────────────────
 
+/** Customization payload accepted by the standalone validation-station elements. */
+export interface ICustomizationInfoDTO {
+    /** Global validation-station feature and display customizations. */
+    FeatureCustomization?: IFeatureCustomization | null;
+    /** Help-panel content and behavior customizations. */
+    HelpCustomization?: IHelpCustomizationDTO | null;
+    /** Per-document-type field customizations. */
+    DocumentTypeCustomizations?: IDocumentTypeCustomizationDTO[] | null;
+}
+
+export type SelectionModeCustomization = 'Tokens' | 'Area' | 'UserChoice';
+
+export type DisplayMode = 'classic' | 'compact';
+
+export interface IFeatureCustomization {
+    /** Hides the document viewer's OCR language dropdown, leaving the selected language on display (both modes). */
+    DisableLanguageSelection?: boolean;
+    /** Hides the "Report as exception" action from the fields form (both modes). */
+    DisableReportException?: boolean;
+    /** The document viewer's initial selection tool; the user can still switch tools afterwards (both modes). */
+    DefaultSelectionMode?: SelectionModeCustomization;
+    /** Has no effect in the current version. */
+    DisableFieldCrops?: boolean;
+    /** @deprecated Renamed to `IgnoreConfidence`. Still honored: either flag on its own takes confidence out of the experience (both modes). */
+    HideConfidence?: boolean;
+    /** Takes confidence out of the experience: no confidence indicator, no confidence rows in the value's hover breakdown, and confidence no longer makes a value count as an issue; broken business rules and failed extraction validation still flag the value (both modes). */
+    IgnoreConfidence?: boolean;
+    /** Anchor selection is disabled unless this flag is set to `false` explicitly; an absent flag disables it too (both modes). */
+    DisableAnchorSelectionMode?: boolean;
+    /** Seeds the confidence-threshold slider once, as a percentage from 0 to 100 (classic mode only). */
+    FieldsValidationConfidence?: number | null;
+    /** Adds the text-direction and reverse-words actions for right-to-left text extracted in the wrong order (both modes). */
+    EnableRTLFeatures?: boolean;
+    /** Read by the validation-station element only; other elements always render compact. Omitted, it keeps the compact default. */
+    DisplayMode?: DisplayMode;
+    /** Runs the document viewer text-only, without the page image and without token creation on the canvas (both modes). */
+    TextOnlyMode?: boolean;
+    /** Hides the per-value, per-row and per-cell confirmation checkboxes; purely visual, the submit flow is unchanged (compact mode only). */
+    HideConfirmationCheckboxes?: boolean;
+    /** Hides the READ-ONLY indicator at the bottom of the fields list while the component is in readonly mode (both modes). */
+    HideReadonlyModeIndicator?: boolean;
+    /** Shows the prediction diff (compact mode only). Needs `predictedExtractionResult`. */
+    EnablePredictionDiff?: boolean;
+}
+
+export interface IHelpCustomizationDTO {
+    ExplanationText: string | null;
+    ShowExplanationOnStartup: boolean;
+    HideHotkeyDialogGroups: string[] | null;
+}
+
+export interface IDocumentTypeCustomizationDTO {
+    DocumentTypeId: string;
+    FieldCustomizations: IFieldCustomizationDTO[];
+}
+
+export interface IFieldCustomizationDTO {
+    FieldId: string;
+    EditReferenceCapabilities: EditReferenceCapabilitiesDTO[];
+    DefaultValue: string | null;
+}
+
+export type EditReferenceCapabilitiesDTO = 'Tokens' | 'Area' | 'Anchor';
+
+/**
+ * Controls the field-filter toolbar of the compact fields form — the `Hide fields`
+ * menu, the field search and the reset button.
+ *
+ * Every flag only ever removes UI. A hidden hide-filter also stops filtering: a
+ * value persisted from an earlier session is ignored rather than left applied with
+ * no control left to clear it. `hideBar` removes the whole toolbar and makes
+ * search/selection filtering inert with it. Hiding all three hide-filters drops the
+ * `Hide fields` menu button, leaving search and reset.
+ *
+ * @example
+ * ```ts
+ * element.options = { fieldFilterOptions: { hideBar: true } };
+ * ```
+ */
+export interface FieldFilterOptions {
+    /** Hides the entire field-filter toolbar and stops all field filtering. */
+    hideBar?: boolean;
+    /** Hides the `Confirmed` entry of the `Hide fields` menu. */
+    hideConfirmed?: boolean;
+    /** Hides the `Not extracted` entry of the `Hide fields` menu. */
+    hideNotExtracted?: boolean;
+    /** Hides the `With no flagged issues` entry of the `Hide fields` menu. */
+    hideNoFlaggedIssues?: boolean;
+}
+
 export interface IValidationStationOptions {
     hideSubmitButton?: boolean;
     hideReportAsExceptionButton?: boolean;
+    /** Hides the document type field. Defaults to `true` for a Flow input, `false` otherwise. */
     hideDocumentTypeField?: boolean;
     hideFields?: boolean;
     /**
@@ -121,14 +212,52 @@ export interface IValidationStationOptions {
     hideBusinessRules?: boolean;
     /** @default 'left' */
     fieldsSectionPosition?: 'left' | 'right';
+    /** Trims or removes the field-filter toolbar. */
+    fieldFilterOptions?: FieldFilterOptions;
     /** @default true */
     enableUserPreferences?: boolean;
     userPreferencesKeySuffix?: string;
+    /**
+     * Width the fields panel starts at, as a percentage (0-100) of the element.
+     * Takes precedence over `defaultFieldsAreaWidth`.
+     *
+     * A width the user has already dragged wins over both (unless
+     * `enableUserPreferences` is false), and the panel is always kept within
+     * 30-80% of the element.
+     *
+     * @example
+     * element.options = { defaultFieldsAreaPercentage: 40 }; // 40% fields, 60% viewer
+     */
+    defaultFieldsAreaPercentage?: number;
+    /**
+     * Width the fields panel starts at, in pixels. Ignored when
+     * `defaultFieldsAreaPercentage` is set.
+     *
+     * @example
+     * element.options = { defaultFieldsAreaWidth: 576 };
+     */
+    defaultFieldsAreaWidth?: number;
     /**
      * If true, `extractionResultChanged` will emit on every internal state
      * change (mapped to ExtractionResult).
      */
     emitDtoStateChanges?: boolean;
+    /**
+     * Configuration for the embedded document viewer. This is the same
+     * {@link DocumentViewerOptions} object the standalone document-viewer element
+     * accepts, so one configuration drives both elements.
+     *
+     * @example
+     * element.options = {
+     *     documentViewerOptions: {
+     *         floatingButtonsOptions: {
+     *             hideLanguageSelect: true,
+     *             hideExtractedTokensToggle: true,
+     *         },
+     *     },
+     * };
+     */
+    documentViewerOptions?: DocumentViewerOptions;
 }
 
 /** Document-viewer interaction mode. */
@@ -148,6 +277,16 @@ export interface DocumentViewerFloatingButtonsOptions {
     hideKeyboardShortcutsButton?: boolean;
     /** Hide the in-document search button. */
     hideSearch?: boolean;
+    /**
+     * Hide the show/hide extracted-tokens entry in the viewer's burger menu, and
+     * disable the keyboard shortcut that toggles it.
+     */
+    hideExtractedTokensToggle?: boolean;
+    /**
+     * Hide the language dropdown entirely. Distinct from the `DisableLanguageSelection`
+     * customization, which leaves the dropdown visible but disabled.
+     */
+    hideLanguageSelect?: boolean;
 }
 
 /** Fine-grained configuration for the document-viewer element. */
@@ -237,15 +376,33 @@ export interface GoToPageResult extends IVsWcActionResultOutput {
 // ─── Standalone save-request payloads ─────────────────────────────────────────
 
 /**
+ * A validated result in the JSON-Schema representation — what a document supplied through
+ * `flowTaxonomy` + `flowExtraction` validates back into, rather than an `ExtractionResult`.
+ *
+ * Discriminate on `output`: a UiPath `ExtractionResult` is PascalCase throughout and never has it.
+ */
+export interface IVsFlowValidatedResult {
+    /** The reviewer's values, shaped by the `flowTaxonomy` schema. */
+    output: unknown;
+    /** Citations keyed by RFC 6901 JSON Pointer, one entry per leaf value. */
+    attribution: Record<string, { confidence?: number; sources?: unknown[] }>;
+}
+
+/**
  * Payload of the `saveValidatedDataRequest` event.
  *
- * `validatedData`, `automaticExtractionResult`, and `taxonomy` carry UiPath
- * Document Understanding SDK contracts from `@uipath/uipath-typescript`.
+ * `automaticExtractionResult` and `taxonomy` carry UiPath Document Understanding SDK contracts
+ * from `@uipath/uipath-typescript`, and so does `validatedData` unless the document was supplied
+ * in the JSON-Schema representation.
  */
 export interface IVsSaveValidatedDataRequest {
     documentId: string;
-    /** The extraction result after user edits. */
-    validatedData: ExtractionResult;
+    /**
+     * The extraction result after user edits — or an {@link IVsFlowValidatedResult} when the
+     * document was supplied through `flowTaxonomy` + `flowExtraction`, which saves back in the
+     * representation it arrived in.
+     */
+    validatedData: ExtractionResult | IVsFlowValidatedResult;
     /** The automatic (pre-edit) extraction result. */
     automaticExtractionResult: ExtractionResult | null;
     /** The taxonomy for this document. */
@@ -273,6 +430,50 @@ export interface IVsSaveExceptionReportRequest {
 // ─── Event maps ───────────────────────────────────────────────────────────────
 
 /**
+ * Context carried by an `indicator-overlay-show` message: a value-indicator's confidence /
+ * broken-rule state plus the trigger's viewport rect, so a host can render and position its own
+ * popover. Confidences are 0–1, or null when not applicable.
+ */
+export interface IVsIndicatorOverlayContext {
+    /** The indicator trigger's bounding rect, in viewport coordinates. */
+    anchorRect: { top: number; left: number; right: number; bottom: number; width: number; height: number };
+    extractionConfidence: number | null;
+    extractionConfidenceThreshold: number;
+    ocrConfidence: number | null;
+    ocrConfidenceThreshold: number;
+    isConfirmed: boolean;
+    brokenRulesCriticality: 'Must' | 'Should' | null;
+}
+
+// ─── Message bus ────────────────────────────────────────────────────────────────
+//
+// The VS web components publish typed messages on a single `ui-du-vs-wc-message` CustomEvent
+// (the WC message bus). Every message derives from `IVsWcBaseMessage` — narrow on `type` to read
+// the payload, and use `instanceId` to tell instances apart when several WCs share a listener.
+
+/** Base shape of every message on the VS WC message bus. */
+export interface IVsWcBaseMessage {
+    /** Discriminator; narrow on this to read the message payload. */
+    type: string;
+    /** Id of the WC instance that emitted the message (from STORE_INSTANCE_ID_TOKEN). */
+    instanceId: number;
+}
+
+/** A value-indicator's overlay opened (hover/focus). */
+export interface IVsIndicatorOverlayShowMessage extends IVsWcBaseMessage {
+    type: 'indicator-overlay-show';
+    context: IVsIndicatorOverlayContext;
+}
+
+/** A value-indicator's overlay closed (or the indicator was destroyed while open). */
+export interface IVsIndicatorOverlayHideMessage extends IVsWcBaseMessage {
+    type: 'indicator-overlay-hide';
+}
+
+/** Union of every message published on the VS WC message bus. */
+export type IVsWcMessage = IVsIndicatorOverlayShowMessage | IVsIndicatorOverlayHideMessage;
+
+/**
  * Edit/state events common to every standalone VS-family web component — the full
  * validation-station element, the compact fields-form element, and the compact
  * table-editor element all emit these. Deliberately excludes `saveResult`: only
@@ -292,7 +493,10 @@ export interface IVsWcCommonStateEventMap {
     fieldValueSelected: IFieldValueDetailsDto;
     /** Fires when the user edits a field value. */
     fieldValueChanged: IFieldValueDetailsDto;
-    /** Fires after business rules are evaluated. */
+    /**
+     * Fires after validation state is re-evaluated. Carries business rules as well as value-level
+     * validation errors.
+     */
     businessRulesEvaluated: EvaluatedBusinessRulesForFieldValueDto[];
     /** Result of the `setFieldValueByPath` command. */
     setFieldValueByPathResult: SetFieldValueByPathResult;
@@ -300,6 +504,13 @@ export interface IVsWcCommonStateEventMap {
     selectAndFocusFieldValueByPathResult: SelectAndFocusFieldValueByPathResult;
     /** Result of the `deleteFieldValueByPath` command. */
     deleteFieldValueByPathResult: DeleteFieldValueByPathResult;
+    /**
+     * The VS WC message bus: a single composed event carrying typed messages (`detail.type`
+     * discriminates, `detail.instanceId` identifies the emitting instance). Used today for the
+     * value-indicator overlay — suppress the built-in overlay via
+     * `::part(indicator-overlay) { display: none }` and render your own from these messages.
+     */
+    'ui-du-vs-wc-message': IVsWcMessage;
 }
 
 /**
@@ -320,7 +531,10 @@ export interface IVsWcCommonEventMap extends IVsWcCommonStateEventMap {
  * only the full validation-station element (which renders a PDF viewer) emits.
  */
 export interface IVsWcSharedEventMap extends IVsWcCommonEventMap {
-    /** Fires when the component's validity changes. Detail is true when there are no critical (Must) invalid business rules. */
+    /**
+     * Fires when the component's validity changes. `true` when no `Must` rule set is broken and no
+     * value-level validation error exists
+     */
     isValid: boolean;
     /** Fires when the fields panel width changes. Detail is the width in pixels. */
     fieldsPanelWidthChanged: number;
@@ -524,16 +738,41 @@ export interface IValidationStationStandaloneWcElement extends IVsWcBaseElement<
     documentId: string | undefined;
 
     // ── Data inputs (replace the HTTP fetches of the non-standalone variant) ──
+    //
+    // The document's fields and values come from EITHER `taxonomy` + `extractionResult`
+    // OR `flowTaxonomy` + `flowExtraction`. Supply one pair. Both halves of a pair are
+    // required; a half-supplied pair leaves the station waiting for the other half.
 
-    /** Taxonomy for this document. */
-    taxonomy: DocumentTaxonomy;
-    /** Initial extraction results. */
-    extractionResult: ExtractionResult;
+    /** Taxonomy for this document. Required unless the Flow pair is supplied instead. */
+    taxonomy?: DocumentTaxonomy;
+    /** Initial extraction results. Required unless the Flow pair is supplied instead. */
+    extractionResult?: ExtractionResult;
+    /**
+     * Flow output schema, describing the document's fields. An alternative to `taxonomy`. Supply
+     * with `flowExtraction`.
+     *
+     * A document described this way saves back in the same representation: the
+     * `saveValidatedDataRequest` event's `validatedData` is then the reviewer's `output` +
+     * `attribution`, not an `ExtractionResult`.
+     */
+    flowTaxonomy?: unknown;
+    /**
+     * Flow extraction result — the extracted values and their confidences, matching
+     * `flowTaxonomy`. Supply with it.
+     */
+    flowExtraction?: unknown;
+    /**
+     * Predicted extraction result — the model output before any human edit, as opposed to
+     * `extractionResult`, the result the user reviews and edits. Same `ExtractionResult`
+     * shape as `extractionResult`. Optional; it enables features that compare against
+     * the predicted extractions. Set `null` to clear it.
+     */
+    predictedExtractionResult?: ExtractionResult | null;
     /** Document object model (digitized document). */
     dom: DocumentEntity;
     /** Plain text content of the document. */
     text: string | undefined;
-    /** Customization configuration. Type: ICustomizationInfoDTO (no SDK equivalent). */
+    /** Customization configuration. Type: the exported ICustomizationInfoDTO. */
     customizationInfo: unknown;
     /** Original document as a base64 data URL. */
     original: string | undefined;
@@ -589,7 +828,14 @@ export interface ICompactFieldsFormStandaloneWcElement extends IVsWcBaseElement<
     taxonomy: DocumentTaxonomy;
     /** Initial extraction results. */
     extractionResult: ExtractionResult;
-    /** Customization configuration. Type: ICustomizationInfoDTO */
+    /**
+     * Predicted extraction result — the model output before any human edit, as opposed to
+     * `extractionResult`, the result the user reviews and edits. Same `ExtractionResult`
+     * shape as `extractionResult`. Optional; it enables features that compare against
+     * the predicted extractions. Set `null` to clear it.
+     */
+    predictedExtractionResult?: ExtractionResult | null;
+    /** Customization configuration. Type: the exported ICustomizationInfoDTO. */
     customizationInfo: unknown;
 }
 
@@ -646,7 +892,14 @@ export interface ICompactTableEditorStandaloneWcElement extends HTMLElement {
     taxonomy: DocumentTaxonomy;
     /** Initial extraction results. */
     extractionResult: ExtractionResult;
-    /** Customization configuration. Type: ICustomizationInfoDTO */
+    /**
+     * Predicted extraction result — the model output before any human edit, as opposed to
+     * `extractionResult`, the result the user reviews and edits. Same `ExtractionResult`
+     * shape as `extractionResult`. Optional; it enables features that compare against
+     * the predicted extractions. Set `null` to clear it.
+     */
+    predictedExtractionResult?: ExtractionResult | null;
+    /** Customization configuration. Type: the exported ICustomizationInfoDTO. */
     customizationInfo: unknown;
 
     // ── Configuration inputs ──────────────────────────────────────────────────
@@ -764,7 +1017,7 @@ export interface ICompactBusinessRulesStandaloneWcElement extends HTMLElement {
     taxonomy: DocumentTaxonomy;
     /** Initial extraction results. */
     extractionResult: ExtractionResult;
-    /** Customization configuration. Type: ICustomizationInfoDTO */
+    /** Customization configuration. Type: the exported ICustomizationInfoDTO. */
     customizationInfo: unknown;
 
     // ── Configuration inputs ──────────────────────────────────────────────────
@@ -892,13 +1145,15 @@ export interface IDocumentViewerStandaloneWcElement extends HTMLElement {
     dom: DocumentEntity;
 
     // ── Optional VS data (enables field-aware highlighting & anchors) ─────────
+    // Optional at the type level (the component accepts them as undefined); supply
+    // them to enable field-aware highlighting/anchors.
 
     /** Taxonomy for this document. */
-    taxonomy: DocumentTaxonomy;
+    taxonomy?: DocumentTaxonomy;
     /** Initial extraction results. */
-    extractionResult: ExtractionResult;
-    /** Customization configuration. Type: ICustomizationInfoDTO (no SDK equivalent). */
-    customizationInfo: unknown;
+    extractionResult?: ExtractionResult;
+    /** Customization configuration. Type: the exported ICustomizationInfoDTO. */
+    customizationInfo?: unknown;
 
     // ── Command inputs ────────────────────────────────────────────────────────
     //
@@ -995,7 +1250,7 @@ export interface ICompactDocTypeFieldStandaloneWcElement extends HTMLElement {
     taxonomy: DocumentTaxonomy;
     /** Initial extraction results. */
     extractionResult: ExtractionResult;
-    /** Customization configuration. Type: ICustomizationInfoDTO */
+    /** Customization configuration. Type: the exported ICustomizationInfoDTO. */
     customizationInfo: unknown;
 
     // ── Configuration inputs ──────────────────────────────────────────────────
@@ -1118,6 +1373,7 @@ export interface IValidationStationStandaloneWcJsxProps extends IVsWcSharedJsxPr
     original?: string;
     taxonomy?: DocumentTaxonomy;
     extractionResult?: ExtractionResult;
+    predictedExtractionResult?: ExtractionResult | null;
     dom?: DocumentEntity;
     customizationInfo?: unknown;
 }
@@ -1142,6 +1398,7 @@ export interface ICompactFieldsFormStandaloneWcJsxProps extends IVsWcSharedJsxPr
     'instance-id'?: string;
     taxonomy?: DocumentTaxonomy;
     extractionResult?: ExtractionResult;
+    predictedExtractionResult?: ExtractionResult | null;
     customizationInfo?: unknown;
 }
 
@@ -1190,6 +1447,7 @@ export interface ICompactTableEditorStandaloneWcJsxProps extends IVsWcCommonHtml
     'instance-id'?: string;
     taxonomy?: DocumentTaxonomy;
     extractionResult?: ExtractionResult;
+    predictedExtractionResult?: ExtractionResult | null;
     customizationInfo?: unknown;
 }
 

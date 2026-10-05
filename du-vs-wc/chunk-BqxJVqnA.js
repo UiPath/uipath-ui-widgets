@@ -1,0 +1,1 @@
+import"./chunk-D4-ktzGU.js";var n=`Northern Mariana Islands`;var i=[{regionCode:`120`,regionName:`Tinian`,city:`San Jose Village`,aliases:`San Jose CDP;San Jose`},{regionCode:`110`,regionName:`Saipan`,city:`Saipan`,aliases:`Sajpan;SPN`}];var o={countryName:n,records:i};export{n as countryName,o as default,i as records};

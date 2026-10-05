@@ -1,0 +1,1 @@
+import"./chunk-D4-ktzGU.js";var n=`Svalbard and Jan Mayen`;var o=[{regionCode:`21`,regionName:`Svalbard`,city:`Longyearbyen`,aliases:``},{regionCode:`22`,regionName:`Jan Mayen`,city:`Olonkinbyen`,aliases:``}];var r={countryName:n,records:o};export{n as countryName,r as default,o as records};
