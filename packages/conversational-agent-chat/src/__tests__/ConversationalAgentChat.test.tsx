@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   act,
   fireEvent,
@@ -2488,6 +2488,9 @@ describe("ConversationalAgentChat", () => {
     let toastError: ReturnType<typeof vi.spyOn>;
     beforeEach(() => {
       toastError = vi.spyOn(toast, "error");
+    });
+    afterEach(() => {
+      toastError.mockRestore();
     });
 
     const getRenameHandler = async () => {
