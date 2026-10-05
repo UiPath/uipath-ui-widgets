@@ -43,6 +43,8 @@ import type {
   JSONValue,
   ToolCallConfirmationValue,
 } from "@uipath/uipath-typescript/conversational-agent";
+import { Traces } from "@uipath/uipath-typescript/traces";
+import type { SpanGetResponse } from "@uipath/uipath-typescript/traces";
 import {
   useCallback,
   useEffect,
@@ -67,6 +69,10 @@ import {
   createClientSideToolRenderer,
   type ClientSideToolRenderer,
 } from "./components/ClientSideToolRenderer";
+import {
+  createToolCallRenderer,
+  type ToolCallRenderer,
+} from "./components/ToolCallRenderer";
 import { ALLOWED_ATTACHMENTS } from "./constants/attachments";
 import "./ConversationalAgentChat.css";
 import {
@@ -87,6 +93,7 @@ import {
   normalizeInput,
   sortEvaluationSets,
 } from "./utils";
+import { getToolCallTraces, mergeToolCallTraceMeta } from "./utils/spanTree";
 import { trackTelemetry } from "./utils/telemetryUtils";
 import { getI18n } from "./i18n";
 import { resolveAgent as fetchAgentRelease } from "./utils/resolveAgent";
@@ -177,6 +184,13 @@ export const ConversationalAgentChat = ({
     () => createClientSideToolRenderer(),
     [],
   );
+  const toolCallRenderer = useMemo<ToolCallRenderer>(
+    () => createToolCallRenderer(),
+    [],
+  );
+  const apolloLocaleRef = useRef<SupportedLocale>(
+    toApolloSupportedLocale(locale),
+  );
   // useLayoutEffect is ok here because the work is minimal enough that the cost is essentially zero
   // needed because React 19 doesn't support ref writes on render
 
@@ -189,6 +203,7 @@ export const ConversationalAgentChat = ({
     onEvaluationSetClickedRef.current = onEvaluationSetClicked;
     onUserMessageSentRef.current = onUserMessageSent;
     citationPreviewRef.current = citationPreview;
+    apolloLocaleRef.current = toApolloSupportedLocale(locale);
     toolConfirmationLabelsRef.current = {
       cancel: t("cancel"),
       confirm: t("tool_confirmation_confirm"),
@@ -204,6 +219,7 @@ export const ConversationalAgentChat = ({
     onUserMessageSent,
     citationPreview,
     folderId,
+    locale,
     t,
   ]);
   // Rebuild the SDK service when sdk or externalUserId change. Skip the first run because the
@@ -232,6 +248,15 @@ export const ConversationalAgentChat = ({
   const agentKeyRef = useRef<string | undefined>(undefined);
   const toolDisplayModeRef = useRef<string | undefined>(undefined);
   const searchTextRef = useRef<string>("");
+  // Latest spans for the active conversation's trace, polled only in FullTrace mode
+  const traceSpansRef = useRef<SpanGetResponse[]>([]);
+  // toolCallId -> JSON of the last-sent meta, so unchanged tool calls aren't re-sent each poll.
+  const sentToolCallMetaJsonRef = useRef<Map<string, string>>(new Map());
+  // Tool calls created in the live exchange
+  const liveToolCallIdsRef = useRef<Set<string>>(new Set());
+  const tracePollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
 
   const [chatService, setChatService] = useState<AutopilotChatService>();
   const [error, setError] = useState<string | null>(null);
@@ -269,6 +294,102 @@ export const ConversationalAgentChat = ({
     inputSchemaStateRef.current = inputSchemaState;
   }, [inputSchemaState]);
 
+  // Merge the trace's "conversationToolCall" spans into their tool call messages (keyed by toolCallId)
+  const applyTraceSpans = useCallback(
+    (spans: SpanGetResponse[]) => {
+      // Only FullTrace renders the span tree; other modes use the SDK's tool call events alone.
+      if (toolDisplayModeRef.current !== "FullTrace") return;
+      const chat = chatServiceRef.current;
+      if (!chat) return;
+      traceSpansRef.current = spans;
+
+      const conversation = chat.getConversation() ?? [];
+
+      for (const trace of getToolCallTraces(spans)) {
+        const existing = conversation.find((m) => m.id === trace.toolCallId);
+        if (!existing && !liveToolCallIdsRef.current.has(trace.toolCallId)) {
+          continue;
+        }
+
+        const meta = mergeToolCallTraceMeta(
+          trace,
+          existing?.meta,
+          toolDisplayModeRef.current,
+        );
+        const metaJson = JSON.stringify(meta);
+        if (
+          sentToolCallMetaJsonRef.current.get(trace.toolCallId) === metaJson
+        ) {
+          continue;
+        }
+
+        chat.sendResponse({
+          ...existing,
+          id: trace.toolCallId,
+          content: t("performing_action_message", {
+            action: meta.toolName ?? "",
+          }),
+          created_at: existing?.created_at ?? trace.startTime,
+          widget: MessageWidget.ApolloAgentsToolCall,
+          meta,
+        });
+        sentToolCallMetaJsonRef.current.set(trace.toolCallId, metaJson);
+      }
+    },
+    [t],
+  );
+
+  const fetchAndApplyTrace = useCallback(
+    async (traceId: string) => {
+      try {
+        const spans = await new Traces(sdk).getById(traceId);
+        applyTraceSpans(spans);
+      } catch {
+        // Transient errors: the next poll tick (or reopening) retries.
+      }
+    },
+    [sdk, applyTraceSpans],
+  );
+
+  // Live polling on FullTrace mode only.
+  const startTracePolling = useCallback(() => {
+    if (toolDisplayModeRef.current !== "FullTrace") return;
+    const traceId = currentConversation.current?.traceId;
+    if (!traceId || tracePollIntervalRef.current) return;
+
+    let inFlight = false;
+    const tick = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        await fetchAndApplyTrace(traceId);
+      } finally {
+        inFlight = false;
+      }
+    };
+    void tick();
+    tracePollIntervalRef.current = setInterval(tick, 1000);
+  }, [fetchAndApplyTrace]);
+
+  const stopTracePolling = useCallback(
+    (finalFetch: boolean) => {
+      if (!tracePollIntervalRef.current) return;
+      clearInterval(tracePollIntervalRef.current);
+      tracePollIntervalRef.current = null;
+      const traceId = currentConversation.current?.traceId;
+      if (finalFetch && traceId) void fetchAndApplyTrace(traceId);
+    },
+    [fetchAndApplyTrace],
+  );
+
+  // On leaving a conversation, stop polling
+  const resetTraceState = useCallback(() => {
+    stopTracePolling(false);
+    traceSpansRef.current = [];
+    sentToolCallMetaJsonRef.current = new Map();
+    liveToolCallIdsRef.current = new Set();
+  }, [stopTracePolling]);
+
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
       if (!chatService) return;
@@ -282,6 +403,11 @@ export const ConversationalAgentChat = ({
 
       exchange.onMessageStart((message: MessageStream) => {
         if (message.startEvent.role === "assistant") {
+          if (toolDisplayModeRef.current === "FullTrace") {
+            startTracePolling();
+            message.onMessageEnd(() => stopTracePolling(true));
+          }
+
           const messageId = message.messageId;
           const messageTimestamp = message.startEvent.timestamp;
           const exchangeId = exchange.exchangeId;
@@ -357,10 +483,14 @@ export const ConversationalAgentChat = ({
             }
           >();
 
+          const isFullTraceMode = () =>
+            toolDisplayModeRef.current === "FullTrace";
+
           const sendToolCallSpinner = (toolCallId: string) => {
             const pending = pendingToolCalls.get(toolCallId);
             if (!pending || pending.spinnerSent) return;
             pending.spinnerSent = true;
+            if (isFullTraceMode()) return;
             chatService.sendResponse({
               id: toolCallId,
               content: t("performing_action_message", {
@@ -428,6 +558,7 @@ export const ConversationalAgentChat = ({
           };
 
           message.onToolCallStart((toolCall: ToolCallStream) => {
+            liveToolCallIdsRef.current.add(toolCall.toolCallId);
             const startEvent = toolCall.startEvent;
             const startTimeIso = new Date().toISOString();
             const toolInput = startEvent.input
@@ -453,6 +584,10 @@ export const ConversationalAgentChat = ({
               const pending = pendingToolCalls.get(toolCall.toolCallId);
               if (pending && !pending.spinnerSent) {
                 sendToolCallSpinner(toolCall.toolCallId);
+              }
+              if (isFullTraceMode()) {
+                pendingToolCalls.delete(toolCall.toolCallId);
+                return;
               }
               const endTimeIso = new Date().toISOString();
               chatService.sendResponse({
@@ -577,6 +712,7 @@ export const ConversationalAgentChat = ({
       });
 
       exchange.onExchangeEnd(() => {
+        stopTracePolling(true);
         activeExchange.current = null;
         chatService.sendOutputStreamEvent({ turnComplete: true });
         chatService.setShowLoading(false);
@@ -584,7 +720,7 @@ export const ConversationalAgentChat = ({
         setHasMessages(true);
       });
     },
-    [chatService, t],
+    [chatService, startTracePolling, stopTracePolling, t],
   );
 
   const resolveAgent = useCallback(async (): Promise<
@@ -751,6 +887,7 @@ export const ConversationalAgentChat = ({
     activeExchange.current = null;
     exchangesCursor.current = undefined;
     storedAgentInputs.current = {};
+    resetTraceState();
     setHasMessages(false);
     // Re-show the InputsPage with a cleared form when the agent's schema has
     // required inputs. Bumping the counter forces an unmount/remount via the
@@ -760,7 +897,7 @@ export const ConversationalAgentChat = ({
       setShowInputPage(true);
     }
     trackTelemetry(TelemetryEvent.NewChat, TelemetryStatus.Success);
-  }, [endActiveSession, inputSchemaState]);
+  }, [endActiveSession, inputSchemaState, resetTraceState]);
 
   const buildHistoryFilterOptions = useCallback(() => {
     // The SDK's URL builder calls value.toString() without a null check, so
@@ -1002,6 +1139,7 @@ export const ConversationalAgentChat = ({
         if (!selectedConversation) return;
 
         endActiveSession();
+        resetTraceState();
         currentConversation.current = selectedConversation;
         session.current = null;
         exchangesCursor.current = undefined;
@@ -1010,6 +1148,12 @@ export const ConversationalAgentChat = ({
         const messages = mapExchangesToChatMessages(exchanges);
         chatService.setConversation(messages);
         setHasMessages(messages.length > 0);
+        if (
+          toolDisplayModeRef.current === "FullTrace" &&
+          selectedConversation.traceId
+        ) {
+          void fetchAndApplyTrace(selectedConversation.traceId);
+        }
         trackTelemetry(
           TelemetryEvent.OpenConversation,
           TelemetryStatus.Success,
@@ -1026,7 +1170,14 @@ export const ConversationalAgentChat = ({
         chatService.setError(t("error_open_conversation", { errorMessage }));
       }
     },
-    [chatService, endActiveSession, fetchExchanges, t],
+    [
+      chatService,
+      endActiveSession,
+      fetchAndApplyTrace,
+      fetchExchanges,
+      resetTraceState,
+      t,
+    ],
   );
 
   // Apollo fires this when the user scrolls to the top of the message list.
@@ -1048,6 +1199,7 @@ export const ConversationalAgentChat = ({
         mapExchangesToChatMessages(exchanges),
         !hasNextPage,
       );
+      applyTraceSpans(traceSpansRef.current);
     } catch (err) {
       chatService.prependOlderMessages([], true);
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -1056,7 +1208,7 @@ export const ConversationalAgentChat = ({
         error: errorMessage,
       });
     }
-  }, [chatService, fetchExchanges]);
+  }, [applyTraceSpans, chatService, fetchExchanges]);
 
   const initChat = useCallback(async () => {
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
@@ -1066,9 +1218,7 @@ export const ConversationalAgentChat = ({
       const agentRelease = await resolveAgent();
       agentIdRef.current = agentRelease?.id;
       agentKeyRef.current = agentRelease?.releaseKey;
-      toolDisplayModeRef.current = (
-        agentRelease?.appearance as { displayMode?: string } | undefined
-      )?.displayMode;
+      toolDisplayModeRef.current = "FullTrace";
       const agentName = agentRelease?.name ?? "";
 
       // In debug mode the agent (and its derived schema) may not be resolvable,
@@ -1276,6 +1426,12 @@ export const ConversationalAgentChat = ({
         chatServiceInstance.setConversation(
           mapExchangesToChatMessages(exchanges),
         );
+        if (
+          toolDisplayModeRef.current === "FullTrace" &&
+          conversation.traceId
+        ) {
+          void fetchAndApplyTrace(conversation.traceId);
+        }
       } else {
         // AutopilotChatService is a singleton, so it may still hold the
         // previous agent's messages. Reset before showing the new agent.
@@ -1291,6 +1447,7 @@ export const ConversationalAgentChat = ({
     }
   }, [
     agentId,
+    fetchAndApplyTrace,
     folderId,
     existingConversationId,
     externalUserId,
@@ -1313,6 +1470,7 @@ export const ConversationalAgentChat = ({
 
   const onStopResponse = useCallback(() => {
     if (!chatService) return;
+    stopTracePolling(true);
     if (activeExchange.current) {
       activeExchange.current.sendExchangeEnd();
       activeExchange.current = null;
@@ -1320,7 +1478,7 @@ export const ConversationalAgentChat = ({
     chatService.sendOutputStreamEvent({ turnComplete: true });
     chatService.setShowLoading(false);
     chatService.setWaiting(false);
-  }, [chatService]);
+  }, [chatService, stopTracePolling]);
 
   const onCustomHeaderActionClicked = useCallback(
     (action: AutopilotChatCustomHeaderAction) => {
@@ -1405,16 +1563,18 @@ export const ConversationalAgentChat = ({
   useEffect(() => {
     return () => {
       endActiveSession();
+      stopTracePolling(false);
     };
-  }, [endActiveSession]);
+  }, [endActiveSession, stopTracePolling]);
 
-  // Release React state held by the imperative tool-confirmation and client-side tool roots.
+  // Release React state held by the imperative tool-confirmation, client-side tool and tool call roots.
   useEffect(() => {
     return () => {
       toolConfirmationRenderer.unmountAll();
       clientSideToolRenderer.unmountAll();
+      toolCallRenderer.unmountAll();
     };
-  }, [toolConfirmationRenderer, clientSideToolRenderer]);
+  }, [toolConfirmationRenderer, clientSideToolRenderer, toolCallRenderer]);
 
   // Register event handlers after chatService is available
   useEffect(() => {
@@ -1465,6 +1625,15 @@ export const ConversationalAgentChat = ({
           render: (container, message) =>
             clientSideToolRenderer.render(container, message),
         });
+        chatService.injectMessageRenderer({
+          name: MessageWidget.ApolloAgentsToolCall,
+          render: (container, message) =>
+            toolCallRenderer.render(
+              container,
+              message,
+              apolloLocaleRef.current,
+            ),
+        });
       } catch (err) {
         const message =
           err instanceof Error ? err.message : t("error_load_history");
@@ -1496,6 +1665,7 @@ export const ConversationalAgentChat = ({
     t,
     toolConfirmationRenderer,
     clientSideToolRenderer,
+    toolCallRenderer,
   ]);
 
   useEffect(() => {
