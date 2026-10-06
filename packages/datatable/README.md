@@ -48,7 +48,8 @@ function App() {
         tenantName: "your-tenant",
         clientId: "your-client-id",
         redirectUri: "http://localhost:3000/callback",
-        scope: "DataFabric.Schema.Read DataFabric.Data.Read DataFabric.Data.Write",
+        scope:
+          "DataFabric.Schema.Read DataFabric.Data.Read DataFabric.Data.Write",
       });
       await uipath.initialize();
       setSdk(uipath);
@@ -80,15 +81,15 @@ function App() {
 
 ## Props
 
-| Prop | Type | Required | Default | Description |
-| ---- | ---- | -------- | ------- | ----------- |
-| `sdk` | `UiPath` | Yes | — | UiPath SDK instance |
-| `entityId` | `string` | Yes | — | The UUID of the Data Fabric entity to display |
-| `pageSize` | `number` | No | `50` | Number of rows per page |
-| `showIdColumn` | `boolean` | No | — | Whether to show the Id column in the grid |
-| `columnConfig` | `Record<string, ColDef>` | No | — | Column configuration overrides, keyed by display name |
-| `rowClassRules` | `RowClassRules` | No | — | ag-Grid row class rules for conditional row styling |
-| `customPaddingForExpandedRow` | `number` | No | — | Custom padding (in pixels) for expanded rows in group-by mode |
+| Prop                          | Type                     | Required | Default | Description                                                   |
+| ----------------------------- | ------------------------ | -------- | ------- | ------------------------------------------------------------- |
+| `sdk`                         | `UiPath`                 | Yes      | —       | UiPath SDK instance                                           |
+| `entityId`                    | `string`                 | Yes      | —       | The UUID of the Data Fabric entity to display                 |
+| `pageSize`                    | `number`                 | No       | `50`    | Number of rows per page                                       |
+| `showIdColumn`                | `boolean`                | No       | `true`  | Whether to show the Id column in the grid                     |
+| `columnConfig`                | `Record<string, ColDef>` | No       | —       | Column configuration overrides, keyed by display name         |
+| `rowClassRules`               | `RowClassRules`          | No       | —       | ag-Grid row class rules for conditional row styling           |
+| `customPaddingForExpandedRow` | `number`                 | No       | —       | Custom padding (in pixels) for expanded rows in group-by mode |
 
 ## Features in detail
 
@@ -96,20 +97,24 @@ function App() {
 
 <!-- tabs -->
 <!-- tab: Create -->
+
 1. Click **Add Row** to add a new row
 2. Fill in the data
 3. Click **Insert Records** to save
 
 <!-- tab: Read -->
+
 Data is loaded automatically on mount. Click **Refresh** to reload.
 
 <!-- tab: Update -->
+
 1. Click any cell to edit (when not in master-detail mode)
 2. Changes are tracked automatically
 3. Click **Show Diff** to review changes
 4. Click **Commit Changes** to save
 
 <!-- tab: Delete -->
+
 1. Select rows using the checkboxes
 2. Click **Delete Records**
 3. Confirm the deletion
@@ -127,18 +132,18 @@ Group records by foreign key relationships:
 
 The datatable handles each entity field type automatically:
 
-| Field type | Editor |
-| ---------- | ------ |
-| Text | Standard text input |
-| Multiline Text | Textarea editor, `Shift+Enter` for a new line |
-| Number | Numeric input (Integer, Decimal, Float, Double, Big Integer) |
-| Date | Date picker |
-| DateTime | Date-time display (read-only) |
-| Boolean | Yes / No / None select |
-| Choice Set (single) | Dropdown with choice set values |
-| Choice Set (multiple) | Multi-select with choice set values |
-| Foreign Key | Dropdown with reference entity records |
-| File | File upload, download and removal |
+| Field type            | Editor                                                       |
+| --------------------- | ------------------------------------------------------------ |
+| Text                  | Standard text input                                          |
+| Multiline Text        | Textarea editor, `Shift+Enter` for a new line                |
+| Number                | Numeric input (Integer, Decimal, Float, Double, Big Integer) |
+| Date                  | Date picker                                                  |
+| DateTime              | Date-time display (read-only)                                |
+| Boolean               | Yes / No / None select                                       |
+| Choice Set (single)   | Dropdown with choice set values                              |
+| Choice Set (multiple) | Multi-select with choice set values                          |
+| Foreign Key           | Dropdown with reference entity records                       |
+| File                  | File upload, download and removal                            |
 
 ### Custom column configuration
 

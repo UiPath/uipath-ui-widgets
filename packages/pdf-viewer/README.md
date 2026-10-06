@@ -20,9 +20,10 @@ npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript@^1.4.1
 
 <!-- tabs -->
 <!-- tab: Standalone React app -->
+
 OAuth is the flow for a browser app, so the instance is built once in an
 effect and `initialize()` is awaited before anything renders — see
-[Pass an initialized SDK instance](https://uipath.github.io/uipath-typescript/react-widgets/#pass-an-initialized-sdk-instance).
+[Pass an initialized SDK instance](https://uipath.github.io/uipath-typescript/authentication/).
 
 ```tsx
 import { PdfViewer } from "@uipath/ui-widgets-pdf-viewer";
@@ -67,6 +68,7 @@ function App() {
 ```
 
 <!-- tab: Coded app -->
+
 Inside a [Coded App](https://uipath.github.io/uipath-typescript/coded-apps/getting-started/), `new UiPath()` reads
 `clientId`, `orgName`, `tenantName`, `baseUrl`, `scope` and `redirectUri`
 from the platform's `uipath:*` meta tags, so there is nothing to pass — but
@@ -104,6 +106,7 @@ function App() {
   );
 }
 ```
+
 <!-- /tabs -->
 
 > **Note: Theming**
@@ -135,15 +138,15 @@ One `source` prop, four shapes. **The widget selects the adapter from the fields
 
 ## Props
 
-| Prop | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `source` | `PdfViewerSource` | Yes | Where the PDF lives (see [Sources](#sources)) |
-| `sdk` | `UiPath` | No\* | Initialized UiPath SDK instance. \*Required for `bucket` and `entity` sources |
-| `toolbar` | `PdfViewerToolbarOptions` | No | Per-feature toggles: `pagination`, `zoom`, `rotate`, `download` (all default `true`); disable all four to hide the toolbar |
-| `fileName` | `string` | No | Name shown in the toolbar and used for downloads |
-| `maxHeight` | `number \| string` | No | Max canvas height (default `640`); the canvas scrolls internally |
-| `onLoadSuccess` | `(info: { numPages: number }) => void` | No | Called when the document loads |
-| `onLoadError` | `(error: Error) => void` | No | Called when fetching or rendering fails |
+| Prop            | Type                                   | Required | Description                                                                                                                |
+| --------------- | -------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `source`        | `PdfViewerSource`                      | Yes      | Where the PDF lives (see [Sources](#sources))                                                                              |
+| `sdk`           | `UiPath`                               | No\*     | Initialized UiPath SDK instance. \*Required for `bucket` and `entity` sources                                              |
+| `toolbar`       | `PdfViewerToolbarOptions`              | No       | Per-feature toggles: `pagination`, `zoom`, `rotate`, `download` (all default `true`); disable all four to hide the toolbar |
+| `fileName`      | `string`                               | No       | Name shown in the toolbar and used for downloads                                                                           |
+| `maxHeight`     | `number \| string`                     | No       | Max canvas height (default `640`); the canvas scrolls internally                                                           |
+| `onLoadSuccess` | `(info: { numPages: number }) => void` | No       | Called when the document loads                                                                                             |
+| `onLoadError`   | `(error: Error) => void`               | No       | Called when fetching or rendering fails                                                                                    |
 
 ## Features
 

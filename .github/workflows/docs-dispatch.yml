@@ -8,12 +8,12 @@ on:
   push:
     branches: [develop]
     paths:
-      - 'packages/*/README.md'
+      - "packages/*/README.md"
   workflow_dispatch:
 
 jobs:
   dispatch:
-    runs-on: ubuntu-latest
+    runs-on: uipath-ubuntu-latest
     steps:
       - name: Trigger the docs build
         # A repository_dispatch to another repo needs a token with `contents:
