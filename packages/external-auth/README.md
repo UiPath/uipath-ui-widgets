@@ -72,33 +72,33 @@ function App() {
 
 ### `ExternalAuth`
 
-| Prop | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `authProviders` | `AuthProvider[]` | Yes | Providers to render, in order, one button each |
-| `title` | `string` | No | Heading shown at the top of the widget (default: `"Sign in to your account"`) |
+| Prop            | Type             | Required | Description                                                                   |
+| --------------- | ---------------- | -------- | ----------------------------------------------------------------------------- |
+| `authProviders` | `AuthProvider[]` | Yes      | Providers to render, in order, one button each                                |
+| `title`         | `string`         | No       | Heading shown at the top of the widget (default: `"Sign in to your account"`) |
 
 ### `AuthProvider`
 
-| Prop | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `displayName` | `string` | Yes | Name shown on the provider button — e.g. `"Google"` renders "Continue with Google" |
-| `displayIcon` | `ReactNode` | No | Icon shown next to the provider name. A string is treated as an image URL; anything else renders as-is |
-| `clientId` | `string` | Yes | Client ID for the provider — passed back to `onSignIn` when the button is clicked |
-| `onSignIn` | `(clientId: string) => void \| Promise<void>` | No\* | Called with the provider's `clientId` when its button is clicked; may be async |
-| `oauth` | `OAuthRedirectConfig` | No\* | Config for the built-in default sign-in (an OIDC authorize redirect), used only when `onSignIn` is omitted |
+| Prop          | Type                                          | Required | Description                                                                                                |
+| ------------- | --------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------- |
+| `displayName` | `string`                                      | Yes      | Name shown on the provider button — e.g. `"Google"` renders "Continue with Google"                         |
+| `displayIcon` | `ReactNode`                                   | No       | Icon shown next to the provider name. A string is treated as an image URL; anything else renders as-is     |
+| `clientId`    | `string`                                      | Yes      | Client ID for the provider — passed back to `onSignIn` when the button is clicked                          |
+| `onSignIn`    | `(clientId: string) => void \| Promise<void>` | No\*     | Called with the provider's `clientId` when its button is clicked; may be async                             |
+| `oauth`       | `OAuthRedirectConfig`                         | No\*     | Config for the built-in default sign-in (an OIDC authorize redirect), used only when `onSignIn` is omitted |
 
 \* Provide **`onSignIn`** or **`oauth`** (or both — `onSignIn` wins). With neither, a button click logs a warning and does nothing.
 
 ### `OAuthRedirectConfig`
 
-| Prop | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `authorizeUrl` | `string` | Yes | Provider authorize endpoint |
-| `redirectUri` | `string` | Yes | Registered redirect URI |
-| `scopes` | `string` | Yes | Space-separated scopes, e.g. `openid email profile` |
-| `responseType` | `string` | No | OAuth `response_type`; defaults to `code` |
-| `usePkce` | `boolean` | No | Generate a PKCE challenge/verifier; defaults to `true` |
-| `extraParams` | `Record<string, string>` | No | Extra query params, e.g. `{ acr_values: "..." }` for UAE PASS |
+| Prop           | Type                     | Required | Description                                                   |
+| -------------- | ------------------------ | -------- | ------------------------------------------------------------- |
+| `authorizeUrl` | `string`                 | Yes      | Provider authorize endpoint                                   |
+| `redirectUri`  | `string`                 | Yes      | Registered redirect URI                                       |
+| `scopes`       | `string`                 | Yes      | Space-separated scopes, e.g. `openid email profile`           |
+| `responseType` | `string`                 | No       | OAuth `response_type`; defaults to `code`                     |
+| `usePkce`      | `boolean`                | No       | Generate a PKCE challenge/verifier; defaults to `true`        |
+| `extraParams`  | `Record<string, string>` | No       | Extra query params, e.g. `{ acr_values: "..." }` for UAE PASS |
 
 ## How it works
 
@@ -130,7 +130,7 @@ If you don't want to write `onSignIn` for a standard OIDC provider, supply an `o
 > **Warning: OIDC only — SAML needs an explicit `onSignIn`**
 > The default covers **OIDC-style providers only** (Google, UAE PASS). SAML cannot be started from the browser and must use an explicit `onSignIn` that points at a backend Service Provider.
 
-The default also only *starts* the flow — you still own the callback route that exchanges and validates the code and creates the session. The helpers `buildOAuthAuthorizeUrl(clientId, config)` and `createDefaultSignIn(config)` are exported too, if you want to call them directly inside your own `onSignIn`.
+The default also only _starts_ the flow — you still own the callback route that exchanges and validates the code and creates the session. The helpers `buildOAuthAuthorizeUrl(clientId, config)` and `createDefaultSignIn(config)` are exported too, if you want to call them directly inside your own `onSignIn`.
 
 ## TypeScript
 

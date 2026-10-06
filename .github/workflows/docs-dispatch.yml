@@ -11,6 +11,10 @@ on:
       - "packages/*/README.md"
   workflow_dispatch:
 
+# The dispatch below authenticates with SDK_DOCS_DISPATCH_TOKEN, not
+# GITHUB_TOKEN, so this workflow needs no permissions on this repo.
+permissions: {}
+
 jobs:
   dispatch:
     runs-on: uipath-ubuntu-latest

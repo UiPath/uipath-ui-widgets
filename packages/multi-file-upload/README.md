@@ -96,16 +96,16 @@ function App() {
 
 ## Props
 
-| Prop | Type | Required | Description |
-| ---- | ---- | -------- | ----------- |
-| `sdk` | `UiPath` | Yes | UiPath SDK instance |
-| `bucketId` | `number` | Yes | The ID of the Orchestrator Storage Bucket to upload files to |
-| `folderId` | `number` | Yes | The ID of the folder containing the Storage Bucket |
-| `path` | `string` | No | Path prefix for uploaded files (e.g. `"uploads/"`) |
-| `onUploadError` | `(error: Error) => void` | No | Called when an upload fails |
-| `onUploadSuccess` | `(uploadedFiles: File[]) => void` | No | Called when files are successfully uploaded |
-| `maxFileSizeInMb` | `number` | No | Maximum file size in megabytes |
-| `accept` | `string` | No | Accepted file types (comma-separated MIME types or extensions). See the [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/accept) |
+| Prop              | Type                              | Required | Description                                                                                                                                                                |
+| ----------------- | --------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sdk`             | `UiPath`                          | Yes      | UiPath SDK instance                                                                                                                                                        |
+| `bucketId`        | `number`                          | Yes      | The ID of the Orchestrator Storage Bucket to upload files to                                                                                                               |
+| `folderId`        | `number`                          | Yes      | The ID of the folder containing the Storage Bucket                                                                                                                         |
+| `path`            | `string`                          | No       | Path prefix for uploaded files (e.g. `"uploads/"`)                                                                                                                         |
+| `onUploadError`   | `(error: Error) => void`          | No       | Called when an upload fails                                                                                                                                                |
+| `onUploadSuccess` | `(uploadedFiles: File[]) => void` | No       | Called when files are successfully uploaded                                                                                                                                |
+| `maxFileSizeInMb` | `number`                          | No       | Maximum file size in megabytes                                                                                                                                             |
+| `accept`          | `string`                          | No       | Accepted file types (comma-separated MIME types or extensions). See the [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/accept) |
 
 ## Example with options
 
