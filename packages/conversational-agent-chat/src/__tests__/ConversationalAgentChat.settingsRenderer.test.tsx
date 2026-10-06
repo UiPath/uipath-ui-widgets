@@ -37,6 +37,7 @@ vi.mock("@uipath/apollo-react/material/components", () => ({
       appendOlderHistoryItems: vi.fn(),
       setLocale: vi.fn(),
       setTheme: vi.fn(),
+      setChatMode: vi.fn(),
       getLocale: vi.fn().mockReturnValue("en"),
       setAllowedAttachments: vi.fn(),
       toggleSettings: vi.fn(),
