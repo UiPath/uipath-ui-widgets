@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   act,
   fireEvent,
@@ -10,6 +10,7 @@ import {
 import { getI18n } from "../i18n";
 import { ConversationalAgentChat } from "../ConversationalAgentChat";
 import { UiPath } from "@uipath/uipath-typescript/core";
+import { toast } from "@uipath/apollo-wind";
 
 // Mock @uipath/apollo-react
 vi.mock("@uipath/apollo-react/core/fonts/font.css", () => ({}));
@@ -69,6 +70,7 @@ vi.mock("@uipath/apollo-react/material/components", () => ({
     SetAttachments: "setAttachments",
     OpenConversation: "openConversation",
     DeleteConversation: "deleteConversation",
+    RenameConversation: "renameConversation",
     HistoryLoadMore: "historyLoadMore",
     ConversationLoadMore: "conversationLoadMore",
     HistorySearch: "historySearch",
@@ -85,6 +87,7 @@ vi.mock("@uipath/apollo-react/material/components", () => ({
     CitationClick: "citation-click",
     Feedback: "feedback",
     DeleteConversation: "delete-conversation",
+    RenameConversation: "rename-conversation",
   },
   AutopilotChatService: {
     Instantiate: vi.fn(() => mockChatService),
@@ -453,6 +456,7 @@ describe("ConversationalAgentChat", () => {
                 preview: true,
                 close: true,
                 settings: false,
+                renameChat: false,
               },
             }),
           }),
@@ -2477,6 +2481,147 @@ describe("ConversationalAgentChat", () => {
         content: "New message after delete",
         attachments: [],
       });
+    });
+  });
+
+  describe("onRenameConversation", () => {
+    let toastError: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      toastError = vi.spyOn(toast, "error");
+    });
+    afterEach(() => {
+      toastError.mockRestore();
+    });
+
+    const getRenameHandler = async () => {
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "renameConversation",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+      return mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "renameConversation",
+      )?.[1];
+    };
+
+    const getRenamePreHook = async () => {
+      const { AutopilotChatService } =
+        await import("@uipath/apollo-react/material/components");
+      let handler: any;
+      await waitFor(() => {
+        const call = (AutopilotChatService.Instantiate as any).mock.calls.at(
+          -1,
+        );
+        handler = call?.[0]?.config?.preHooks?.["rename-conversation"];
+        expect(handler).toBeTypeOf("function");
+      });
+      return handler;
+    };
+
+    it("should persist the label with autogenerateLabel off and update history", async () => {
+      mockUpdateById.mockResolvedValue({ id: "conv-1", label: "Renamed" });
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      const onRenameConversation = await getRenameHandler();
+      mockChatService.setHistory.mockClear();
+
+      await act(async () => {
+        await onRenameConversation?.({
+          conversationId: "conv-1",
+          name: "  Renamed  ",
+        });
+      });
+
+      expect(mockUpdateById).toHaveBeenCalledWith("conv-1", {
+        label: "Renamed",
+        autogenerateLabel: false,
+      });
+      const [items] = mockChatService.setHistory.mock.calls.at(-1)!;
+      expect(items.find((i: any) => i.id === "conv-1")?.name).toBe("Renamed");
+      expect(items.find((i: any) => i.id === "conv-2")?.name).toBe(
+        "Second Chat",
+      );
+    });
+
+    it("should show an error toast and keep history when the update fails", async () => {
+      mockUpdateById.mockRejectedValue(new Error("boom"));
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      const onRenameConversation = await getRenameHandler();
+      mockChatService.setHistory.mockClear();
+
+      await act(async () => {
+        await onRenameConversation?.({ conversationId: "conv-1", name: "X" });
+      });
+
+      expect(toastError).toHaveBeenCalledWith(
+        "Failed to rename conversation",
+        expect.objectContaining({ description: "boom" }),
+      );
+      expect(mockChatService.setError).not.toHaveBeenCalled();
+      expect(mockChatService.setHistory).not.toHaveBeenCalled();
+    });
+
+    it("should accept a valid name in the pre-hook", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+      const preHook = await getRenamePreHook();
+
+      await expect(
+        preHook({ conversationId: "conv-1", name: "a".repeat(100) }),
+      ).resolves.toBe(true);
+      expect(toastError).not.toHaveBeenCalled();
+    });
+
+    it("should reject a blank name in the pre-hook", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+      const preHook = await getRenamePreHook();
+
+      await expect(
+        preHook({ conversationId: "conv-1", name: "   " }),
+      ).resolves.toBe(false);
+    });
+
+    it("should reject a name over 100 characters and show an error toast", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+      const preHook = await getRenamePreHook();
+
+      await expect(
+        preHook({ conversationId: "conv-1", name: "a".repeat(101) }),
+      ).resolves.toBe(false);
+      expect(toastError).toHaveBeenCalledWith(
+        "Name too long",
+        expect.objectContaining({
+          description: "Conversation name must be 100 characters or less.",
+        }),
+      );
+      expect(mockChatService.setError).not.toHaveBeenCalled();
+      expect(mockUpdateById).not.toHaveBeenCalled();
+    });
+
+    it("should let consumers opt out via disabledFeatures", async () => {
+      const { AutopilotChatService } =
+        await import("@uipath/apollo-react/material/components");
+
+      render(
+        <ConversationalAgentChat
+          {...defaultProps}
+          disabledFeatures={{ renameChat: true }}
+        />,
+      );
+
+      await waitFor(
+        () => {
+          const call = (AutopilotChatService.Instantiate as any).mock.calls.at(
+            -1,
+          );
+          expect(call?.[0]?.config?.disabledFeatures?.renameChat).toBe(true);
+        },
+        { timeout: 3000 },
+      );
     });
   });
 

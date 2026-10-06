@@ -43,6 +43,7 @@ export interface DisabledFeatures {
   settings?: boolean;
   newChat?: boolean;
   htmlPreview?: boolean;
+  renameChat?: boolean;
 }
 
 /** @internal */

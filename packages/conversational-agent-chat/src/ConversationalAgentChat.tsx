@@ -7,6 +7,7 @@ import {
   AutopilotChatMessage,
   AutopilotChatMode,
   AutopilotChatPreHookAction,
+  type AutopilotChatRenameConversationPayload,
   AutopilotChatService,
   type SupportedLocale,
 } from "@uipath/apollo-react/material/components";
@@ -21,6 +22,8 @@ import {
   DialogHeader,
   DialogTitle,
   PortalContainerProvider,
+  Toaster,
+  toast,
 } from "@uipath/apollo-wind";
 import {
   ContentPartChunkEvent,
@@ -46,6 +49,7 @@ import type {
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -105,6 +109,8 @@ const EXCHANGES_PAGE_SIZE = 15;
 // `sessionStarted`, so if it never arrives, surface an error instead of
 // leaving the send silently pending.
 const SESSION_START_TIMEOUT_MS = 30_000;
+// Backend limit on ConversationSchema.label.
+const CONVERSATION_LABEL_MAX_LENGTH = 100;
 type ConversationCreateOptionsArg = Parameters<
   ConversationalAgent["conversations"]["create"]
 >[2];
@@ -151,6 +157,8 @@ export const ConversationalAgentChat = ({
     i18n.changeLanguage(locale);
   }
   const { t } = useWidgetTranslation();
+  // Scopes our toasts to our own <Toaster> so a host's Toaster doesn't render them too.
+  const toasterId = useId();
   const agentService = useRef(
     new ConversationalAgent(sdk, {
       ...(externalUserId ? { externalUserId } : {}),
@@ -826,6 +834,33 @@ export const ConversationalAgentChat = ({
     [chatService, onNewChat, setConversationHistory],
   );
 
+  const onRenameConversation = useCallback(
+    async ({
+      conversationId,
+      name,
+    }: AutopilotChatRenameConversationPayload) => {
+      if (!chatService) return;
+      try {
+        // Stop the server's auto-labeling from overwriting the user's name.
+        const updated = await agentService.current.conversations.updateById(
+          conversationId,
+          { label: name.trim(), autogenerateLabel: false },
+        );
+        setConversationHistory(
+          pastConversations.current.map((c) =>
+            c.id === conversationId ? { ...c, label: updated.label } : c,
+          ),
+        );
+      } catch (err) {
+        toast.error(t("error_rename_conversation"), {
+          description: err instanceof Error ? err.message : String(err),
+          toasterId,
+        });
+      }
+    },
+    [chatService, setConversationHistory, t, toasterId],
+  );
+
   const onSendMessage = useCallback(
     async (data: AutopilotChatMessage) => {
       try {
@@ -1180,6 +1215,22 @@ export const ConversationalAgentChat = ({
           paginatedMessages: true,
           settingsRenderer: renderSettings,
           preHooks: {
+            [AutopilotChatPreHookAction.RenameConversation]: async ({
+              name,
+            }: AutopilotChatRenameConversationPayload) => {
+              const trimmed = name.trim();
+              if (trimmed.length === 0) return false;
+              if (trimmed.length > CONVERSATION_LABEL_MAX_LENGTH) {
+                toast.error(t("error_rename_conversation_too_long_title"), {
+                  description: t("error_rename_conversation_too_long", {
+                    max: CONVERSATION_LABEL_MAX_LENGTH,
+                  }),
+                  toasterId,
+                });
+                return false;
+              }
+              return true;
+            },
             [AutopilotChatPreHookAction.CitationClick]: async (
               citationData,
             ) => {
@@ -1247,6 +1298,8 @@ export const ConversationalAgentChat = ({
             // Apollo defaults `settings: true`; flip it so our gear renders
             // by default. Consumers can still opt out via `disabledFeatures`.
             settings: false,
+            // Apollo disables rename by default; enable it to match the react-sdk.
+            renameChat: false,
             ...(!agentId ? { newChat: true, history: true } : {}),
             ...disabledFeaturesRef.current,
           },
@@ -1296,6 +1349,7 @@ export const ConversationalAgentChat = ({
     getConversation,
     fetchExchanges,
     t,
+    toasterId,
   ]);
 
   const handleReload = useCallback(() => {
@@ -1436,6 +1490,10 @@ export const ConversationalAgentChat = ({
             AutopilotChatEvent.DeleteConversation,
             onClickDeleteConversation,
           ),
+          chatService.on(
+            AutopilotChatEvent.RenameConversation,
+            onRenameConversation,
+          ),
           chatService.on(AutopilotChatEvent.HistoryLoadMore, onHistoryLoadMore),
           chatService.on(
             AutopilotChatEvent.ConversationLoadMore,
@@ -1484,6 +1542,7 @@ export const ConversationalAgentChat = ({
     onHistoryLoadMore,
     onHistorySearch,
     onNewChat,
+    onRenameConversation,
     onSendMessage,
     onSetAttachments,
     onStopResponse,
@@ -1632,6 +1691,7 @@ export const ConversationalAgentChat = ({
             </DialogContent>
           )}
         </Dialog>
+        <Toaster id={toasterId} position="top-right" richColors />
       </PortalContainerProvider>
     </div>
   );
