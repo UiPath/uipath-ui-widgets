@@ -281,6 +281,10 @@ export const mapExchangesToChatMessages = (
     }),
   );
 
+export const isFlowAgent = (
+  agent: AgentGetByIdResponse | null | undefined,
+): boolean => (agent as any)?.processType === "Flow";
+
 /**
  * Sorts evaluation sets: non-disabled first (default first within non-disabled),
  * then disabled sets in their original order.

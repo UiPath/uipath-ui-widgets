@@ -82,6 +82,7 @@ import {
   createFileKey,
   getConversationHistoryDisplayItems,
   getFirstRunExperience,
+  isFlowAgent,
   mapCitationSource,
   mapExchangesToChatMessages,
   normalizeInput,
@@ -230,6 +231,7 @@ export const ConversationalAgentChat = ({
   const exchangesCursor = useRef<{ value: string } | undefined>(undefined);
   const agentIdRef = useRef<number | undefined>(undefined);
   const agentKeyRef = useRef<string | undefined>(undefined);
+  const isFlowAgentRef = useRef(false);
   const searchTextRef = useRef<string>("");
 
   const [chatService, setChatService] = useState<AutopilotChatService>();
@@ -1063,6 +1065,8 @@ export const ConversationalAgentChat = ({
       const agentRelease = await resolveAgent();
       agentIdRef.current = agentRelease?.id;
       agentKeyRef.current = agentRelease?.releaseKey;
+      // Studio Web debug keeps Stop for Flows.
+      isFlowAgentRef.current = !isDebugMode && isFlowAgent(agentRelease);
       const agentName = agentRelease?.name ?? "";
 
       // In debug mode the agent (and its derived schema) may not be resolvable,
@@ -1249,6 +1253,7 @@ export const ConversationalAgentChat = ({
             settings: false,
             ...(!agentId ? { newChat: true, history: true } : {}),
             ...disabledFeaturesRef.current,
+            ...(isFlowAgentRef.current ? { stopResponse: true } : {}),
           },
         },
       });
@@ -1308,7 +1313,11 @@ export const ConversationalAgentChat = ({
   const onStopResponse = useCallback(() => {
     if (!chatService) return;
     if (activeExchange.current) {
-      activeExchange.current.sendExchangeEnd();
+      // Flows own their exchange; a client exchange end strands them. Switching
+      // conversations still fires StopResponse.
+      if (!isFlowAgentRef.current) {
+        activeExchange.current.sendExchangeEnd();
+      }
       activeExchange.current = null;
     }
     chatService.sendOutputStreamEvent({ turnComplete: true });

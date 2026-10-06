@@ -737,6 +737,130 @@ describe("ConversationalAgentChat", () => {
     });
   });
 
+  describe("Flow agents", () => {
+    const flowAgent = () => ({
+      id: defaultProps.agentId,
+      folderId: defaultProps.folderId,
+      name: "Test Flow",
+      processType: "Flow",
+      conversations: { create: mockCreate },
+    });
+
+    const getDisabledFeatures = async () => {
+      const { AutopilotChatService } =
+        await import("@uipath/apollo-react/material/components");
+      const call = (AutopilotChatService.Instantiate as any).mock.calls.at(-1);
+      return call?.[0]?.config?.disabledFeatures ?? {};
+    };
+
+    const sendThenStop = async () => {
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "stopResponse",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Hello", attachments: [] });
+      const startedExchange = lastExchange;
+      const onStopResponse = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "stopResponse",
+      )?.[1];
+      onStopResponse?.();
+      return startedExchange;
+    };
+
+    it("should disable stopResponse for a Flow", async () => {
+      mockGetById.mockResolvedValue(flowAgent());
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        async () => {
+          expect((await getDisabledFeatures()).stopResponse).toBe(true);
+        },
+        { timeout: 3000 },
+      );
+    });
+
+    it("should disable stopResponse for a Flow even when the host enables it", async () => {
+      mockGetById.mockResolvedValue(flowAgent());
+      render(
+        <ConversationalAgentChat
+          {...defaultProps}
+          disabledFeatures={{ stopResponse: false }}
+        />,
+      );
+
+      await waitFor(
+        async () => {
+          expect((await getDisabledFeatures()).stopResponse).toBe(true);
+        },
+        { timeout: 3000 },
+      );
+    });
+
+    it("should keep stopResponse enabled for a Flow in debug mode", async () => {
+      mockGetById.mockResolvedValue(flowAgent());
+      render(<ConversationalAgentChat {...defaultProps} isDebugMode />);
+
+      await waitFor(
+        () => {
+          expect(screen.getByText("Chat Loaded")).toBeInTheDocument();
+        },
+        { timeout: 3000 },
+      );
+      expect((await getDisabledFeatures()).stopResponse).toBeUndefined();
+    });
+
+    it("should honor a host-provided stopResponse for non-Flow agents", async () => {
+      render(
+        <ConversationalAgentChat
+          {...defaultProps}
+          disabledFeatures={{ stopResponse: true }}
+        />,
+      );
+
+      await waitFor(
+        async () => {
+          expect((await getDisabledFeatures()).stopResponse).toBe(true);
+        },
+        { timeout: 3000 },
+      );
+    });
+
+    it("should not send exchange end on StopResponse for a Flow", async () => {
+      mockGetById.mockResolvedValue(flowAgent());
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      const startedExchange = await sendThenStop();
+
+      expect(startedExchange?.sendExchangeEnd).not.toHaveBeenCalled();
+      expect(mockChatService.setWaiting).toHaveBeenCalledWith(false);
+    });
+
+    it("should send exchange end on StopResponse for a Flow in debug mode", async () => {
+      mockGetById.mockResolvedValue(flowAgent());
+      render(<ConversationalAgentChat {...defaultProps} isDebugMode />);
+
+      const startedExchange = await sendThenStop();
+
+      expect(startedExchange?.sendExchangeEnd).toHaveBeenCalledTimes(1);
+    });
+
+    it("should send exchange end on StopResponse for non-Flow agents", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      const startedExchange = await sendThenStop();
+
+      expect(startedExchange?.sendExchangeEnd).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("should enable paginatedHistory in config", async () => {
     const { AutopilotChatService } =
       await import("@uipath/apollo-react/material/components");
