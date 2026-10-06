@@ -69,12 +69,15 @@ function App({ task }: { task: { data: DuFramework.ContentValidationData } }) {
 
 ## Data sources
 
-The widget needs a taxonomy, an extraction result and a document DOM. There are two mutually exclusive ways to give it those:
+The widget needs a taxonomy, an extraction result and a document DOM. There are three mutually exclusive ways to give it those:
 
-| Mode              | Pass                         | Who fetches                                                   | Who writes back                                 |
-| ----------------- | ---------------------------- | ------------------------------------------------------------- | ----------------------------------------------- |
-| **Self-fetching** | `sdk` + `data`               | The widget, from the bucket paths on `ContentValidationData`  | The widget, to `ValidatedExtractionResultsPath` |
-| **Pre-fetched**   | `artifacts` (+ `documentId`) | You — hand it a `DuDocumentArtifacts` object you already hold | You, from the request the widget emits          |
+| Mode                    | Pass                         | Who fetches                                                   | Who writes back                                       |
+| ----------------------- | ---------------------------- | ------------------------------------------------------------- | ----------------------------------------------------- |
+| **Self-fetching**       | `sdk` + `data`               | The widget, from the bucket paths on `ContentValidationData`  | The widget, to `ValidatedExtractionResultsPath`       |
+| **Self-fetching, Flow** | `sdk` + `processedDocument`  | The widget, through the Flow run that produced the document   | The widget, as a review recorded against the Flow run |
+| **Pre-fetched**         | `artifacts` (+ `documentId`) | You — hand it a `DuDocumentArtifacts` object you already hold | You, from the request the widget emits                |
+
+If both `data` and `processedDocument` are set, `data` wins.
 
 **The outputs do not change with the mode.** `onSubmit`, `onSaveAsDraft` and `onReportException` fire for every user action either way, and always carry the request the web component produced. The only difference is a second argument: when the widget persisted the data itself, it passes the outcome too.
 
@@ -102,11 +105,11 @@ Every bucket call is scoped to the folder `data` names — `FolderId`, or `Folde
 The two modes can be mixed: pass `artifacts` **and** `sdk` + `data` to skip the fetch while keeping the built-in write-back — `onSubmit` then receives the outcome as well.
 
 > **Info: `DuDocumentArtifacts`**
-> `{ taxonomy, extractionResult, predictedExtractionResult?, dom, text, customizationInfo, original }` — `original` is the base64-encoded document the viewer renders.
+> `{ taxonomy, extractionResult, predictedExtractionResult?, dom, text, customizationInfo, original }` — `original` is the base64-encoded document the viewer renders. In `DuDocumentArtifacts`, `taxonomy` and `extractionResult` are UiPath DU contracts. `ValidationStation` also takes `IxpDocumentArtifacts`, the same shape with both in the IXP representation (an `IXPTaxonomy` JSON Schema and an `IXPExtraction`) and no `predictedExtractionResult`; the subcomponents take `DuDocumentArtifacts` only.
 
 ### Comparing against the prediction
 
-`predictedExtractionResult` is the model's prediction — the extraction output nobody edited — as opposed to `extractionResult`, the result the user reviews. Self-fetching fills it from `AutomaticExtractionResultsPath`; in pre-fetched mode it is optional, and a hand-built `DuDocumentArtifacts` without it is still valid.
+`predictedExtractionResult` is the model's prediction — the extraction output nobody edited — as opposed to `extractionResult`, the result the user reviews. Self-fetching fills it from `AutomaticExtractionResultsPath`; in pre-fetched mode it is optional, and a hand-built `DuDocumentArtifacts` without it is still valid. It is a UiPath DU contract, so only the UiPath representation carries one — an IXP document (including a Flow `ProcessedDocument`) has no prediction.
 
 By itself it changes nothing visible. It drives the `EnablePredictionDiff` customization flag (compact mode, on `ValidationStation`, `CompactFieldsForm` and `CompactTableEditor`): where the prediction differs from the current values, the element shows the predicted value with a button that takes it over. Like every customization flag, it lives under `FeatureCustomization` in `customizationInfo` — typed by the exported `ICustomizationInfoDTO` / `IFeatureCustomization`:
 
@@ -178,14 +181,61 @@ function HostOwnedReview({ sdk, data }) {
 
 The request payloads are exported too — `IVsSaveValidatedDataRequest`, `IVsSaveValidatedDataAsDraftRequest` and `IVsSaveExceptionReportRequest` — so handlers declared outside JSX can name their parameter.
 
+### Flow documents (`ProcessedDocument`)
+
+A Flow IDP node emits a `ProcessedDocument` rather than a `ContentValidationData`. It carries the taxonomy (an `IXPTaxonomy`) and the result (an `IXPExtraction`) inline, plus `metadata` naming the run that produced it — `traceId`, `spanId` and `folderKey`. The document, its DOM and its OCR text are read through that run's trace.
+
+```tsx
+<ValidationStation
+  sdk={sdk}
+  processedDocument={task.data}
+  onSubmit={(request) => completeTask(request.validatedData)}
+/>
+```
+
+- **Loading.** The document opens on the result last saved against the producing span (a draft), else on the payload's `result`. `documentId` defaults to `metadata.traceId`.
+- **Saving.** Submit and draft record the review against the producing span; report-as-exception records a rejection with the reason. `onSubmit`, `onSaveAsDraft` and `onReportException` receive the outcome as their second argument. `request.validatedData` is an `IXPExtraction`.
+- **Record format.** A review is stored as `{ draft, extraction }` — `draft: true` for a draft, `false` for a submit — the shape the Angular Validation Station uses, so either reopens a review the other saved. A record in any other shape is ignored on load.
+- **Completing the task is yours.** The downstream Flow node reads the validated result from the task completion, so complete it with `request.validatedData` whatever the outcome says.
+- **Scope.** Only `ValidationStation` takes `processedDocument` or an IXP document; the [subcomponents](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/validation-station-subcomponents.md) take the UiPath representation only.
+- **OAuth scopes.** The `sdk`'s token needs `Traces.Api` (the run's spans, and the review record) and `OR.Buckets.Read` (the document, DOM and OCR text, via ECS). A coded action app completing the task also needs `OR.Tasks`. A missing scope surfaces as a 401/403 in the load or save error.
+- **Hosting.** The artifacts are downloaded in the browser from pre-signed ECS storage URLs, so the host's origin must be in the ECS storage account's CORS rules. Coded apps (`https://{org}.{env}.uipath.host`) are.
+
+The widget does this through exported functions, so a host that fetches up front runs exactly the same code:
+
+| Export                                                              | Use                                                                                  |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `fetchProcessedDocumentArtifacts(sdk, processedDocument)`           | Fetch the `IxpDocumentArtifacts` — what the widget fetches given `processedDocument` |
+| `submitProcessedDocument(sdk, processedDocument, request)`          | Record a submitted review                                                            |
+| `saveProcessedDocumentAsDraft(sdk, processedDocument, request)`     | Record a draft — the one the next load opens on                                      |
+| `reportProcessedDocumentException(sdk, processedDocument, request)` | Record a rejection with the reviewer's reason. Replaces a saved draft                |
+
+```tsx
+const artifacts = await fetchProcessedDocumentArtifacts(sdk, processedDocument);
+
+<ValidationStation
+  artifacts={artifacts}
+  onSubmit={async (request) => {
+    await submitProcessedDocument(sdk, processedDocument, request);
+    completeTask(request.validatedData);
+  }}
+  onSaveAsDraft={(request) =>
+    saveProcessedDocumentAsDraft(sdk, processedDocument, request)
+  }
+/>;
+```
+
+The save functions are stateless: each one edits the span's newest review record, or creates it when there is none, so the widget and a host saving outside it always land on the same record.
+
 ## Props
 
 | Prop                             | Type                                           | Required | Default   | Description                                                                                                                                                                                                                                                            |
 | -------------------------------- | ---------------------------------------------- | -------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `sdk`                            | `UiPath`                                       | No\*     | —         | UiPath SDK instance for authentication and API calls. Required for self-fetching / persistence                                                                                                                                                                         |
 | `data`                           | `ContentValidationData`                        | No\*     | —         | Document data containing the bucket paths, document ID, and the folder they live in — `FolderId` or `FolderKey`, whichever the producing activity set. Required for self-fetching / persistence                                                                        |
-| `artifacts`                      | `DuDocumentArtifacts`                          | No\*     | —         | Pre-fetched document artifacts. When supplied, no bucket fetch is performed. \*Either `artifacts` or `sdk` + `data` must be provided                                                                                                                                   |
-| `documentId`                     | `string`                                       | No       | —         | Document ID forwarded to the web component. Falls back to `data.DocumentId` — pass it in pre-fetched mode, where there is no `data`                                                                                                                                    |
+| `processedDocument`              | `ProcessedDocument`                            | No\*     | —         | A Flow IDP node's output. With `sdk`, the widget fetches its artifacts and records reviews through the producing run — see [Flow documents](#flow-documents-processeddocument). Ignored when `data` is set                                                             |
+| `artifacts`                      | `DuDocumentArtifacts \| IxpDocumentArtifacts`  | No\*     | —         | Pre-fetched document artifacts. When supplied, no fetch is performed. \*Either `artifacts`, `sdk` + `data` or `sdk` + `processedDocument` must be provided                                                                                                             |
+| `documentId`                     | `string`                                       | No       | —         | Document ID forwarded to the web component. Falls back to `data.DocumentId`, else `processedDocument.metadata.traceId` — pass it in pre-fetched mode                                                                                                                   |
 | `theme`                          | `'light' \| 'dark' \| 'light-hc' \| 'dark-hc'` | No       | `'light'` | Visual theme                                                                                                                                                                                                                                                           |
 | `language`                       | `ValidationStationLanguage`                    | No       | `English` | UI language (see [the enum](#language-enum))                                                                                                                                                                                                                           |
 | `isReadonly`                     | `boolean`                                      | No       | `false`   | When `true`, renders in read-only mode                                                                                                                                                                                                                                 |
@@ -204,11 +254,11 @@ The three save callbacks (`onSubmit`, `onSaveAsDraft`, `onReportException`) are 
 
 The widget surfaces three user-initiated flows and reports each through exactly one callback, whichever mode it is in. Every callback receives the raw request; `result` is filled in only for the flows the widget persisted itself.
 
-| Callback            | User action             | Signature                    | What the widget does                                                                                                                                               | What the host does                                                                                                                       |
-| ------------------- | ----------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `onSubmit`          | **Submit**              | `(request, result?) => void` | With `sdk` + `data`: `processExtractedData`, then uploads to `ValidatedExtractionResultsPath`, and passes the outcome as `result`. Without: emits the request only | React to `result`, or — when it is absent — persist the request yourself (`submitValidatedData` does exactly what the widget would have) |
-| `onSaveAsDraft`     | **Save as draft**       | `(request, result?) => void` | With `sdk` + `data`: uploads `validatedData` straight to the bucket (no `processExtractedData`). Without: emits the request only                                   | Same as above; the host-side equivalent is `saveValidatedDataAsDraft`                                                                    |
-| `onReportException` | **Report as exception** | `(request) => void`          | Nothing — the widget never persists exceptions, in either mode. The reason is at `request.exceptionReport.Reason`                                                  | Required if you want the report persisted — call `OrchestratorDuModule.submitExceptionReport(...)` yourself                              |
+| Callback            | User action             | Signature                    | What the widget does                                                                                                                                                                   | What the host does                                                                                                                       |
+| ------------------- | ----------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `onSubmit`          | **Submit**              | `(request, result?) => void` | With `sdk` + `data`: `processExtractedData`, then uploads to `ValidatedExtractionResultsPath`, and passes the outcome as `result`. Without: emits the request only                     | React to `result`, or — when it is absent — persist the request yourself (`submitValidatedData` does exactly what the widget would have) |
+| `onSaveAsDraft`     | **Save as draft**       | `(request, result?) => void` | With `sdk` + `data`: uploads `validatedData` straight to the bucket (no `processExtractedData`). Without: emits the request only                                                       | Same as above; the host-side equivalent is `saveValidatedDataAsDraft`                                                                    |
+| `onReportException` | **Report as exception** | `(request, result?) => void` | With `sdk` + `processedDocument`: records the rejection against the Flow run and passes the outcome as `result`. Otherwise nothing — the reason is at `request.exceptionReport.Reason` | For any other source, persist it yourself — call `OrchestratorDuModule.submitExceptionReport(...)`                                       |
 
 Submit and draft hand you a `SaveValidatedDataResult` (`{ success, error? }`) — the host owns all UI feedback (toast, retry, etc.); the widget does not surface failures itself. The exception callback hands you `documentId` and `reason` strings ready to forward to the SDK.
 
@@ -261,7 +311,7 @@ function App({ sdk, data, task }) {
 ```
 
 > **Warning: Failures are silent if you skip the callbacks**
-> All three callbacks are optional, but the widget surfaces no errors on its own. `onReportException` is the only place the report goes — without it, the user's **Report as exception** click is a no-op.
+> All three callbacks are optional, but the widget surfaces no errors on its own. Outside a `processedDocument`, `onReportException` is the only place the report goes — without it, the user's **Report as exception** click is a no-op.
 
 ## Reading the document state
 
@@ -352,7 +402,14 @@ import type {
   ValidationStationProps,
   ValidationStationWcConfig,
   DuArtifactsSource,
+  ValidationStationArtifactsSource,
   DuDocumentArtifacts,
+  IxpDocumentArtifacts,
+  ValidationStationArtifacts,
+  IXPTaxonomy,
+  IXPExtraction,
+  ProcessedDocument,
+  IVsWcMessage,
   IValidationStationOptions,
   FieldFilterOptions,
   DocumentViewerOptions,
@@ -545,7 +602,7 @@ What it does need is the package copied into `public/`, which Vite serves verbat
     "prebuild": "npm run stage-du-wc"
   },
   "devDependencies": {
-    "@uipath/du-validation-station-wc": "1.0.0-rc.1"
+    "@uipath/du-validation-station-wc": "1.0.0-rc.3"
   }
 }
 ```
@@ -579,11 +636,23 @@ so `includeFonts: true` against one of those links the Apollo fonts too.
 - **CSP.** Serving from your own origin needs no more than `script-src 'self'`. A separate origin must be added to `script-src` and `style-src`, and note that the loader offers no Subresource Integrity hook — self-hosting avoids that exposure entirely.
 - **Version skew.** The URL decides which web component version actually runs, and it is not checked against the installed `@uipath/du-validation-station-wc`. Keep the hosted copy in step with the version this package's types are built against.
 
-## Web component 1.0.0-rc.2
+## Web component 1.0.0-rc.3
 
-The widgets now render `@uipath/du-validation-station-wc` `1.0.0-rc.2`. Keep the
+The widgets now render `@uipath/du-validation-station-wc` `1.0.0-rc.3`. Keep the
 hosted copy in step (see _Version skew_ above). No prop of this package was
-removed or renamed, but the web component changes a few things you will see:
+removed or renamed, but the web component changes a few things you will see.
+
+From rc.3:
+
+- **The IXP representation.** `ValidationStation` takes an IXP document — a
+  Flow `processedDocument`, or `IxpDocumentArtifacts` — see
+  [Flow documents](#flow-documents-processeddocument).
+- **`HideHighlightRow`** on `FeatureCustomization` (compact mode) hides the
+  _Highlight row_ action from each field group row's menu.
+- The compact fields form's expand / collapse-all control is redesigned, and
+  reads _Expand all field groups_ / _Collapse all field groups_.
+
+From rc.2:
 
 - **New compact UI, on by default:** a field-filter toolbar (trim or remove it
   with `options.fieldFilterOptions`), expandable field groups, a line-number

@@ -1,11 +1,14 @@
 export { ValidationStationLanguage } from "./types.js";
-export type { DuArtifactsSource } from "./useResolvedArtifacts.js";
+export type {
+  DuArtifactsSource,
+  ValidationStationArtifactsSource,
+} from "./useResolvedArtifacts.js";
 export type {
   DeleteFieldValueByPath,
   DeleteFieldValueByPathResult,
   DuCommonProps,
-  DuDocumentArtifacts,
   DocumentViewerOptions,
+  DuDocumentArtifacts,
   DuSaveCallbacks,
   DuTheme,
   EvaluatedBusinessRulesForFieldValueDto,
@@ -20,12 +23,16 @@ export type {
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveValidatedDataRequest,
   IVsWcMessage,
+  IxpDocumentArtifacts,
+  IXPExtraction,
+  IXPTaxonomy,
   SaveValidatedDataResult,
   SelectAndFocusFieldValueByPath,
   SelectAndFocusFieldValueByPathResult,
   SetFieldValueByPath,
   SetFieldValueByPathResult,
   ValidationStationEventProps,
+  ValidationStationArtifacts,
   ValidationStationProps,
   VsSaveResultEventProps,
   VsStateEventProps,
@@ -39,6 +46,20 @@ export {
   saveValidatedDataAsDraft,
   submitValidatedData,
 } from "./saveValidatedDataUtil.js";
+
+// ─── Flow documents (ProcessedDocument) ───────────────────────────────────────
+export { fetchProcessedDocumentArtifacts } from "./processedDocument/artifacts.js";
+export {
+  reportProcessedDocumentException,
+  saveProcessedDocumentAsDraft,
+  submitProcessedDocument,
+} from "./processedDocument/save.js";
+export type {
+  ProcessedDocument,
+  ProcessedDocumentMetadata,
+  ProcessedDocumentTaxonomy,
+  ProcessedDocumentType,
+} from "./processedDocument/types.js";
 
 // ─── Web component loading ────────────────────────────────────────────────────
 export {

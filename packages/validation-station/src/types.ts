@@ -14,6 +14,8 @@ import type {
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveValidatedDataRequest,
   IVsWcMessage,
+  IXPExtraction,
+  IXPTaxonomy,
   SelectAndFocusFieldValueByPath,
   SelectAndFocusFieldValueByPathResult,
   SetFieldValueByPath,
@@ -21,7 +23,7 @@ import type {
 } from "@uipath/du-validation-station-wc";
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import type { SaveValidatedDataResult } from "./saveValidatedDataUtil.js";
-import type { DuArtifactsSource } from "./useResolvedArtifacts.js";
+import type { ValidationStationArtifactsSource } from "./useResolvedArtifacts.js";
 
 export type {
   DeleteFieldValueByPath,
@@ -45,6 +47,9 @@ export type {
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveValidatedDataRequest,
   IVsWcMessage,
+  // The IXP representation `ValidationStation` also takes.
+  IXPExtraction,
+  IXPTaxonomy,
   SaveValidatedDataResult,
   SelectAndFocusFieldValueByPath,
   SelectAndFocusFieldValueByPathResult,
@@ -132,6 +137,29 @@ export interface DuDocumentArtifacts {
 }
 
 /**
+ * {@link DuDocumentArtifacts} with the taxonomy and the extraction result in
+ * the IXP (JSON Schema) representation. Only `ValidationStation` takes it; the
+ * subcomponents take the UiPath representation.
+ *
+ * `fetchProcessedDocumentArtifacts` produces one of these from a Flow
+ * `ProcessedDocument`.
+ */
+export interface IxpDocumentArtifacts extends Omit<
+  DuDocumentArtifacts,
+  "taxonomy" | "extractionResult" | "predictedExtractionResult"
+> {
+  taxonomy: IXPTaxonomy;
+  extractionResult: IXPExtraction;
+  /** None: the web component takes a prediction in the UiPath representation only. */
+  predictedExtractionResult?: never;
+}
+
+/** The artifacts `ValidationStation` takes: either representation. */
+export type ValidationStationArtifacts =
+  | DuDocumentArtifacts
+  | IxpDocumentArtifacts;
+
+/**
  * The save flows every save-capable widget reports — `ValidationStation` and
  * `CompactFieldsForm`. Both implement them identically, so a host swapping one
  * for the other keeps its handlers.
@@ -142,9 +170,14 @@ export interface DuSaveCallbacks {
    * carries the request the web component produced.
    *
    * `result` is present only when the widget persisted the data itself, i.e.
-   * when it has `sdk` + `data` naming a folder. Otherwise the write-back
-   * is yours — the exported `submitValidatedData` does what the widget would
-   * have done for a bucket-backed document.
+   * when it has `sdk` + `data` naming a folder, or (`ValidationStation` only)
+   * `sdk` + `processedDocument`.
+   * Otherwise the write-back is yours — the exported `submitValidatedData`
+   * (bucket-backed document) and `submitProcessedDocument` (Flow document) do
+   * what the widget would have done.
+   *
+   * For a `processedDocument`, `request.validatedData` is an `IXPExtraction`:
+   * complete the task with it whatever `result` says.
    */
   onSubmit?: (
     request: IVsSaveValidatedDataRequest,
@@ -152,20 +185,27 @@ export interface DuSaveCallbacks {
   ) => void;
   /**
    * The user saved a draft (`save={{ validate: false }}`). Same contract as
-   * {@link DuSaveCallbacks.onSubmit}; the host-side equivalent is
-   * `saveValidatedDataAsDraft`.
+   * {@link DuSaveCallbacks.onSubmit}; the host-side equivalents are
+   * `saveValidatedDataAsDraft` and `saveProcessedDocumentAsDraft`.
    */
   onSaveAsDraft?: (
     request: IVsSaveValidatedDataAsDraftRequest,
     result?: SaveValidatedDataResult,
   ) => void;
   /**
-   * The user reported the document as an exception. The widget never persists
-   * this in either mode, so there is no `result` — the host owns it, typically
-   * via `OrchestratorDuModule.submitExceptionReport(...)`. The reason lives at
+   * The user reported the document as an exception. The reason lives at
    * `request.exceptionReport.Reason`.
+   *
+   * Given `sdk` + `processedDocument` (`ValidationStation` only), the widget
+   * records the rejection and
+   * passes the outcome as `result` (host-side: `reportProcessedDocumentException`).
+   * Otherwise there is no `result` and the host owns it, typically via
+   * `OrchestratorDuModule.submitExceptionReport(...)`.
    */
-  onReportException?: (request: IVsSaveExceptionReportRequest) => void;
+  onReportException?: (
+    request: IVsSaveExceptionReportRequest,
+    result?: SaveValidatedDataResult,
+  ) => void;
 }
 
 /**
@@ -259,13 +299,14 @@ export interface ValidationStationEventProps
 /**
  * Props for the monolithic `ValidationStation`.
  *
- * The document data comes from a {@link DuArtifactsSource}: either
- * pre-fetched `artifacts` handed in directly, or `sdk` + `data` for the widget
- * to fetch from the bucket paths on `ContentValidationData`.
+ * The document data comes from a {@link ValidationStationArtifactsSource}:
+ * pre-fetched `artifacts` handed in directly, `sdk` + `data` for the widget to
+ * fetch from the bucket paths on `ContentValidationData`, or `sdk` +
+ * `processedDocument` for it to fetch a Flow document through its run.
  */
 export interface ValidationStationProps
   extends
-    DuArtifactsSource,
+    ValidationStationArtifactsSource,
     DuCommonProps,
     DuSaveCallbacks,
     ValidationStationEventProps {

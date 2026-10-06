@@ -5,7 +5,11 @@ import {
   type ResolvedArtifacts,
   type DuArtifactsSource,
 } from "../useResolvedArtifacts.js";
-import { ValidationStationLanguage, type DuTheme } from "../types.js";
+import {
+  ValidationStationLanguage,
+  type DuDocumentArtifacts,
+  type DuTheme,
+} from "../types.js";
 import { useWcReady } from "../useWcReady.js";
 import { wcStyle } from "./shared.js";
 
@@ -31,7 +35,7 @@ interface WcCommonProps {
   isReadonly: boolean;
 }
 
-export interface WcElementState extends ResolvedArtifacts {
+export interface WcElementState extends ResolvedArtifacts<DuDocumentArtifacts> {
   wcReady: boolean;
   /** Tag actually rendered — the base tag, or its persistent variant. */
   tag: string;

@@ -3,16 +3,19 @@ import type { UiPath } from "@uipath/uipath-typescript/core";
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import { useEffect, useRef, useState } from "react";
 import { fetchBucketArtifacts } from "./bucketArtifactsUtil.js";
+import { selectPayload } from "./payloadSource.js";
+import { fetchProcessedDocumentArtifacts } from "./processedDocument/artifacts.js";
+import type { ProcessedDocument } from "./processedDocument/types.js";
 import {
   type DuDocumentArtifacts,
   TelemetryEvent,
   TelemetryStatus,
+  type ValidationStationArtifacts,
 } from "./types.js";
 import { trackTelemetry } from "./utils/telemetryUtils.js";
 
 /**
- * Data source shared by `ValidationStation` and every subcomponent wrapper. Two
- * mutually-exclusive modes:
+ * Data source of every subcomponent wrapper. Two mutually-exclusive modes:
  *
  * 1. **Pre-fetched** — pass `artifacts` (and usually `documentId`). No HTTP
  *    call is made. This is the composition mode: a parent fetches once and
@@ -37,8 +40,32 @@ export interface DuArtifactsSource {
   documentId?: string;
 }
 
-export interface ResolvedArtifacts {
-  artifacts: DuDocumentArtifacts | null;
+/**
+ * `ValidationStation`'s data source: {@link DuArtifactsSource}, whose
+ * `artifacts` may also be in the IXP representation, plus a third mode:
+ *
+ * 3. **Self-fetching, Flow** — pass `sdk` + `processedDocument`. The hook
+ *    fetches the document's artifacts through its producing run, as
+ *    `fetchProcessedDocumentArtifacts` does.
+ *
+ * `data` wins when both it and `processedDocument` are set.
+ */
+export interface ValidationStationArtifactsSource extends Omit<
+  DuArtifactsSource,
+  "artifacts" | "documentId"
+> {
+  /** Pre-fetched artifacts. When supplied, no fetch is performed. */
+  artifacts?: ValidationStationArtifacts;
+  /** A Flow IDP node's output — self-fetching through its producing run. */
+  processedDocument?: ProcessedDocument;
+  /** Document id. Falls back to `data.DocumentId`, else the `processedDocument`'s trace id. */
+  documentId?: string;
+}
+
+export interface ResolvedArtifacts<
+  A extends ValidationStationArtifacts = ValidationStationArtifacts,
+> {
+  artifacts: A | null;
   error: string | null;
   documentId: string | undefined;
 }
@@ -46,22 +73,42 @@ export interface ResolvedArtifacts {
 /**
  * Resolves the artifacts a widget needs — `ValidationStation` and every
  * subcomponent alike — transparently handling both the pre-fetched and
- * self-fetching modes described on {@link DuArtifactsSource}.
+ * self-fetching modes described on {@link ValidationStationArtifactsSource}.
  */
-export function useResolvedArtifacts({
-  sdk,
-  data,
-  artifacts: provided,
-  documentId,
-}: DuArtifactsSource): ResolvedArtifacts {
-  const [fetched, setFetched] = useState<DuDocumentArtifacts | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const resolvedDocumentId = documentId ?? data?.DocumentId;
+export function useResolvedArtifacts(
+  source: DuArtifactsSource,
+): ResolvedArtifacts<DuDocumentArtifacts>;
+export function useResolvedArtifacts(
+  source: ValidationStationArtifactsSource,
+): ResolvedArtifacts;
+export function useResolvedArtifacts(
+  source: ValidationStationArtifactsSource,
+): ResolvedArtifacts {
+  const { sdk, artifacts: provided, documentId } = source;
+  const { data, processedDocument } = selectPayload(
+    source.data,
+    source.processedDocument,
+  );
+  const resolvedDocumentId =
+    documentId ?? data?.DocumentId ?? processedDocument?.metadata?.traceId;
+  // The outcome is tagged with the document it belongs to, so another
+  // document shows the loading state instead of the previous one while its
+  // fetch is in flight. By content rather than payload identity: a caller
+  // passing an inline payload would otherwise never see its own fetch land.
+  // A Flow run's documents share a trace id, so theirs adds the span id.
+  const outcomeKey = processedDocument
+    ? `${resolvedDocumentId}|${processedDocument.metadata?.spanId}`
+    : resolvedDocumentId;
+  const [outcome, setOutcome] = useState<{
+    key: string | undefined;
+    artifacts: ValidationStationArtifacts | null;
+    error: string | null;
+  } | null>(null);
   const hasFolder = !!(data?.FolderKey || data?.FolderId);
   // Fetch only when the caller did not supply artifacts and a full context is
   // present (the missing-folder case is surfaced at render).
-  const shouldFetch = !provided && !!sdk && !!data && hasFolder;
+  const shouldFetch =
+    !provided && !!sdk && (data ? hasFolder : !!processedDocument);
 
   // Keep the latest sdk reachable so each fetch uses the current instance (token
   // refresh / tenant switch) without making sdk identity a fetch trigger.
@@ -74,23 +121,29 @@ export function useResolvedArtifacts({
     if (!shouldFetch) return;
 
     let cancelled = false;
-    // Build the service from the CURRENT sdk on each fetch — caching it in a ref
-    // would pin the original sdk's auth/base URL.
-    const bucketService = new BucketService(sdkRef.current!);
+    const pending: Promise<ValidationStationArtifacts> = data
+      ? fetchBucketArtifacts(new BucketService(sdkRef.current!), data)
+      : fetchProcessedDocumentArtifacts(sdkRef.current!, processedDocument!);
 
-    fetchBucketArtifacts(bucketService, data!)
-      .then((result) => {
+    pending
+      .then((artifacts) => {
         if (!cancelled) {
-          setFetched(result);
-          setError(null);
+          setOutcome({
+            key: outcomeKey,
+            artifacts,
+            error: null,
+          });
           trackTelemetry(TelemetryEvent.Load, TelemetryStatus.Success);
         }
       })
       .catch((er) => {
         if (!cancelled) {
           const message = er instanceof Error ? er.message : String(er);
-          setFetched(null);
-          setError(message);
+          setOutcome({
+            key: outcomeKey,
+            artifacts: null,
+            error: message,
+          });
           trackTelemetry(TelemetryEvent.Load, TelemetryStatus.Error, {
             error: message,
           });
@@ -100,11 +153,11 @@ export function useResolvedArtifacts({
     return () => {
       cancelled = true;
     };
-    // Keyed on `data` identity: the fetch reads the bucket PATH fields off it,
-    // not just DocumentId, so a new payload with the same DocumentId but
-    // different paths must refetch. Callers pass a stable `data` reference
-    // (React state) so this does not refetch on unrelated re-renders.
-  }, [shouldFetch, data]);
+    // Keyed on payload identity: the fetch reads the bucket PATH fields off
+    // `data` (the trace ids off `processedDocument`), not just the document id,
+    // so a new payload with the same id must refetch. Callers pass a stable
+    // reference (React state) so this does not refetch on unrelated re-renders.
+  }, [shouldFetch, data, processedDocument, outcomeKey]);
 
   if (provided) {
     return {
@@ -114,16 +167,16 @@ export function useResolvedArtifacts({
     };
   }
 
-  if (!sdk || !data) {
+  if (!sdk || !(data || processedDocument)) {
     return {
       artifacts: null,
       error:
-        "No data source provided. Pass `artifacts` (pre-fetched) or `sdk` + `data` (to fetch).",
+        "No data source provided. Pass `artifacts` (pre-fetched), or `sdk` + `data` or `sdk` + `processedDocument` (to fetch).",
       documentId: resolvedDocumentId,
     };
   }
 
-  if (!hasFolder) {
+  if (data && !hasFolder) {
     return {
       artifacts: null,
       error:
@@ -132,9 +185,10 @@ export function useResolvedArtifacts({
     };
   }
 
+  const current = outcome?.key === outcomeKey ? outcome : null;
   return {
-    artifacts: fetched,
-    error,
+    artifacts: current?.artifacts ?? null,
+    error: current?.error ?? null,
     documentId: resolvedDocumentId,
   };
 }
