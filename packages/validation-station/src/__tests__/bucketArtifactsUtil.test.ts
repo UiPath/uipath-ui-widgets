@@ -83,6 +83,9 @@ describe("fetchBucketArtifacts", () => {
 
     expect(result.taxonomy).toEqual(taxonomy);
     expect(result.extractionResult).toEqual(extraction);
+    // No validated result yet: the prediction is the automatic one, as a copy.
+    expect(result.predictedExtractionResult).toEqual(extraction);
+    expect(result.predictedExtractionResult).not.toBe(result.extractionResult);
     expect(result.dom).toEqual(dom);
     expect(result.text).toBe(text);
     expect(result.customizationInfo).toEqual(customization);
@@ -291,6 +294,7 @@ describe("fetchBucketArtifacts", () => {
     );
 
     expect(result.extractionResult).toEqual(automaticResult);
+    expect(result.predictedExtractionResult).toEqual(automaticResult);
   });
 
   it("uses validated extraction when present", async () => {
@@ -321,6 +325,79 @@ describe("fetchBucketArtifacts", () => {
     );
 
     expect(result.extractionResult).toEqual(validatedResult);
+  });
+
+  it("reads the automatic extraction as the prediction next to a validated one", async () => {
+    const automaticResult = { auto: true };
+    const validatedResult = { validated: true };
+
+    mockGetReadUri.mockImplementation(({ path }: { path: string }) =>
+      Promise.resolve({ uri: `https://example.com/${path}` }),
+    );
+    vi.spyOn(globalThis, "fetch").mockImplementation((input: any) => {
+      const url = typeof input === "string" ? input : input.url;
+      const body = url.endsWith("validated.zip")
+        ? validatedResult
+        : url.endsWith("extraction.zip")
+          ? automaticResult
+          : {};
+      return Promise.resolve(new Response(JSON.stringify(body)));
+    });
+
+    const result = await fetchBucketArtifacts(mockBucketService, {
+      ...mockData,
+      ValidatedExtractionResultsPath: "validated.zip",
+    });
+
+    expect(result.extractionResult).toEqual(validatedResult);
+    expect(result.predictedExtractionResult).toEqual(automaticResult);
+  });
+
+  it("still loads a validated extraction when the automatic one fails", async () => {
+    const validatedResult = { validated: true };
+
+    mockGetReadUri.mockImplementation(({ path }: { path: string }) => {
+      if (path === "extraction.zip") return Promise.reject(new Error("404"));
+      return Promise.resolve({ uri: `https://example.com/${path}` });
+    });
+    vi.spyOn(globalThis, "fetch").mockImplementation((input: any) => {
+      const url = typeof input === "string" ? input : input.url;
+      return Promise.resolve(
+        new Response(
+          url.endsWith("validated.zip")
+            ? JSON.stringify(validatedResult)
+            : "{}",
+        ),
+      );
+    });
+
+    const result = await fetchBucketArtifacts(mockBucketService, {
+      ...mockData,
+      ValidatedExtractionResultsPath: "validated.zip",
+    });
+
+    // The prediction is optional; losing it must not block the review.
+    expect(result.extractionResult).toEqual(validatedResult);
+    expect(result.predictedExtractionResult).toBeNull();
+  });
+
+  it("rejects when neither extraction result can be read", async () => {
+    mockGetReadUri.mockImplementation(({ path }: { path: string }) => {
+      if (path === "extraction.zip" || path === "validated.zip") {
+        return Promise.reject(new Error(`404 ${path}`));
+      }
+      return Promise.resolve({ uri: `https://example.com/${path}` });
+    });
+    vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(new Response("{}")),
+    );
+
+    await expect(
+      fetchBucketArtifacts(mockBucketService, {
+        ...mockData,
+        ValidatedExtractionResultsPath: "validated.zip",
+      }),
+    ).rejects.toThrow("404 extraction.zip");
   });
 });
 

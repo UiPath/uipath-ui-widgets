@@ -9,8 +9,9 @@ import type { ValidationStationProps } from "./types";
 
 // Served from `public/du-vs-wc` — staged by the `prestorybook` script and
 // exposed via `staticDirs` in `.storybook/main.ts`. `includeFonts` because
-// Storybook does not load Apollo fonts or Material Icons globally, without which
-// icon glyphs render as empty boxes.
+// Storybook does not load Material Icons globally, without which every icon
+// renders as its ligature text. (The npm-staged `fonts.css` carries only Material
+// Icons — text inherits Storybook's own font stack.)
 configureValidationStationWc({
   deploymentUrl: "/du-vs-wc",
   includeFonts: true,

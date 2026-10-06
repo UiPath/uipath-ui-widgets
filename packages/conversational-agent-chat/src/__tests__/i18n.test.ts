@@ -1,6 +1,23 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { getI18n } from "../i18n";
 
+// Locales that ship real translation bundles (excludes the "keys" debug pseudo-locale).
+const SUPPORTED_LOCALES = [
+  "en",
+  "de",
+  "es",
+  "es-MX",
+  "fr",
+  "ja",
+  "ko",
+  "pt",
+  "pt-BR",
+  "ro",
+  "tr",
+  "zh-CN",
+  "zh-TW",
+] as const;
+
 beforeAll(() => {
   getI18n();
 });
@@ -27,10 +44,6 @@ describe("i18n", () => {
     });
 
     it("should have shared translations bundled for English", () => {
-      // Only `en` (plus the `keys` debug pseudo-locale) ships real resources
-      // today. Asserting other locales here would pass on i18next's English
-      // fallback and give a false sense of coverage — add them back as the
-      // localization team delivers resource files.
       const t = getI18n().getFixedT("en");
       const sharedKeys = ["disclaimer_message", "chat_input_placeholder"];
 
@@ -38,6 +51,34 @@ describe("i18n", () => {
         const value = t(key);
         expect(value, `en.${key} should be defined`).toBeTruthy();
         expect(value, `en.${key} should not return the key`).not.toBe(key);
+      }
+    });
+
+    it("registers a resource bundle for every supported locale", () => {
+      const i18n = getI18n();
+      for (const locale of SUPPORTED_LOCALES) {
+        expect(
+          i18n.hasResourceBundle(locale, "translation"),
+          `${locale} bundle should be registered`,
+        ).toBe(true);
+      }
+    });
+
+    it("resolves locale-specific strings instead of falling back to English", () => {
+      const i18n = getI18n();
+      const enPlaceholder = i18n.getFixedT("en")("chat_input_placeholder");
+
+      // Spot-check a spread of scripts; each must have its own translation, not
+      // the English fallback, which would signal an unregistered/empty bundle.
+      for (const locale of ["fr", "ja", "zh-CN", "pt-BR"] as const) {
+        const value = i18n.getFixedT(locale)("chat_input_placeholder");
+        expect(
+          value,
+          `${locale}.chat_input_placeholder should be defined`,
+        ).toBeTruthy();
+        expect(value, `${locale} should not fall back to English`).not.toBe(
+          enPlaceholder,
+        );
       }
     });
 

@@ -1,13 +1,19 @@
 import type {
   DeleteFieldValueByPath,
   DeleteFieldValueByPathResult,
+  DocumentViewerOptions,
   EvaluatedBusinessRulesForFieldValueDto,
+  FieldFilterOptions,
+  ICustomizationInfoDTO,
+  IFeatureCustomization,
   IFieldValueDetailsDto,
   ISaveResult,
   IValidationStationOptions,
+  IVsIndicatorOverlayContext,
   IVsSaveExceptionReportRequest,
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveValidatedDataRequest,
+  IVsWcMessage,
   SelectAndFocusFieldValueByPath,
   SelectAndFocusFieldValueByPathResult,
   SetFieldValueByPath,
@@ -22,14 +28,23 @@ export type {
   // Payloads of the state/command-result callbacks, so handlers declared
   // outside JSX can name their parameter.
   DeleteFieldValueByPathResult,
+  // The `options` members, for hosts building the object outside JSX.
+  DocumentViewerOptions,
   EvaluatedBusinessRulesForFieldValueDto,
+  FieldFilterOptions,
+  // Opt-in typing for `customizationInfo`, which the elements take as `unknown`.
+  ICustomizationInfoDTO,
+  IFeatureCustomization,
   IFieldValueDetailsDto,
   ISaveResult,
   IValidationStationOptions,
+  // Payload of `onWcMessage`.
+  IVsIndicatorOverlayContext,
   // Payloads of the save callbacks, for handlers declared outside JSX.
   IVsSaveExceptionReportRequest,
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveValidatedDataRequest,
+  IVsWcMessage,
   SaveValidatedDataResult,
   SelectAndFocusFieldValueByPath,
   SelectAndFocusFieldValueByPathResult,
@@ -91,7 +106,7 @@ export interface DuCommonProps {
 /**
  * Everything the Validation Station elements need to render one document:
  * the taxonomy, the extraction result to edit, the digitised document model,
- * and the document itself.
+ * and the document itself — plus, optionally, the model's prediction.
  *
  * Storage-agnostic — `fetchDuDocumentArtifacts` produces one of these from an
  * Orchestrator storage bucket, but a host holding the same pieces anywhere
@@ -100,6 +115,16 @@ export interface DuCommonProps {
 export interface DuDocumentArtifacts {
   taxonomy: DuFramework.DocumentTaxonomy;
   extractionResult: DuFramework.ExtractionResult;
+  /**
+   * The model's prediction — the extraction output nobody edited — as opposed
+   * to `extractionResult`, the result the user reviews. By itself it changes
+   * nothing visible; the `EnablePredictionDiff` customization flag (compact
+   * mode) compares against it.
+   *
+   * Self-fetching fills it from `AutomaticExtractionResultsPath`. Optional, so a
+   * hand-built object without one stays valid.
+   */
+  predictedExtractionResult?: DuFramework.ExtractionResult | null;
   dom: DuFramework.DocumentEntity;
   text: string | undefined;
   customizationInfo: unknown;
@@ -188,6 +213,15 @@ export interface VsStateEventProps {
   onDeleteFieldValueByPathResult?: (
     result: DeleteFieldValueByPathResult,
   ) => void;
+  /**
+   * The element's message bus (`ui-du-vs-wc-message`): typed messages,
+   * discriminated on `type`. Today these are the value-indicator overlay's
+   * `indicator-overlay-show` / `indicator-overlay-hide`, for a host rendering
+   * its own popover — hide the built-in one with
+   * `::part(indicator-overlay) { display: none }`. `instanceId` tells elements
+   * apart when several report to one handler.
+   */
+  onWcMessage?: (message: IVsWcMessage) => void;
 }
 
 /**
