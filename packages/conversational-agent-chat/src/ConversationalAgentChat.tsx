@@ -128,7 +128,7 @@ export const ConversationalAgentChat = ({
   externalUserId,
   inputSchema: inputSchemaProp,
   locale = "en",
-  theme = "light",
+  theme: themeProp,
   mode = AutopilotChatMode.Embedded,
   readOnly = false,
   overrideLabels,
@@ -153,6 +153,7 @@ export const ConversationalAgentChat = ({
       "`inputSchema` is only supported when `isDebugMode` is true; the agent's input schema is resolved automatically.",
     );
   }
+  const theme = themeProp ?? "light";
   // must change language before useTranslation is called to avoid stale translations
   if (i18n.language !== locale) {
     i18n.changeLanguage(locale);
@@ -266,6 +267,7 @@ export const ConversationalAgentChat = ({
   } | null>(null);
   const citationPreviewRef = useRef(citationPreview);
   const [hasMessages, setHasMessages] = useState(false);
+  const [themeRoot, setThemeRoot] = useState<HTMLDivElement | null>(null);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
   const onUserMessageSentRef = useRef(onUserMessageSent);
   const chatServiceRef = useRef<AutopilotChatService | null>(null);
@@ -1596,104 +1598,119 @@ export const ConversationalAgentChat = ({
 
   return (
     <div className="uipath-conversational-agent-chat">
-      <PortalContainerProvider>
-        {!error && showInputPage && inputSchemaState && (
-          <InputsPage
-            key={`${agentId}-${inputsInstance}`}
-            agentName={agentNameState}
-            inputSchema={inputSchemaState}
-            onSubmit={async (data) => {
-              const inputs = data as Record<string, unknown>;
-              if (isDebugMode && existingConversationId) {
-                await agentService.current.conversations.updateById(
-                  existingConversationId,
-                  { agentInput: { inline: inputs as JSONObject } },
-                );
-              } else {
-                const agent = await resolveAgent();
-                if (!agent) {
-                  throw new Error(t("error_missing_conversation_params"));
+      {/* Apollo's color tokens switch on a theme class, which the scoped
+          stylesheet only honors on a descendant of the widget root (or on the
+          host's <body>), so `theme` is applied here rather than on the root.
+          Without an explicit `theme`, no class is set and the host's <body>
+          theme class keeps applying, as before. */}
+      <div
+        ref={setThemeRoot}
+        className={
+          themeProp ? `uipath-cas-theme ${themeProp}` : "uipath-cas-theme"
+        }
+      >
+        <PortalContainerProvider>
+          {!error && showInputPage && inputSchemaState && (
+            <InputsPage
+              key={`${agentId}-${inputsInstance}`}
+              agentName={agentNameState}
+              inputSchema={inputSchemaState}
+              onSubmit={async (data) => {
+                const inputs = data as Record<string, unknown>;
+                if (isDebugMode && existingConversationId) {
+                  await agentService.current.conversations.updateById(
+                    existingConversationId,
+                    { agentInput: { inline: inputs as JSONObject } },
+                  );
+                } else {
+                  const agent = await resolveAgent();
+                  if (!agent) {
+                    throw new Error(t("error_missing_conversation_params"));
+                  }
+                  const conversation = await agent.conversations.create({
+                    ...(jobStartOverrides ? { jobStartOverrides } : {}),
+                    agentInput: { inline: inputs as JSONObject },
+                  } as ConversationCreateOptionsArg);
+                  currentConversation.current = conversation;
                 }
-                const conversation = await agent.conversations.create({
-                  ...(jobStartOverrides ? { jobStartOverrides } : {}),
-                  agentInput: { inline: inputs as JSONObject },
-                } as ConversationCreateOptionsArg);
-                currentConversation.current = conversation;
-              }
-              storedAgentInputs.current = inputs;
-              setShowInputPage(false);
-            }}
-          />
-        )}
-
-        {error && (
-          <div className="info-container">
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-            <Button variant={"outline"} onClick={handleReload}>
-              {t("reload")}
-            </Button>
-          </div>
-        )}
-
-        {!error && !chatService && (
-          <div className="info-container">
-            <div>{t("loading")}</div>
-            <Loader />
-          </div>
-        )}
-
-        {!error && chatService && !showInputPage && (
-          <ApChat
-            key={locale}
-            chatServiceInstance={chatService}
-            locale={toApolloSupportedLocale(locale)}
-            theme={theme}
-            enableInternalThemeProvider
-          />
-        )}
-
-        <FeedbackDialog
-          open={feedbackDialogOpen}
-          isPositive={feedbackIsPositive}
-          onOpenChange={setFeedbackDialogOpen}
-          onSubmit={onFeedbackSubmit}
-          onCancel={onFeedbackCancel}
-        />
-        <Dialog
-          open={!!citationPreviewData}
-          onOpenChange={(open) => {
-            if (!open) setCitationPreviewData(null);
-          }}
-        >
-          {citationPreviewData && (
-            <DialogContent className="sm:max-w-4xl">
-              <DialogHeader>
-                <DialogTitle>{citationPreviewData.title}</DialogTitle>
-              </DialogHeader>
-              {citationPreviewData.error ? (
-                <Column
-                  w="full"
-                  align="center"
-                  justify="center"
-                  style={{ height: "60vh", maxHeight: "600px" }}
-                >
-                  {t("file_preview_error")}
-                </Column>
-              ) : (
-                <FilePreviewer
-                  file={citationPreviewData.file}
-                  usePdfJs={usePdfJsViewer}
-                  pageNumber={citationPreviewData.pageNumber}
-                  iframeParams={`#page=${citationPreviewData.pageNumber}`}
-                />
-              )}
-            </DialogContent>
+                storedAgentInputs.current = inputs;
+                setShowInputPage(false);
+              }}
+            />
           )}
-        </Dialog>
-        <Toaster id={toasterId} position="top-right" richColors />
-      </PortalContainerProvider>
+
+          {error && (
+            <div className="info-container">
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+              <Button variant={"outline"} onClick={handleReload}>
+                {t("reload")}
+              </Button>
+            </div>
+          )}
+
+          {!error && !chatService && (
+            <div className="info-container">
+              <div>{t("loading")}</div>
+              <Loader />
+            </div>
+          )}
+
+          {!error && chatService && !showInputPage && (
+            <ApChat
+              key={locale}
+              chatServiceInstance={chatService}
+              locale={toApolloSupportedLocale(locale)}
+              theme={theme}
+              enableInternalThemeProvider
+              // Keep Apollo's tooltips, menus and history popover inside the
+              // themed wrapper; portalled to <body> they'd lose the theme tokens.
+              portalContainer={themeRoot ?? undefined}
+            />
+          )}
+
+          <FeedbackDialog
+            open={feedbackDialogOpen}
+            isPositive={feedbackIsPositive}
+            onOpenChange={setFeedbackDialogOpen}
+            onSubmit={onFeedbackSubmit}
+            onCancel={onFeedbackCancel}
+          />
+          <Dialog
+            open={!!citationPreviewData}
+            onOpenChange={(open) => {
+              if (!open) setCitationPreviewData(null);
+            }}
+          >
+            {citationPreviewData && (
+              <DialogContent className="sm:max-w-4xl">
+                <DialogHeader>
+                  <DialogTitle>{citationPreviewData.title}</DialogTitle>
+                </DialogHeader>
+                {citationPreviewData.error ? (
+                  <Column
+                    w="full"
+                    align="center"
+                    justify="center"
+                    style={{ height: "60vh", maxHeight: "600px" }}
+                  >
+                    {t("file_preview_error")}
+                  </Column>
+                ) : (
+                  <FilePreviewer
+                    file={citationPreviewData.file}
+                    usePdfJs={usePdfJsViewer}
+                    pageNumber={citationPreviewData.pageNumber}
+                    iframeParams={`#page=${citationPreviewData.pageNumber}`}
+                  />
+                )}
+              </DialogContent>
+            )}
+          </Dialog>
+          <Toaster id={toasterId} position="top-right" richColors />
+        </PortalContainerProvider>
+      </div>
     </div>
   );
 };

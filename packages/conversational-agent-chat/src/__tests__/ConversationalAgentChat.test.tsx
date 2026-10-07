@@ -57,8 +57,13 @@ const createMockChatService = () => ({
 let mockChatService = createMockChatService();
 
 vi.mock("@uipath/apollo-react/material/components", () => ({
-  ApChat: ({ chatServiceInstance, locale, theme }: any) => (
-    <div data-testid="ap-chat" data-locale={locale} data-theme={theme}>
+  ApChat: ({ chatServiceInstance, locale, theme, portalContainer }: any) => (
+    <div
+      data-testid="ap-chat"
+      data-locale={locale}
+      data-theme={theme}
+      data-portal-container={portalContainer?.className}
+    >
       {chatServiceInstance ? "Chat Loaded" : "Loading..."}
     </div>
   ),
@@ -666,6 +671,44 @@ describe("ConversationalAgentChat", () => {
       () => {
         const apChat = screen.getByTestId("ap-chat");
         expect(apChat).toHaveAttribute("data-theme", "dark");
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it("should apply the theme class inside the widget root and follow theme changes", async () => {
+    const { container, rerender } = render(
+      <ConversationalAgentChat {...defaultProps} theme="dark" />,
+    );
+    const root = container.querySelector(".uipath-conversational-agent-chat");
+    const themeRoot = root?.querySelector(":scope > .uipath-cas-theme");
+
+    // The scoped stylesheet only applies theme tokens to a descendant of the
+    // root, so the class must not land on the root itself.
+    expect(root).not.toHaveClass("dark");
+    expect(themeRoot).toHaveClass("dark");
+
+    rerender(<ConversationalAgentChat {...defaultProps} theme="light-hc" />);
+    expect(themeRoot).toHaveClass("light-hc");
+    expect(themeRoot).not.toHaveClass("dark");
+  });
+
+  it("should not set a theme class when theme is omitted, so the host's body theme applies", () => {
+    const { container } = render(<ConversationalAgentChat {...defaultProps} />);
+    const themeRoot = container.querySelector(".uipath-cas-theme");
+
+    expect(themeRoot?.className).toBe("uipath-cas-theme");
+  });
+
+  it("should portal ApChat popups into the themed wrapper", async () => {
+    render(<ConversationalAgentChat {...defaultProps} theme="dark" />);
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("ap-chat")).toHaveAttribute(
+          "data-portal-container",
+          "uipath-cas-theme dark",
+        );
       },
       { timeout: 3000 },
     );
