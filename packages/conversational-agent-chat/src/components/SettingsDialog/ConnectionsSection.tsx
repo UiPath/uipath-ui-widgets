@@ -218,7 +218,9 @@ export const ConnectionsSection = ({
     setSaveError(null);
     try {
       const configurableKeys = new Set(
-        items.filter((i) => i.isConfigurable !== false).map((i) => i.connectorKey),
+        items
+          .filter((i) => i.isConfigurable !== false)
+          .map((i) => i.connectorKey),
       );
       const updated = await api.updateConnectionSelections(agentId, folderId, {
         selections: Object.entries(stagedSelections)

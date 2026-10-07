@@ -525,7 +525,6 @@ export const ConnectionReadinessCard = ({
             {connectedCount === 0
               ? t("connection_readiness_setup_title")
               : t("connection_readiness_mixed_title", {
-                  connected: connectedCount,
                   total: totalConfigurable,
                   remaining: totalConfigurable - connectedCount,
                 })}
@@ -563,14 +562,7 @@ export const ConnectionReadinessCard = ({
                     <span className="text-sm font-medium">
                       {connector.connectorName}
                     </span>
-                    <span
-                      className={cn(
-                        "text-xs",
-                        isConnected
-                          ? "text-muted-foreground"
-                          : "text-muted-foreground",
-                      )}
-                    >
+                    <span className="text-xs text-muted-foreground">
                       {getStatusText(connector)}
                     </span>
                   </div>
