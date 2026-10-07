@@ -2024,6 +2024,7 @@ describe("ConversationalAgentChat", () => {
       expect(cstCall).toBeTruthy();
       expect(cstCall[0].meta.toolName).toBe("create_plan");
       expect(cstCall[0].meta.isCompleted).toBe(false);
+      expect(cstCall[0].meta.defaultValues).toBeUndefined();
 
       // Simulate submit
       cstCall[0].meta.onSubmit({ title: "My Plan" });

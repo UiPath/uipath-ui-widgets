@@ -59,29 +59,19 @@ const hasAnyRequiredDescendant = (prop: InputSchemaProperty): boolean => {
 // "datetime-local"; any new option must likewise be a valid <input> type.
 type DateFormat = "date" | "time" | "datetime-local";
 
-// Tool input schemas often arrive as plain `type: "string"` with no format,
-// even when the value is a date. Precedence: schema → value → undefined.
-// length >= 10 avoids bare years like "2026" matching as parseable dates.
-//
-// A declared `format` is authoritative: `time` renders a time picker. Only the
-// value-inference fallback below stays conservative (it can't tell a bare time
-// string from an arbitrary label).
+// Limits the year to four digits (Chrome allows six by default).
+const MAX_BY_FORMAT: Partial<Record<DateFormat, string>> = {
+  date: "9999-12-31",
+  "datetime-local": "9999-12-31T23:59:59",
+};
+
+// Pickers only render for a declared `format`, never inferred from the value.
 const resolveDateFormat = (
   prop: InputSchemaProperty,
-  value: unknown,
 ): DateFormat | undefined => {
   if (prop.format === "date") return "date";
   if (prop.format === "time") return "time";
   if (prop.format === "date-time") return "datetime-local";
-  if (prop.type && prop.type !== "string") return undefined;
-  if (value instanceof Date) return "datetime-local";
-  if (
-    typeof value === "string" &&
-    value.length >= 10 &&
-    !isNaN(Date.parse(value))
-  ) {
-    return value.includes("T") ? "datetime-local" : "date";
-  }
   return undefined;
 };
 
@@ -105,7 +95,7 @@ interface FieldLabelProps {
   fieldKey: string;
   isRequired?: boolean;
   hasError?: boolean;
-  /** Resolved date/time format (schema-driven if set, else inferred from value). */
+  /** Input type from the schema `format`, if any. */
   dateFormat?: DateFormat;
 }
 
@@ -145,7 +135,7 @@ export const AgentSchemaField = ({
 }: AgentSchemaFieldProps) => {
   const { t } = useWidgetTranslation();
   const showRequired = isRequired || hasAnyRequiredDescendant(prop);
-  const dateFormat = resolveDateFormat(prop, value);
+  const dateFormat = resolveDateFormat(prop);
   const label = (
     <FieldLabel
       prop={prop}
@@ -193,6 +183,7 @@ export const AgentSchemaField = ({
       >
         <Input
           type={dateFormat}
+          max={MAX_BY_FORMAT[dateFormat]}
           value={(value as string) ?? ""}
           disabled={disabled}
           onChange={(e: ChangeEvent<HTMLInputElement>) =>

@@ -1,9 +1,11 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "@uipath/apollo-wind";
 import {
   AgentSchemaForm,
   type AgentSchemaFormHandle,
 } from "./AgentSchemaForm/AgentSchemaForm";
+import { omitEmptyOptionalValues } from "./AgentSchemaForm/omitEmptyOptionalValues";
+import { resolveSchema } from "./AgentSchemaForm/resolveSchema";
 import type { InputSchema } from "./AgentSchemaForm/types";
 
 export interface ClientSideToolProps {
@@ -36,6 +38,12 @@ export function ClientSideTool({
     type: "object",
     properties: {},
   }) as InputSchema;
+  const resolvedSchema = useMemo(
+    () => resolveSchema(inputSchema),
+    [inputSchema],
+  );
+  // Collapsing with nothing required would hide the whole form.
+  const hasRequiredFields = (resolvedSchema.required?.length ?? 0) > 0;
 
   return (
     <div className="my-3 flex flex-col gap-3 rounded-lg border border-border bg-background p-4">
@@ -50,9 +58,10 @@ export function ClientSideTool({
         initialValues={defaultValues ?? {}}
         disabled={isSubmitting}
         formRef={formRef}
+        collapsibleOptional={hasRequiredFields}
         onSubmit={async (data) => {
           setIsSubmitting(true);
-          onSubmit(data);
+          onSubmit(omitEmptyOptionalValues(data, resolvedSchema));
         }}
       />
       <div className="mt-1 flex justify-end gap-2">
