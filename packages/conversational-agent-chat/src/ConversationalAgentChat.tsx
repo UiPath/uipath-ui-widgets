@@ -1092,6 +1092,15 @@ export const ConversationalAgentChat = ({
     try {
       initializedFor.current = initKey;
 
+      // Fetched alongside the agent so it doesn't add latency; a failure only
+      // keeps the flag-gated features off, so it never fails chat init.
+      const featureFlagsPromise = agentService.current
+        .getFeatureFlags()
+        .catch((e): Record<string, unknown> => {
+          console.warn("Failed to fetch feature flags", e);
+          return {};
+        });
+
       const agentRelease = await resolveAgent();
       agentIdRef.current = agentRelease?.id;
       agentKeyRef.current = agentRelease?.releaseKey;
@@ -1299,6 +1308,9 @@ export const ConversationalAgentChat = ({
             renameChat: false,
             ...(!agentId ? { newChat: true, history: true } : {}),
             ...disabledFeaturesRef.current,
+            // Off until the tenant's fileAttachmentEnabled flag confirms it
+            // (see below); a host can disable attachments but not force them on.
+            attachments: true,
           },
         },
       });
@@ -1309,9 +1321,19 @@ export const ConversationalAgentChat = ({
       chatServiceInstance.setPrompt("");
       chatServiceInstance.clearError();
 
-      if (!disabledFeaturesRef.current?.attachments) {
+      // Not awaited so a slow flag fetch doesn't hold up the chat. Skip if a
+      // newer init has taken over the singleton chat service in the meantime.
+      void featureFlagsPromise.then((flags) => {
+        if (initializedFor.current !== initKey) return;
+        if (
+          flags.fileAttachmentEnabled !== true ||
+          disabledFeaturesRef.current?.attachments
+        ) {
+          return;
+        }
+        chatServiceInstance.setDisabledFeatures({ attachments: false });
         chatServiceInstance.setAllowedAttachments(ALLOWED_ATTACHMENTS);
-      }
+      });
 
       if (existingConversationId) {
         const conversation = await getConversation();

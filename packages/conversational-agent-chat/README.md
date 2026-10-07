@@ -138,7 +138,7 @@ Responses stream in real time, so the conversation stays fluid while the agent g
 
 ### File attachments
 
-Users can attach files to their messages via drag and drop or the file picker.
+Users can attach files to their messages via drag and drop or the file picker. Attachments only appear when the tenant's `fileAttachmentEnabled` feature flag is on; hosts can still hide them with `disabledFeatures.attachments`.
 
 ### Tool call tracking
 

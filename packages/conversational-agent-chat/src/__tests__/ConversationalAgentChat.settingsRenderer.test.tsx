@@ -55,6 +55,7 @@ vi.mock("../components/SettingsDialog", () => ({
 
 vi.mock("@uipath/uipath-typescript/conversational-agent", () => ({
   ConversationalAgent: class {
+    getFeatureFlags = vi.fn().mockResolvedValue({});
     getById = vi.fn().mockResolvedValue({
       name: "Test Agent",
       appearance: {

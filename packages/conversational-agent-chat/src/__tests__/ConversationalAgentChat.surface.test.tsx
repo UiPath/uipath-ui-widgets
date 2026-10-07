@@ -47,6 +47,7 @@ vi.mock("../utils/telemetryUtils", () => ({
 
 vi.mock("@uipath/uipath-typescript/conversational-agent", () => ({
   ConversationalAgent: class {
+    getFeatureFlags = vi.fn().mockResolvedValue({});
     constructor(...args: any[]) {
       conversationalAgentCtorCalls.push(args);
     }

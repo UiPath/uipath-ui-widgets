@@ -51,6 +51,7 @@ const createMockChatService = () => ({
   setWaiting: vi.fn(),
   setCustomHeaderActions: vi.fn(),
   setAllowedAttachments: vi.fn(),
+  setDisabledFeatures: vi.fn(),
   getConversation: vi.fn().mockReturnValue([]),
 });
 
@@ -111,6 +112,7 @@ const {
   mockCreate,
   mockUpdateById,
   mockDownloadCitationSource,
+  mockGetFeatureFlags,
   mockExchangesGetAll,
   sessionControl,
 } = vi.hoisted(() => ({
@@ -119,6 +121,7 @@ const {
   mockCreate: vi.fn(),
   mockUpdateById: vi.fn(),
   mockDownloadCitationSource: vi.fn(),
+  mockGetFeatureFlags: vi.fn(),
   mockExchangesGetAll: vi.fn(),
   // When neverStarts is true, startSession returns a session that never fires
   // sessionStarted and keeps emits paused — exercises the start-timeout path.
@@ -212,6 +215,7 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
       }
       getById = mockGetById;
       downloadCitationSource = mockDownloadCitationSource;
+      getFeatureFlags = mockGetFeatureFlags;
 
       getAll = vi.fn().mockResolvedValue([
         {
@@ -298,6 +302,9 @@ describe("ConversationalAgentChat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     capturedAgentConstructorArgs.length = 0;
+    mockGetFeatureFlags
+      .mockReset()
+      .mockResolvedValue({ fileAttachmentEnabled: true });
     mockGetById.mockReset().mockResolvedValue({
       id: 12345,
       releaseKey: "11111111-2222-3333-4444-555555555555",
@@ -482,6 +489,7 @@ describe("ConversationalAgentChat", () => {
                 close: true,
                 settings: false,
                 renameChat: false,
+                attachments: true,
               },
             }),
           }),
@@ -491,42 +499,127 @@ describe("ConversationalAgentChat", () => {
     );
   });
 
-  it("should call setAllowedAttachments when attachments are not disabled", async () => {
-    render(<ConversationalAgentChat {...defaultProps} />);
+  describe("attachments feature flag", () => {
+    const getInitDisabledFeatures = async () => {
+      const { AutopilotChatService } =
+        await import("@uipath/apollo-react/material/components");
+      const initialize = vi.mocked(AutopilotChatService.Instantiate).mock
+        .calls[0][0] as any;
+      return initialize.config.disabledFeatures;
+    };
 
-    await waitFor(
-      () => {
-        expect(mockChatService.setAllowedAttachments).toHaveBeenCalledWith(
-          expect.objectContaining({
-            multiple: true,
-            types: expect.objectContaining({
-              "application/pdf": [".pdf"],
-              "image/png": [".png"],
+    it("enables attachments once fileAttachmentEnabled is on", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.setAllowedAttachments).toHaveBeenCalledWith(
+            expect.objectContaining({
+              multiple: true,
+              types: expect.objectContaining({
+                "application/pdf": [".pdf"],
+                "image/png": [".png"],
+              }),
+              maxSize: 30 * 1024 * 1024,
             }),
-            maxSize: 30 * 1024 * 1024,
-          }),
-        );
-      },
-      { timeout: 3000 },
-    );
-  });
+          );
+        },
+        { timeout: 3000 },
+      );
+      expect(mockChatService.setDisabledFeatures).toHaveBeenCalledWith({
+        attachments: false,
+      });
+      expect(mockGetFeatureFlags).toHaveBeenCalledTimes(1);
+    });
 
-  it("should not call setAllowedAttachments when attachments are disabled", async () => {
-    render(
-      <ConversationalAgentChat
-        {...defaultProps}
-        disabledFeatures={{ attachments: true }}
-      />,
-    );
+    it("starts with attachments disabled even if the host passes attachments: false", async () => {
+      mockGetFeatureFlags.mockReturnValue(new Promise(() => {}));
+      render(
+        <ConversationalAgentChat
+          {...defaultProps}
+          disabledFeatures={{ attachments: false }}
+        />,
+      );
 
-    await waitFor(
-      () => {
-        expect(screen.getByTestId("ap-chat")).toBeInTheDocument();
-      },
-      { timeout: 3000 },
-    );
+      await waitFor(
+        () => {
+          expect(screen.getByTestId("ap-chat")).toHaveTextContent(
+            "Chat Loaded",
+          );
+        },
+        { timeout: 3000 },
+      );
 
-    expect(mockChatService.setAllowedAttachments).not.toHaveBeenCalled();
+      expect((await getInitDisabledFeatures()).attachments).toBe(true);
+      expect(mockChatService.setAllowedAttachments).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["off", { fileAttachmentEnabled: false }],
+      ["missing", {}],
+    ])("keeps attachments disabled when the flag is %s", async (_, flags) => {
+      mockGetFeatureFlags.mockResolvedValue(flags);
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(screen.getByTestId("ap-chat")).toHaveTextContent(
+            "Chat Loaded",
+          );
+        },
+        { timeout: 3000 },
+      );
+      await waitFor(() => expect(mockGetFeatureFlags).toHaveBeenCalled());
+
+      expect(mockChatService.setAllowedAttachments).not.toHaveBeenCalled();
+      expect(mockChatService.setDisabledFeatures).not.toHaveBeenCalled();
+    });
+
+    it("keeps attachments disabled and still loads the chat when the flag fetch fails", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mockGetFeatureFlags.mockRejectedValue(new Error("flags down"));
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(screen.getByTestId("ap-chat")).toHaveTextContent(
+            "Chat Loaded",
+          );
+        },
+        { timeout: 3000 },
+      );
+      await waitFor(() =>
+        expect(warnSpy).toHaveBeenCalledWith(
+          "Failed to fetch feature flags",
+          expect.any(Error),
+        ),
+      );
+
+      expect(mockChatService.setAllowedAttachments).not.toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it("lets the host disable attachments even when the flag is on", async () => {
+      render(
+        <ConversationalAgentChat
+          {...defaultProps}
+          disabledFeatures={{ attachments: true }}
+        />,
+      );
+
+      await waitFor(
+        () => {
+          expect(screen.getByTestId("ap-chat")).toHaveTextContent(
+            "Chat Loaded",
+          );
+        },
+        { timeout: 3000 },
+      );
+      await waitFor(() => expect(mockGetFeatureFlags).toHaveBeenCalled());
+
+      expect(mockChatService.setAllowedAttachments).not.toHaveBeenCalled();
+      expect(mockChatService.setDisabledFeatures).not.toHaveBeenCalled();
+    });
   });
 
   it("should configure override labels", async () => {
