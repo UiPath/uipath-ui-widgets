@@ -23,6 +23,21 @@ vi.mock("../saveValidatedDataUtil", () => ({
     mockSaveValidatedDataAsDraft(...args),
 }));
 
+// The widget persists a Flow document through the exported functions hosts
+// use, so their behaviour cannot drift.
+const mockSubmitProcessedDocument = vi.fn();
+const mockSaveProcessedDocumentAsDraft = vi.fn();
+const mockReportProcessedDocumentException = vi.fn();
+
+vi.mock("../processedDocument/save", () => ({
+  submitProcessedDocument: (...args: any[]) =>
+    mockSubmitProcessedDocument(...args),
+  saveProcessedDocumentAsDraft: (...args: any[]) =>
+    mockSaveProcessedDocumentAsDraft(...args),
+  reportProcessedDocumentException: (...args: any[]) =>
+    mockReportProcessedDocumentException(...args),
+}));
+
 const mockArtifacts = {
   taxonomy: { fields: [] },
   extractionResult: { results: [] },
@@ -222,6 +237,91 @@ describe("ValidationStation", () => {
         expect(mockSubmitValidatedData).toHaveBeenCalled();
         expect(mockSaveValidatedDataAsDraft).toHaveBeenCalled();
       });
+    });
+  });
+
+  describe("processedDocument source (sdk + processedDocument)", () => {
+    const processedDocument = {
+      type: "Extraction",
+      metadata: { traceId: "trace-1", spanId: "span-1", folderKey: "f-1" },
+    };
+    const pdProps: any = { sdk: { id: "sdk" }, processedDocument };
+
+    const waitForWc = async (container: HTMLElement) =>
+      await waitFor(() => {
+        const el = container.querySelector(
+          "ui-du-validation-station-standalone-wc-element",
+        );
+        if (!el) throw new Error("WC element not mounted");
+        return el;
+      });
+
+    it("hands the processedDocument to artifact resolution", async () => {
+      const { container } = render(<ValidationStation {...pdProps} />);
+
+      await waitForWc(container);
+      expect(mockUseSubcomponentArtifacts).toHaveBeenCalledWith(
+        expect.objectContaining({ sdk: pdProps.sdk, processedDocument }),
+      );
+    });
+
+    it.each([
+      [
+        "saveValidatedDataRequest",
+        "onSubmit",
+        () => mockSubmitProcessedDocument,
+      ],
+      [
+        "saveValidatedDataAsDraftRequest",
+        "onSaveAsDraft",
+        () => mockSaveProcessedDocumentAsDraft,
+      ],
+      [
+        "saveExceptionReportRequest",
+        "onReportException",
+        () => mockReportProcessedDocumentException,
+      ],
+    ])(
+      "persists `%s` through the exported function and emits the outcome",
+      async (event, prop, getMock) => {
+        const outcome = { success: false, error: "status 500" };
+        getMock().mockResolvedValue(outcome);
+        const callback = vi.fn();
+        const { container } = render(
+          <ValidationStation {...pdProps} {...{ [prop]: callback }} />,
+        );
+        const el = await waitForWc(container);
+
+        const detail = { documentId: "trace-1", validatedData: { output: {} } };
+        el.dispatchEvent(new CustomEvent(event, { detail }));
+
+        await waitFor(() => {
+          expect(callback).toHaveBeenCalledWith(detail, outcome);
+        });
+        expect(getMock()).toHaveBeenCalledWith(
+          pdProps.sdk,
+          processedDocument,
+          detail,
+        );
+        expect(mockSubmitValidatedData).not.toHaveBeenCalled();
+        expect(mockSaveValidatedDataAsDraft).not.toHaveBeenCalled();
+      },
+    );
+
+    it("persists through ContentValidationData when both payloads are set", async () => {
+      mockSubmitValidatedData.mockResolvedValue({ success: true });
+      const { container } = render(
+        <ValidationStation {...pdProps} data={baseProps.data} />,
+      );
+      const el = await waitForWc(container);
+
+      const detail = { documentId: "doc-123", validatedData: {} };
+      el.dispatchEvent(new CustomEvent("saveValidatedDataRequest", { detail }));
+
+      await waitFor(() => {
+        expect(mockSubmitValidatedData).toHaveBeenCalled();
+      });
+      expect(mockSubmitProcessedDocument).not.toHaveBeenCalled();
     });
   });
 

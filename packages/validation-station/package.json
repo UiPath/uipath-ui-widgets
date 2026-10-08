@@ -66,8 +66,8 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "@uipath/du-utils": "1.0.0-rc.2",
-    "@uipath/du-validation-station-wc": "1.0.0-rc.2",
+    "@uipath/du-utils": "1.0.0-rc.3",
+    "@uipath/du-validation-station-wc": "1.0.0-rc.3",
     "fflate": "^0.8.2"
   }
 }
