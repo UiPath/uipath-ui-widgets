@@ -24,10 +24,10 @@ export const widgets: Widget[] = [
       "The same review screen, with the document fetched by the app instead of the widget — `fetchDuDocumentArtifacts` loads the artifacts, they are passed straight in, and the app owns the submit and draft write-back.",
   },
   {
-    id: "validation-station-flow",
-    title: "Validation Station (Flow document)",
+    id: "validation-station-ixp",
+    title: "Validation Station (IXP document)",
     description:
-      "Paste a Flow `ProcessedDocument` and review it — widget-driven, or host-driven with `fetchProcessedDocumentArtifacts` and the save functions — with every save outcome logged.",
+      "Paste an IXP `ProcessedDocument` and review it — widget-driven, or host-driven with `fetchProcessedDocumentArtifacts` and the save functions — with every save outcome logged.",
   },
   {
     id: "invoice-review-workspace",

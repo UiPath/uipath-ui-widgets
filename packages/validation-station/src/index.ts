@@ -47,7 +47,7 @@ export {
   submitValidatedData,
 } from "./saveValidatedDataUtil.js";
 
-// ─── Flow documents (ProcessedDocument) ───────────────────────────────────────
+// ─── IXP documents (ProcessedDocument) ────────────────────────────────────────
 export { fetchProcessedDocumentArtifacts } from "./processedDocument/artifacts.js";
 export {
   reportProcessedDocumentException,

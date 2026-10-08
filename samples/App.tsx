@@ -7,7 +7,7 @@ import HomePage from "./pages/HomePage";
 import InvoiceReviewWorkspacePage from "./pages/InvoiceReviewWorkspace";
 import MultiFileUploadPage from "./pages/MultiFileUploadPage";
 import {
-  ValidationStationProcessedDocumentPage,
+  ValidationStationIxpPage,
   ValidationStationPage,
   ValidationStationPrefetchedPage,
 } from "./pages/ValidationStation";
@@ -40,8 +40,8 @@ function App({ uipathSdk }: AppProps) {
     case "validation-station-prefetched":
       page = <ValidationStationPrefetchedPage uipathSdk={uipathSdk} />;
       break;
-    case "validation-station-flow":
-      page = <ValidationStationProcessedDocumentPage uipathSdk={uipathSdk} />;
+    case "validation-station-ixp":
+      page = <ValidationStationIxpPage uipathSdk={uipathSdk} />;
       break;
     case "invoice-review-workspace":
       page = <InvoiceReviewWorkspacePage uipathSdk={uipathSdk} />;

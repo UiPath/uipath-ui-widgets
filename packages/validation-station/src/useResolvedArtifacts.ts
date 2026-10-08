@@ -44,7 +44,7 @@ export interface DuArtifactsSource {
  * `ValidationStation`'s data source: {@link DuArtifactsSource}, whose
  * `artifacts` may also be in the IXP representation, plus a third mode:
  *
- * 3. **Self-fetching, Flow** — pass `sdk` + `processedDocument`. The hook
+ * 3. **Self-fetching, IXP** — pass `sdk` + `processedDocument`. The hook
  *    fetches the document's artifacts through its producing run, as
  *    `fetchProcessedDocumentArtifacts` does.
  *

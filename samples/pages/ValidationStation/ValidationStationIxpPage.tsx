@@ -24,7 +24,7 @@ import { loadValidationStationWcOnDemand } from "../../duWcLoader";
 import CenteredText from "./CenteredText";
 import PageHeader from "../PageHeader";
 
-interface ValidationStationFlowPageProps {
+interface ValidationStationIxpPageProps {
   uipathSdk: UiPath;
 }
 
@@ -49,10 +49,10 @@ const describeValidatedData = (request: unknown): string | undefined => {
 
 let nextLogId = 0;
 
-/** A scratch page for testing a pasted Flow `ProcessedDocument` against a real tenant. */
-function ValidationStationFlowPage({
+/** A scratch page for testing a pasted IXP `ProcessedDocument` against a real tenant. */
+function ValidationStationIxpPage({
   uipathSdk,
-}: ValidationStationFlowPageProps) {
+}: ValidationStationIxpPageProps) {
   useEffect(() => {
     loadValidationStationWcOnDemand();
   }, []);
@@ -212,7 +212,7 @@ function ValidationStationFlowPage({
 
   return (
     <>
-      <PageHeader widgetId="validation-station-flow" />
+      <PageHeader widgetId="validation-station-ixp" />
       <Box sx={{ flex: 1, overflow: "auto", height: "calc(100vh - 160px)" }}>
         <Grid container sx={{ height: "100%" }}>
           <Grid
@@ -340,4 +340,4 @@ function ValidationStationFlowPage({
   );
 }
 
-export default ValidationStationFlowPage;
+export default ValidationStationIxpPage;

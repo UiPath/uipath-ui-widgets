@@ -366,7 +366,7 @@ function LayoutPreview({ widgetId }: LayoutPreviewProps) {
     // source differs — so they share one preview.
     case "validation-station":
     case "validation-station-prefetched":
-    case "validation-station-flow":
+    case "validation-station-ixp":
       return <ValidationStationPreview />;
     case "invoice-review-workspace":
       return <InvoiceReviewWorkspacePreview />;

@@ -71,11 +71,11 @@ function App({ task }: { task: { data: DuFramework.ContentValidationData } }) {
 
 The widget needs a taxonomy, an extraction result and a document DOM. There are three mutually exclusive ways to give it those:
 
-| Mode                    | Pass                         | Who fetches                                                   | Who writes back                                       |
-| ----------------------- | ---------------------------- | ------------------------------------------------------------- | ----------------------------------------------------- |
-| **Self-fetching**       | `sdk` + `data`               | The widget, from the bucket paths on `ContentValidationData`  | The widget, to `ValidatedExtractionResultsPath`       |
-| **Self-fetching, Flow** | `sdk` + `processedDocument`  | The widget, through the Flow run that produced the document   | The widget, as a review recorded against the Flow run |
-| **Pre-fetched**         | `artifacts` (+ `documentId`) | You — hand it a `DuDocumentArtifacts` object you already hold | You, from the request the widget emits                |
+| Mode                   | Pass                         | Who fetches                                                   | Who writes back                                       |
+| ---------------------- | ---------------------------- | ------------------------------------------------------------- | ----------------------------------------------------- |
+| **Self-fetching**      | `sdk` + `data`               | The widget, from the bucket paths on `ContentValidationData`  | The widget, to `ValidatedExtractionResultsPath`       |
+| **Self-fetching, IXP** | `sdk` + `processedDocument`  | The widget, through the Flow run that produced the document   | The widget, as a review recorded against the Flow run |
+| **Pre-fetched**        | `artifacts` (+ `documentId`) | You — hand it a `DuDocumentArtifacts` object you already hold | You, from the request the widget emits                |
 
 If both `data` and `processedDocument` are set, `data` wins.
 
@@ -181,7 +181,7 @@ function HostOwnedReview({ sdk, data }) {
 
 The request payloads are exported too — `IVsSaveValidatedDataRequest`, `IVsSaveValidatedDataAsDraftRequest` and `IVsSaveExceptionReportRequest` — so handlers declared outside JSX can name their parameter.
 
-### Flow documents (`ProcessedDocument`)
+### IXP (`ProcessedDocument`)
 
 A Flow IDP node emits a `ProcessedDocument` rather than a `ContentValidationData`. It carries the taxonomy (an `IXPTaxonomy`) and the result (an `IXPExtraction`) inline, plus `metadata` naming the run that produced it — `traceId`, `spanId` and `folderKey`. The document, its DOM and its OCR text are read through that run's trace.
 
@@ -233,7 +233,7 @@ The save functions are stateless: each one edits the span's newest review record
 | -------------------------------- | ---------------------------------------------- | -------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `sdk`                            | `UiPath`                                       | No\*     | —         | UiPath SDK instance for authentication and API calls. Required for self-fetching / persistence                                                                                                                                                                         |
 | `data`                           | `ContentValidationData`                        | No\*     | —         | Document data containing the bucket paths, document ID, and the folder they live in — `FolderId` or `FolderKey`, whichever the producing activity set. Required for self-fetching / persistence                                                                        |
-| `processedDocument`              | `ProcessedDocument`                            | No\*     | —         | A Flow IDP node's output. With `sdk`, the widget fetches its artifacts and records reviews through the producing run — see [Flow documents](#flow-documents-processeddocument). Ignored when `data` is set                                                             |
+| `processedDocument`              | `ProcessedDocument`                            | No\*     | —         | A Flow IDP node's output. With `sdk`, the widget fetches its artifacts and records reviews through the producing run — see [IXP documents](#ixp-documents-processeddocument). Ignored when `data` is set                                                               |
 | `artifacts`                      | `DuDocumentArtifacts \| IxpDocumentArtifacts`  | No\*     | —         | Pre-fetched document artifacts. When supplied, no fetch is performed. \*Either `artifacts`, `sdk` + `data` or `sdk` + `processedDocument` must be provided                                                                                                             |
 | `documentId`                     | `string`                                       | No       | —         | Document ID forwarded to the web component. Falls back to `data.DocumentId`, else `processedDocument.metadata.traceId` — pass it in pre-fetched mode                                                                                                                   |
 | `theme`                          | `'light' \| 'dark' \| 'light-hc' \| 'dark-hc'` | No       | `'light'` | Visual theme                                                                                                                                                                                                                                                           |
@@ -646,7 +646,7 @@ From rc.3:
 
 - **The IXP representation.** `ValidationStation` takes an IXP document — a
   Flow `processedDocument`, or `IxpDocumentArtifacts` — see
-  [Flow documents](#flow-documents-processeddocument).
+  [IXP documents](#ixp-documents-processeddocument).
 - **`HideHighlightRow`** on `FeatureCustomization` (compact mode) hides the
   _Highlight row_ action from each field group row's menu.
 - The compact fields form's expand / collapse-all control is redesigned, and
