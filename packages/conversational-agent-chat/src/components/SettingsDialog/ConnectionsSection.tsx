@@ -279,15 +279,23 @@ export const ConnectionsSection = ({
           if (status.status === "success" && status.connectionId) {
             clearPoll();
             setConnectingKey(null);
-            // Auto-save the new connection
+            // Auto-save the new connection (post full selections to avoid replace-semantics wipe)
             try {
+              const configurableItems = items.filter(
+                (i) => i.isConfigurable !== false,
+              );
               const updated = await api.updateConnectionSelections(
                 agentId,
                 folderId,
                 {
-                  selections: [
-                    { connectorKey, connectionId: status.connectionId },
-                  ],
+                  selections: configurableItems.map((i) => ({
+                    connectorKey: i.connectorKey,
+                    connectionId:
+                      i.connectorKey === connectorKey
+                        ? status.connectionId
+                        : (stagedSelections[i.connectorKey] ??
+                          i.currentConnectionId),
+                  })),
                 },
               );
               if (oauthSessionRef.current === oauthSession) {
@@ -313,8 +321,7 @@ export const ConnectionsSection = ({
               setConnectingKey(null);
           }
         } catch {
-          clearPoll();
-          if (oauthSessionRef.current === oauthSession) setConnectingKey(null);
+          // Transient error — keep polling until the session expires
         } finally {
           pollInFlightRef.current = false;
         }

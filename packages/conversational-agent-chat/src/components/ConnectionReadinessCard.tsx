@@ -59,6 +59,7 @@ export const ConnectionReadinessCard = ({
   const [localConnectors, setLocalConnectors] =
     useState<ConnectorReadiness[]>(connectors);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollInFlightRef = useRef(false);
   const oauthSessionRef = useRef(0);
 
   // Sync when prop changes
@@ -192,9 +193,12 @@ export const ConnectionReadinessCard = ({
           "noopener,noreferrer,width=600,height=700",
         );
 
+        pollInFlightRef.current = false;
         pollingRef.current = setInterval(async () => {
           // Another OAuth connection replaced this one
           if (oauthSessionRef.current !== oauthSession) return;
+          if (pollInFlightRef.current) return;
+          pollInFlightRef.current = true;
 
           try {
             if (Date.now() > expiresTime) {
@@ -229,13 +233,15 @@ export const ConnectionReadinessCard = ({
 
               // Persist via SDK first, then rebuild local state from the response
               try {
-                const updatedSelections = localConnectors.map((c) => ({
-                  connectorKey: c.connectorKey,
-                  connectionId:
-                    c.connectorKey === connectorKey
-                      ? status.connectionId
-                      : c.currentConnectionId,
-                }));
+                const updatedSelections = localConnectors
+                  .filter((c) => c.isConfigurable)
+                  .map((c) => ({
+                    connectorKey: c.connectorKey,
+                    connectionId:
+                      c.connectorKey === connectorKey
+                        ? status.connectionId
+                        : c.currentConnectionId,
+                  }));
                 const updated = await (
                   conversationalAgent as unknown as {
                     updateConnectionSelections: (
@@ -299,7 +305,9 @@ export const ConnectionReadinessCard = ({
                 setConnectingKey(null);
             }
           } catch {
-            // Polling error; keep trying until expired
+            // Transient error — keep polling until the session expires
+          } finally {
+            pollInFlightRef.current = false;
           }
         }, 500);
       } catch {
@@ -332,7 +340,7 @@ export const ConnectionReadinessCard = ({
 
   // --- Collapsed bar state ---
   if (collapsed || allConnected) {
-    const neededCount = broken.length;
+    const neededCount = unconnected.length + broken.length;
     if (neededCount === 0) return null;
 
     return (

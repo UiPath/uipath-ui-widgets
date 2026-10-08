@@ -265,6 +265,7 @@ export const ConversationalAgentChat = ({
   const onUserMessageSentRef = useRef(onUserMessageSent);
   const chatServiceRef = useRef<AutopilotChatService | null>(null);
   const settingsRootRef = useRef<Root | null>(null);
+  const autoBindTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Last-applied agent inputs for the active conversation. Pre-populates the
   // settings inputs form when reopened; cleared on New Chat.
   const storedAgentInputs = useRef<Record<string, unknown>>({});
@@ -1069,6 +1070,10 @@ export const ConversationalAgentChat = ({
     try {
       initializedFor.current = initKey;
       setConnectionReadiness(null);
+      if (autoBindTimeoutRef.current) {
+        clearTimeout(autoBindTimeoutRef.current);
+        autoBindTimeoutRef.current = null;
+      }
 
       const agentRelease = await resolveAgent();
       agentIdRef.current = agentRelease?.id;
@@ -1176,7 +1181,8 @@ export const ConversationalAgentChat = ({
             setConnectionReadiness(null);
           });
         // Re-fetch after a delay to pick up server-side auto-bind results
-        setTimeout(() => {
+        autoBindTimeoutRef.current = setTimeout(() => {
+          autoBindTimeoutRef.current = null;
           if (initializedFor.current !== capturedKey) return;
           ca.getAvailableConnections(capturedAgentId, capturedFolderId)
             .then(applyReadiness)
@@ -1475,6 +1481,10 @@ export const ConversationalAgentChat = ({
       if (settingsRootRef.current) {
         settingsRootRef.current.unmount();
         settingsRootRef.current = null;
+      }
+      if (autoBindTimeoutRef.current) {
+        clearTimeout(autoBindTimeoutRef.current);
+        autoBindTimeoutRef.current = null;
       }
     };
   }, []);
