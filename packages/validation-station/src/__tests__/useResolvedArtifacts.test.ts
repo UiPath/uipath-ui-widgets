@@ -160,7 +160,7 @@ describe("useResolvedArtifacts with a processedDocument", () => {
 // Checked by `tsc`. A bucket source must stay typed as the UiPath
 // representation, or hosts reading `artifacts.taxonomy` break.
 describe("useResolvedArtifacts result type", () => {
-  it("is the UiPath representation for a bucket source", () => {
+  it("is the Document Understanding representation for a bucket source", () => {
     const { result } = renderHook(() =>
       useResolvedArtifacts({
         sdk,

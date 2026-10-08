@@ -23,7 +23,8 @@ import { useWcReady } from "./useWcReady.js";
  * Takes its document pre-fetched (`artifacts`), self-fetched from the bucket
  * paths on `data` (`sdk` + `data`), or self-fetched through a Flow run
  * (`sdk` + `processedDocument`) — see {@link DuArtifactsSource}. The document
- * may be in the UiPath or the IXP representation.
+ * may be a Document Understanding document (`DocumentTaxonomy` +
+ * `ExtractionResult`) or an IXP document (`IXPTaxonomy` + `IXPExtraction`).
  *
  * Reports every event in the element's public
  * `IValidationStationStandaloneWcEventMap`: the save flows through

@@ -109,7 +109,7 @@ The two modes can be mixed: pass `artifacts` **and** `sdk` + `data` to skip the 
 
 ### Comparing against the prediction
 
-`predictedExtractionResult` is the model's prediction — the extraction output nobody edited — as opposed to `extractionResult`, the result the user reviews. Self-fetching fills it from `AutomaticExtractionResultsPath`; in pre-fetched mode it is optional, and a hand-built `DuDocumentArtifacts` without it is still valid. It is a UiPath DU contract, so only the UiPath representation carries one — an IXP document (including a Flow `ProcessedDocument`) has no prediction.
+`predictedExtractionResult` is the model's prediction — the extraction output nobody edited — as opposed to `extractionResult`, the result the user reviews. Self-fetching fills it from `AutomaticExtractionResultsPath`; in pre-fetched mode it is optional, and a hand-built `DuDocumentArtifacts` without it is still valid. It is a UiPath DU contract, so only a Document Understanding document carries one — an IXP document (including a Flow `ProcessedDocument`) has no prediction.
 
 By itself it changes nothing visible. It drives the `EnablePredictionDiff` customization flag (compact mode, on `ValidationStation`, `CompactFieldsForm` and `CompactTableEditor`): where the prediction differs from the current values, the element shows the predicted value with a button that takes it over. Like every customization flag, it lives under `FeatureCustomization` in `customizationInfo` — typed by the exported `ICustomizationInfoDTO` / `IFeatureCustomization`:
 
@@ -197,7 +197,7 @@ A Flow IDP node emits a `ProcessedDocument` rather than a `ContentValidationData
 - **Saving.** Submit and draft record the review against the producing span; report-as-exception records a rejection with the reason. `onSubmit`, `onSaveAsDraft` and `onReportException` receive the outcome as their second argument. `request.validatedData` is an `IXPExtraction`.
 - **Record format.** A review is stored as `{ draft, extraction }` — `draft: true` for a draft, `false` for a submit — the shape the Angular Validation Station uses, so either reopens a review the other saved. A record in any other shape is ignored on load.
 - **Completing the task is yours.** The downstream Flow node reads the validated result from the task completion, so complete it with `request.validatedData` whatever the outcome says.
-- **Scope.** Only `ValidationStation` takes `processedDocument` or an IXP document; the [subcomponents](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/validation-station-subcomponents.md) take the UiPath representation only.
+- **Scope.** Only `ValidationStation` takes `processedDocument` or an IXP document; the [subcomponents](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/validation-station-subcomponents.md) take Document Understanding documents (`DuDocumentArtifacts`) only.
 - **OAuth scopes.** The `sdk`'s token needs `Traces.Api` (the run's spans, and the review record) and `OR.Buckets.Read` (the document, DOM and OCR text, via ECS). A coded action app completing the task also needs `OR.Tasks`. A missing scope surfaces as a 401/403 in the load or save error.
 - **Hosting.** The artifacts are downloaded in the browser from pre-signed ECS storage URLs, so the host's origin must be in the ECS storage account's CORS rules. Coded apps (`https://{org}.{env}.uipath.host`) are.
 

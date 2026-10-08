@@ -139,7 +139,7 @@ export interface DuDocumentArtifacts {
 /**
  * {@link DuDocumentArtifacts} with the taxonomy and the extraction result in
  * the IXP (JSON Schema) representation. Only `ValidationStation` takes it; the
- * subcomponents take the UiPath representation.
+ * subcomponents take the Document Understanding representation.
  *
  * `fetchProcessedDocumentArtifacts` produces one of these from a Flow
  * `ProcessedDocument`.
@@ -150,7 +150,7 @@ export interface IxpDocumentArtifacts extends Omit<
 > {
   taxonomy: IXPTaxonomy;
   extractionResult: IXPExtraction;
-  /** None: the web component takes a prediction in the UiPath representation only. */
+  /** None: the web component takes a prediction in the Document Understanding representation only. */
   predictedExtractionResult?: never;
 }
 

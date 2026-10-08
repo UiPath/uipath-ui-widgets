@@ -5,4 +5,4 @@
  */
 export { default as ValidationStationPage } from "./ValidationStationPage";
 export { default as ValidationStationPrefetchedPage } from "./ValidationStationPrefetchedPage";
-export { default as ValidationStationFlowPage } from "./ValidationStationFlowPage";
+export { default as ValidationStationProcessedDocumentPage } from "./ValidationStationFlowPage";
