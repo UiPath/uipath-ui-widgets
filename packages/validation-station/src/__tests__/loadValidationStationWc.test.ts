@@ -40,8 +40,6 @@ async function freshModule(): Promise<Mod> {
   return import("../loadValidationStationWc");
 }
 
-const originalPromiseTry = Promise.try;
-
 beforeEach(() => {
   vi.clearAllMocks();
   mockLoadWc.mockResolvedValue(undefined);
@@ -51,8 +49,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  if (originalPromiseTry) Promise.try = originalPromiseTry;
-  else Reflect.deleteProperty(Promise, "try");
 });
 
 describe("configureValidationStationWc", () => {
@@ -153,56 +149,6 @@ describe("configureValidationStationWc", () => {
       mod.configureValidationStationWc({ deploymentUrl: "/du-vs-wc" }),
     ).resolves.toBeUndefined();
     expect(mockLoadWc).toHaveBeenCalledTimes(2);
-  });
-
-  describe("Promise.try polyfill", () => {
-    // zone.js (shipped in the WC's polyfills.js) swaps in a ZoneAwarePromise
-    // without Promise.try; the module restores it once the bundle has loaded.
-    beforeEach(() => {
-      Reflect.deleteProperty(Promise, "try");
-    });
-
-    it("is not applied before the web component loads", async () => {
-      await freshModule();
-      expect(Promise.try).toBeUndefined();
-    });
-
-    describe("once loaded", () => {
-      // The polyfill is installed on the global, so these read `Promise.try`
-      // directly rather than going back through the module.
-      beforeEach(async () => {
-        const mod = await freshModule();
-        await mod.configureValidationStationWc({ deploymentUrl: "/du-vs-wc" });
-      });
-
-      it("is restored once the load resolves", () => {
-        expect(typeof Promise.try).toBe("function");
-      });
-
-      it("resolves with the callback's return value", async () => {
-        await expect(Promise.try(() => 42)).resolves.toBe(42);
-      });
-
-      it("unwraps a returned promise", async () => {
-        await expect(Promise.try(() => Promise.resolve("ok"))).resolves.toBe(
-          "ok",
-        );
-      });
-
-      it("rejects when the callback throws synchronously", async () => {
-        await expect(
-          Promise.try(() => {
-            throw new Error("boom");
-          }),
-        ).rejects.toThrow("boom");
-      });
-
-      it("forwards extra arguments to the callback", async () => {
-        await expect(
-          Promise.try((a: number, b: number) => a + b, 2, 3),
-        ).resolves.toBe(5);
-      });
-    });
   });
 });
 

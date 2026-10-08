@@ -1,0 +1,33 @@
+name: Refresh SDK Docs Site
+
+# The React Widgets pages on the UiPath TypeScript SDK docs site are these
+# READMEs -- UiPath/uipath-typescript fetches them at docs build time rather
+# than keeping a second copy. Tell it to rebuild when one of them changes, so
+# the site does not wait for the next SDK release.
+on:
+  push:
+    branches: [develop]
+    paths:
+      - "packages/*/README.md"
+  workflow_dispatch:
+
+# The dispatch below authenticates with SDK_DOCS_DISPATCH_TOKEN, not
+# GITHUB_TOKEN, so this workflow needs no permissions on this repo.
+permissions: {}
+
+jobs:
+  dispatch:
+    runs-on: uipath-ubuntu-latest
+    steps:
+      - name: Trigger the docs build
+        # A repository_dispatch to another repo needs a token with `contents:
+        # write` there; the default GITHUB_TOKEN is scoped to this repo only.
+        env:
+          GH_TOKEN: ${{ secrets.SDK_DOCS_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::warning::SDK_DOCS_DISPATCH_TOKEN is not set -- the docs site will pick these READMEs up on its next build instead."
+            exit 0
+          fi
+          gh api repos/UiPath/uipath-typescript/dispatches \
+            --field event_type=react-widgets-docs-updated

@@ -10,7 +10,8 @@
  */
 const scopeSelectors = (rootSelector) => {
   const DOC_ROOT = /^(html|body|:root|:host)([^\s>+~]*)/;
-  // Apollo Wind theme classes apply to an ancestor, not the widget itself.
+  // Apollo Wind theme classes may sit on a host ancestor or on an element
+  // inside the widget (where a `theme` prop applies them), so both match.
   const THEME_HEAD =
     /^(\.(?:light-hc|dark-hc|future-dark|future-light|light|dark|wireframe)(?![\w-])[^\s>+~]*)/;
   const NESTING_AMPERSAND = /(?:^|[^\\])&/;
@@ -43,7 +44,7 @@ const scopeSelectors = (rootSelector) => {
     if (themeHead) {
       const head = themeHead[1];
       const rest = trimmed.slice(head.length);
-      return `${head} ${rootSelector}${rest}`;
+      return [`${head} ${rootSelector}${rest}`, `${rootSelector} ${trimmed}`];
     }
 
     return `${rootSelector} ${trimmed}`;
@@ -55,7 +56,7 @@ const scopeSelectors = (rootSelector) => {
     OnceExit(root) {
       root.walkRules((rule) => {
         if (!isScopable(rule)) return;
-        rule.selectors = rule.selectors.map(scopeSelector);
+        rule.selectors = rule.selectors.flatMap(scopeSelector);
       });
     },
   };

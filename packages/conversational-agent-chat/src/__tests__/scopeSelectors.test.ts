@@ -60,10 +60,15 @@ describe("postcss-scope-selectors", () => {
       );
     });
 
-    it("treats apollo-wind theme-class heads as ancestors", () => {
-      expect(run(".future-dark{--x:1}")).toBe(`.future-dark ${ROOT}{--x:1}`);
+    it("matches apollo-wind theme-class heads on a host ancestor or inside the widget", () => {
+      expect(run(".future-dark{--x:1}")).toBe(
+        `.future-dark ${ROOT},${ROOT} .future-dark{--x:1}`,
+      );
+      expect(run(".dark:not(.react-flow){--accent:#000}")).toBe(
+        `.dark:not(.react-flow) ${ROOT},${ROOT} .dark:not(.react-flow){--accent:#000}`,
+      );
       expect(run(".wireframe *::before{border:none}")).toBe(
-        `.wireframe ${ROOT} *::before{border:none}`,
+        `.wireframe ${ROOT} *::before,${ROOT} .wireframe *::before{border:none}`,
       );
       // Avoid treating similarly named classes as themes.
       expect(run(".lightbox{opacity:1}")).toBe(`${ROOT} .lightbox{opacity:1}`);

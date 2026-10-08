@@ -45,6 +45,7 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
   onSetFieldValueByPathResult,
   onSelectAndFocusFieldValueByPathResult,
   onDeleteFieldValueByPathResult,
+  onWcMessage,
   onSaveResult,
   onSubmit,
   onSaveAsDraft,
@@ -88,6 +89,7 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
       selectAndFocusFieldValueByPathResult:
         onSelectAndFocusFieldValueByPathResult,
       deleteFieldValueByPathResult: onDeleteFieldValueByPathResult,
+      "ui-du-vs-wc-message": onWcMessage,
       saveResult: onSaveResult,
       saveValidatedDataRequest: handleSubmit,
       saveValidatedDataAsDraftRequest: handleSaveAsDraft,
@@ -98,7 +100,12 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
 
   const gate = resolveArtifacts(error, wcReady, artifacts);
   if (!gate.ready) return gate.fallback;
-  const { taxonomy, extractionResult, customizationInfo } = gate.artifacts;
+  const {
+    taxonomy,
+    extractionResult,
+    predictedExtractionResult,
+    customizationInfo,
+  } = gate.artifacts;
 
   const props: ICompactFieldsFormStandaloneWcJsxProps = {
     ...commonProps,
@@ -111,6 +118,7 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
     deleteFieldValueByPath,
     taxonomy,
     extractionResult,
+    predictedExtractionResult,
     customizationInfo,
   };
 

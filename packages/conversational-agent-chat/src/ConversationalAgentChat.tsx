@@ -7,6 +7,7 @@ import {
   AutopilotChatMessage,
   AutopilotChatMode,
   AutopilotChatPreHookAction,
+  type AutopilotChatRenameConversationPayload,
   AutopilotChatService,
   type SupportedLocale,
 } from "@uipath/apollo-react/material/components";
@@ -21,6 +22,8 @@ import {
   DialogHeader,
   DialogTitle,
   PortalContainerProvider,
+  Toaster,
+  toast,
 } from "@uipath/apollo-wind";
 import {
   ContentPartChunkEvent,
@@ -46,6 +49,7 @@ import type {
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -109,6 +113,8 @@ const EXCHANGES_PAGE_SIZE = 15;
 // `sessionStarted`, so if it never arrives, surface an error instead of
 // leaving the send silently pending.
 const SESSION_START_TIMEOUT_MS = 30_000;
+// Backend limit on ConversationSchema.label.
+const CONVERSATION_LABEL_MAX_LENGTH = 100;
 type ConversationCreateOptionsArg = Parameters<
   ConversationalAgent["conversations"]["create"]
 >[2];
@@ -126,7 +132,8 @@ export const ConversationalAgentChat = ({
   externalUserId,
   inputSchema: inputSchemaProp,
   locale = "en",
-  theme = "light",
+  theme: themeProp,
+  mode = AutopilotChatMode.Embedded,
   readOnly = false,
   overrideLabels,
   firstRunExperience,
@@ -150,11 +157,14 @@ export const ConversationalAgentChat = ({
       "`inputSchema` is only supported when `isDebugMode` is true; the agent's input schema is resolved automatically.",
     );
   }
+  const theme = themeProp ?? "light";
   // must change language before useTranslation is called to avoid stale translations
   if (i18n.language !== locale) {
     i18n.changeLanguage(locale);
   }
   const { t } = useWidgetTranslation();
+  // Scopes our toasts to our own <Toaster> so a host's Toaster doesn't render them too.
+  const toasterId = useId();
   const agentService = useRef(
     new ConversationalAgent(sdk, {
       ...(externalUserId ? { externalUserId } : {}),
@@ -165,6 +175,7 @@ export const ConversationalAgentChat = ({
   const currentConversation = useRef<ConversationCreateResponse | null>(null);
   const initializedFor = useRef<string | null>(null);
   const themeRef = useRef(theme);
+  const modeRef = useRef(mode);
   const overrideLabelsRef = useRef(overrideLabels);
   const disabledFeaturesRef = useRef(disabledFeatures);
   const firstRunExperienceRef = useRef(firstRunExperience);
@@ -186,6 +197,7 @@ export const ConversationalAgentChat = ({
 
   useLayoutEffect(() => {
     themeRef.current = theme;
+    modeRef.current = mode;
     overrideLabelsRef.current = overrideLabels;
     disabledFeaturesRef.current = disabledFeatures;
     firstRunExperienceRef.current = firstRunExperience;
@@ -201,6 +213,7 @@ export const ConversationalAgentChat = ({
     };
   }, [
     theme,
+    mode,
     overrideLabels,
     disabledFeatures,
     firstRunExperience,
@@ -261,6 +274,7 @@ export const ConversationalAgentChat = ({
   const [connectionReadiness, setConnectionReadiness] = useState<
     ConnectorReadiness[] | null
   >(null);
+  const [themeRoot, setThemeRoot] = useState<HTMLDivElement | null>(null);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
   const onUserMessageSentRef = useRef(onUserMessageSent);
   const chatServiceRef = useRef<AutopilotChatService | null>(null);
@@ -494,16 +508,10 @@ export const ConversationalAgentChat = ({
 
               const clientSideWidgetId = `client-side-tool-${toolCall.toolCallId}`;
 
-              // Build default values from output schema properties
               const outputSchemaObj = (outputSchema ?? {
                 type: "object",
                 properties: {},
               }) as Record<string, unknown>;
-              const outputSchemaProps = outputSchemaObj.properties ?? {};
-              const defaultValues: Record<string, unknown> = {};
-              for (const key of Object.keys(outputSchemaProps)) {
-                defaultValues[key] = null;
-              }
 
               chatService.sendResponse({
                 id: clientSideWidgetId,
@@ -517,7 +525,6 @@ export const ConversationalAgentChat = ({
                 meta: {
                   toolName: startEvent.toolName,
                   inputSchema: outputSchemaObj,
-                  defaultValues,
                   isCompleted: false,
                   onSubmit: (formData: Record<string, unknown>) => {
                     const conversation = chatService.getConversation();
@@ -832,6 +839,33 @@ export const ConversationalAgentChat = ({
       }
     },
     [chatService, onNewChat, setConversationHistory],
+  );
+
+  const onRenameConversation = useCallback(
+    async ({
+      conversationId,
+      name,
+    }: AutopilotChatRenameConversationPayload) => {
+      if (!chatService) return;
+      try {
+        // Stop the server's auto-labeling from overwriting the user's name.
+        const updated = await agentService.current.conversations.updateById(
+          conversationId,
+          { label: name.trim(), autogenerateLabel: false },
+        );
+        setConversationHistory(
+          pastConversations.current.map((c) =>
+            c.id === conversationId ? { ...c, label: updated.label } : c,
+          ),
+        );
+      } catch (err) {
+        toast.error(t("error_rename_conversation"), {
+          description: err instanceof Error ? err.message : String(err),
+          toasterId,
+        });
+      }
+    },
+    [chatService, setConversationHistory, t, toasterId],
   );
 
   const onSendMessage = useCallback(
@@ -1252,7 +1286,7 @@ export const ConversationalAgentChat = ({
       const chatServiceInstance = AutopilotChatService.Instantiate({
         instanceName: `agent-${agentId}-${folderId}`,
         config: {
-          mode: AutopilotChatMode.Embedded,
+          mode: modeRef.current,
           locale: toApolloSupportedLocale(locale),
           theme: themeRef.current,
           readOnly,
@@ -1274,6 +1308,22 @@ export const ConversationalAgentChat = ({
           paginatedMessages: true,
           settingsRenderer: renderSettings,
           preHooks: {
+            [AutopilotChatPreHookAction.RenameConversation]: async ({
+              name,
+            }: AutopilotChatRenameConversationPayload) => {
+              const trimmed = name.trim();
+              if (trimmed.length === 0) return false;
+              if (trimmed.length > CONVERSATION_LABEL_MAX_LENGTH) {
+                toast.error(t("error_rename_conversation_too_long_title"), {
+                  description: t("error_rename_conversation_too_long", {
+                    max: CONVERSATION_LABEL_MAX_LENGTH,
+                  }),
+                  toasterId,
+                });
+                return false;
+              }
+              return true;
+            },
             [AutopilotChatPreHookAction.CitationClick]: async (
               citationData,
             ) => {
@@ -1341,6 +1391,8 @@ export const ConversationalAgentChat = ({
             // Apollo defaults `settings: true`; flip it so our gear renders
             // by default. Consumers can still opt out via `disabledFeatures`.
             settings: false,
+            // Apollo disables rename by default; enable it to match the react-sdk.
+            renameChat: false,
             ...(!agentId ? { newChat: true, history: true } : {}),
             ...disabledFeaturesRef.current,
           },
@@ -1390,6 +1442,7 @@ export const ConversationalAgentChat = ({
     getConversation,
     fetchExchanges,
     t,
+    toasterId,
   ]);
 
   const handleReload = useCallback(() => {
@@ -1493,6 +1546,10 @@ export const ConversationalAgentChat = ({
     chatService?.setTheme(theme);
   }, [chatService, theme]);
 
+  useEffect(() => {
+    chatService?.setChatMode(mode);
+  }, [chatService, mode]);
+
   // Close the SDK session on unmount so the WebSocket doesn't linger.
   useEffect(() => {
     return () => {
@@ -1533,6 +1590,10 @@ export const ConversationalAgentChat = ({
           chatService.on(
             AutopilotChatEvent.DeleteConversation,
             onClickDeleteConversation,
+          ),
+          chatService.on(
+            AutopilotChatEvent.RenameConversation,
+            onRenameConversation,
           ),
           chatService.on(AutopilotChatEvent.HistoryLoadMore, onHistoryLoadMore),
           chatService.on(
@@ -1582,6 +1643,7 @@ export const ConversationalAgentChat = ({
     onHistoryLoadMore,
     onHistorySearch,
     onNewChat,
+    onRenameConversation,
     onSendMessage,
     onSetAttachments,
     onStopResponse,
@@ -1634,120 +1696,136 @@ export const ConversationalAgentChat = ({
 
   return (
     <div className="uipath-conversational-agent-chat">
-      <PortalContainerProvider>
-        {!error && showInputPage && inputSchemaState && (
-          <InputsPage
-            key={`${agentId}-${inputsInstance}`}
-            agentName={agentNameState}
-            inputSchema={inputSchemaState}
-            onSubmit={async (data) => {
-              const inputs = data as Record<string, unknown>;
-              if (isDebugMode && existingConversationId) {
-                await agentService.current.conversations.updateById(
-                  existingConversationId,
-                  { agentInput: { inline: inputs as JSONObject } },
-                );
-              } else {
-                const agent = await resolveAgent();
-                if (!agent) {
-                  throw new Error(t("error_missing_conversation_params"));
-                }
-                const conversation = await agent.conversations.create({
-                  ...(jobStartOverrides ? { jobStartOverrides } : {}),
-                  agentInput: { inline: inputs as JSONObject },
-                } as ConversationCreateOptionsArg);
-                currentConversation.current = conversation;
-              }
-              storedAgentInputs.current = inputs;
-              setShowInputPage(false);
-            }}
-          />
-        )}
-
-        {error && (
-          <div className="info-container">
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-            <Button variant={"outline"} onClick={handleReload}>
-              {t("reload")}
-            </Button>
-          </div>
-        )}
-
-        {!error && !chatService && (
-          <div className="info-container">
-            <div>{t("loading")}</div>
-            <Loader />
-          </div>
-        )}
-
-        {!error && chatService && !showInputPage && (
-          <>
-            {connectionReadiness &&
-              agentIdRef.current != null &&
-              folderIdRef.current != null && (
-                <ConnectionReadinessCard
-                  connectors={connectionReadiness}
-                  conversationalAgent={agentService.current}
-                  agentId={agentIdRef.current}
-                  folderId={folderIdRef.current}
-                  onAllConnected={() => setConnectionReadiness(null)}
-                  onOpenSettings={() =>
-                    chatServiceRef.current?.toggleSettings(true)
+      {/* Apollo's color tokens switch on a theme class, which the scoped
+          stylesheet only honors on a descendant of the widget root (or on the
+          host's <body>), so `theme` is applied here rather than on the root.
+          Without an explicit `theme`, no class is set and the host's <body>
+          theme class keeps applying, as before. */}
+      <div
+        ref={setThemeRoot}
+        className={
+          themeProp ? `uipath-cas-theme ${themeProp}` : "uipath-cas-theme"
+        }
+      >
+        <PortalContainerProvider>
+          {!error && showInputPage && inputSchemaState && (
+            <InputsPage
+              key={`${agentId}-${inputsInstance}`}
+              agentName={agentNameState}
+              inputSchema={inputSchemaState}
+              onSubmit={async (data) => {
+                const inputs = data as Record<string, unknown>;
+                if (isDebugMode && existingConversationId) {
+                  await agentService.current.conversations.updateById(
+                    existingConversationId,
+                    { agentInput: { inline: inputs as JSONObject } },
+                  );
+                } else {
+                  const agent = await resolveAgent();
+                  if (!agent) {
+                    throw new Error(t("error_missing_conversation_params"));
                   }
-                  defaultCollapsed={hasMessages}
-                />
-              )}
-            <ApChat
-              key={locale}
-              chatServiceInstance={chatService}
-              locale={toApolloSupportedLocale(locale)}
-              theme={theme}
-              enableInternalThemeProvider
+                  const conversation = await agent.conversations.create({
+                    ...(jobStartOverrides ? { jobStartOverrides } : {}),
+                    agentInput: { inline: inputs as JSONObject },
+                  } as ConversationCreateOptionsArg);
+                  currentConversation.current = conversation;
+                }
+                storedAgentInputs.current = inputs;
+                setShowInputPage(false);
+              }}
             />
-          </>
-        )}
-
-        <FeedbackDialog
-          open={feedbackDialogOpen}
-          isPositive={feedbackIsPositive}
-          onOpenChange={setFeedbackDialogOpen}
-          onSubmit={onFeedbackSubmit}
-          onCancel={onFeedbackCancel}
-        />
-        <Dialog
-          open={!!citationPreviewData}
-          onOpenChange={(open) => {
-            if (!open) setCitationPreviewData(null);
-          }}
-        >
-          {citationPreviewData && (
-            <DialogContent className="sm:max-w-4xl">
-              <DialogHeader>
-                <DialogTitle>{citationPreviewData.title}</DialogTitle>
-              </DialogHeader>
-              {citationPreviewData.error ? (
-                <Column
-                  w="full"
-                  align="center"
-                  justify="center"
-                  style={{ height: "60vh", maxHeight: "600px" }}
-                >
-                  {t("file_preview_error")}
-                </Column>
-              ) : (
-                <FilePreviewer
-                  file={citationPreviewData.file}
-                  usePdfJs={usePdfJsViewer}
-                  pageNumber={citationPreviewData.pageNumber}
-                  iframeParams={`#page=${citationPreviewData.pageNumber}`}
-                />
-              )}
-            </DialogContent>
           )}
-        </Dialog>
-      </PortalContainerProvider>
+
+          {error && (
+            <div className="info-container">
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+              <Button variant={"outline"} onClick={handleReload}>
+                {t("reload")}
+              </Button>
+            </div>
+          )}
+
+          {!error && !chatService && (
+            <div className="info-container">
+              <div>{t("loading")}</div>
+              <Loader />
+            </div>
+          )}
+
+          {!error && chatService && !showInputPage && (
+            <>
+              {connectionReadiness &&
+                agentIdRef.current != null &&
+                folderIdRef.current != null && (
+                  <ConnectionReadinessCard
+                    connectors={connectionReadiness}
+                    conversationalAgent={agentService.current}
+                    agentId={agentIdRef.current}
+                    folderId={folderIdRef.current}
+                    onAllConnected={() => setConnectionReadiness(null)}
+                    onOpenSettings={() =>
+                      chatServiceRef.current?.toggleSettings(true)
+                    }
+                    defaultCollapsed={hasMessages}
+                  />
+                )}
+              <ApChat
+                key={locale}
+                chatServiceInstance={chatService}
+                locale={toApolloSupportedLocale(locale)}
+                theme={theme}
+                enableInternalThemeProvider
+                // Keep Apollo's tooltips, menus and history popover inside the
+                // themed wrapper; portalled to <body> they'd lose the theme tokens.
+                portalContainer={themeRoot ?? undefined}
+              />
+            </>
+          )}
+
+          <FeedbackDialog
+            open={feedbackDialogOpen}
+            isPositive={feedbackIsPositive}
+            onOpenChange={setFeedbackDialogOpen}
+            onSubmit={onFeedbackSubmit}
+            onCancel={onFeedbackCancel}
+          />
+          <Dialog
+            open={!!citationPreviewData}
+            onOpenChange={(open) => {
+              if (!open) setCitationPreviewData(null);
+            }}
+          >
+            {citationPreviewData && (
+              <DialogContent className="sm:max-w-4xl">
+                <DialogHeader>
+                  <DialogTitle>{citationPreviewData.title}</DialogTitle>
+                </DialogHeader>
+                {citationPreviewData.error ? (
+                  <Column
+                    w="full"
+                    align="center"
+                    justify="center"
+                    style={{ height: "60vh", maxHeight: "600px" }}
+                  >
+                    {t("file_preview_error")}
+                  </Column>
+                ) : (
+                  <FilePreviewer
+                    file={citationPreviewData.file}
+                    usePdfJs={usePdfJsViewer}
+                    pageNumber={citationPreviewData.pageNumber}
+                    iframeParams={`#page=${citationPreviewData.pageNumber}`}
+                  />
+                )}
+              </DialogContent>
+            )}
+          </Dialog>
+          <Toaster id={toasterId} position="top-right" richColors />
+        </PortalContainerProvider>
+      </div>
     </div>
   );
 };
