@@ -315,8 +315,5 @@
   "country_name_western_sahara": "Westsahara",
   "country_name_yemen": "Jemen",
   "country_name_zambia": "Sambia",
-  "country_name_zimbabwe": "Simbabwe",
-  "conversation_ended_completed": "Diese Konversation ist beendet. Starten Sie einen neuen Chat, um mit Ihrem Agent zu sprechen.",
-  "conversation_ended_failed": "Diese Konversation wurde aufgrund eines Fehlers beendet. Starten Sie einen neuen Chat, um es erneut zu versuchen.",
-  "conversation_ended_cancelled": "Diese Konversation wurde abgebrochen. Starten Sie einen neuen Chat, um mit Ihrem Agent zu sprechen."
+  "country_name_zimbabwe": "Simbabwe"
 }

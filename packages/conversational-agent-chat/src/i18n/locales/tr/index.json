@@ -315,8 +315,5 @@
   "country_name_western_sahara": "Batı Sahra",
   "country_name_yemen": "Yemen",
   "country_name_zambia": "Zambiya",
-  "country_name_zimbabwe": "Zimbabve",
-  "conversation_ended_completed": "Bu görüşme sona erdi. Temsilcinizle görüşmek için yeni bir sohbet başlatın.",
-  "conversation_ended_failed": "Bu görüşme bir hata nedeniyle sona erdi. Tekrar denemek için yeni bir sohbet başlatın.",
-  "conversation_ended_cancelled": "Bu görüşme iptal edildi. Temsilcinizle görüşmek için yeni bir sohbet başlatın."
+  "country_name_zimbabwe": "Zimbabve"
 }

@@ -315,8 +315,5 @@
   "country_name_western_sahara": "西撒哈拉",
   "country_name_yemen": "也门",
   "country_name_zambia": "赞比亚",
-  "country_name_zimbabwe": "津巴布韦",
-  "conversation_ended_completed": "此对话已结束。开启新聊天以与您的智能体对话。",
-  "conversation_ended_failed": "由于出现错误，此对话结束。发起新聊天以重试。",
-  "conversation_ended_cancelled": "此对话已取消。开启新聊天以与您的智能体对话。"
+  "country_name_zimbabwe": "津巴布韦"
 }

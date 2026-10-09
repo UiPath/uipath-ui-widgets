@@ -315,8 +315,5 @@
   "country_name_western_sahara": "Sahara Occidentală",
   "country_name_yemen": "Yemen",
   "country_name_zambia": "Zambia",
-  "country_name_zimbabwe": "Zimbabwe",
-  "conversation_ended_completed": "Această conversație s-a încheiat. Începeți un chat nou pentru a vorbi cu agentul dvs.",
-  "conversation_ended_failed": "Această conversație s-a încheiat din cauza unei erori. Începeți un chat nou pentru a încerca din nou.",
-  "conversation_ended_cancelled": "Această conversație a fost anulată. Începeți un chat nou pentru a vorbi cu agentul dvs."
+  "country_name_zimbabwe": "Zimbabwe"
 }

@@ -315,8 +315,5 @@
   "country_name_western_sahara": "西サハラ",
   "country_name_yemen": "イエメン",
   "country_name_zambia": "ザンビア",
-  "country_name_zimbabwe": "ジンバブエ",
-  "conversation_ended_completed": "この会話は終了しました。エージェントと会話するには、新しいチャットを開始します。",
-  "conversation_ended_failed": "エラーにより、この会話は終了しました。もう一度試すには、新しいチャットを開始します。",
-  "conversation_ended_cancelled": "この会話はキャンセルされました。エージェントと会話するには、新しいチャットを開始します。"
+  "country_name_zimbabwe": "ジンバブエ"
 }
