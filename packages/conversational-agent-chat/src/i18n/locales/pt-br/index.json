@@ -315,5 +315,8 @@
   "country_name_western_sahara": "Saara Ocidental",
   "country_name_yemen": "Iêmen",
   "country_name_zambia": "Zâmbia",
-  "country_name_zimbabwe": "Zimbábue"
+  "country_name_zimbabwe": "Zimbábue",
+  "conversation_ended_completed": "Esta conversa terminou. Inicie um novo chat para falar com seu agente.",
+  "conversation_ended_failed": "Esta conversa foi encerrada devido a um erro. Inicie um novo chat para tentar novamente.",
+  "conversation_ended_cancelled": "Esta conversa foi cancelada. Inicie um novo chat para falar com seu agente."
 }

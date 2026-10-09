@@ -315,5 +315,8 @@
   "country_name_western_sahara": "서부 사하라",
   "country_name_yemen": "예멘",
   "country_name_zambia": "잠비아",
-  "country_name_zimbabwe": "짐바브웨"
+  "country_name_zimbabwe": "짐바브웨",
+  "conversation_ended_completed": "이 대화는 종료되었습니다. 새 채팅을 시작하여 에이전트와 대화하십시오.",
+  "conversation_ended_failed": "이 대화는 오류로 인해 종료되었습니다. 새 채팅을 시작하고 다시 시도하십시오.",
+  "conversation_ended_cancelled": "이 대화는 취소되었습니다. 새 채팅을 시작하여 에이전트와 대화하십시오."
 }
