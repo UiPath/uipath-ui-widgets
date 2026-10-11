@@ -317,6 +317,13 @@ export const ConnectionReadinessCard = ({
     [conversationalAgent, agentId, folderId, localConnectors],
   );
 
+  const STATE_LABEL: Record<string, string> = {
+    Enabled: "connections_status_connected",
+    Expired: "connections_status_expired",
+    Disabled: "connections_status_disabled",
+    Failed: "connections_status_failed",
+  };
+
   const getStatusText = (connector: ConnectorReadiness): string => {
     if (connectingKey === connector.connectorKey) {
       return t("connection_readiness_waiting");
@@ -326,9 +333,13 @@ export const ConnectionReadinessCard = ({
         connector.currentConnectionState &&
         connector.currentConnectionState !== "Enabled"
       ) {
+        const labelKey =
+          STATE_LABEL[connector.currentConnectionState] ??
+          "connections_status_disabled";
         return t("connection_readiness_broken_status", {
           name: connector.currentConnectionName,
-          status: connector.currentConnectionState,
+          // eslint-disable-next-line no-restricted-syntax
+          status: t(labelKey as Parameters<typeof t>[0]),
         });
       }
       return t("connection_readiness_connected_as", {

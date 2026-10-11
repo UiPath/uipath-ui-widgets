@@ -155,6 +155,7 @@ export const ConnectionsSection = ({
       setItems(data);
       setInitialSelections(sels);
       setStagedSelections(sels);
+      setLoadError(null);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -179,6 +180,7 @@ export const ConnectionsSection = ({
           const sels = getInitialSelections(data);
           setInitialSelections(sels);
           setStagedSelections(sels);
+          setLoadError(null);
         })
         .catch(() => {})
         .finally(() => {
@@ -207,7 +209,7 @@ export const ConnectionsSection = ({
   };
 
   const handleClear = (connectorKey: string) => {
-    setStagedSelections((prev) => ({ ...prev, [connectorKey]: null }));
+    setStagedSelections((prev) => ({ ...prev, [connectorKey]: "" }));
     setOpenPicker(null);
     setSaveResult(null);
   };
@@ -224,10 +226,10 @@ export const ConnectionsSection = ({
       );
       const updated = await api.updateConnectionSelections(agentId, folderId, {
         selections: Object.entries(stagedSelections)
-          .filter(([key, v]) => v !== "" && configurableKeys.has(key))
+          .filter(([key]) => configurableKeys.has(key))
           .map(([connectorKey, connectionId]) => ({
             connectorKey,
-            connectionId,
+            connectionId: connectionId || null,
           })),
       });
       const sels = getInitialSelections(updated);
