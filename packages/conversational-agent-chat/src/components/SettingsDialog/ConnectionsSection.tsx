@@ -7,7 +7,15 @@ import {
   Spinner,
   cn,
 } from "@uipath/apollo-wind";
-import type { ConversationalAgent } from "@uipath/uipath-typescript/conversational-agent";
+import type {
+  AvailableConnection,
+  AvailableConnectionsResponse,
+  ConversationalAgent,
+} from "@uipath/uipath-typescript/conversational-agent";
+import {
+  ConnectionSessionStatus,
+  ConnectionState,
+} from "@uipath/uipath-typescript/conversational-agent";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useWidgetTranslation } from "../../i18n/useWidgetTranslation";
 
@@ -17,90 +25,24 @@ export interface ConnectionsSectionProps {
   folderId: number;
 }
 
-/**
- * Mirror of SDK types — defined locally so the component compiles against the
- * currently-installed SDK (1.5.x) while the new methods land in 1.8+. Once the
- * SDK is bumped these can be replaced with direct imports.
- */
-interface AvailableConnection {
-  id: string;
-  name: string;
-  state: "Enabled" | "Disabled" | "Expired" | "Failed";
-  isDefault: boolean;
-  personalWorkspace: boolean;
-  folderKey: string | null;
-  folderName: string | null;
-}
-
-interface AvailableConnectionsItem {
-  connectorKey: string;
-  connectorName?: string;
-  connectorImage?: string;
-  resourceKeys: string[];
-  currentConnectionId: string | null;
-  currentConnectionName: string | null;
-  configurationUrl?: string;
-  connectionsUrl?: string;
-  isConfigurable?: boolean;
-  connections: AvailableConnection[];
-}
-
-type AvailableConnectionsResponse = AvailableConnectionsItem[];
-
-interface ConnectionSelection {
-  connectorKey: string;
-  connectionId: string | null;
-}
-
 const POLL_INTERVAL_MS = 500;
 
 const STATUS_VARIANT: Record<
   string,
   "default" | "secondary" | "destructive" | "outline"
 > = {
-  Enabled: "default",
-  Disabled: "secondary",
-  Expired: "outline",
-  Failed: "destructive",
+  [ConnectionState.Enabled]: "default",
+  [ConnectionState.Disabled]: "secondary",
+  [ConnectionState.Expired]: "outline",
+  [ConnectionState.Failed]: "destructive",
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  Enabled: "connections_status_connected",
-  Expired: "connections_status_expired",
-  Disabled: "connections_status_disabled",
-  Failed: "connections_status_failed",
+  [ConnectionState.Enabled]: "connections_status_connected",
+  [ConnectionState.Expired]: "connections_status_expired",
+  [ConnectionState.Disabled]: "connections_status_disabled",
+  [ConnectionState.Failed]: "connections_status_failed",
 };
-
-/**
- * Casts the ConversationalAgent to access connection methods that are pending in the SDK.
- *
- * TODO(sdk-typing): Remove this cast and hardcoded state strings once @uipath/uipath-typescript
- * exposes connection methods and types (getAvailableConnections, getConnectionAuthUrl,
- * getConnectionSessionStatus, updateConnectionSelections, connection state enum) on
- * ConversationalAgent.
- */
-const asConnections = (ca: ConversationalAgent) =>
-  ca as unknown as {
-    getAvailableConnections(
-      agentId: number,
-      folderId: number,
-    ): Promise<AvailableConnectionsResponse>;
-    updateConnectionSelections(
-      agentId: number,
-      folderId: number,
-      payload: { selections: ConnectionSelection[] },
-    ): Promise<AvailableConnectionsResponse>;
-    getConnectionAuthUrl(connectorKey: string): Promise<{
-      authUrl: string;
-      sessionId: string;
-      expiresTime: number;
-    }>;
-    getConnectionSessionStatus(sessionId: string): Promise<{
-      status: "pending" | "success" | "failed";
-      connectionId: string | null;
-      expiresTime: number;
-    }>;
-  };
 
 const getInitialSelections = (
   items: AvailableConnectionsResponse,
@@ -115,7 +57,7 @@ export const ConnectionsSection = ({
   folderId,
 }: ConnectionsSectionProps) => {
   const { t } = useWidgetTranslation();
-  const api = asConnections(conversationalAgent);
+  const api = conversationalAgent;
 
   const [items, setItems] = useState<AvailableConnectionsResponse>([]);
   const [initialSelections, setInitialSelections] = useState<
@@ -278,7 +220,10 @@ export const ConnectionsSection = ({
           const status = await api.getConnectionSessionStatus(sessionId);
           if (oauthSessionRef.current !== oauthSession) return;
 
-          if (status.status === "success" && status.connectionId) {
+          if (
+            status.status === ConnectionSessionStatus.Success &&
+            status.connectionId
+          ) {
             clearPoll();
             setConnectingKey(null);
             // Auto-save the new connection (post full selections to avoid replace-semantics wipe)
@@ -317,7 +262,7 @@ export const ConnectionsSection = ({
             }
             setOpenPicker(null);
             setSearchQuery("");
-          } else if (status.status === "failed") {
+          } else if (status.status === ConnectionSessionStatus.Failed) {
             clearPoll();
             if (oauthSessionRef.current === oauthSession)
               setConnectingKey(null);

@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ConversationalAgent } from "@uipath/uipath-typescript/conversational-agent";
+import { ConnectionState } from "@uipath/uipath-typescript/conversational-agent";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { initI18n } from "../../i18n";
 import { ConnectionsSection } from "../../components/SettingsDialog/ConnectionsSection";
@@ -24,7 +25,7 @@ const MOCK_CONNECTIONS = [
       {
         id: "conn-1",
         name: "john@example.com",
-        state: "Enabled" as const,
+        state: ConnectionState.Enabled,
         isDefault: true,
         personalWorkspace: true,
         folderKey: null,
@@ -33,7 +34,7 @@ const MOCK_CONNECTIONS = [
       {
         id: "conn-2",
         name: "work@company.com",
-        state: "Enabled" as const,
+        state: ConnectionState.Enabled,
         isDefault: false,
         personalWorkspace: false,
         folderKey: "f1",
@@ -296,5 +297,127 @@ describe("ConnectionsSection", () => {
     // Apply should be disabled again
     const applyButton = screen.getByRole("button", { name: /apply changes/i });
     expect(applyButton).toBeDisabled();
+  });
+
+  it("clearing a connection that was originally empty keeps isDirty false", async () => {
+    const user = userEvent.setup();
+    // Salesforce has no currentConnectionId → initial value is ""
+    const { agent } = makeAgent();
+    render(
+      <ConnectionsSection
+        conversationalAgent={agent}
+        agentId={1}
+        folderId={2}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByText("Salesforce")).toBeInTheDocument();
+    });
+
+    // Apply should be disabled — no changes
+    const applyButton = screen.getByRole("button", { name: /apply changes/i });
+    expect(applyButton).toBeDisabled();
+  });
+
+  it("clears loadError on successful retry", async () => {
+    const { agent, mocks } = makeAgent();
+    // First call fails
+    mocks.getAvailableConnections.mockRejectedValueOnce(
+      new Error("Network error"),
+    );
+    // Subsequent calls succeed
+    mocks.getAvailableConnections.mockResolvedValue(MOCK_CONNECTIONS);
+
+    render(
+      <ConnectionsSection
+        conversationalAgent={agent}
+        agentId={1}
+        folderId={2}
+      />,
+    );
+
+    // Error should appear
+    await waitFor(() => {
+      expect(screen.getByText(/Network error/)).toBeInTheDocument();
+    });
+  });
+
+  it("sends connectionId null when clearing a connected connector", async () => {
+    const user = userEvent.setup();
+    const { agent, mocks } = makeAgent();
+    render(
+      <ConnectionsSection
+        conversationalAgent={agent}
+        agentId={1}
+        folderId={2}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByText("john@example.com")).toBeInTheDocument();
+    });
+
+    // Click the clear (X) button for Google Drive
+    const clearButton = screen.getByRole("button", { name: /clear/i });
+    await user.click(clearButton);
+
+    // Apply should be enabled
+    const applyButton = screen.getByRole("button", { name: /apply changes/i });
+    expect(applyButton).not.toBeDisabled();
+
+    await user.click(applyButton);
+
+    // Should include the cleared connector with connectionId: null
+    expect(mocks.updateConnectionSelections).toHaveBeenCalledWith(
+      1,
+      2,
+      expect.objectContaining({
+        selections: expect.arrayContaining([
+          expect.objectContaining({
+            connectorKey: "google-drive",
+            connectionId: null,
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it("filters non-configurable connectors from save payload", async () => {
+    const user = userEvent.setup();
+    const connectionsWithNonConfigurable = [
+      ...MOCK_CONNECTIONS,
+      {
+        connectorKey: "shared-service",
+        connectorName: "Shared Service",
+        resourceKeys: [],
+        currentConnectionId: "admin-conn",
+        currentConnectionName: "admin",
+        isConfigurable: false,
+        connections: [],
+      },
+    ];
+    const { agent, mocks } = makeAgent(connectionsWithNonConfigurable);
+    render(
+      <ConnectionsSection
+        conversationalAgent={agent}
+        agentId={1}
+        folderId={2}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByText("Google Drive")).toBeInTheDocument();
+    });
+
+    // Change a selection to make dirty
+    await user.click(screen.getByText("john@example.com"));
+    await user.click(screen.getByText("work@company.com"));
+
+    const applyButton = screen.getByRole("button", { name: /apply changes/i });
+    await user.click(applyButton);
+
+    const call = mocks.updateConnectionSelections.mock.calls[0];
+    const keys = call[2].selections.map(
+      (s: { connectorKey: string }) => s.connectorKey,
+    );
+    expect(keys).not.toContain("shared-service");
   });
 });

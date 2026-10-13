@@ -1,5 +1,9 @@
 import { Button, Spinner, cn } from "@uipath/apollo-wind";
 import type { ConversationalAgent } from "@uipath/uipath-typescript/conversational-agent";
+import {
+  ConnectionSessionStatus,
+  ConnectionState,
+} from "@uipath/uipath-typescript/conversational-agent";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWidgetTranslation } from "../i18n/useWidgetTranslation";
 
@@ -10,7 +14,7 @@ export interface ConnectorReadiness {
   isConfigurable: boolean;
   currentConnectionId: string | null;
   currentConnectionName: string | null;
-  currentConnectionState?: "Enabled" | "Disabled" | "Expired" | "Failed";
+  currentConnectionState?: ConnectionState;
   connectionsUrl?: string;
 }
 
@@ -33,11 +37,6 @@ type ConnectingKey = string | null;
  * 1. Collapsed bar - all connected or user collapsed. Shows count + Show button.
  * 2. Expanded broken card - connections expired/failed. Red border, reconnect.
  * 3. Expanded setup card - connections need initial setup. Warning border, connect.
- *
- * TODO(sdk-typing): Remove `as unknown as { ... }` casts and hardcoded state strings
- * once @uipath/uipath-typescript exposes connection methods and types
- * (getAvailableConnections, getConnectionAuthUrl, getConnectionSessionStatus,
- * updateConnectionSelections, connection state enum) on ConversationalAgent.
  */
 export const ConnectionReadinessCard = ({
   connectors,
@@ -84,25 +83,7 @@ export const ConnectionReadinessCard = ({
       if (document.visibilityState !== "visible") return;
       if (fetchingRef.current || pollingRef.current) return;
       fetchingRef.current = true;
-      (
-        conversationalAgent as unknown as {
-          getAvailableConnections(
-            a: number,
-            f: number,
-          ): Promise<
-            Array<{
-              connectorKey: string;
-              connectorName?: string;
-              connectorImage?: string;
-              currentConnectionId: string | null;
-              currentConnectionName: string | null;
-              isConfigurable?: boolean;
-              connectionsUrl?: string;
-              connections: Array<{ id: string; state: string }>;
-            }>
-          >;
-        }
-      )
+      conversationalAgent
         .getAvailableConnections(agentId, folderId)
         .then((items) => {
           setLocalConnectors(
@@ -120,8 +101,10 @@ export const ConnectionReadinessCard = ({
                 currentConnectionId: item.currentConnectionId,
                 currentConnectionName: item.currentConnectionName,
                 currentConnectionState:
-                  (selectedConn?.state as ConnectorReadiness["currentConnectionState"]) ??
-                  (item.currentConnectionId ? "Expired" : undefined),
+                  selectedConn?.state ??
+                  (item.currentConnectionId
+                    ? ConnectionState.Expired
+                    : undefined),
                 connectionsUrl: item.connectionsUrl,
               };
             }),
@@ -144,13 +127,13 @@ export const ConnectionReadinessCard = ({
       c.isConfigurable &&
       c.currentConnectionId &&
       c.currentConnectionState &&
-      c.currentConnectionState !== "Enabled",
+      c.currentConnectionState !== ConnectionState.Enabled,
   );
   const healthy = localConnectors.filter(
     (c) =>
       c.isConfigurable &&
       c.currentConnectionId &&
-      c.currentConnectionState === "Enabled",
+      c.currentConnectionState === ConnectionState.Enabled,
   );
   const allConnected = unconnected.length === 0 && broken.length === 0;
 
@@ -172,15 +155,8 @@ export const ConnectionReadinessCard = ({
       setConnectingKey(connectorKey);
 
       try {
-        const result = await (
-          conversationalAgent as unknown as {
-            getConnectionAuthUrl: (connectorKey: string) => Promise<{
-              authUrl: string;
-              sessionId: string;
-              expiresTime: number;
-            }>;
-          }
-        ).getConnectionAuthUrl(connectorKey);
+        const result =
+          await conversationalAgent.getConnectionAuthUrl(connectorKey);
 
         // Stale — a newer OAuth connection started while we awaited the auth URL
         if (oauthSessionRef.current !== oauthSession) return;
@@ -211,20 +187,16 @@ export const ConnectionReadinessCard = ({
               return;
             }
 
-            const status = await (
-              conversationalAgent as unknown as {
-                getConnectionSessionStatus: (sessionId: string) => Promise<{
-                  status: "pending" | "success" | "failed";
-                  connectionId: string | null;
-                  expiresTime: number;
-                }>;
-              }
-            ).getConnectionSessionStatus(sessionId);
+            const status =
+              await conversationalAgent.getConnectionSessionStatus(sessionId);
 
             // Ignore if a newer OAuth connection started while the request was in-flight
             if (oauthSessionRef.current !== oauthSession) return;
 
-            if (status.status === "success" && status.connectionId) {
+            if (
+              status.status === ConnectionSessionStatus.Success &&
+              status.connectionId
+            ) {
               if (pollingRef.current) {
                 clearInterval(pollingRef.current);
                 pollingRef.current = null;
@@ -242,33 +214,12 @@ export const ConnectionReadinessCard = ({
                         ? status.connectionId
                         : c.currentConnectionId,
                   }));
-                const updated = await (
-                  conversationalAgent as unknown as {
-                    updateConnectionSelections: (
-                      agentId: number,
-                      folderId: number,
-                      payload: {
-                        selections: {
-                          connectorKey: string;
-                          connectionId: string | null;
-                        }[];
-                      },
-                    ) => Promise<
-                      Array<{
-                        connectorKey: string;
-                        connectorName?: string;
-                        connectorImage?: string;
-                        currentConnectionId: string | null;
-                        currentConnectionName: string | null;
-                        isConfigurable?: boolean;
-                        connectionsUrl?: string;
-                        connections: Array<{ id: string; state: string }>;
-                      }>
-                    >;
-                  }
-                ).updateConnectionSelections(agentId, folderId, {
-                  selections: updatedSelections,
-                });
+                const updated =
+                  await conversationalAgent.updateConnectionSelections(
+                    agentId,
+                    folderId,
+                    { selections: updatedSelections },
+                  );
                 if (oauthSessionRef.current === oauthSession) {
                   setLocalConnectors(
                     updated.map((item) => {
@@ -285,8 +236,10 @@ export const ConnectionReadinessCard = ({
                         currentConnectionId: item.currentConnectionId,
                         currentConnectionName: item.currentConnectionName,
                         currentConnectionState:
-                          (sel?.state as ConnectorReadiness["currentConnectionState"]) ??
-                          (item.currentConnectionId ? "Expired" : undefined),
+                          sel?.state ??
+                          (item.currentConnectionId
+                            ? ConnectionState.Expired
+                            : undefined),
                         connectionsUrl: item.connectionsUrl,
                       };
                     }),
@@ -296,7 +249,7 @@ export const ConnectionReadinessCard = ({
                 // Persistence failed — do not update local state so the
                 // card continues to show the connector as unresolved.
               }
-            } else if (status.status === "failed") {
+            } else if (status.status === ConnectionSessionStatus.Failed) {
               if (pollingRef.current) {
                 clearInterval(pollingRef.current);
                 pollingRef.current = null;
@@ -318,10 +271,10 @@ export const ConnectionReadinessCard = ({
   );
 
   const STATE_LABEL: Record<string, string> = {
-    Enabled: "connections_status_connected",
-    Expired: "connections_status_expired",
-    Disabled: "connections_status_disabled",
-    Failed: "connections_status_failed",
+    [ConnectionState.Enabled]: "connections_status_connected",
+    [ConnectionState.Expired]: "connections_status_expired",
+    [ConnectionState.Disabled]: "connections_status_disabled",
+    [ConnectionState.Failed]: "connections_status_failed",
   };
 
   const getStatusText = (connector: ConnectorReadiness): string => {

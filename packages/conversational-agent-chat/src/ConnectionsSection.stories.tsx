@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ConversationalAgent } from "@uipath/uipath-typescript/conversational-agent";
+import { ConnectionState } from "@uipath/uipath-typescript/conversational-agent";
 import { ConnectionsSection } from "./components/SettingsDialog/ConnectionsSection";
 import { ConnectionReadinessCard } from "./components/ConnectionReadinessCard";
 import type { ConnectorReadiness } from "./components/ConnectionReadinessCard";
@@ -27,7 +28,7 @@ const MOCK_CONNECTIONS = [
       {
         id: "conn-1",
         name: "john@example.com",
-        state: "Enabled" as const,
+        state: ConnectionState.Enabled,
         isDefault: true,
         personalWorkspace: true,
         folderKey: null,
@@ -36,7 +37,7 @@ const MOCK_CONNECTIONS = [
       {
         id: "conn-2",
         name: "work@company.com",
-        state: "Enabled" as const,
+        state: ConnectionState.Enabled,
         isDefault: false,
         personalWorkspace: false,
         folderKey: "f1",
@@ -45,7 +46,7 @@ const MOCK_CONNECTIONS = [
       {
         id: "conn-3",
         name: "shared@team.com",
-        state: "Expired" as const,
+        state: ConnectionState.Expired,
         isDefault: false,
         personalWorkspace: false,
         folderKey: "f2",
@@ -66,7 +67,7 @@ const MOCK_CONNECTIONS = [
       {
         id: "conn-4",
         name: "admin@salesforce.com",
-        state: "Enabled" as const,
+        state: ConnectionState.Enabled,
         isDefault: false,
         personalWorkspace: true,
         folderKey: null,
@@ -246,7 +247,7 @@ const READINESS_BROKEN: ConnectorReadiness[] = [
     isConfigurable: true,
     currentConnectionId: "conn-1",
     currentConnectionName: "john@example.com",
-    currentConnectionState: "Expired",
+    currentConnectionState: ConnectionState.Expired,
   },
   {
     connectorKey: "salesforce",
@@ -254,7 +255,7 @@ const READINESS_BROKEN: ConnectorReadiness[] = [
     isConfigurable: true,
     currentConnectionId: "conn-2",
     currentConnectionName: "admin@sf.com",
-    currentConnectionState: "Failed",
+    currentConnectionState: ConnectionState.Failed,
   },
 ];
 
@@ -267,7 +268,7 @@ const READINESS_MIXED: ConnectorReadiness[] = [
     isConfigurable: true,
     currentConnectionId: "conn-1",
     currentConnectionName: "john@example.com",
-    currentConnectionState: "Enabled",
+    currentConnectionState: ConnectionState.Enabled,
   },
   {
     connectorKey: "salesforce",
