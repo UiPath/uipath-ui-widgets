@@ -141,7 +141,7 @@ let chunkHandler: any = null;
 let contentPartEndHandler: any = null;
 let toolCallEndHandler: any = null;
 let labelUpdatedHandler: any = null;
-let endConversationHandler: any = null;
+let conversationEndHandler: any = null;
 let lastSessionHelper: any = null;
 let lastExchange: any = null;
 
@@ -266,8 +266,8 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
               labelUpdatedHandler = handler;
               return () => {};
             }),
-            onEndConversation: vi.fn((handler: any) => {
-              endConversationHandler = handler;
+            onConversationEnd: vi.fn((handler: any) => {
+              conversationEndHandler = handler;
               return () => {};
             }),
             sendSessionEnd: vi.fn(),
@@ -361,7 +361,7 @@ describe("ConversationalAgentChat", () => {
     contentPartEndHandler = null;
     toolCallEndHandler = null;
     labelUpdatedHandler = null;
-    endConversationHandler = null;
+    conversationEndHandler = null;
     lastSessionHelper = null;
     lastExchange = null;
     sessionControl.neverStarts = false;
@@ -2402,13 +2402,13 @@ describe("ConversationalAgentChat", () => {
       );
       await getHandler("openConversation")("conv-1");
       await getHandler("request")({ content: "Hi", attachments: [] });
-      await waitFor(() => expect(endConversationHandler).toBeTruthy());
+      await waitFor(() => expect(conversationEndHandler).toBeTruthy());
     };
 
     it("should show a warning banner when the conversation completes", async () => {
       await startSessionOnConv1();
 
-      endConversationHandler({ reason: "completed" });
+      conversationEndHandler({ reason: "completed" });
 
       expect(mockChatService.setError).toHaveBeenLastCalledWith(
         ENDED_COMPLETED,
@@ -2419,7 +2419,7 @@ describe("ConversationalAgentChat", () => {
     it("should show an error banner when the conversation fails", async () => {
       await startSessionOnConv1();
 
-      endConversationHandler({ reason: "failed" });
+      conversationEndHandler({ reason: "failed" });
 
       expect(mockChatService.setError).toHaveBeenLastCalledWith(
         ENDED_FAILED,
@@ -2430,7 +2430,7 @@ describe("ConversationalAgentChat", () => {
     it("should treat an end event without a reason as completed", async () => {
       await startSessionOnConv1();
 
-      endConversationHandler({});
+      conversationEndHandler({});
 
       expect(mockChatService.setError).toHaveBeenLastCalledWith(
         ENDED_COMPLETED,
@@ -2440,7 +2440,7 @@ describe("ConversationalAgentChat", () => {
 
     it("should block sends after the conversation ends", async () => {
       await startSessionOnConv1();
-      endConversationHandler({ reason: "completed" });
+      conversationEndHandler({ reason: "completed" });
       const startExchange = lastSessionHelper.startExchange;
       startExchange.mockClear();
       mockChatService.setError.mockClear();
@@ -2457,7 +2457,7 @@ describe("ConversationalAgentChat", () => {
 
     it("should restore the ended state when reopening the conversation from history", async () => {
       await startSessionOnConv1();
-      endConversationHandler({ reason: "failed" });
+      conversationEndHandler({ reason: "failed" });
 
       // An open conversation accepts sends again.
       await getHandler("openConversation")("conv-2");
@@ -2476,7 +2476,7 @@ describe("ConversationalAgentChat", () => {
 
     it("should clear the ended state on new chat", async () => {
       await startSessionOnConv1();
-      endConversationHandler({ reason: "completed" });
+      conversationEndHandler({ reason: "completed" });
       mockChatService.clearError.mockClear();
 
       getHandler("newChat")();

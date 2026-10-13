@@ -737,7 +737,7 @@ export const ConversationalAgentChat = ({
         ),
       );
     });
-    sessionHelper.onEndConversation(({ reason }) => {
+    sessionHelper.onConversationEnd(({ reason }) => {
       const endReason = reason ?? ConversationEndReason.Completed;
       const endedTime = new Date().toISOString();
       // Mark it ended in the history list so reopening it later shows the ended state.
