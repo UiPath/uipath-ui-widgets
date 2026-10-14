@@ -29,7 +29,7 @@ Learn more in the [UiPath Document Understanding docs](https://docs.uipath.com/a
   - [2. Mount the element](#2-mount-the-element)
   - [3. Wire up data and event handlers](#3-wire-up-data-and-event-handlers)
   - [Updating the data inputs after mount](#updating-the-data-inputs-after-mount)
-  - [Supplying a Flow extraction instead](#supplying-a-flow-extraction-instead)
+  - [Supplying an IXP extraction](#supplying-an-ixp-extraction)
 - [Customization options](#customization-options)
 - [Element options](#element-options)
 - [Custom value-indicator overlay](#custom-value-indicator-overlay)
@@ -160,24 +160,23 @@ them to resolve to anything other than `any`.
 `ICustomizationInfoDTO` for opt-in typing (see
 [Customization options](#customization-options)).
 
-### Supplying a Flow extraction instead
+### Supplying an IXP extraction
 
-A document produced by a UiPath Flow extraction can be supplied as
-`flowTaxonomy` (the output JSON Schema) + `flowExtraction` (the extracted
-values and their confidences) **instead of** `taxonomy` + `extractionResult`.
-Supply one pair or the other, and both halves of it — a half-supplied pair
-leaves the element waiting for the other half.
+The validation-station and compact fields-form elements also accept a document
+in the IXP representation: `taxonomy` as an `IXPTaxonomy` (the output JSON
+Schema) and `extractionResult` as an `IXPExtraction` (the extracted `output`
+plus an `attribution` map keyed by JSON Pointer). Supply both in the same
+representation.
 
 ```ts
-el.flowTaxonomy   = await fetchFlowOutputSchema();
-el.flowExtraction = await fetchFlowExtraction();
+el.taxonomy         = await fetchIxpOutputSchema();
+el.extractionResult = await fetchIxpExtraction();
 ```
 
 Such a document saves back in the representation it arrived in:
-`saveValidatedDataRequest`'s `validatedData` is then an
-`IVsFlowValidatedResult` — the reviewer's `output` plus an `attribution` map
-keyed by JSON Pointer — rather than an `ExtractionResult`. Tell the two apart
-by the `output` property, which an `ExtractionResult` never has.
+`saveValidatedDataRequest`'s `validatedData` is then an `IXPExtraction`
+rather than an `ExtractionResult`. Tell the two apart by the `output`
+property, which an `ExtractionResult` never has.
 
 ### Updating the data inputs after mount
 
@@ -231,6 +230,7 @@ its `FeatureCustomization` member, typed `IFeatureCustomization`. A supplied
 | `DisplayMode` | Chooses which shell the validation-station element renders. Only that element reads it — every other element always renders compact. Omitted, it keeps the compact default; `'classic'` selects the classic shell. | selects the mode | validation-station |
 | `TextOnlyMode` | When `true`, the document viewer skips the page image and runs text-only, with no token creation on the canvas; the document-viewer element ignores the flag and derives text-only mode from the content inputs it was given. | both | validation-station |
 | `HideConfirmationCheckboxes` | When `true`, hides the per-value, per-row and per-cell confirmation checkboxes. Purely visual — the confirmation state and the submit flow are unchanged. | compact | validation-station, fields-form, table-editor |
+| `HideHighlightRow` | When `true`, hides the "Highlight row" action from the menu of each field group row in the fields list; in read-only mode, where that leaves the menu empty, the menu button is hidden too. The table editors keep their own "Highlight row" action. | compact | validation-station, fields-form |
 | `HideReadonlyModeIndicator` | When `true`, hides the READ-ONLY indicator shown at the bottom of the fields list while the element is read-only. | both | validation-station, fields-form |
 | `EnablePredictionDiff` | When `true`, shows the predicted value where it differs from the current values, with a button that takes it over. Needs `predictedExtractionResult`. | compact | validation-station, fields-form, table-editor |
 
@@ -248,6 +248,7 @@ chrome of the validation-station element. Every member is optional.
 | Option | Effect |
 |---|---|
 | `hideSubmitButton`, `hideReportAsExceptionButton`, `hideDocumentTypeField`, `hideFields`, `hideBusinessRules` | Hide the matching part of the fields panel. |
+| `emptyTaxonomyMessage` | Text shown under the "No taxonomy defined" title when the selected document type has no fields (compact mode). Rendered verbatim, so pass it already localized; when unset, a default about there being no fields to validate is shown. |
 | `fieldsSectionPosition` | `'left'` (default) or `'right'` — which side the fields panel sits on. |
 | `fieldFilterOptions` | Trims the compact field-filter toolbar: `hideBar` removes it entirely; `hideConfirmed`, `hideNotExtracted` and `hideNoFlaggedIssues` each drop one entry of the *Hide fields* menu, and the menu button disappears once all three are hidden. A hidden filter also stops filtering. |
 | `defaultFieldsAreaPercentage` | Width the fields panel starts at, as a percentage (0–100) of the element. Wins over `defaultFieldsAreaWidth`. |

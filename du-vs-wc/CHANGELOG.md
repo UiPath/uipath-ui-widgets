@@ -7,6 +7,100 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0-rc.4] - 2026-10-09
+
+Fourth release candidate for `1.0.0`. No element tag, input, event or
+command method from `1.0.0-rc.3` is renamed or removed. The new options are
+opt-in, but some compact-mode UI appears by default: the *No taxonomy
+defined* state, the table editor's *Duplicate row* action and column
+freezing.
+
+> 🚀 This is a **release candidate**. Please report any issues before the
+> stable release.
+
+### Added
+
+- `predictedExtractionResult` on the validation-station and compact
+  fields-form elements accepts an `IXPExtraction`, like `extractionResult`,
+  so an IXP document can show the prediction diff. Supply it in the same
+  representation as `extractionResult`. The table editor still takes an
+  `ExtractionResult` only.
+- IXP taxonomies can declare a **single-instance field group**: a nullable
+  `object` whose fields sit directly under `properties`. It renders as one
+  row; `null` or a missing value renders as not found, and the reviewer can
+  add the instance but not a second one. It saves back as an object, or
+  `null` when there is no row. Previously such a taxonomy failed to load.
+- `emptyTaxonomyMessage` option — when the selected document type has no
+  fields, the compact fields form shows a *No taxonomy defined* state with
+  this text, or a default message when it is unset. Pass it already
+  localized. Submitting is still allowed; use `hideSubmitButton` to prevent
+  it.
+- Table columns can be frozen up to a chosen column, so they stay visible
+  while the table scrolls horizontally.
+- A *Duplicate row* action in the compact table editor's row menu. It
+  inserts a copy of the row directly below it; the copied values are
+  unconfirmed and have no document reference. It is not offered in
+  read-only mode or in the classic table editor.
+- **Shift+N** keyboard shortcut — moves to the next value or table cell with
+  a flagged issue (a failed validation, a broken business rule, or an
+  unconfirmed value below its confidence threshold), in the same order as
+  `N` / `P`, wrapping at the end. Unlike `N`, it never confirms the value it
+  leaves.
+
+### Fixed
+
+- IXP field groups no longer require a document reference, so a row can be
+  added without first selecting something in the document. Each field still
+  follows its own reference rule.
+- The *Continue & save* prompt for unconfirmed values closes as soon as the
+  user edits a field, confirms a value or changes the document type, so it
+  can no longer submit values changed after it opened.
+- The prediction diff compares numbers and date parts by value, so `1.50`
+  and `1.5` no longer show as a difference.
+- Classic mode shows the document type's real extraction confidence instead
+  of always 100%.
+- Frozen table columns: no gap after the line-number column, and a dedicated
+  tooltip when no columns fit.
+- Component theme overrides are resolved by inheritance instead of
+  `:host-context`.
+- Accessibility: the date-range picker's controls are grouped under their
+  form field label, and the page navigator's input has a visible label.
+
+## [1.0.0-rc.3] - 2026-10-01
+
+Third release candidate for `1.0.0`. It carries a breaking change for hosts
+that supply a Flow extraction: `flowTaxonomy` + `flowExtraction` are removed,
+and `taxonomy` + `extractionResult` take the IXP representation instead. Read
+**Changed** before upgrading. Hosts that supply UiPath extraction results are
+unaffected.
+
+> 🚀 This is a **release candidate**. Please report any issues before the
+> stable release.
+
+### Added
+
+- `HideHighlightRow` on `FeatureCustomization` (validation-station and
+  fields-form elements, compact mode only) — hides the "Highlight row"
+  action from the menu of each field group row in the fields list, for
+  hosts with nothing to highlight, e.g. no document viewer. In read-only
+  mode, where that leaves the menu empty, the menu button is hidden too.
+  The table editors are unaffected.
+
+### Changed
+
+- **Breaking:** the validation-station element's `flowTaxonomy` +
+  `flowExtraction` inputs are removed. `taxonomy` and `extractionResult` now
+  accept the IXP representation directly, as an `IXPTaxonomy` and an
+  `IXPExtraction`, on the validation-station and compact fields-form elements.
+  The fields form hides its document type field by default for an
+  `IXPTaxonomy`, like the validation-station element.
+- **Breaking:** `IVsFlowValidatedResult` is replaced by `IXPExtraction`, the
+  same type the `extractionResult` input takes, as the IXP `validatedData` of
+  `saveValidatedDataRequest`.
+- The compact fields form's expand / collapse-all control is redesigned and
+  aligned with the field rows, and its labels now read *Expand all field
+  groups* / *Collapse all field groups*.
+
 ## [1.0.0-rc.2] - 2026-09-28
 
 Second release candidate for `1.0.0`. No element tag, event or command

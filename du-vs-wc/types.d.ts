@@ -147,6 +147,8 @@ export interface IFeatureCustomization {
     TextOnlyMode?: boolean;
     /** Hides the per-value, per-row and per-cell confirmation checkboxes; purely visual, the submit flow is unchanged (compact mode only). */
     HideConfirmationCheckboxes?: boolean;
+    /** Hides the "Highlight row" action from a field group row's menu in the fields list (compact mode only). */
+    HideHighlightRow?: boolean;
     /** Hides the READ-ONLY indicator at the bottom of the fields list while the component is in readonly mode (both modes). */
     HideReadonlyModeIndicator?: boolean;
     /** Shows the prediction diff (compact mode only). Needs `predictedExtractionResult`. */
@@ -201,7 +203,7 @@ export interface FieldFilterOptions {
 export interface IValidationStationOptions {
     hideSubmitButton?: boolean;
     hideReportAsExceptionButton?: boolean;
-    /** Hides the document type field. Defaults to `true` for a Flow input, `false` otherwise. */
+    /** Hides the document type field. Defaults to `true` for an IXP taxonomy, `false` otherwise. */
     hideDocumentTypeField?: boolean;
     hideFields?: boolean;
     /**
@@ -210,6 +212,15 @@ export interface IValidationStationOptions {
      * compact-business-rules web component).
      */
     hideBusinessRules?: boolean;
+    /**
+     * In compact mode, message shown under the "No taxonomy defined" title when the selected document type has no fields.
+     * Rendered verbatim — pass text already localized for the user. When unset or empty, a default about
+     * there being no fields to validate is shown.
+     *
+     * @example
+     * options = { emptyTaxonomyMessage: 'To generate predictions, the taxonomy must have field groups and fields defined.' };
+     */
+    emptyTaxonomyMessage?: string;
     /** @default 'left' */
     fieldsSectionPosition?: 'left' | 'right';
     /** Trims or removes the field-filter toolbar. */
@@ -376,16 +387,39 @@ export interface GoToPageResult extends IVsWcActionResultOutput {
 // ─── Standalone save-request payloads ─────────────────────────────────────────
 
 /**
- * A validated result in the JSON-Schema representation — what a document supplied through
- * `flowTaxonomy` + `flowExtraction` validates back into, rather than an `ExtractionResult`.
+ * A document's taxonomy in the IXP representation: the output JSON Schema describing its fields.
+ *
+ * Discriminated by `properties` / `$defs`: a UiPath `DocumentTaxonomy` is PascalCase throughout
+ * and never has them.
+ */
+export interface IXPTaxonomy {
+    type?: string | string[];
+    /** The document's fields and field groups, keyed by field name. */
+    properties?: Record<string, unknown>;
+    required?: string[];
+    /** The field type declarations the `properties` reference. */
+    $defs?: Record<string, unknown>;
+}
+
+/**
+ * An extraction result in the IXP representation — both what an `IXPTaxonomy` document is
+ * supplied as and what it validates back into.
  *
  * Discriminate on `output`: a UiPath `ExtractionResult` is PascalCase throughout and never has it.
  */
-export interface IVsFlowValidatedResult {
-    /** The reviewer's values, shaped by the `flowTaxonomy` schema. */
+export interface IXPExtraction {
+    /** The values, shaped by the `IXPTaxonomy` schema. */
     output: unknown;
     /** Citations keyed by RFC 6901 JSON Pointer, one entry per leaf value. */
-    attribution: Record<string, { confidence?: number; sources?: unknown[] }>;
+    attribution: Record<string, {
+        confidence?: number;
+        sources?: {
+            attachmentId?: string;
+            /** 1-based. */
+            pageNumber?: number;
+            boundingBoxes?: { xMin: number; xMax: number; yMin: number; yMax: number }[];
+        }[];
+    }>;
 }
 
 /**
@@ -393,16 +427,15 @@ export interface IVsFlowValidatedResult {
  *
  * `automaticExtractionResult` and `taxonomy` carry UiPath Document Understanding SDK contracts
  * from `@uipath/uipath-typescript`, and so does `validatedData` unless the document was supplied
- * in the JSON-Schema representation.
+ * in the IXP representation.
  */
 export interface IVsSaveValidatedDataRequest {
     documentId: string;
     /**
-     * The extraction result after user edits — or an {@link IVsFlowValidatedResult} when the
-     * document was supplied through `flowTaxonomy` + `flowExtraction`, which saves back in the
-     * representation it arrived in.
+     * The extraction result after user edits — an {@link IXPExtraction} when the document was
+     * supplied in the IXP representation, which saves back in the representation it arrived in.
      */
-    validatedData: ExtractionResult | IVsFlowValidatedResult;
+    validatedData: ExtractionResult | IXPExtraction;
     /** The automatic (pre-edit) extraction result. */
     automaticExtractionResult: ExtractionResult | null;
     /** The taxonomy for this document. */
@@ -739,35 +772,27 @@ export interface IValidationStationStandaloneWcElement extends IVsWcBaseElement<
 
     // ── Data inputs (replace the HTTP fetches of the non-standalone variant) ──
     //
-    // The document's fields and values come from EITHER `taxonomy` + `extractionResult`
-    // OR `flowTaxonomy` + `flowExtraction`. Supply one pair. Both halves of a pair are
-    // required; a half-supplied pair leaves the station waiting for the other half.
+    // `taxonomy` + `extractionResult` are EITHER the UiPath SDK contracts OR the IXP
+    // (JSON-Schema) representation — supply both in the same representation.
 
-    /** Taxonomy for this document. Required unless the Flow pair is supplied instead. */
-    taxonomy?: DocumentTaxonomy;
-    /** Initial extraction results. Required unless the Flow pair is supplied instead. */
-    extractionResult?: ExtractionResult;
     /**
-     * Flow output schema, describing the document's fields. An alternative to `taxonomy`. Supply
-     * with `flowExtraction`.
-     *
-     * A document described this way saves back in the same representation: the
-     * `saveValidatedDataRequest` event's `validatedData` is then the reviewer's `output` +
-     * `attribution`, not an `ExtractionResult`.
+     * Taxonomy for this document: a UiPath `DocumentTaxonomy`, or an {@link IXPTaxonomy}
+     * (the IXP output JSON Schema).
      */
-    flowTaxonomy?: unknown;
+    taxonomy?: DocumentTaxonomy | IXPTaxonomy;
     /**
-     * Flow extraction result — the extracted values and their confidences, matching
-     * `flowTaxonomy`. Supply with it.
+     * Initial extraction results: a UiPath `ExtractionResult`, or an {@link IXPExtraction}
+     * matching an `IXPTaxonomy`. An IXP document saves back in the same representation — the
+     * `saveValidatedDataRequest` event's `validatedData` is then an `IXPExtraction`.
      */
-    flowExtraction?: unknown;
+    extractionResult?: ExtractionResult | IXPExtraction;
     /**
      * Predicted extraction result — the model output before any human edit, as opposed to
-     * `extractionResult`, the result the user reviews and edits. Same `ExtractionResult`
-     * shape as `extractionResult`. Optional; it enables features that compare against
+     * `extractionResult`, the result the user reviews and edits. In the same representation
+     * as `extractionResult`. Optional; it enables features that compare against
      * the predicted extractions. Set `null` to clear it.
      */
-    predictedExtractionResult?: ExtractionResult | null;
+    predictedExtractionResult?: ExtractionResult | IXPExtraction | null;
     /** Document object model (digitized document). */
     dom: DocumentEntity;
     /** Plain text content of the document. */
@@ -823,18 +848,28 @@ export interface ICompactFieldsFormStandaloneWcElement extends IVsWcBaseElement<
     instanceId: string | undefined;
 
     // ── Data inputs (replace the HTTP fetches of the non-standalone variant) ──
+    //
+    // `taxonomy` + `extractionResult` are EITHER the UiPath SDK contracts OR the IXP
+    // (JSON-Schema) representation — supply both in the same representation.
 
-    /** Taxonomy for this document. */
-    taxonomy: DocumentTaxonomy;
-    /** Initial extraction results. */
-    extractionResult: ExtractionResult;
+    /**
+     * Taxonomy for this document: a UiPath `DocumentTaxonomy`, or an {@link IXPTaxonomy}
+     * (the IXP output JSON Schema).
+     */
+    taxonomy: DocumentTaxonomy | IXPTaxonomy;
+    /**
+     * Initial extraction results: a UiPath `ExtractionResult`, or an {@link IXPExtraction}
+     * matching an `IXPTaxonomy`. An IXP document saves back in the same representation — the
+     * `saveValidatedDataRequest` event's `validatedData` is then an `IXPExtraction`.
+     */
+    extractionResult: ExtractionResult | IXPExtraction;
     /**
      * Predicted extraction result — the model output before any human edit, as opposed to
-     * `extractionResult`, the result the user reviews and edits. Same `ExtractionResult`
-     * shape as `extractionResult`. Optional; it enables features that compare against
+     * `extractionResult`, the result the user reviews and edits. In the same representation
+     * as `extractionResult`. Optional; it enables features that compare against
      * the predicted extractions. Set `null` to clear it.
      */
-    predictedExtractionResult?: ExtractionResult | null;
+    predictedExtractionResult?: ExtractionResult | IXPExtraction | null;
     /** Customization configuration. Type: the exported ICustomizationInfoDTO. */
     customizationInfo: unknown;
 }
@@ -1371,9 +1406,9 @@ export interface IValidationStationStandaloneWcJsxProps extends IVsWcSharedJsxPr
     documentId?: string;
     text?: string;
     original?: string;
-    taxonomy?: DocumentTaxonomy;
-    extractionResult?: ExtractionResult;
-    predictedExtractionResult?: ExtractionResult | null;
+    taxonomy?: DocumentTaxonomy | IXPTaxonomy;
+    extractionResult?: ExtractionResult | IXPExtraction;
+    predictedExtractionResult?: ExtractionResult | IXPExtraction | null;
     dom?: DocumentEntity;
     customizationInfo?: unknown;
 }
@@ -1396,9 +1431,9 @@ export interface ICompactFieldsFormStandaloneWcJsxProps extends IVsWcSharedJsxPr
     documentId?: string;
     /** Link id — set as the `instance-id` attribute before connect. See {@link ICompactFieldsFormStandaloneWcElement.instanceId}. */
     'instance-id'?: string;
-    taxonomy?: DocumentTaxonomy;
-    extractionResult?: ExtractionResult;
-    predictedExtractionResult?: ExtractionResult | null;
+    taxonomy?: DocumentTaxonomy | IXPTaxonomy;
+    extractionResult?: ExtractionResult | IXPExtraction;
+    predictedExtractionResult?: ExtractionResult | IXPExtraction | null;
     customizationInfo?: unknown;
 }
 

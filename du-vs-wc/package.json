@@ -1,6 +1,6 @@
 {
     "name": "@uipath/du-validation-station-wc",
-    "version": "1.0.0-rc.2",
+    "version": "1.0.0-rc.4",
     "description": "Validation Station as a web component for UiPath Document Understanding.",
     "keywords": [
         "uipath",
