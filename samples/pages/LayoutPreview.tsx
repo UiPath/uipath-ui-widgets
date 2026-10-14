@@ -362,10 +362,11 @@ function LayoutPreview({ widgetId }: LayoutPreviewProps) {
   switch (widgetId) {
     case "datatable":
       return <DataTablePreview />;
-    // Both Validation Station samples render the same screen — only the data
-    // flow differs — so they share one preview.
+    // The Validation Station samples render the same screen — only the data
+    // source differs — so they share one preview.
     case "validation-station":
     case "validation-station-prefetched":
+    case "validation-station-ixp":
       return <ValidationStationPreview />;
     case "invoice-review-workspace":
       return <InvoiceReviewWorkspacePreview />;

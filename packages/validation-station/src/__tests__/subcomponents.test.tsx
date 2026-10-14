@@ -142,6 +142,36 @@ describe.each(cases)("$name", ({ Component, tag }) => {
   });
 });
 
+describe.each([
+  {
+    name: "CompactFieldsForm",
+    Component: CompactFieldsForm as React.FC<any>,
+    tag: "ui-du-compact-fields-form-standalone-wc-element",
+  },
+  {
+    name: "CompactTableEditor",
+    Component: CompactTableEditor as React.FC<any>,
+    tag: "ui-du-compact-table-editor-standalone-wc-element",
+  },
+  {
+    name: "CompactBusinessRules",
+    Component: CompactBusinessRules as React.FC<any>,
+    tag: "ui-du-compact-business-rules-standalone-wc-element",
+  },
+])("$name message bus", ({ Component, tag }) => {
+  it("forwards `ui-du-vs-wc-message` to onWcMessage", async () => {
+    const onWcMessage = vi.fn();
+    const { container } = render(<Component onWcMessage={onWcMessage} />);
+    const el = container.querySelector(tag)!;
+    const detail = { type: "indicator-overlay-hide", instanceId: 2 };
+
+    await waitFor(() => {
+      el.dispatchEvent(new CustomEvent("ui-du-vs-wc-message", { detail }));
+      expect(onWcMessage).toHaveBeenCalledWith(detail);
+    });
+  });
+});
+
 describe("CompactFieldsForm save wiring", () => {
   const sdk = {} as any;
   const data = { DocumentId: "doc-123", FolderId: 42 } as any;

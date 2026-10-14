@@ -7,6 +7,7 @@ import type { UiPath } from "@uipath/uipath-typescript/core";
 import { type DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import { OrchestratorDuModule } from "@uipath/uipath-typescript/orchestrator-du-module";
 import { strToU8, zipSync } from "fflate";
+import { isIXPExtraction } from "./ixpUtil.js";
 
 export interface SaveValidatedDataResult {
   success: boolean;
@@ -81,6 +82,12 @@ export async function submitValidatedData(
   request: IVsSaveValidatedDataRequest,
 ): Promise<SaveValidatedDataResult> {
   try {
+    // DU post-processing takes the UiPath contracts only.
+    if (isIXPExtraction(request.validatedData)) {
+      throw new Error(
+        "An IXP extraction cannot be submitted through ContentValidationData. Submit it with submitProcessedDocument.",
+      );
+    }
     const target = bucketTarget(data);
     const du = new OrchestratorDuModule(sdk);
     const processedResult = await du.processExtractedData(
@@ -109,6 +116,12 @@ export async function saveValidatedDataAsDraft(
   request: IVsSaveValidatedDataAsDraftRequest,
 ): Promise<SaveValidatedDataResult> {
   try {
+    // The next bucket load reads this file as an `ExtractionResult`.
+    if (isIXPExtraction(request.validatedData)) {
+      throw new Error(
+        "An IXP extraction cannot be saved through ContentValidationData. Save it with saveProcessedDocumentAsDraft.",
+      );
+    }
     await uploadResultToBucket(
       new BucketService(sdk),
       bucketTarget(data),
