@@ -254,8 +254,7 @@ export const ConnectionsSection = ({
                     connectionId:
                       i.connectorKey === connectorKey
                         ? status.connectionId
-                        : (stagedSelectionsRef.current[i.connectorKey] ||
-                          null),
+                        : stagedSelectionsRef.current[i.connectorKey] || null,
                   })),
                 },
               );
