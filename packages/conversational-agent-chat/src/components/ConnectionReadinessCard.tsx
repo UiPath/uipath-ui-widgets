@@ -67,12 +67,15 @@ export const ConnectionReadinessCard = ({
     setLocalConnectors(connectors);
   }, [connectors]);
 
-  // Cleanup polling on unmount
+  // Cleanup polling on unmount — also invalidate any in-flight OAuth requests
   useEffect(() => {
+    const sessionRef = oauthSessionRef;
+    const pollRef = pollingRef;
     return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
+      ++sessionRef.current;
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
       }
     };
   }, []);

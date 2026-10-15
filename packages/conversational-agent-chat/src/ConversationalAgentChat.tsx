@@ -1275,6 +1275,7 @@ export const ConversationalAgentChat = ({
               inputsResetKey={inputsResetKey}
               agentId={agentIdRef.current}
               folderId={folderIdRef.current}
+              onConnectionsChanged={fetchConnectionReadiness}
             />
           </PortalContainerProvider>,
         );

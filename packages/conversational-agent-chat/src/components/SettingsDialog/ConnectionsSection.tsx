@@ -39,6 +39,8 @@ export interface ConnectionsSectionProps {
   conversationalAgent: ConversationalAgent;
   agentId: number;
   folderId: number;
+  /** Called after a manual save or OAuth auto-save completes successfully. */
+  onConnectionsChanged?: () => void;
 }
 
 const POLL_INTERVAL_MS = 500;
@@ -54,6 +56,7 @@ export const ConnectionsSection = ({
   conversationalAgent,
   agentId,
   folderId,
+  onConnectionsChanged,
 }: ConnectionsSectionProps) => {
   const { t } = useWidgetTranslation();
   const api = conversationalAgent;
@@ -136,7 +139,14 @@ export const ConnectionsSection = ({
     return () => document.removeEventListener("visibilitychange", handler);
   }, [api, agentId, folderId]);
 
-  useEffect(() => () => clearPoll(), [clearPoll]);
+  useEffect(() => {
+    const sessionRef = oauthSessionRef;
+    return () => {
+      // Increment session so any in-flight OAuth requests are ignored
+      ++sessionRef.current;
+      clearPoll();
+    };
+  }, [clearPoll]);
 
   const isDirty = useMemo(
     () =>
@@ -182,6 +192,7 @@ export const ConnectionsSection = ({
       setInitialSelections(sels);
       setStagedSelections(sels);
       setSaveResult("success");
+      onConnectionsChanged?.();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err));
       setSaveResult("error");
@@ -243,8 +254,8 @@ export const ConnectionsSection = ({
                     connectionId:
                       i.connectorKey === connectorKey
                         ? status.connectionId
-                        : (stagedSelectionsRef.current[i.connectorKey] ??
-                          i.currentConnectionId),
+                        : (stagedSelectionsRef.current[i.connectorKey] ||
+                          null),
                   })),
                 },
               );
@@ -253,6 +264,7 @@ export const ConnectionsSection = ({
                 setItems(updated);
                 setInitialSelections(sels);
                 setStagedSelections(sels);
+                onConnectionsChanged?.();
               }
             } catch {
               // Fallback: at least update the local selection

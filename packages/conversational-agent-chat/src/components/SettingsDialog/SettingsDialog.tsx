@@ -38,6 +38,8 @@ export interface SettingsDialogProps {
   agentId?: number;
   /** Folder ID for loading personal connections. */
   folderId?: number;
+  /** Called when connections are saved (manual or OAuth). */
+  onConnectionsChanged?: () => void;
 }
 
 /**
@@ -55,6 +57,7 @@ export const SettingsDialog = ({
   inputsResetKey,
   agentId,
   folderId,
+  onConnectionsChanged,
 }: SettingsDialogProps) => {
   const { t } = useWidgetTranslation();
   const showInputs =
@@ -100,6 +103,7 @@ export const SettingsDialog = ({
                 conversationalAgent={conversationalAgent}
                 agentId={agentId}
                 folderId={folderId}
+                onConnectionsChanged={onConnectionsChanged}
               />
             </AccordionContent>
           </AccordionItem>
