@@ -3,7 +3,15 @@ import {
   AlertDescription,
   Badge,
   Button,
-  Input,
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Spinner,
   cn,
 } from "@uipath/apollo-wind";
@@ -12,10 +20,7 @@ import type {
   AvailableConnectionsResponse,
   ConversationalAgent,
 } from "@uipath/uipath-typescript/conversational-agent";
-import {
-  ConnectionSessionStatus,
-  ConnectionState,
-} from "@uipath/uipath-typescript/conversational-agent";
+import { ConnectionSessionStatus } from "@uipath/uipath-typescript/conversational-agent";
 import {
   useCallback,
   useEffect,
@@ -24,6 +29,10 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  CONNECTION_STATUS_LABEL,
+  CONNECTION_STATUS_VARIANT,
+} from "../../constants/connectionStatus";
 import { useWidgetTranslation } from "../../i18n/useWidgetTranslation";
 
 export interface ConnectionsSectionProps {
@@ -33,23 +42,6 @@ export interface ConnectionsSectionProps {
 }
 
 const POLL_INTERVAL_MS = 500;
-
-const STATUS_VARIANT: Record<
-  string,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  [ConnectionState.Enabled]: "default",
-  [ConnectionState.Disabled]: "secondary",
-  [ConnectionState.Expired]: "outline",
-  [ConnectionState.Failed]: "destructive",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  [ConnectionState.Enabled]: "connections_status_connected",
-  [ConnectionState.Expired]: "connections_status_expired",
-  [ConnectionState.Disabled]: "connections_status_disabled",
-  [ConnectionState.Failed]: "connections_status_failed",
-};
 
 const getInitialSelections = (
   items: AvailableConnectionsResponse,
@@ -357,54 +349,169 @@ export const ConnectionsSection = ({
             <div className="flex items-center gap-2">
               <div className="min-w-0 flex-1 truncate">
                 {isConfigurable ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isThisConnecting) return;
-                      if (hasSelection || item.connections.length > 0) {
-                        setOpenPicker(isPickerOpen ? null : item.connectorKey);
-                        setSearchQuery("");
-                      } else {
-                        startOAuthConnect(item.connectorKey);
-                      }
-                    }}
-                    className={
-                      hasSelection
-                        ? "inline-flex items-center gap-1 text-sm hover:opacity-80"
-                        : "text-sm font-semibold text-primary hover:underline"
-                    }
-                    disabled={isThisConnecting}
-                  >
-                    {isThisConnecting ? (
-                      <>
-                        <Spinner size="sm" className="mr-1" />
-                        {t("connection_readiness_connecting")}
-                      </>
-                    ) : hasSelection ? (
-                      <>
-                        <span>
-                          {selectedConn?.name ??
-                            item.currentConnectionName ??
-                            selectedId}
-                        </span>
-                        <svg
-                          className="h-4 w-4 text-muted-foreground"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
+                  isThisConnecting ? (
+                    <span className="inline-flex items-center text-sm">
+                      <Spinner size="sm" className="mr-1" />
+                      {t("connection_readiness_connecting")}
+                    </span>
+                  ) : hasSelection || item.connections.length > 0 ? (
+                    <Popover
+                      open={isPickerOpen}
+                      onOpenChange={(open) => {
+                        setOpenPicker(open ? item.connectorKey : null);
+                        if (!open) setSearchQuery("");
+                      }}
+                    >
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className={
+                            hasSelection
+                              ? "inline-flex items-center gap-1 text-sm hover:opacity-80"
+                              : "text-sm font-semibold text-primary hover:underline"
+                          }
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </>
-                    ) : (
-                      t("connections_connect")
-                    )}
-                  </button>
+                          {hasSelection ? (
+                            <>
+                              <span>
+                                {selectedConn?.name ??
+                                  item.currentConnectionName ??
+                                  selectedId}
+                              </span>
+                              <svg
+                                className="h-4 w-4 text-muted-foreground"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 9l-7 7-7-7"
+                                />
+                              </svg>
+                            </>
+                          ) : (
+                            t("connections_connect")
+                          )}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-72 p-0"
+                        align="start"
+                        onOpenAutoFocus={(e) => e.preventDefault()}
+                      >
+                        <Command shouldFilter={false}>
+                          <div className="flex items-center gap-2 border-b px-2">
+                            <CommandInput
+                              placeholder={t("connections_search_placeholder")}
+                              value={searchQuery}
+                              onValueChange={setSearchQuery}
+                              className="h-8"
+                            />
+                            <Button
+                              variant="link"
+                              size="sm"
+                              onClick={() => {
+                                setOpenPicker(null);
+                                setSearchQuery("");
+                                startOAuthConnect(item.connectorKey);
+                              }}
+                              className="shrink-0 p-0 text-xs"
+                            >
+                              {t("connections_add_connection")}
+                            </Button>
+                          </div>
+                          <CommandList className="max-h-48">
+                            <CommandEmpty>
+                              {t("connections_no_configurable")}
+                            </CommandEmpty>
+                            {(() => {
+                              const query = searchQuery.trim().toLowerCase();
+                              const grouped = item.connections.reduce<
+                                Record<string, AvailableConnection[]>
+                              >(
+                                (groups, conn) => {
+                                  const groupName = conn.personalWorkspace
+                                    ? t("connections_personal_workspace")
+                                    : (conn.folderName ??
+                                      t("connections_unknown_folder"));
+                                  if (
+                                    query &&
+                                    !conn.name.toLowerCase().includes(query) &&
+                                    !groupName.toLowerCase().includes(query)
+                                  ) {
+                                    return groups;
+                                  }
+                                  groups[groupName] = groups[groupName] ?? [];
+                                  groups[groupName].push(conn);
+                                  return groups;
+                                },
+                                Object.create(null) as Record<
+                                  string,
+                                  AvailableConnection[]
+                                >,
+                              );
+                              return Object.entries(grouped).map(
+                                ([groupName, conns]) => (
+                                  <CommandGroup
+                                    key={groupName}
+                                    heading={groupName}
+                                  >
+                                    {conns.map((conn) => (
+                                      <CommandItem
+                                        key={conn.id}
+                                        value={conn.id}
+                                        onSelect={() => {
+                                          handleSelect(
+                                            item.connectorKey,
+                                            conn.id,
+                                          );
+                                        }}
+                                        className={cn(
+                                          conn.id === selectedId && "bg-muted",
+                                        )}
+                                      >
+                                        <span className="truncate">
+                                          {conn.name}
+                                        </span>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                ),
+                              );
+                            })()}
+                          </CommandList>
+                          {(item.connectionsUrl ?? item.configurationUrl) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                window.open(
+                                  item.connectionsUrl ?? item.configurationUrl,
+                                  "_blank",
+                                  "noopener,noreferrer",
+                                )
+                              }
+                              className="w-full rounded-none border-t p-2.5 text-sm"
+                            >
+                              {t("connections_open_connections")}
+                            </Button>
+                          )}
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  ) : (
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0 text-sm font-semibold"
+                      onClick={() => startOAuthConnect(item.connectorKey)}
+                    >
+                      {t("connections_connect")}
+                    </Button>
+                  )
                 ) : hasSelection ? (
                   <span className="text-sm">
                     {item.currentConnectionName ?? selectedId}
@@ -419,12 +526,13 @@ export const ConnectionsSection = ({
               {/* Status badge */}
               {selectedConn && (
                 <Badge
-                  variant={STATUS_VARIANT[selectedConn.state] ?? "secondary"}
+                  variant={
+                    CONNECTION_STATUS_VARIANT[selectedConn.state] ?? "secondary"
+                  }
                 >
-                  {/* Possible keys: "connections_status_connected" | "connections_status_expired" | "connections_status_disabled" | "connections_status_failed" */}
                   {/* eslint-disable-next-line no-restricted-syntax */}
                   {t(
-                    (STATUS_LABEL[selectedConn.state] ??
+                    (CONNECTION_STATUS_LABEL[selectedConn.state] ??
                       "connections_status_disabled") as Parameters<typeof t>[0],
                   )}
                 </Badge>
@@ -437,11 +545,12 @@ export const ConnectionsSection = ({
 
               {/* Clear button */}
               {hasSelection && isConfigurable && (
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   aria-label={t("connections_clear")}
                   onClick={() => handleClear(item.connectorKey)}
-                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className="shrink-0 p-1"
                 >
                   <svg
                     className="h-4 w-4"
@@ -456,115 +565,9 @@ export const ConnectionsSection = ({
                       d="M6 18L18 6M6 6l12 12"
                     />
                   </svg>
-                </button>
+                </Button>
               )}
             </div>
-
-            {/* Inline picker */}
-            {isPickerOpen && isConfigurable && (
-              <div className="mt-2 rounded-md border bg-background shadow-md">
-                {/* Search + add */}
-                <div className="flex items-center gap-2 border-b p-2">
-                  <Input
-                    placeholder={t("connections_search_placeholder")}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="h-7 text-sm"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOpenPicker(null);
-                      setSearchQuery("");
-                      startOAuthConnect(item.connectorKey);
-                    }}
-                    className="shrink-0 text-xs text-primary hover:underline"
-                  >
-                    {t("connections_add_connection")}
-                  </button>
-                </div>
-
-                {/* Grouped options */}
-                <div className="max-h-48 overflow-y-auto">
-                  {(() => {
-                    const query = searchQuery.trim().toLowerCase();
-                    const grouped = item.connections.reduce<
-                      Record<string, AvailableConnection[]>
-                    >(
-                      (groups, conn) => {
-                        const groupName = conn.personalWorkspace
-                          ? t("connections_personal_workspace")
-                          : (conn.folderName ??
-                            t("connections_unknown_folder"));
-                        if (
-                          query &&
-                          !conn.name.toLowerCase().includes(query) &&
-                          !groupName.toLowerCase().includes(query)
-                        ) {
-                          return groups;
-                        }
-                        groups[groupName] = groups[groupName] ?? [];
-                        groups[groupName].push(conn);
-                        return groups;
-                      },
-                      Object.create(null) as Record<
-                        string,
-                        AvailableConnection[]
-                      >,
-                    );
-                    const groupNames = Object.keys(grouped);
-
-                    if (groupNames.length === 0) {
-                      return (
-                        <p className="p-3 text-sm text-muted-foreground">
-                          {t("connections_no_configurable")}
-                        </p>
-                      );
-                    }
-                    return groupNames.map((groupName) => (
-                      <div key={groupName}>
-                        <p className="px-3 pb-1 pt-2.5 text-xs text-muted-foreground">
-                          {groupName}
-                        </p>
-                        {grouped[groupName].map((conn) => (
-                          <button
-                            key={conn.id}
-                            type="button"
-                            onClick={() =>
-                              handleSelect(item.connectorKey, conn.id)
-                            }
-                            className={cn(
-                              "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-muted",
-                              conn.id === selectedId && "bg-muted",
-                            )}
-                          >
-                            <span className="flex-1 truncate">{conn.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    ));
-                  })()}
-                </div>
-
-                {/* Footer link */}
-                {(item.connectionsUrl ?? item.configurationUrl) && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      window.open(
-                        item.connectionsUrl ?? item.configurationUrl,
-                        "_blank",
-                        "noopener,noreferrer",
-                      )
-                    }
-                    className="w-full border-t p-2.5 text-center text-sm hover:bg-muted"
-                  >
-                    {t("connections_open_connections")}
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         );
       })}

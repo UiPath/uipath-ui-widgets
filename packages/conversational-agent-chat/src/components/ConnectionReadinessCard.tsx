@@ -5,6 +5,7 @@ import {
   ConnectionState,
 } from "@uipath/uipath-typescript/conversational-agent";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { CONNECTION_STATUS_LABEL } from "../constants/connectionStatus";
 import { useWidgetTranslation } from "../i18n/useWidgetTranslation";
 
 export interface ConnectorReadiness {
@@ -30,12 +31,6 @@ export interface ConnectionReadinessCardProps {
 
 type ConnectingKey = string | null;
 
-const STATE_LABEL: Record<string, string> = {
-  [ConnectionState.Enabled]: "connections_status_connected",
-  [ConnectionState.Expired]: "connections_status_expired",
-  [ConnectionState.Disabled]: "connections_status_disabled",
-  [ConnectionState.Failed]: "connections_status_failed",
-};
 
 /**
  * In-chat card showing connection readiness for the current agent.
@@ -278,6 +273,7 @@ export const ConnectionReadinessCard = ({
           }
         }, 500);
       } catch {
+        // Auth URL request failed — reset UI so the user can retry
         if (oauthSessionRef.current === oauthSession) setConnectingKey(null);
       }
     },
@@ -294,7 +290,7 @@ export const ConnectionReadinessCard = ({
         connector.currentConnectionState !== "Enabled"
       ) {
         const labelKey =
-          STATE_LABEL[connector.currentConnectionState] ??
+          CONNECTION_STATUS_LABEL[connector.currentConnectionState] ??
           "connections_status_disabled";
         return t("connection_readiness_broken_status", {
           name: connector.currentConnectionName,
