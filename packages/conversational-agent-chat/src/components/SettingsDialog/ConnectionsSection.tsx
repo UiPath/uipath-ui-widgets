@@ -81,6 +81,8 @@ export const ConnectionsSection = ({
   const pollInFlightRef = useRef(false);
   const fetchingRef = useRef(false);
   const oauthSessionRef = useRef(0);
+  const stagedSelectionsRef = useRef(stagedSelections);
+  stagedSelectionsRef.current = stagedSelections;
 
   const clearPoll = useCallback(() => {
     if (pollingRef.current) {
@@ -240,7 +242,7 @@ export const ConnectionsSection = ({
                     connectionId:
                       i.connectorKey === connectorKey
                         ? status.connectionId
-                        : (stagedSelections[i.connectorKey] ??
+                        : (stagedSelectionsRef.current[i.connectorKey] ??
                           i.currentConnectionId),
                   })),
                 },
@@ -270,12 +272,15 @@ export const ConnectionsSection = ({
         } catch {
           // Transient error — keep polling until the session expires
         } finally {
-          pollInFlightRef.current = false;
+          if (oauthSessionRef.current === oauthSession) {
+            pollInFlightRef.current = false;
+          }
         }
       }, POLL_INTERVAL_MS);
     } catch {
       // Auth URL failed — fall back to connectionsUrl
       if (oauthSessionRef.current === oauthSession) {
+        setConnectingKey(null);
         const item = items.find((i) => i.connectorKey === connectorKey);
         const fallback = item?.connectionsUrl ?? item?.configurationUrl;
         if (fallback) window.open(fallback, "_blank", "noopener,noreferrer");
@@ -487,7 +492,7 @@ export const ConnectionsSection = ({
                       groups[groupName] = groups[groupName] ?? [];
                       groups[groupName].push(conn);
                       return groups;
-                    }, {});
+                    }, Object.create(null) as Record<string, AvailableConnection[]>);
                     const groupNames = Object.keys(grouped);
 
                     if (groupNames.length === 0) {

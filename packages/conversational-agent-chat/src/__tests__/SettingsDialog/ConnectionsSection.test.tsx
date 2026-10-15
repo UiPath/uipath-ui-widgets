@@ -300,7 +300,6 @@ describe("ConnectionsSection", () => {
   });
 
   it("clearing a connection that was originally empty keeps isDirty false", async () => {
-    const user = userEvent.setup();
     // Salesforce has no currentConnectionId → initial value is ""
     const { agent } = makeAgent();
     render(
@@ -319,7 +318,7 @@ describe("ConnectionsSection", () => {
     expect(applyButton).toBeDisabled();
   });
 
-  it("clears loadError on successful retry", async () => {
+  it("clears loadError on successful retry via visibility change", async () => {
     const { agent, mocks } = makeAgent();
     // First call fails
     mocks.getAvailableConnections.mockRejectedValueOnce(
@@ -340,6 +339,19 @@ describe("ConnectionsSection", () => {
     await waitFor(() => {
       expect(screen.getByText(/Network error/)).toBeInTheDocument();
     });
+
+    // Simulate user returning to tab — triggers visibility-change refresh
+    Object.defineProperty(document, "visibilityState", {
+      value: "visible",
+      writable: true,
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    // Error should clear and connectors should load
+    await waitFor(() => {
+      expect(screen.getByText("Google Drive")).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Network error/)).not.toBeInTheDocument();
   });
 
   it("sends connectionId null when clearing a connected connector", async () => {

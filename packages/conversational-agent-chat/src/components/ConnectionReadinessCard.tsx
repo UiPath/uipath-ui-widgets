@@ -260,7 +260,9 @@ export const ConnectionReadinessCard = ({
           } catch {
             // Transient error — keep polling until the session expires
           } finally {
-            pollInFlightRef.current = false;
+            if (oauthSessionRef.current === oauthSession) {
+              pollInFlightRef.current = false;
+            }
           }
         }, 500);
       } catch {

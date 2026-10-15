@@ -57,7 +57,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { createPortal } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { useWidgetTranslation } from "./i18n/useWidgetTranslation";
 import { InputsPage } from "./components/InputsPage";
@@ -108,6 +107,9 @@ import FilePreviewer from "./components/FilePreviewer";
 const i18n = getI18n();
 
 const TOOL_CONFIRMATION_WIDGET_ID_PREFIX = "confirmation-";
+const CONNECTION_READINESS_CARD = "cas-connection-readiness";
+const CONNECTION_READINESS_CARD_ID = "connection-readiness-card";
+const connectionReadinessRoots = new Map<HTMLElement, Root>();
 // Exchanges per page when lazily loading a conversation's history. Pages are
 // fetched newest-first and prepended as the user scrolls toward the top.
 const EXCHANGES_PAGE_SIZE = 15;
@@ -278,9 +280,6 @@ export const ConversationalAgentChat = ({
     ConnectorReadiness[] | null
   >(null);
   const [themeRoot, setThemeRoot] = useState<HTMLDivElement | null>(null);
-  const [chatScrollPortal, setChatScrollPortal] = useState<HTMLElement | null>(
-    null,
-  );
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
   const onUserMessageSentRef = useRef(onUserMessageSent);
   const chatServiceRef = useRef<AutopilotChatService | null>(null);
@@ -1257,7 +1256,10 @@ export const ConversationalAgentChat = ({
             <SettingsDialog
               profileResetKey={profileResetKey}
               conversationalAgent={agentService.current}
-              onClose={() => chatServiceRef.current?.toggleSettings(false)}
+              onClose={() => {
+                chatServiceRef.current?.toggleSettings(false);
+                fetchConnectionReadiness();
+              }}
               inputSchema={inputSchemaStateRef.current}
               initialInputs={storedAgentInputs.current}
               onApplyInputs={handleApplySettingsInputs}
@@ -1537,31 +1539,6 @@ export const ConversationalAgentChat = ({
     chatService?.setChatMode(mode);
   }, [chatService, mode]);
 
-  // Portal the readiness card into ApChat's message scroll area so it appears
-  // inline above the welcome message (matching CAS positioning).
-  // TODO: replace with a `beforeMessagesContent` prop once apollo-react
-  // exposes a slot for injecting content into the message area.
-  useEffect(() => {
-    if (!chatService || !themeRoot) {
-      setChatScrollPortal(null);
-      return;
-    }
-    let marker: HTMLDivElement | null = null;
-    // ApChat may need a frame to render its internal DOM
-    const raf = requestAnimationFrame(() => {
-      const contentRef = themeRoot.querySelector("#content-ref");
-      if (!contentRef) return;
-      marker = document.createElement("div");
-      contentRef.insertBefore(marker, contentRef.firstChild);
-      setChatScrollPortal(marker);
-    });
-    return () => {
-      cancelAnimationFrame(raf);
-      marker?.remove();
-      setChatScrollPortal(null);
-    };
-  }, [chatService, themeRoot]);
-
   // Close the SDK session on unmount so the WebSocket doesn't linger.
   useEffect(() => {
     return () => {
@@ -1574,6 +1551,8 @@ export const ConversationalAgentChat = ({
     return () => {
       toolConfirmationRenderer.unmountAll();
       clientSideToolRenderer.unmountAll();
+      for (const root of connectionReadinessRoots.values()) root.unmount();
+      connectionReadinessRoots.clear();
     };
   }, [toolConfirmationRenderer, clientSideToolRenderer]);
 
@@ -1630,6 +1609,34 @@ export const ConversationalAgentChat = ({
           render: (container, message) =>
             clientSideToolRenderer.render(container, message),
         });
+        chatService.injectMessageRenderer({
+          name: CONNECTION_READINESS_CARD,
+          render: (container, message) => {
+            const meta = message?.meta ?? {};
+            const connectors: ConnectorReadiness[] = meta.connectors ?? [];
+            if (connectors.length === 0) return;
+
+            let root = connectionReadinessRoots.get(container);
+            if (!root) {
+              root = createRoot(container);
+              connectionReadinessRoots.set(container, root);
+            }
+
+            root.render(
+              <ConnectionReadinessCard
+                connectors={connectors}
+                conversationalAgent={agentService.current}
+                agentId={meta.agentId}
+                folderId={meta.folderId}
+                onAllConnected={() => setConnectionReadiness(null)}
+                onOpenSettings={() =>
+                  chatServiceRef.current?.toggleSettings(true)
+                }
+                defaultCollapsed={meta.defaultCollapsed}
+              />,
+            );
+          },
+        });
       } catch (err) {
         const message =
           err instanceof Error ? err.message : t("error_load_history");
@@ -1663,6 +1670,48 @@ export const ConversationalAgentChat = ({
     toolConfirmationRenderer,
     clientSideToolRenderer,
   ]);
+
+  // Inject/update/remove the connection readiness card as a message in the
+  // conversation — matching CAS positioning inside the scroll area.
+  useEffect(() => {
+    if (!chatService) return;
+    const conversation = chatService.getConversation() ?? [];
+    const existingIndex = conversation.findIndex(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (m: any) => m.id === CONNECTION_READINESS_CARD_ID,
+    );
+
+    if (connectionReadiness) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cardMessage: any = {
+        id: CONNECTION_READINESS_CARD_ID,
+        content: " ",
+        created_at: new Date().toISOString(),
+        role: "assistant",
+        widget: CONNECTION_READINESS_CARD,
+        done: true,
+        disableActions: true,
+        meta: {
+          connectors: connectionReadiness,
+          agentId: agentIdRef.current,
+          folderId: folderIdRef.current,
+          defaultCollapsed: hasMessages,
+        },
+      };
+      if (existingIndex >= 0) {
+        const updated = [...conversation];
+        updated[existingIndex] = cardMessage;
+        chatService.setConversation(updated);
+      } else {
+        chatService.setConversation([cardMessage, ...conversation]);
+      }
+    } else if (existingIndex >= 0) {
+      chatService.setConversation(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        conversation.filter((m: any) => m.id !== CONNECTION_READINESS_CARD_ID),
+      );
+    }
+  }, [chatService, connectionReadiness, hasMessages]);
 
   useEffect(() => {
     if (
@@ -1779,24 +1828,6 @@ export const ConversationalAgentChat = ({
                 // themed wrapper; portalled to <body> they'd lose the theme tokens.
                 portalContainer={themeRoot ?? undefined}
               />
-              {connectionReadiness &&
-                chatScrollPortal &&
-                agentIdRef.current != null &&
-                folderIdRef.current != null &&
-                createPortal(
-                  <ConnectionReadinessCard
-                    connectors={connectionReadiness}
-                    conversationalAgent={agentService.current}
-                    agentId={agentIdRef.current}
-                    folderId={folderIdRef.current}
-                    onAllConnected={() => setConnectionReadiness(null)}
-                    onOpenSettings={() =>
-                      chatServiceRef.current?.toggleSettings(true)
-                    }
-                    defaultCollapsed={hasMessages}
-                  />,
-                  chatScrollPortal,
-                )}
             </>
           )}
 
