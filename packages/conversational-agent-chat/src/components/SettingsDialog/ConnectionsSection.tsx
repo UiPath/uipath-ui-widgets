@@ -16,7 +16,14 @@ import {
   ConnectionSessionStatus,
   ConnectionState,
 } from "@uipath/uipath-typescript/conversational-agent";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useWidgetTranslation } from "../../i18n/useWidgetTranslation";
 
 export interface ConnectionsSectionProps {
@@ -480,21 +487,28 @@ export const ConnectionsSection = ({
                     const query = searchQuery.trim().toLowerCase();
                     const grouped = item.connections.reduce<
                       Record<string, AvailableConnection[]>
-                    >((groups, conn) => {
-                      const groupName = conn.personalWorkspace
-                        ? t("connections_personal_workspace")
-                        : (conn.folderName ?? t("connections_unknown_folder"));
-                      if (
-                        query &&
-                        !conn.name.toLowerCase().includes(query) &&
-                        !groupName.toLowerCase().includes(query)
-                      ) {
+                    >(
+                      (groups, conn) => {
+                        const groupName = conn.personalWorkspace
+                          ? t("connections_personal_workspace")
+                          : (conn.folderName ??
+                            t("connections_unknown_folder"));
+                        if (
+                          query &&
+                          !conn.name.toLowerCase().includes(query) &&
+                          !groupName.toLowerCase().includes(query)
+                        ) {
+                          return groups;
+                        }
+                        groups[groupName] = groups[groupName] ?? [];
+                        groups[groupName].push(conn);
                         return groups;
-                      }
-                      groups[groupName] = groups[groupName] ?? [];
-                      groups[groupName].push(conn);
-                      return groups;
-                    }, Object.create(null) as Record<string, AvailableConnection[]>);
+                      },
+                      Object.create(null) as Record<
+                        string,
+                        AvailableConnection[]
+                      >,
+                    );
                     const groupNames = Object.keys(grouped);
 
                     if (groupNames.length === 0) {

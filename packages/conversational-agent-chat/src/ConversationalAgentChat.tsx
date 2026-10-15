@@ -787,9 +787,7 @@ export const ConversationalAgentChat = ({
           currentConnectionName: item.currentConnectionName,
           currentConnectionState:
             selectedConn?.state ??
-            (item.currentConnectionId
-              ? ConnectionState.Expired
-              : undefined),
+            (item.currentConnectionId ? ConnectionState.Expired : undefined),
           connectionsUrl: item.connectionsUrl,
         };
       });
@@ -1123,7 +1121,13 @@ export const ConversationalAgentChat = ({
         chatService.setError(t("error_open_conversation", { errorMessage }));
       }
     },
-    [chatService, endActiveSession, fetchConnectionReadiness, fetchExchanges, t],
+    [
+      chatService,
+      endActiveSession,
+      fetchConnectionReadiness,
+      fetchExchanges,
+      t,
+    ],
   );
 
   // Apollo fires this when the user scrolls to the top of the message list.
