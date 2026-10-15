@@ -109,7 +109,6 @@ const i18n = getI18n();
 const TOOL_CONFIRMATION_WIDGET_ID_PREFIX = "confirmation-";
 const CONNECTION_READINESS_CARD = "cas-connection-readiness";
 const CONNECTION_READINESS_CARD_ID = "connection-readiness-card";
-const connectionReadinessRoots = new Map<HTMLElement, Root>();
 // Exchanges per page when lazily loading a conversation's history. Pages are
 // fetched newest-first and prepended as the user scrolls toward the top.
 const EXCHANGES_PAGE_SIZE = 15;
@@ -285,6 +284,7 @@ export const ConversationalAgentChat = ({
   const chatServiceRef = useRef<AutopilotChatService | null>(null);
   const settingsRootRef = useRef<Root | null>(null);
   const autoBindTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectionReadinessRoots = useRef(new Map<HTMLElement, Root>());
   // Last-applied agent inputs for the active conversation. Pre-populates the
   // settings inputs form when reopened; cleared on New Chat.
   const storedAgentInputs = useRef<Record<string, unknown>>({});
@@ -766,8 +766,10 @@ export const ConversationalAgentChat = ({
     const capturedAgentId = agentIdRef.current;
     const capturedFolderId = folderIdRef.current;
     if (capturedAgentId == null || capturedFolderId == null) return;
+    const capturedInitKey = initializedFor.current;
 
     const applyReadiness = (items: AvailableConnectionsResponse) => {
+      if (initializedFor.current !== capturedInitKey) return;
       if (items.length === 0) {
         setConnectionReadiness(null);
         return;
@@ -802,7 +804,10 @@ export const ConversationalAgentChat = ({
     agentService.current
       .getAvailableConnections(capturedAgentId, capturedFolderId)
       .then(applyReadiness)
-      .catch(() => setConnectionReadiness(null));
+      .catch(() => {
+        if (initializedFor.current !== capturedInitKey) return;
+        setConnectionReadiness(null);
+      });
   }, []);
 
   const onNewChat = useCallback(() => {
@@ -1548,11 +1553,12 @@ export const ConversationalAgentChat = ({
 
   // Release React state held by the imperative tool-confirmation and client-side tool roots.
   useEffect(() => {
+    const roots = connectionReadinessRoots.current;
     return () => {
       toolConfirmationRenderer.unmountAll();
       clientSideToolRenderer.unmountAll();
-      for (const root of connectionReadinessRoots.values()) root.unmount();
-      connectionReadinessRoots.clear();
+      for (const root of roots.values()) root.unmount();
+      roots.clear();
     };
   }, [toolConfirmationRenderer, clientSideToolRenderer]);
 
@@ -1616,10 +1622,10 @@ export const ConversationalAgentChat = ({
             const connectors: ConnectorReadiness[] = meta.connectors ?? [];
             if (connectors.length === 0) return;
 
-            let root = connectionReadinessRoots.get(container);
+            let root = connectionReadinessRoots.current.get(container);
             if (!root) {
               root = createRoot(container);
-              connectionReadinessRoots.set(container, root);
+              connectionReadinessRoots.current.set(container, root);
             }
 
             root.render(

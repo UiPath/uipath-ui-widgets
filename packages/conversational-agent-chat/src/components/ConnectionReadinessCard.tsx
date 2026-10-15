@@ -30,6 +30,13 @@ export interface ConnectionReadinessCardProps {
 
 type ConnectingKey = string | null;
 
+const STATE_LABEL: Record<string, string> = {
+  [ConnectionState.Enabled]: "connections_status_connected",
+  [ConnectionState.Expired]: "connections_status_expired",
+  [ConnectionState.Disabled]: "connections_status_disabled",
+  [ConnectionState.Failed]: "connections_status_failed",
+};
+
 /**
  * In-chat card showing connection readiness for the current agent.
  *
@@ -272,13 +279,6 @@ export const ConnectionReadinessCard = ({
     [conversationalAgent, agentId, folderId, localConnectors],
   );
 
-  const STATE_LABEL: Record<string, string> = {
-    [ConnectionState.Enabled]: "connections_status_connected",
-    [ConnectionState.Expired]: "connections_status_expired",
-    [ConnectionState.Disabled]: "connections_status_disabled",
-    [ConnectionState.Failed]: "connections_status_failed",
-  };
-
   const getStatusText = (connector: ConnectorReadiness): string => {
     if (connectingKey === connector.connectorKey) {
       return t("connection_readiness_waiting");
@@ -304,11 +304,12 @@ export const ConnectionReadinessCard = ({
     return t("connection_readiness_not_connected");
   };
 
-  // --- Collapsed bar state ---
-  if (collapsed || allConnected) {
-    const neededCount = unconnected.length + broken.length;
-    if (neededCount === 0) return null;
+  // All connected — nothing to show
+  if (allConnected) return null;
 
+  // --- Collapsed bar state ---
+  if (collapsed) {
+    const neededCount = unconnected.length + broken.length;
     return (
       <div className="mx-auto my-2 w-full max-w-3xl flex flex-none items-center justify-between rounded-lg border bg-card px-4 py-3">
         <span className="text-sm text-muted-foreground">

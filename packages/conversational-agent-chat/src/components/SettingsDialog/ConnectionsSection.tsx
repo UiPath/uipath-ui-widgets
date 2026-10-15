@@ -16,7 +16,7 @@ import {
   ConnectionSessionStatus,
   ConnectionState,
 } from "@uipath/uipath-typescript/conversational-agent";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useWidgetTranslation } from "../../i18n/useWidgetTranslation";
 
 export interface ConnectionsSectionProps {
@@ -82,7 +82,9 @@ export const ConnectionsSection = ({
   const fetchingRef = useRef(false);
   const oauthSessionRef = useRef(0);
   const stagedSelectionsRef = useRef(stagedSelections);
-  stagedSelectionsRef.current = stagedSelections;
+  useLayoutEffect(() => {
+    stagedSelectionsRef.current = stagedSelections;
+  }, [stagedSelections]);
 
   const clearPoll = useCallback(() => {
     if (pollingRef.current) {
