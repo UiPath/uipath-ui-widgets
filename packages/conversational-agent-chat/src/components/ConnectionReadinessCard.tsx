@@ -31,7 +31,6 @@ export interface ConnectionReadinessCardProps {
 
 type ConnectingKey = string | null;
 
-
 /**
  * In-chat card showing connection readiness for the current agent.
  *
