@@ -208,9 +208,10 @@ export const ConnectionReadinessCard = ({
                 clearInterval(pollingRef.current);
                 pollingRef.current = null;
               }
-              setConnectingKey(null);
 
-              // Persist via SDK first, then rebuild local state from the response
+              // Persist via SDK first, then rebuild local state from the response.
+              // Keep connectingKey set until save completes so buttons stay
+              // disabled and a second flow can't start with stale data.
               try {
                 const updatedSelections = localConnectors
                   .filter((c) => c.isConfigurable)
@@ -255,6 +256,10 @@ export const ConnectionReadinessCard = ({
               } catch {
                 // Persistence failed — do not update local state so the
                 // card continues to show the connector as unresolved.
+              } finally {
+                if (oauthSessionRef.current === oauthSession) {
+                  setConnectingKey(null);
+                }
               }
             } else if (status.status === ConnectionSessionStatus.Failed) {
               if (pollingRef.current) {

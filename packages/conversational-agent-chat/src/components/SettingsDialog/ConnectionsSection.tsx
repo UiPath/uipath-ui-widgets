@@ -236,8 +236,8 @@ export const ConnectionsSection = ({
             status.connectionId
           ) {
             clearPoll();
-            setConnectingKey(null);
-            // Auto-save the new connection (post full selections to avoid replace-semantics wipe)
+            // Keep connectingKey set until save completes so buttons stay
+            // disabled and a second flow can't start with stale data.
             try {
               const configurableItems = items.filter(
                 (i) => i.isConfigurable !== false,
@@ -269,6 +269,10 @@ export const ConnectionsSection = ({
                   ...prev,
                   [connectorKey]: status.connectionId,
                 }));
+              }
+            } finally {
+              if (oauthSessionRef.current === oauthSession) {
+                setConnectingKey(null);
               }
             }
             setOpenPicker(null);
