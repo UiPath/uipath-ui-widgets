@@ -1,8 +1,16 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ConversationalAgent } from "@uipath/uipath-typescript/conversational-agent";
-import { ConnectionState } from "@uipath/uipath-typescript/conversational-agent";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+// ConnectionState is a string enum; replicate values inline to avoid SDK
+// module resolution issues in the vitest/jsdom environment.
+enum ConnectionState {
+  Enabled = "Enabled",
+  Expired = "Expired",
+  Disabled = "Disabled",
+  Failed = "Failed",
+}
 import { initI18n } from "../../i18n";
 import { ConnectionsSection } from "../../components/SettingsDialog/ConnectionsSection";
 
