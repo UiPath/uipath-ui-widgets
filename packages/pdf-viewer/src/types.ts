@@ -19,7 +19,7 @@ export enum PdfViewerSourceType {
  * Field names mirror the SDK signatures they map to (the SDK's preferred
  * positional forms — the single-options-object overloads are deprecated):
  * - bucket → `Buckets.getReadUri(bucketId, path, { folderId | folderKey | folderPath })`
- * - entity → `Entities.downloadAttachment(entityId, recordId, fieldName)`
+ * - entity → `Entities.downloadAttachment({ id: entityId }, recordId, fieldName)`
  * - url / blob → escape hatches for custom data stores (no SDK required)
  */
 export type PdfViewerSource =

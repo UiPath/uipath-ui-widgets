@@ -13,7 +13,7 @@ npm install @uipath/ui-widgets-pdf-viewer
 ### Peer dependencies
 
 ```bash
-npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript@^1.4.1
+npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript@^1.7.1
 ```
 
 ## Usage
