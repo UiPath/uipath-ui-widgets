@@ -65,7 +65,6 @@ import { FeedbackDialog } from "./components/FeedbackDialog";
 import { Loader } from "./components/Loader";
 import { SettingsDialog } from "./components/SettingsDialog";
 import {
-  ConnectionReadinessCard,
   type ConnectorReadiness,
 } from "./components/ConnectionReadinessCard";
 import type { ToolConfirmationLabels } from "./components/ToolConfirmation";
@@ -77,6 +76,7 @@ import {
   createClientSideToolRenderer,
   type ClientSideToolRenderer,
 } from "./components/ClientSideToolRenderer";
+import { createConnectionReadinessRenderer } from "./components/ConnectionReadinessRenderer";
 import { ALLOWED_ATTACHMENTS } from "./constants/attachments";
 import "./ConversationalAgentChat.css";
 import {
@@ -196,6 +196,10 @@ export const ConversationalAgentChat = ({
     () => createClientSideToolRenderer(),
     [],
   );
+  const connectionReadinessRenderer = useMemo(
+    () => createConnectionReadinessRenderer(),
+    [],
+  );
   // useLayoutEffect is ok here because the work is minimal enough that the cost is essentially zero
   // needed because React 19 doesn't support ref writes on render
 
@@ -284,7 +288,6 @@ export const ConversationalAgentChat = ({
   const chatServiceRef = useRef<AutopilotChatService | null>(null);
   const settingsRootRef = useRef<Root | null>(null);
   const autoBindTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const connectionReadinessRoots = useRef(new Map<HTMLElement, Root>());
   // Last-applied agent inputs for the active conversation. Pre-populates the
   // settings inputs form when reopened; cleared on New Chat.
   const storedAgentInputs = useRef<Record<string, unknown>>({});
@@ -1558,14 +1561,12 @@ export const ConversationalAgentChat = ({
 
   // Release React state held by the imperative tool-confirmation and client-side tool roots.
   useEffect(() => {
-    const roots = connectionReadinessRoots.current;
     return () => {
       toolConfirmationRenderer.unmountAll();
       clientSideToolRenderer.unmountAll();
-      for (const root of roots.values()) root.unmount();
-      roots.clear();
+      connectionReadinessRenderer.unmountAll();
     };
-  }, [toolConfirmationRenderer, clientSideToolRenderer]);
+  }, [toolConfirmationRenderer, clientSideToolRenderer, connectionReadinessRenderer]);
 
   // Register event handlers after chatService is available
   useEffect(() => {
@@ -1622,31 +1623,13 @@ export const ConversationalAgentChat = ({
         });
         chatService.injectMessageRenderer({
           name: CONNECTION_READINESS_CARD,
-          render: (container, message) => {
-            const meta = message?.meta ?? {};
-            const connectors: ConnectorReadiness[] = meta.connectors ?? [];
-            if (connectors.length === 0) return;
-
-            let root = connectionReadinessRoots.current.get(container);
-            if (!root) {
-              root = createRoot(container);
-              connectionReadinessRoots.current.set(container, root);
-            }
-
-            root.render(
-              <ConnectionReadinessCard
-                connectors={connectors}
-                conversationalAgent={agentService.current}
-                agentId={meta.agentId}
-                folderId={meta.folderId}
-                onAllConnected={() => setConnectionReadiness(null)}
-                onOpenSettings={() =>
-                  chatServiceRef.current?.toggleSettings(true)
-                }
-                defaultCollapsed={meta.defaultCollapsed}
-              />,
-            );
-          },
+          render: (container, message) =>
+            connectionReadinessRenderer.render(container, message, {
+              conversationalAgent: agentService.current,
+              onAllConnected: () => setConnectionReadiness(null),
+              onOpenSettings: () =>
+                chatServiceRef.current?.toggleSettings(true),
+            }),
         });
       } catch (err) {
         const message =
@@ -1680,6 +1663,7 @@ export const ConversationalAgentChat = ({
     t,
     toolConfirmationRenderer,
     clientSideToolRenderer,
+    connectionReadinessRenderer,
   ]);
 
   // Inject/update/remove the connection readiness card as a message in the
@@ -1717,12 +1701,15 @@ export const ConversationalAgentChat = ({
         chatService.setConversation([cardMessage, ...conversation]);
       }
     } else if (existingIndex >= 0) {
+      // Defer unmount — the card's onAllConnected effect may still be
+      // executing inside this root's React tree when this runs.
+      queueMicrotask(() => connectionReadinessRenderer.unmountAll());
       chatService.setConversation(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         conversation.filter((m: any) => m.id !== CONNECTION_READINESS_CARD_ID),
       );
     }
-  }, [chatService, connectionReadiness, hasMessages]);
+  }, [chatService, connectionReadiness, hasMessages, connectionReadinessRenderer]);
 
   useEffect(() => {
     if (

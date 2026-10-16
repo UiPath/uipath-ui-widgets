@@ -15,6 +15,8 @@ import { initI18n } from "../../i18n";
 import { ConnectionsSection } from "../../components/SettingsDialog/ConnectionsSection";
 
 beforeAll(() => {
+  // cmdk calls scrollIntoView which jsdom doesn't implement
+  window.HTMLElement.prototype.scrollIntoView = () => {};
   initI18n();
 });
 

@@ -210,20 +210,18 @@ export const ConnectionReadinessCard = ({
               // Keep connectingKey set until save completes so buttons stay
               // disabled and a second flow can't start with stale data.
               try {
-                const updatedSelections = localConnectors
-                  .filter((c) => c.isConfigurable)
-                  .map((c) => ({
-                    connectorKey: c.connectorKey,
-                    connectionId:
-                      c.connectorKey === connectorKey
-                        ? status.connectionId
-                        : c.currentConnectionId,
-                  }));
                 const updated =
                   await conversationalAgent.updateConnectionSelections(
                     agentId,
                     folderId,
-                    { selections: updatedSelections },
+                    {
+                      selections: [
+                        {
+                          connectorKey,
+                          connectionId: status.connectionId,
+                        },
+                      ],
+                    },
                   );
                 if (oauthSessionRef.current === oauthSession) {
                   setLocalConnectors(
@@ -279,7 +277,7 @@ export const ConnectionReadinessCard = ({
         if (oauthSessionRef.current === oauthSession) setConnectingKey(null);
       }
     },
-    [conversationalAgent, agentId, folderId, localConnectors],
+    [conversationalAgent, agentId, folderId],
   );
 
   const getStatusText = (connector: ConnectorReadiness): string => {
@@ -306,6 +304,14 @@ export const ConnectionReadinessCard = ({
     }
     return t("connection_readiness_not_connected");
   };
+
+  // TODO: remove after verification
+  console.log("[ConnectionReadinessRenderer] rendering card", {
+    total: localConnectors.length,
+    unconnected: unconnected.length,
+    broken: broken.length,
+    allConnected,
+  });
 
   // All connected — nothing to show
   if (allConnected) return null;

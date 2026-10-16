@@ -24,7 +24,6 @@ import { ConnectionSessionStatus } from "@uipath/uipath-typescript/conversationa
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -83,10 +82,6 @@ export const ConnectionsSection = ({
   const pollInFlightRef = useRef(false);
   const fetchingRef = useRef(false);
   const oauthSessionRef = useRef(0);
-  const stagedSelectionsRef = useRef(stagedSelections);
-  useLayoutEffect(() => {
-    stagedSelectionsRef.current = stagedSelections;
-  }, [stagedSelections]);
 
   const clearPoll = useCallback(() => {
     if (pollingRef.current) {
@@ -242,27 +237,36 @@ export const ConnectionsSection = ({
             // Keep connectingKey set until save completes so buttons stay
             // disabled and a second flow can't start with stale data.
             try {
-              const configurableItems = items.filter(
-                (i) => i.isConfigurable !== false,
-              );
               const updated = await api.updateConnectionSelections(
                 agentId,
                 folderId,
                 {
-                  selections: configurableItems.map((i) => ({
-                    connectorKey: i.connectorKey,
-                    connectionId:
-                      i.connectorKey === connectorKey
-                        ? status.connectionId
-                        : stagedSelectionsRef.current[i.connectorKey] || null,
-                  })),
+                  selections: [
+                    {
+                      connectorKey,
+                      connectionId: status.connectionId,
+                    },
+                  ],
                 },
               );
               if (oauthSessionRef.current === oauthSession) {
                 const sels = getInitialSelections(updated);
                 setItems(updated);
                 setInitialSelections(sels);
-                setStagedSelections(sels);
+                // Start from server state, but preserve unapplied user picks
+                // for other connectors (where staged differs from old baseline)
+                setStagedSelections((prev) => {
+                  const merged = { ...sels };
+                  for (const key of Object.keys(prev)) {
+                    if (
+                      key !== connectorKey &&
+                      prev[key] !== initialSelections[key]
+                    ) {
+                      merged[key] = prev[key];
+                    }
+                  }
+                  return merged;
+                });
                 onConnectionsChanged?.();
               }
             } catch {
