@@ -318,5 +318,8 @@
   "country_name_western_sahara": "country_name_western_sahara",
   "country_name_yemen": "country_name_yemen",
   "country_name_zambia": "country_name_zambia",
-  "country_name_zimbabwe": "country_name_zimbabwe"
+  "country_name_zimbabwe": "country_name_zimbabwe",
+  "conversation_ended_completed": "conversation_ended_completed",
+  "conversation_ended_failed": "conversation_ended_failed",
+  "conversation_ended_cancelled": "conversation_ended_cancelled"
 }
