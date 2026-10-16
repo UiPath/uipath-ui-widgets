@@ -817,6 +817,7 @@ export const ConversationalAgentChat = ({
     exchangesCursor.current = undefined;
     storedAgentInputs.current = {};
     setHasMessages(false);
+    connectionReadinessRenderer.unmountAll();
     // Re-show the InputsPage with a cleared form when the agent's schema has
     // required inputs. Bumping the counter forces an unmount/remount via the
     // key on <InputsPage>, which resets internal form state.
@@ -826,7 +827,12 @@ export const ConversationalAgentChat = ({
     }
     fetchConnectionReadiness();
     trackTelemetry(TelemetryEvent.NewChat, TelemetryStatus.Success);
-  }, [endActiveSession, fetchConnectionReadiness, inputSchemaState]);
+  }, [
+    endActiveSession,
+    fetchConnectionReadiness,
+    inputSchemaState,
+    connectionReadinessRenderer,
+  ]);
 
   const buildHistoryFilterOptions = useCallback(() => {
     // The SDK's URL builder calls value.toString() without a null check, so
@@ -1101,6 +1107,7 @@ export const ConversationalAgentChat = ({
         session.current = null;
         exchangesCursor.current = undefined;
 
+        connectionReadinessRenderer.unmountAll();
         const { exchanges } = await fetchExchanges(selectedConversation.id);
         const messages = mapExchangesToChatMessages(exchanges);
         chatService.setConversation(messages);
@@ -1124,6 +1131,7 @@ export const ConversationalAgentChat = ({
     },
     [
       chatService,
+      connectionReadinessRenderer,
       endActiveSession,
       fetchConnectionReadiness,
       fetchExchanges,
@@ -1408,13 +1416,16 @@ export const ConversationalAgentChat = ({
         chatServiceInstance.setAllowedAttachments(ALLOWED_ATTACHMENTS);
       }
 
+      // Clean up any existing readiness roots before replacing the conversation
+      connectionReadinessRenderer.unmountAll();
+
       if (existingConversationId) {
         const conversation = await getConversation();
         exchangesCursor.current = undefined;
         const { exchanges } = await fetchExchanges(conversation.id);
-        chatServiceInstance.setConversation(
-          mapExchangesToChatMessages(exchanges),
-        );
+        const messages = mapExchangesToChatMessages(exchanges);
+        chatServiceInstance.setConversation(messages);
+        setHasMessages(messages.length > 0);
       } else {
         // AutopilotChatService is a singleton, so it may still hold the
         // previous agent's messages. Reset before showing the new agent.
@@ -1440,6 +1451,7 @@ export const ConversationalAgentChat = ({
     resolveAgent,
     getConversation,
     fetchConnectionReadiness,
+    connectionReadinessRenderer,
     fetchExchanges,
     t,
     toasterId,
