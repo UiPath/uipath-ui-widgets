@@ -517,4 +517,162 @@ describe("ConnectionReadinessCard", () => {
 
     vi.spyOn(window, "open").mockRestore();
   });
+
+  // --- OAuth success updates state and calls onConnectionsChanged ---
+
+  it("updates local connectors and calls onConnectionsChanged on OAuth success", async () => {
+    const user = userEvent.setup();
+    const { agent, mocks } = makeAgent();
+    const onConnectionsChanged = vi.fn();
+
+    mocks.getConnectionSessionStatus.mockResolvedValue({
+      status: "success",
+      connectionId: "new-conn-1",
+      expiresTime: Date.now() + 300_000,
+    });
+    mocks.updateConnectionSelections.mockResolvedValue([
+      {
+        connectorKey: "google-drive",
+        connectorName: "Google Drive",
+        connectorImage: "https://example.com/drive.png",
+        isConfigurable: true,
+        currentConnectionId: "new-conn-1",
+        currentConnectionName: "john@example.com",
+        connections: [
+          { id: "new-conn-1", name: "john@example.com", state: "Enabled" },
+        ],
+        connectionsUrl: "",
+      },
+    ]);
+
+    const connectors = [makeConnector()];
+
+    vi.spyOn(window, "open").mockImplementation(() => null);
+
+    render(
+      <ConnectionReadinessCard
+        connectors={connectors}
+        conversationalAgent={agent}
+        agentId={1}
+        folderId={2}
+        onConnectionsChanged={onConnectionsChanged}
+      />,
+    );
+
+    await user.click(screen.getByText("Connect"));
+
+    await waitFor(() => {
+      expect(mocks.updateConnectionSelections).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(onConnectionsChanged).toHaveBeenCalled();
+    });
+
+    vi.spyOn(window, "open").mockRestore();
+  });
+
+  // --- OAuth auth URL failure ---
+
+  it("resets connectingKey when auth URL request fails", async () => {
+    const user = userEvent.setup();
+    const { agent, mocks } = makeAgent();
+
+    mocks.getConnectionAuthUrl.mockRejectedValue(new Error("Network error"));
+
+    const connectors = [makeConnector()];
+
+    render(
+      <ConnectionReadinessCard
+        connectors={connectors}
+        conversationalAgent={agent}
+        agentId={1}
+        folderId={2}
+      />,
+    );
+
+    await user.click(screen.getByText("Connect"));
+
+    // Should reset back to Connect (not stuck on spinner)
+    await waitFor(() => {
+      expect(screen.getByText("Connect")).toBeInTheDocument();
+    });
+  });
+
+  // --- Visibility change re-fetches connections ---
+
+  it("re-fetches connections on visibility change", async () => {
+    const { agent, mocks } = makeAgent();
+
+    mocks.getAvailableConnections.mockResolvedValue([
+      {
+        connectorKey: "google-drive",
+        connectorName: "Google Drive",
+        connectorImage: "https://example.com/drive.png",
+        isConfigurable: true,
+        currentConnectionId: "conn-1",
+        currentConnectionName: "john@example.com",
+        connections: [
+          { id: "conn-1", name: "john@example.com", state: "Enabled" },
+        ],
+        connectionsUrl: "",
+      },
+    ]);
+
+    const connectors = [makeConnector()];
+
+    render(
+      <ConnectionReadinessCard
+        connectors={connectors}
+        conversationalAgent={agent}
+        agentId={1}
+        folderId={2}
+      />,
+    );
+
+    // Simulate returning from another tab
+    Object.defineProperty(document, "visibilityState", {
+      value: "visible",
+      writable: true,
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    await waitFor(() => {
+      expect(mocks.getAvailableConnections).toHaveBeenCalledWith(1, 2);
+    });
+  });
+
+  // --- OAuth polling failure resets state ---
+
+  it("resets connectingKey when OAuth session fails", async () => {
+    const user = userEvent.setup();
+    const { agent, mocks } = makeAgent();
+
+    mocks.getConnectionSessionStatus.mockResolvedValue({
+      status: "failed",
+      connectionId: null,
+    });
+
+    const connectors = [makeConnector()];
+
+    vi.spyOn(window, "open").mockImplementation(() => null);
+
+    render(
+      <ConnectionReadinessCard
+        connectors={connectors}
+        conversationalAgent={agent}
+        agentId={1}
+        folderId={2}
+      />,
+    );
+
+    await user.click(screen.getByText("Connect"));
+
+    // Should reset back to Connect after polling detects failure
+    await waitFor(() => {
+      expect(screen.getByText("Connect")).toBeInTheDocument();
+    });
+
+    vi.spyOn(window, "open").mockRestore();
+  });
 });

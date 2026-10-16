@@ -55,9 +55,12 @@ const MOCK_CONNECTIONS = [
   {
     connectorKey: "salesforce",
     connectorName: "Salesforce",
+    connectorImage: "https://example.com/sf.png",
     resourceKeys: ["sf.contacts"],
     currentConnectionId: null,
     currentConnectionName: null,
+    configurationUrl: "",
+    connectionsUrl: "",
     isConfigurable: true,
     connections: [],
   },
@@ -410,9 +413,12 @@ describe("ConnectionsSection", () => {
       {
         connectorKey: "shared-service",
         connectorName: "Shared Service",
+        connectorImage: "",
         resourceKeys: [],
         currentConnectionId: "admin-conn",
         currentConnectionName: "admin",
+        configurationUrl: "",
+        connectionsUrl: "",
         isConfigurable: false,
         connections: [],
       },
@@ -441,5 +447,160 @@ describe("ConnectionsSection", () => {
       (s: { connectorKey: string }) => s.connectorKey,
     );
     expect(keys).not.toContain("shared-service");
+  });
+
+  // --- OAuth connect flow ---
+
+  it("starts OAuth flow and shows connecting state", async () => {
+    const user = userEvent.setup();
+    // Use Salesforce (no connections) so it shows the Connect link
+    const { agent, mocks } = makeAgent();
+
+    vi.spyOn(window, "open").mockImplementation(() => null);
+
+    render(
+      <ConnectionsSection
+        conversationalAgent={agent}
+        agentId={1}
+        folderId={2}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Salesforce")).toBeInTheDocument();
+    });
+
+    // Click the Connect link for Salesforce
+    const connectLink = screen.getByRole("button", { name: "Connect" });
+    await user.click(connectLink);
+
+    await waitFor(() => {
+      expect(mocks.getConnectionAuthUrl).toHaveBeenCalledWith("salesforce");
+    });
+
+    expect(window.open).toHaveBeenCalledWith(
+      "https://auth.example.com",
+      "_blank",
+      "noopener,noreferrer",
+    );
+
+    vi.spyOn(window, "open").mockRestore();
+  });
+
+  it("auto-saves on OAuth success and calls onConnectionsChanged", async () => {
+    const user = userEvent.setup();
+    const onConnectionsChanged = vi.fn();
+    const { agent, mocks } = makeAgent();
+
+    mocks.getConnectionSessionStatus.mockResolvedValue({
+      status: "success",
+      connectionId: "new-sf-conn",
+    });
+    mocks.updateConnectionSelections.mockResolvedValue(MOCK_CONNECTIONS);
+
+    vi.spyOn(window, "open").mockImplementation(() => null);
+
+    render(
+      <ConnectionsSection
+        conversationalAgent={agent}
+        agentId={1}
+        folderId={2}
+        onConnectionsChanged={onConnectionsChanged}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Salesforce")).toBeInTheDocument();
+    });
+
+    const connectLink = screen.getByRole("button", { name: "Connect" });
+    await user.click(connectLink);
+
+    await waitFor(() => {
+      expect(mocks.updateConnectionSelections).toHaveBeenCalled();
+    });
+
+    // Verify only the OAuth'd connector is in the payload
+    const call = mocks.updateConnectionSelections.mock.calls[0];
+    expect(call[2].selections).toEqual([
+      { connectorKey: "salesforce", connectionId: "new-sf-conn" },
+    ]);
+
+    await waitFor(() => {
+      expect(onConnectionsChanged).toHaveBeenCalled();
+    });
+
+    vi.spyOn(window, "open").mockRestore();
+  });
+
+  it("falls back to connectionsUrl when auth URL fails", async () => {
+    const user = userEvent.setup();
+    const connectionsWithUrl = [
+      {
+        ...MOCK_CONNECTIONS[1],
+        connectionsUrl: "https://example.com/connections",
+      },
+    ];
+    const { agent, mocks } = makeAgent(connectionsWithUrl);
+
+    mocks.getConnectionAuthUrl.mockRejectedValue(new Error("Auth failed"));
+    vi.spyOn(window, "open").mockImplementation(() => null);
+
+    render(
+      <ConnectionsSection
+        conversationalAgent={agent}
+        agentId={1}
+        folderId={2}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Salesforce")).toBeInTheDocument();
+    });
+
+    const connectLink = screen.getByRole("button", { name: "Connect" });
+    await user.click(connectLink);
+
+    await waitFor(() => {
+      expect(window.open).toHaveBeenCalledWith(
+        "https://example.com/connections",
+        "_blank",
+        "noopener,noreferrer",
+      );
+    });
+
+    vi.spyOn(window, "open").mockRestore();
+  });
+
+  it("shows save error alert on failed save", async () => {
+    const user = userEvent.setup();
+    const { agent, mocks } = makeAgent();
+
+    mocks.updateConnectionSelections.mockRejectedValue(
+      new Error("Save failed"),
+    );
+
+    render(
+      <ConnectionsSection
+        conversationalAgent={agent}
+        agentId={1}
+        folderId={2}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("john@example.com")).toBeInTheDocument();
+    });
+
+    // Change selection to make dirty
+    await user.click(screen.getByText("john@example.com"));
+    await user.click(screen.getByText("work@company.com"));
+
+    const applyButton = screen.getByRole("button", { name: /apply changes/i });
+    await user.click(applyButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Save failed/)).toBeInTheDocument();
+    });
   });
 });
