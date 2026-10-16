@@ -63,6 +63,18 @@ let getAllMock = vi.fn();
 vi.mock("@uipath/uipath-typescript/conversational-agent", () => ({
   ConversationalAgent: class {
     getAll = (...args: any[]) => getAllMock(...args);
+    getAvailableConnections = vi.fn().mockResolvedValue([]);
+  },
+  ConnectionState: {
+    Enabled: "Enabled",
+    Expired: "Expired",
+    Disabled: "Disabled",
+    Failed: "Failed",
+  },
+  ConnectionSessionStatus: {
+    Pending: "pending",
+    Success: "success",
+    Failed: "failed",
   },
 }));
 
