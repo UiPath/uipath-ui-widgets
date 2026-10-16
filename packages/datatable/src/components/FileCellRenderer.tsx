@@ -29,7 +29,11 @@ export const FileCellRenderer = (props: FileCellRendererProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchBlob = useCallback(async () => {
-    return entityService.downloadAttachment(entityId, data.Id, fieldName);
+    return entityService.downloadAttachment(
+      { id: entityId },
+      data.Id,
+      fieldName,
+    );
   }, [entityService, entityId, data.Id, fieldName]);
 
   const handleOpen = useCallback(() => {
@@ -101,7 +105,7 @@ export const FileCellRenderer = (props: FileCellRendererProps) => {
   const handleRemove = useCallback(() => {
     toast.promise(
       entityService
-        .deleteAttachment(entityId, data.Id, fieldName)
+        .deleteAttachment({ id: entityId }, data.Id, fieldName)
         .then(() => {
           setFileName(null);
 
@@ -130,7 +134,7 @@ export const FileCellRenderer = (props: FileCellRendererProps) => {
       setIsUploading(true);
       toast.promise(
         entityService
-          .uploadAttachment(entityId, data.Id, fieldName, file)
+          .uploadAttachment({ id: entityId }, data.Id, fieldName, file)
           .then(() => {
             setFileName(file.name);
 
