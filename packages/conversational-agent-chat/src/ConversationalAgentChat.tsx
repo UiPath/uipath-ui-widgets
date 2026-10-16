@@ -64,9 +64,7 @@ import type { InputSchema } from "./components/AgentSchemaForm/types";
 import { FeedbackDialog } from "./components/FeedbackDialog";
 import { Loader } from "./components/Loader";
 import { SettingsDialog } from "./components/SettingsDialog";
-import {
-  type ConnectorReadiness,
-} from "./components/ConnectionReadinessCard";
+import { type ConnectorReadiness } from "./components/ConnectionReadinessCard";
 import type { ToolConfirmationLabels } from "./components/ToolConfirmation";
 import {
   createToolConfirmationRenderer,
@@ -1566,7 +1564,11 @@ export const ConversationalAgentChat = ({
       clientSideToolRenderer.unmountAll();
       connectionReadinessRenderer.unmountAll();
     };
-  }, [toolConfirmationRenderer, clientSideToolRenderer, connectionReadinessRenderer]);
+  }, [
+    toolConfirmationRenderer,
+    clientSideToolRenderer,
+    connectionReadinessRenderer,
+  ]);
 
   // Register event handlers after chatService is available
   useEffect(() => {
@@ -1629,6 +1631,7 @@ export const ConversationalAgentChat = ({
               onAllConnected: () => setConnectionReadiness(null),
               onOpenSettings: () =>
                 chatServiceRef.current?.toggleSettings(true),
+              onConnectionsChanged: fetchConnectionReadiness,
             }),
         });
       } catch (err) {
@@ -1664,6 +1667,7 @@ export const ConversationalAgentChat = ({
     toolConfirmationRenderer,
     clientSideToolRenderer,
     connectionReadinessRenderer,
+    fetchConnectionReadiness,
   ]);
 
   // Inject/update/remove the connection readiness card as a message in the
@@ -1697,7 +1701,11 @@ export const ConversationalAgentChat = ({
         const updated = [...conversation];
         updated[existingIndex] = cardMessage;
         chatService.setConversation(updated);
+      } else if (hasMessages) {
+        // Append so the card appears near the bottom where the user is
+        chatService.setConversation([...conversation, cardMessage]);
       } else {
+        // Fresh conversation — card goes first, before welcome message
         chatService.setConversation([cardMessage, ...conversation]);
       }
     } else if (existingIndex >= 0) {
@@ -1709,7 +1717,12 @@ export const ConversationalAgentChat = ({
         conversation.filter((m: any) => m.id !== CONNECTION_READINESS_CARD_ID),
       );
     }
-  }, [chatService, connectionReadiness, hasMessages, connectionReadinessRenderer]);
+  }, [
+    chatService,
+    connectionReadiness,
+    hasMessages,
+    connectionReadinessRenderer,
+  ]);
 
   useEffect(() => {
     if (

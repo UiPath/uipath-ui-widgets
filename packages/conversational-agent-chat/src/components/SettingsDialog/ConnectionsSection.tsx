@@ -21,13 +21,7 @@ import type {
   ConversationalAgent,
 } from "@uipath/uipath-typescript/conversational-agent";
 import { ConnectionSessionStatus } from "@uipath/uipath-typescript/conversational-agent";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CONNECTION_STATUS_LABEL,
   CONNECTION_STATUS_VARIANT,

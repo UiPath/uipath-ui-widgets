@@ -14,6 +14,7 @@ export interface ConnectionReadinessRenderer {
       conversationalAgent: ConversationalAgent;
       onAllConnected: () => void;
       onOpenSettings: () => void;
+      onConnectionsChanged: () => void;
     },
   ): void;
   unmountAll(): void;
@@ -47,6 +48,7 @@ export function createConnectionReadinessRenderer(): ConnectionReadinessRenderer
           folderId={meta.folderId}
           onAllConnected={context.onAllConnected}
           onOpenSettings={context.onOpenSettings}
+          onConnectionsChanged={context.onConnectionsChanged}
           defaultCollapsed={meta.defaultCollapsed}
         />,
       );

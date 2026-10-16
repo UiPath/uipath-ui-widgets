@@ -26,6 +26,7 @@ export interface ConnectionReadinessCardProps {
   folderId: number;
   onAllConnected?: () => void;
   onOpenSettings?: () => void;
+  onConnectionsChanged?: () => void;
   defaultCollapsed?: boolean;
 }
 
@@ -46,6 +47,7 @@ export const ConnectionReadinessCard = ({
   folderId,
   onAllConnected,
   onOpenSettings,
+  onConnectionsChanged,
   defaultCollapsed = false,
 }: ConnectionReadinessCardProps) => {
   const { t } = useWidgetTranslation();
@@ -247,6 +249,7 @@ export const ConnectionReadinessCard = ({
                       };
                     }),
                   );
+                  onConnectionsChanged?.();
                 }
               } catch {
                 // Persistence failed — do not update local state so the
@@ -277,7 +280,7 @@ export const ConnectionReadinessCard = ({
         if (oauthSessionRef.current === oauthSession) setConnectingKey(null);
       }
     },
-    [conversationalAgent, agentId, folderId],
+    [conversationalAgent, agentId, folderId, onConnectionsChanged],
   );
 
   const getStatusText = (connector: ConnectorReadiness): string => {
@@ -304,14 +307,6 @@ export const ConnectionReadinessCard = ({
     }
     return t("connection_readiness_not_connected");
   };
-
-  // TODO: remove after verification
-  console.log("[ConnectionReadinessRenderer] rendering card", {
-    total: localConnectors.length,
-    unconnected: unconnected.length,
-    broken: broken.length,
-    allConnected,
-  });
 
   // All connected — nothing to show
   if (allConnected) return null;
