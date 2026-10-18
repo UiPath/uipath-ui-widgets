@@ -217,6 +217,7 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
       }
       getById = mockGetById;
       downloadCitationSource = mockDownloadCitationSource;
+      getAvailableConnections = vi.fn().mockResolvedValue([]);
 
       getAll = vi.fn().mockResolvedValue([
         {
@@ -293,6 +294,17 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
       };
     },
     SortOrder: { Descending: "descending", Ascending: "ascending" },
+    ConnectionState: {
+      Enabled: "Enabled",
+      Expired: "Expired",
+      Disabled: "Disabled",
+      Failed: "Failed",
+    },
+    ConnectionSessionStatus: {
+      Pending: "pending",
+      Success: "success",
+      Failed: "failed",
+    },
   };
 });
 
