@@ -24,7 +24,7 @@ source prop — adapter selected by the fields present
   │                  (the SDK's preferred positional overload; the
   │                   options-object form is deprecated in the SDK)
   │                  → fetch(uri, {headers}) → Blob             (requires sdk)
-  ├─ { entityId } → Entities.downloadAttachment(entityId, recordId, fieldName)
+  ├─ { entityId } → Entities.downloadAttachment({ id: entityId }, recordId, fieldName)
   │                  → Blob                                      (requires sdk)
   └─ (none of the above — untyped JS misuse) → classified "unknown",
      rejected with a descriptive error on the widget's error card

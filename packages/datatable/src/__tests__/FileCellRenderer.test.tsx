@@ -187,7 +187,7 @@ describe("FileCellRenderer", () => {
       error: "Failed to remove file",
     });
     expect(mockEntityService.deleteAttachment).toHaveBeenCalledWith(
-      "entity-123",
+      { id: "entity-123" },
       "record-1",
       "Documents",
     );
@@ -239,7 +239,7 @@ describe("FileCellRenderer", () => {
       error: "Failed to upload file",
     });
     expect(mockEntityService.uploadAttachment).toHaveBeenCalledWith(
-      "entity-123",
+      { id: "entity-123" },
       "record-1",
       "Documents",
       testFile,
