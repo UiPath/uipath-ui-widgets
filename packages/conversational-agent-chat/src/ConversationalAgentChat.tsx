@@ -1145,7 +1145,10 @@ export const ConversationalAgentChat = ({
         exchangesCursor.current = undefined;
 
         const { exchanges } = await fetchExchanges(selectedConversation.id);
-        const messages = mapExchangesToChatMessages(exchanges);
+        const messages = mapExchangesToChatMessages(
+          exchanges,
+          toolDisplayModeRef.current,
+        );
         chatService.setConversation(messages);
         setHasMessages(messages.length > 0);
         if (
@@ -1196,7 +1199,7 @@ export const ConversationalAgentChat = ({
         exchangesCursor.current,
       );
       chatService.prependOlderMessages(
-        mapExchangesToChatMessages(exchanges),
+        mapExchangesToChatMessages(exchanges, toolDisplayModeRef.current),
         !hasNextPage,
       );
       applyTraceSpans(traceSpansRef.current);
@@ -1218,7 +1221,9 @@ export const ConversationalAgentChat = ({
       const agentRelease = await resolveAgent();
       agentIdRef.current = agentRelease?.id;
       agentKeyRef.current = agentRelease?.releaseKey;
-      toolDisplayModeRef.current = "FullTrace";
+      toolDisplayModeRef.current =
+        (agentRelease?.appearance as { displayMode?: string } | undefined)
+          ?.displayMode ?? "InputsAndOutputs";
       const agentName = agentRelease?.name ?? "";
 
       // In debug mode the agent (and its derived schema) may not be resolvable,
@@ -1424,7 +1429,7 @@ export const ConversationalAgentChat = ({
         exchangesCursor.current = undefined;
         const { exchanges } = await fetchExchanges(conversation.id);
         chatServiceInstance.setConversation(
-          mapExchangesToChatMessages(exchanges),
+          mapExchangesToChatMessages(exchanges, toolDisplayModeRef.current),
         );
         if (
           toolDisplayModeRef.current === "FullTrace" &&

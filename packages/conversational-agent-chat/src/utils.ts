@@ -228,6 +228,7 @@ const mapContentPartsToChatContentPartsAndAttachments = (
 
 export const mapExchangesToChatMessages = (
   exchanges: ExchangeGetResponse[],
+  displayMode?: string,
 ): AutopilotChatMessage[] =>
   exchanges.flatMap((exchange) =>
     exchange.messages.flatMap((message) => {
@@ -274,6 +275,7 @@ export const mapExchangesToChatMessages = (
           endTime: toolCall.result?.timestamp,
           isError: toolCall.result?.isError,
           exchangeId: exchange.exchangeId,
+          ...(displayMode && { displayMode }),
         },
       }));
 
