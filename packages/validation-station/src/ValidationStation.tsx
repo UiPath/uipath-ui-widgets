@@ -20,8 +20,11 @@ import { useWcReady } from "./useWcReady.js";
  * The all-in-one Document Understanding Validation Station: document viewer,
  * fields form, table editor, business rules and save actions in one element.
  *
- * Takes its document either pre-fetched (`artifacts`) or self-fetched from the
- * bucket paths on `data` (`sdk` + `data`) — see {@link DuArtifactsSource}.
+ * Takes its document pre-fetched (`artifacts`), self-fetched from the bucket
+ * paths on `data` (`sdk` + `data`), or self-fetched through a Flow run
+ * (`sdk` + `processedDocument`) — see {@link DuArtifactsSource}. The document
+ * may be a Document Understanding document (`DocumentTaxonomy` +
+ * `ExtractionResult`) or an IXP document (`IXPTaxonomy` + `IXPExtraction`).
  *
  * Reports every event in the element's public
  * `IValidationStationStandaloneWcEventMap`: the save flows through
@@ -32,6 +35,7 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
   sdk,
   data,
   artifacts: providedArtifacts,
+  processedDocument,
   documentId: documentIdProp,
   theme = "light",
   language = ValidationStationLanguage.English,
@@ -66,6 +70,7 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
     sdk,
     data,
     artifacts: providedArtifacts,
+    processedDocument,
     documentId: documentIdProp,
   });
   const tag = persistent
@@ -76,7 +81,7 @@ export const ValidationStation: React.FC<ValidationStationProps> = ({
 
   const { handleSubmit, handleSaveAsDraft, handleException } =
     createSaveHandlers(
-      { sdk, data },
+      { sdk, data, processedDocument },
       { onSubmit, onSaveAsDraft, onReportException },
     );
 

@@ -34,6 +34,7 @@ vi.mock("@uipath/apollo-react/material/components", () => ({
       appendOlderHistoryItems: vi.fn(),
       setLocale: vi.fn(),
       setTheme: vi.fn(),
+      setChatMode: vi.fn(),
       getLocale: vi.fn().mockReturnValue("en"),
       setAllowedAttachments: vi.fn(),
     })),
@@ -72,8 +73,20 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => ({
         startExchange: vi.fn(),
       })),
     };
+    getAvailableConnections = vi.fn().mockResolvedValue([]);
   },
   SortOrder: { Descending: "descending", Ascending: "ascending" },
+  ConnectionState: {
+    Enabled: "Enabled",
+    Expired: "Expired",
+    Disabled: "Disabled",
+    Failed: "Failed",
+  },
+  ConnectionSessionStatus: {
+    Pending: "pending",
+    Success: "success",
+    Failed: "failed",
+  },
 }));
 
 describe("ConversationalAgentChat — surface prop forwarding", () => {

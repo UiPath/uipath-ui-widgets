@@ -5,6 +5,7 @@ import {
   normalizeInput,
   convertAttachmentToFile,
   getConversationHistoryDisplayItems,
+  isFlowAgent,
   mapExchangesToChatMessages,
 } from "../utils";
 import {
@@ -794,6 +795,25 @@ describe("utils", () => {
       const result = mapExchangesToChatMessages(exchanges);
 
       expect(result[0].meta).toEqual({ exchangeId: "exc-123" });
+    });
+  });
+
+  describe("isFlowAgent", () => {
+    it("should return true for a Flow release", () => {
+      expect(isFlowAgent({ processType: "Flow" } as any)).toBe(true);
+    });
+
+    it("should return false for other process types", () => {
+      expect(isFlowAgent({ processType: "Agent" } as any)).toBe(false);
+      expect(isFlowAgent({ processType: "ProcessOrchestration" } as any)).toBe(
+        false,
+      );
+    });
+
+    it("should return false when the release or processType is missing", () => {
+      expect(isFlowAgent({} as any)).toBe(false);
+      expect(isFlowAgent(null)).toBe(false);
+      expect(isFlowAgent(undefined)).toBe(false);
     });
   });
 });

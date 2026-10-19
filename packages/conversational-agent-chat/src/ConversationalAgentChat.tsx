@@ -7,6 +7,7 @@ import {
   AutopilotChatMessage,
   AutopilotChatMode,
   AutopilotChatPreHookAction,
+  type AutopilotChatRenameConversationPayload,
   AutopilotChatService,
   type SupportedLocale,
 } from "@uipath/apollo-react/material/components";
@@ -21,6 +22,8 @@ import {
   DialogHeader,
   DialogTitle,
   PortalContainerProvider,
+  Toaster,
+  toast,
 } from "@uipath/apollo-wind";
 import {
   ContentPartChunkEvent,
@@ -29,6 +32,7 @@ import {
   ConversationCreateResponse,
   ErrorStartHandlerArgs,
   ExchangeGetResponse,
+  ConnectionState,
   ExchangeStream,
   FeedbackRating,
   MessageStream,
@@ -39,6 +43,7 @@ import {
 } from "@uipath/uipath-typescript/conversational-agent";
 import type {
   AgentGetByIdResponse,
+  AvailableConnectionsResponse,
   JSONObject,
   JSONValue,
   ToolCallConfirmationValue,
@@ -48,6 +53,7 @@ import type { SpanGetResponse } from "@uipath/uipath-typescript/traces";
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -60,6 +66,7 @@ import type { InputSchema } from "./components/AgentSchemaForm/types";
 import { FeedbackDialog } from "./components/FeedbackDialog";
 import { Loader } from "./components/Loader";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { type ConnectorReadiness } from "./components/ConnectionReadinessCard";
 import type { ToolConfirmationLabels } from "./components/ToolConfirmation";
 import {
   createToolConfirmationRenderer,
@@ -73,6 +80,7 @@ import {
   createToolCallRenderer,
   type ToolCallRenderer,
 } from "./components/ToolCallRenderer";
+import { createConnectionReadinessRenderer } from "./components/ConnectionReadinessRenderer";
 import { ALLOWED_ATTACHMENTS } from "./constants/attachments";
 import "./ConversationalAgentChat.css";
 import {
@@ -88,6 +96,7 @@ import {
   createFileKey,
   getConversationHistoryDisplayItems,
   getFirstRunExperience,
+  isFlowAgent,
   mapCitationSource,
   mapExchangesToChatMessages,
   normalizeInput,
@@ -104,6 +113,8 @@ import FilePreviewer from "./components/FilePreviewer";
 const i18n = getI18n();
 
 const TOOL_CONFIRMATION_WIDGET_ID_PREFIX = "confirmation-";
+const CONNECTION_READINESS_CARD = "cas-connection-readiness";
+const CONNECTION_READINESS_CARD_ID = "connection-readiness-card";
 // Exchanges per page when lazily loading a conversation's history. Pages are
 // fetched newest-first and prepended as the user scrolls toward the top.
 const EXCHANGES_PAGE_SIZE = 15;
@@ -112,6 +123,8 @@ const EXCHANGES_PAGE_SIZE = 15;
 // `sessionStarted`, so if it never arrives, surface an error instead of
 // leaving the send silently pending.
 const SESSION_START_TIMEOUT_MS = 30_000;
+// Backend limit on ConversationSchema.label.
+const CONVERSATION_LABEL_MAX_LENGTH = 100;
 type ConversationCreateOptionsArg = Parameters<
   ConversationalAgent["conversations"]["create"]
 >[2];
@@ -129,7 +142,8 @@ export const ConversationalAgentChat = ({
   externalUserId,
   inputSchema: inputSchemaProp,
   locale = "en",
-  theme = "light",
+  theme: themeProp,
+  mode = AutopilotChatMode.Embedded,
   readOnly = false,
   overrideLabels,
   firstRunExperience,
@@ -153,11 +167,14 @@ export const ConversationalAgentChat = ({
       "`inputSchema` is only supported when `isDebugMode` is true; the agent's input schema is resolved automatically.",
     );
   }
+  const theme = themeProp ?? "light";
   // must change language before useTranslation is called to avoid stale translations
   if (i18n.language !== locale) {
     i18n.changeLanguage(locale);
   }
   const { t } = useWidgetTranslation();
+  // Scopes our toasts to our own <Toaster> so a host's Toaster doesn't render them too.
+  const toasterId = useId();
   const agentService = useRef(
     new ConversationalAgent(sdk, {
       ...(externalUserId ? { externalUserId } : {}),
@@ -168,6 +185,7 @@ export const ConversationalAgentChat = ({
   const currentConversation = useRef<ConversationCreateResponse | null>(null);
   const initializedFor = useRef<string | null>(null);
   const themeRef = useRef(theme);
+  const modeRef = useRef(mode);
   const overrideLabelsRef = useRef(overrideLabels);
   const disabledFeaturesRef = useRef(disabledFeatures);
   const firstRunExperienceRef = useRef(firstRunExperience);
@@ -191,11 +209,16 @@ export const ConversationalAgentChat = ({
   const apolloLocaleRef = useRef<SupportedLocale>(
     toApolloSupportedLocale(locale),
   );
+  const connectionReadinessRenderer = useMemo(
+    () => createConnectionReadinessRenderer(),
+    [],
+  );
   // useLayoutEffect is ok here because the work is minimal enough that the cost is essentially zero
   // needed because React 19 doesn't support ref writes on render
 
   useLayoutEffect(() => {
     themeRef.current = theme;
+    modeRef.current = mode;
     overrideLabelsRef.current = overrideLabels;
     disabledFeaturesRef.current = disabledFeatures;
     firstRunExperienceRef.current = firstRunExperience;
@@ -212,6 +235,7 @@ export const ConversationalAgentChat = ({
     };
   }, [
     theme,
+    mode,
     overrideLabels,
     disabledFeatures,
     firstRunExperience,
@@ -247,6 +271,7 @@ export const ConversationalAgentChat = ({
   const agentIdRef = useRef<number | undefined>(undefined);
   const agentKeyRef = useRef<string | undefined>(undefined);
   const toolDisplayModeRef = useRef<string | undefined>(undefined);
+  const isFlowAgentRef = useRef(false);
   const searchTextRef = useRef<string>("");
   // Latest spans for the active conversation's trace, polled only in FullTrace mode
   const traceSpansRef = useRef<SpanGetResponse[]>([]);
@@ -280,10 +305,15 @@ export const ConversationalAgentChat = ({
   } | null>(null);
   const citationPreviewRef = useRef(citationPreview);
   const [hasMessages, setHasMessages] = useState(false);
+  const [connectionReadiness, setConnectionReadiness] = useState<
+    ConnectorReadiness[] | null
+  >(null);
+  const [themeRoot, setThemeRoot] = useState<HTMLDivElement | null>(null);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
   const onUserMessageSentRef = useRef(onUserMessageSent);
   const chatServiceRef = useRef<AutopilotChatService | null>(null);
   const settingsRootRef = useRef<Root | null>(null);
+  const autoBindTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Last-applied agent inputs for the active conversation. Pre-populates the
   // settings inputs form when reopened; cleared on New Chat.
   const storedAgentInputs = useRef<Record<string, unknown>>({});
@@ -624,16 +654,10 @@ export const ConversationalAgentChat = ({
 
               const clientSideWidgetId = `client-side-tool-${toolCall.toolCallId}`;
 
-              // Build default values from output schema properties
               const outputSchemaObj = (outputSchema ?? {
                 type: "object",
                 properties: {},
               }) as Record<string, unknown>;
-              const outputSchemaProps = outputSchemaObj.properties ?? {};
-              const defaultValues: Record<string, unknown> = {};
-              for (const key of Object.keys(outputSchemaProps)) {
-                defaultValues[key] = null;
-              }
 
               chatService.sendResponse({
                 id: clientSideWidgetId,
@@ -647,7 +671,6 @@ export const ConversationalAgentChat = ({
                 meta: {
                   toolName: startEvent.toolName,
                   inputSchema: outputSchemaObj,
-                  defaultValues,
                   isCompleted: false,
                   onSubmit: (formData: Record<string, unknown>) => {
                     const conversation = chatService.getConversation();
@@ -880,6 +903,53 @@ export const ConversationalAgentChat = ({
     session.current = null;
   }, []);
 
+  // Shared helper: fetch connection readiness and update state.
+  const fetchConnectionReadiness = useCallback(() => {
+    const capturedAgentId = agentIdRef.current;
+    const capturedFolderId = folderIdRef.current;
+    if (capturedAgentId == null || capturedFolderId == null) return;
+    const capturedInitKey = initializedFor.current;
+
+    const applyReadiness = (items: AvailableConnectionsResponse) => {
+      if (initializedFor.current !== capturedInitKey) return;
+      if (items.length === 0) {
+        setConnectionReadiness(null);
+        return;
+      }
+      const readiness: ConnectorReadiness[] = items.map((item) => {
+        const selectedConn = item.currentConnectionId
+          ? item.connections?.find((c) => c.id === item.currentConnectionId)
+          : undefined;
+        return {
+          connectorKey: item.connectorKey,
+          connectorName: item.connectorName ?? item.connectorKey,
+          connectorImage: item.connectorImage,
+          isConfigurable: item.isConfigurable !== false,
+          currentConnectionId: item.currentConnectionId,
+          currentConnectionName: item.currentConnectionName,
+          currentConnectionState:
+            selectedConn?.state ??
+            (item.currentConnectionId ? ConnectionState.Expired : undefined),
+          connectionsUrl: item.connectionsUrl,
+        };
+      });
+      const hasUnresolved = readiness.some(
+        (c) =>
+          c.isConfigurable &&
+          (!c.currentConnectionId ||
+            c.currentConnectionState !== ConnectionState.Enabled),
+      );
+      setConnectionReadiness(hasUnresolved ? readiness : null);
+    };
+    agentService.current
+      .getAvailableConnections(capturedAgentId, capturedFolderId)
+      .then(applyReadiness)
+      .catch(() => {
+        if (initializedFor.current !== capturedInitKey) return;
+        setConnectionReadiness(null);
+      });
+  }, []);
+
   const onNewChat = useCallback(() => {
     endActiveSession();
     currentConversation.current = null;
@@ -889,6 +959,7 @@ export const ConversationalAgentChat = ({
     storedAgentInputs.current = {};
     resetTraceState();
     setHasMessages(false);
+    connectionReadinessRenderer.unmountAll();
     // Re-show the InputsPage with a cleared form when the agent's schema has
     // required inputs. Bumping the counter forces an unmount/remount via the
     // key on <InputsPage>, which resets internal form state.
@@ -896,8 +967,15 @@ export const ConversationalAgentChat = ({
       setInputsInstance((n) => n + 1);
       setShowInputPage(true);
     }
+    fetchConnectionReadiness();
     trackTelemetry(TelemetryEvent.NewChat, TelemetryStatus.Success);
-  }, [endActiveSession, inputSchemaState, resetTraceState]);
+  }, [
+    endActiveSession,
+    fetchConnectionReadiness,
+    inputSchemaState,
+    connectionReadinessRenderer,
+    resetTraceState,
+  ]);
 
   const buildHistoryFilterOptions = useCallback(() => {
     // The SDK's URL builder calls value.toString() without a null check, so
@@ -966,11 +1044,40 @@ export const ConversationalAgentChat = ({
     [chatService, onNewChat, setConversationHistory],
   );
 
+  const onRenameConversation = useCallback(
+    async ({
+      conversationId,
+      name,
+    }: AutopilotChatRenameConversationPayload) => {
+      if (!chatService) return;
+      try {
+        // Stop the server's auto-labeling from overwriting the user's name.
+        const updated = await agentService.current.conversations.updateById(
+          conversationId,
+          { label: name.trim(), autogenerateLabel: false },
+        );
+        setConversationHistory(
+          pastConversations.current.map((c) =>
+            c.id === conversationId ? { ...c, label: updated.label } : c,
+          ),
+        );
+      } catch (err) {
+        toast.error(t("error_rename_conversation"), {
+          description: err instanceof Error ? err.message : String(err),
+          toasterId,
+        });
+      }
+    },
+    [chatService, setConversationHistory, t, toasterId],
+  );
+
   const onSendMessage = useCallback(
     async (data: AutopilotChatMessage) => {
       try {
         // required for debug-mode hosts that need to gate agent execution on the first user message
         onUserMessageSentRef.current?.({ content: data.content });
+        setHasMessages(true);
+        setConnectionReadiness(null);
         const sessionHelper = await getSessionHelper();
         const exchange = sessionHelper.startExchange();
         chatService?.setWaiting(true);
@@ -1144,6 +1251,7 @@ export const ConversationalAgentChat = ({
         session.current = null;
         exchangesCursor.current = undefined;
 
+        connectionReadinessRenderer.unmountAll();
         const { exchanges } = await fetchExchanges(selectedConversation.id);
         const messages = mapExchangesToChatMessages(
           exchanges,
@@ -1151,6 +1259,7 @@ export const ConversationalAgentChat = ({
         );
         chatService.setConversation(messages);
         setHasMessages(messages.length > 0);
+        fetchConnectionReadiness();
         if (
           toolDisplayModeRef.current === "FullTrace" &&
           selectedConversation.traceId
@@ -1175,8 +1284,10 @@ export const ConversationalAgentChat = ({
     },
     [
       chatService,
+      connectionReadinessRenderer,
       endActiveSession,
       fetchAndApplyTrace,
+      fetchConnectionReadiness,
       fetchExchanges,
       resetTraceState,
       t,
@@ -1217,6 +1328,11 @@ export const ConversationalAgentChat = ({
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
     try {
       initializedFor.current = initKey;
+      setConnectionReadiness(null);
+      if (autoBindTimeoutRef.current) {
+        clearTimeout(autoBindTimeoutRef.current);
+        autoBindTimeoutRef.current = null;
+      }
 
       const agentRelease = await resolveAgent();
       agentIdRef.current = agentRelease?.id;
@@ -1224,6 +1340,7 @@ export const ConversationalAgentChat = ({
       toolDisplayModeRef.current =
         (agentRelease?.appearance as { displayMode?: string } | undefined)
           ?.displayMode ?? "InputsAndOutputs";
+      isFlowAgentRef.current = isFlowAgent(agentRelease);
       const agentName = agentRelease?.name ?? "";
 
       // In debug mode the agent (and its derived schema) may not be resolvable,
@@ -1258,6 +1375,17 @@ export const ConversationalAgentChat = ({
         firstRunExperienceRef.current,
         agentRelease?.appearance,
       );
+
+      // Fetch connection readiness (fire-and-forget; card is optional)
+      if (agentRelease) {
+        fetchConnectionReadiness();
+        // Re-fetch after a delay to pick up server-side auto-bind results
+        autoBindTimeoutRef.current = setTimeout(() => {
+          autoBindTimeoutRef.current = null;
+          if (initializedFor.current !== initKey) return;
+          fetchConnectionReadiness();
+        }, 1500);
+      }
 
       // Persists agent inputs against the active conversation via
       // updateConversation. Server-side this applies to all subsequent
@@ -1306,11 +1434,17 @@ export const ConversationalAgentChat = ({
             <SettingsDialog
               profileResetKey={profileResetKey}
               conversationalAgent={agentService.current}
-              onClose={() => chatServiceRef.current?.toggleSettings(false)}
+              onClose={() => {
+                chatServiceRef.current?.toggleSettings(false);
+                fetchConnectionReadiness();
+              }}
               inputSchema={inputSchemaStateRef.current}
               initialInputs={storedAgentInputs.current}
               onApplyInputs={handleApplySettingsInputs}
               inputsResetKey={inputsResetKey}
+              agentId={agentIdRef.current}
+              folderId={folderIdRef.current}
+              onConnectionsChanged={fetchConnectionReadiness}
             />
           </PortalContainerProvider>,
         );
@@ -1319,7 +1453,7 @@ export const ConversationalAgentChat = ({
       const chatServiceInstance = AutopilotChatService.Instantiate({
         instanceName: `agent-${agentId}-${folderId}`,
         config: {
-          mode: AutopilotChatMode.Embedded,
+          mode: modeRef.current,
           locale: toApolloSupportedLocale(locale),
           theme: themeRef.current,
           readOnly,
@@ -1341,6 +1475,22 @@ export const ConversationalAgentChat = ({
           paginatedMessages: true,
           settingsRenderer: renderSettings,
           preHooks: {
+            [AutopilotChatPreHookAction.RenameConversation]: async ({
+              name,
+            }: AutopilotChatRenameConversationPayload) => {
+              const trimmed = name.trim();
+              if (trimmed.length === 0) return false;
+              if (trimmed.length > CONVERSATION_LABEL_MAX_LENGTH) {
+                toast.error(t("error_rename_conversation_too_long_title"), {
+                  description: t("error_rename_conversation_too_long", {
+                    max: CONVERSATION_LABEL_MAX_LENGTH,
+                  }),
+                  toasterId,
+                });
+                return false;
+              }
+              return true;
+            },
             [AutopilotChatPreHookAction.CitationClick]: async (
               citationData,
             ) => {
@@ -1408,8 +1558,11 @@ export const ConversationalAgentChat = ({
             // Apollo defaults `settings: true`; flip it so our gear renders
             // by default. Consumers can still opt out via `disabledFeatures`.
             settings: false,
+            // Apollo disables rename by default; enable it to match the react-sdk.
+            renameChat: false,
             ...(!agentId ? { newChat: true, history: true } : {}),
             ...disabledFeaturesRef.current,
+            ...(isFlowAgentRef.current ? { stopResponse: true } : {}),
           },
         },
       });
@@ -1424,10 +1577,14 @@ export const ConversationalAgentChat = ({
         chatServiceInstance.setAllowedAttachments(ALLOWED_ATTACHMENTS);
       }
 
+      // Clean up any existing readiness roots before replacing the conversation
+      connectionReadinessRenderer.unmountAll();
+
       if (existingConversationId) {
         const conversation = await getConversation();
         exchangesCursor.current = undefined;
         const { exchanges } = await fetchExchanges(conversation.id);
+        const messages = mapExchangesToChatMessages(exchanges);
         chatServiceInstance.setConversation(
           mapExchangesToChatMessages(exchanges, toolDisplayModeRef.current),
         );
@@ -1437,6 +1594,7 @@ export const ConversationalAgentChat = ({
         ) {
           void fetchAndApplyTrace(conversation.traceId);
         }
+        setHasMessages(messages.length > 0);
       } else {
         // AutopilotChatService is a singleton, so it may still hold the
         // previous agent's messages. Reset before showing the new agent.
@@ -1462,8 +1620,11 @@ export const ConversationalAgentChat = ({
     readOnly,
     resolveAgent,
     getConversation,
+    fetchConnectionReadiness,
+    connectionReadinessRenderer,
     fetchExchanges,
     t,
+    toasterId,
   ]);
 
   const handleReload = useCallback(() => {
@@ -1477,7 +1638,11 @@ export const ConversationalAgentChat = ({
     if (!chatService) return;
     stopTracePolling(true);
     if (activeExchange.current) {
-      activeExchange.current.sendExchangeEnd();
+      // Flows own their exchange; a client exchange end strands them. Switching
+      // conversations still fires StopResponse.
+      if (!isFlowAgentRef.current) {
+        activeExchange.current.sendExchangeEnd();
+      }
       activeExchange.current = null;
     }
     chatService.sendOutputStreamEvent({ turnComplete: true });
@@ -1557,12 +1722,20 @@ export const ConversationalAgentChat = ({
         settingsRootRef.current.unmount();
         settingsRootRef.current = null;
       }
+      if (autoBindTimeoutRef.current) {
+        clearTimeout(autoBindTimeoutRef.current);
+        autoBindTimeoutRef.current = null;
+      }
     };
   }, []);
 
   useEffect(() => {
     chatService?.setTheme(theme);
   }, [chatService, theme]);
+
+  useEffect(() => {
+    chatService?.setChatMode(mode);
+  }, [chatService, mode]);
 
   // Close the SDK session on unmount so the WebSocket doesn't linger.
   useEffect(() => {
@@ -1577,9 +1750,15 @@ export const ConversationalAgentChat = ({
     return () => {
       toolConfirmationRenderer.unmountAll();
       clientSideToolRenderer.unmountAll();
+      connectionReadinessRenderer.unmountAll();
       toolCallRenderer.unmountAll();
     };
-  }, [toolConfirmationRenderer, clientSideToolRenderer, toolCallRenderer]);
+  }, [
+    toolConfirmationRenderer,
+    clientSideToolRenderer,
+    connectionReadinessRenderer,
+    toolCallRenderer,
+  ]);
 
   // Register event handlers after chatService is available
   useEffect(() => {
@@ -1606,6 +1785,10 @@ export const ConversationalAgentChat = ({
           chatService.on(
             AutopilotChatEvent.DeleteConversation,
             onClickDeleteConversation,
+          ),
+          chatService.on(
+            AutopilotChatEvent.RenameConversation,
+            onRenameConversation,
           ),
           chatService.on(AutopilotChatEvent.HistoryLoadMore, onHistoryLoadMore),
           chatService.on(
@@ -1639,6 +1822,17 @@ export const ConversationalAgentChat = ({
               apolloLocaleRef.current,
             ),
         });
+        chatService.injectMessageRenderer({
+          name: CONNECTION_READINESS_CARD,
+          render: (container, message) =>
+            connectionReadinessRenderer.render(container, message, {
+              conversationalAgent: agentService.current,
+              onAllConnected: () => setConnectionReadiness(null),
+              onOpenSettings: () =>
+                chatServiceRef.current?.toggleSettings(true),
+              onConnectionsChanged: fetchConnectionReadiness,
+            }),
+        });
       } catch (err) {
         const message =
           err instanceof Error ? err.message : t("error_load_history");
@@ -1664,6 +1858,7 @@ export const ConversationalAgentChat = ({
     onHistoryLoadMore,
     onHistorySearch,
     onNewChat,
+    onRenameConversation,
     onSendMessage,
     onSetAttachments,
     onStopResponse,
@@ -1671,6 +1866,62 @@ export const ConversationalAgentChat = ({
     toolConfirmationRenderer,
     clientSideToolRenderer,
     toolCallRenderer,
+    connectionReadinessRenderer,
+    fetchConnectionReadiness,
+  ]);
+
+  // Inject/update/remove the connection readiness card as a message in the
+  // conversation — matching CAS positioning inside the scroll area.
+  useEffect(() => {
+    if (!chatService) return;
+    const conversation = chatService.getConversation() ?? [];
+    const existingIndex = conversation.findIndex(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (m: any) => m.id === CONNECTION_READINESS_CARD_ID,
+    );
+
+    if (connectionReadiness) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cardMessage: any = {
+        id: CONNECTION_READINESS_CARD_ID,
+        content: " ",
+        created_at: new Date().toISOString(),
+        role: "assistant",
+        widget: CONNECTION_READINESS_CARD,
+        done: true,
+        disableActions: true,
+        meta: {
+          connectors: connectionReadiness,
+          agentId: agentIdRef.current,
+          folderId: folderIdRef.current,
+          defaultCollapsed: hasMessages,
+        },
+      };
+      if (existingIndex >= 0) {
+        const updated = [...conversation];
+        updated[existingIndex] = cardMessage;
+        chatService.setConversation(updated);
+      } else if (hasMessages) {
+        // Append so the card appears near the bottom where the user is
+        chatService.setConversation([...conversation, cardMessage]);
+      } else {
+        // Fresh conversation — card goes first, before welcome message
+        chatService.setConversation([cardMessage, ...conversation]);
+      }
+    } else if (existingIndex >= 0) {
+      // Defer unmount — the card's onAllConnected effect may still be
+      // executing inside this root's React tree when this runs.
+      queueMicrotask(() => connectionReadinessRenderer.unmountAll());
+      chatService.setConversation(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        conversation.filter((m: any) => m.id !== CONNECTION_READINESS_CARD_ID),
+      );
+    }
+  }, [
+    chatService,
+    connectionReadiness,
+    hasMessages,
+    connectionReadinessRenderer,
   ]);
 
   useEffect(() => {
@@ -1717,103 +1968,121 @@ export const ConversationalAgentChat = ({
 
   return (
     <div className="uipath-conversational-agent-chat">
-      <PortalContainerProvider>
-        {!error && showInputPage && inputSchemaState && (
-          <InputsPage
-            key={`${agentId}-${inputsInstance}`}
-            agentName={agentNameState}
-            inputSchema={inputSchemaState}
-            onSubmit={async (data) => {
-              const inputs = data as Record<string, unknown>;
-              if (isDebugMode && existingConversationId) {
-                await agentService.current.conversations.updateById(
-                  existingConversationId,
-                  { agentInput: { inline: inputs as JSONObject } },
-                );
-              } else {
-                const agent = await resolveAgent();
-                if (!agent) {
-                  throw new Error(t("error_missing_conversation_params"));
+      {/* Apollo's color tokens switch on a theme class, which the scoped
+          stylesheet only honors on a descendant of the widget root (or on the
+          host's <body>), so `theme` is applied here rather than on the root.
+          Without an explicit `theme`, no class is set and the host's <body>
+          theme class keeps applying, as before. */}
+      <div
+        ref={setThemeRoot}
+        className={
+          themeProp ? `uipath-cas-theme ${themeProp}` : "uipath-cas-theme"
+        }
+      >
+        <PortalContainerProvider>
+          {!error && showInputPage && inputSchemaState && (
+            <InputsPage
+              key={`${agentId}-${inputsInstance}`}
+              agentName={agentNameState}
+              inputSchema={inputSchemaState}
+              onSubmit={async (data) => {
+                const inputs = data as Record<string, unknown>;
+                if (isDebugMode && existingConversationId) {
+                  await agentService.current.conversations.updateById(
+                    existingConversationId,
+                    { agentInput: { inline: inputs as JSONObject } },
+                  );
+                } else {
+                  const agent = await resolveAgent();
+                  if (!agent) {
+                    throw new Error(t("error_missing_conversation_params"));
+                  }
+                  const conversation = await agent.conversations.create({
+                    ...(jobStartOverrides ? { jobStartOverrides } : {}),
+                    agentInput: { inline: inputs as JSONObject },
+                  } as ConversationCreateOptionsArg);
+                  currentConversation.current = conversation;
                 }
-                const conversation = await agent.conversations.create({
-                  ...(jobStartOverrides ? { jobStartOverrides } : {}),
-                  agentInput: { inline: inputs as JSONObject },
-                } as ConversationCreateOptionsArg);
-                currentConversation.current = conversation;
-              }
-              storedAgentInputs.current = inputs;
-              setShowInputPage(false);
-            }}
-          />
-        )}
-
-        {error && (
-          <div className="info-container">
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-            <Button variant={"outline"} onClick={handleReload}>
-              {t("reload")}
-            </Button>
-          </div>
-        )}
-
-        {!error && !chatService && (
-          <div className="info-container">
-            <div>{t("loading")}</div>
-            <Loader />
-          </div>
-        )}
-
-        {!error && chatService && !showInputPage && (
-          <ApChat
-            key={locale}
-            chatServiceInstance={chatService}
-            locale={toApolloSupportedLocale(locale)}
-            theme={theme}
-            enableInternalThemeProvider
-          />
-        )}
-
-        <FeedbackDialog
-          open={feedbackDialogOpen}
-          isPositive={feedbackIsPositive}
-          onOpenChange={setFeedbackDialogOpen}
-          onSubmit={onFeedbackSubmit}
-          onCancel={onFeedbackCancel}
-        />
-        <Dialog
-          open={!!citationPreviewData}
-          onOpenChange={(open) => {
-            if (!open) setCitationPreviewData(null);
-          }}
-        >
-          {citationPreviewData && (
-            <DialogContent className="sm:max-w-4xl">
-              <DialogHeader>
-                <DialogTitle>{citationPreviewData.title}</DialogTitle>
-              </DialogHeader>
-              {citationPreviewData.error ? (
-                <Column
-                  w="full"
-                  align="center"
-                  justify="center"
-                  style={{ height: "60vh", maxHeight: "600px" }}
-                >
-                  {t("file_preview_error")}
-                </Column>
-              ) : (
-                <FilePreviewer
-                  file={citationPreviewData.file}
-                  usePdfJs={usePdfJsViewer}
-                  pageNumber={citationPreviewData.pageNumber}
-                  iframeParams={`#page=${citationPreviewData.pageNumber}`}
-                />
-              )}
-            </DialogContent>
+                storedAgentInputs.current = inputs;
+                setShowInputPage(false);
+              }}
+            />
           )}
-        </Dialog>
-      </PortalContainerProvider>
+
+          {error && (
+            <div className="info-container">
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+              <Button variant={"outline"} onClick={handleReload}>
+                {t("reload")}
+              </Button>
+            </div>
+          )}
+
+          {!error && !chatService && (
+            <div className="info-container">
+              <div>{t("loading")}</div>
+              <Loader />
+            </div>
+          )}
+
+          {!error && chatService && !showInputPage && (
+            <>
+              <ApChat
+                key={locale}
+                chatServiceInstance={chatService}
+                locale={toApolloSupportedLocale(locale)}
+                theme={theme}
+                enableInternalThemeProvider
+                // Keep Apollo's tooltips, menus and history popover inside the
+                // themed wrapper; portalled to <body> they'd lose the theme tokens.
+                portalContainer={themeRoot ?? undefined}
+              />
+            </>
+          )}
+
+          <FeedbackDialog
+            open={feedbackDialogOpen}
+            isPositive={feedbackIsPositive}
+            onOpenChange={setFeedbackDialogOpen}
+            onSubmit={onFeedbackSubmit}
+            onCancel={onFeedbackCancel}
+          />
+          <Dialog
+            open={!!citationPreviewData}
+            onOpenChange={(open) => {
+              if (!open) setCitationPreviewData(null);
+            }}
+          >
+            {citationPreviewData && (
+              <DialogContent className="sm:max-w-4xl">
+                <DialogHeader>
+                  <DialogTitle>{citationPreviewData.title}</DialogTitle>
+                </DialogHeader>
+                {citationPreviewData.error ? (
+                  <Column
+                    w="full"
+                    align="center"
+                    justify="center"
+                    style={{ height: "60vh", maxHeight: "600px" }}
+                  >
+                    {t("file_preview_error")}
+                  </Column>
+                ) : (
+                  <FilePreviewer
+                    file={citationPreviewData.file}
+                    usePdfJs={usePdfJsViewer}
+                    pageNumber={citationPreviewData.pageNumber}
+                    iframeParams={`#page=${citationPreviewData.pageNumber}`}
+                  />
+                )}
+              </DialogContent>
+            )}
+          </Dialog>
+          <Toaster id={toasterId} position="top-right" richColors />
+        </PortalContainerProvider>
+      </div>
     </div>
   );
 };

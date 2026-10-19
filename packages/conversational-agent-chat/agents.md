@@ -42,6 +42,7 @@ ConversationalAgentChat
 - **History** - Loaded paginated (20 per page, descending by `lastActivityTime`) with cursor-based pagination.
 - **Switch** - Past conversations loaded by fetching all exchanges and mapping to chat messages.
 - **Delete** - Removed via API, clears current conversation if active.
+- **Rename** - Inline rename from the history list (on by default; opt out with `disabledFeatures.renameChat: true`). A pre-hook rejects blank names and names over 100 characters, then `agentService.conversations.updateById(id, { label, autogenerateLabel: false })` persists it so later exchanges don't overwrite it.
 - **New Chat** - Resets all references (conversation, session, exchange).
 
 ## File Attachments
@@ -68,6 +69,7 @@ All user actions flow through `AutopilotChatService` events:
 | `SetAttachments`     | `onSetAttachments()`          |
 | `OpenConversation`   | `onClickOpenConversation()`   |
 | `DeleteConversation` | `onClickDeleteConversation()` |
+| `RenameConversation` | `onRenameConversation()`      |
 | `HistoryLoadMore`    | `onHistoryLoadMore()`         |
 | `Feedback`           | `onFeedback()`                |
 | `StopResponse`       | `onStopResponse()`            |

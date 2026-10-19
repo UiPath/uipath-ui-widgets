@@ -33,3 +33,15 @@ global.IntersectionObserver = class IntersectionObserver {
 // Mock CSS imports
 vi.mock("*.css", () => ({}));
 vi.mock("*.scss", () => ({}));
+
+// Mock window.matchMedia (used by Sonner's Toaster)
+window.matchMedia = ((query: string) => ({
+  matches: false,
+  media: query,
+  onchange: null,
+  addListener() {},
+  removeListener() {},
+  addEventListener() {},
+  removeEventListener() {},
+  dispatchEvent: () => false,
+})) as any;

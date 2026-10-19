@@ -609,7 +609,7 @@ describe("PdfViewer", () => {
         expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
       );
       expect(mockDownloadAttachment).toHaveBeenCalledWith(
-        "entity-1",
+        { id: "entity-1" },
         "record-1",
         "document",
       );
@@ -767,7 +767,7 @@ describe("PdfViewer", () => {
         expect(screen.getByTestId("pdf-page")).toBeInTheDocument(),
       );
       expect(mockDownloadAttachment).toHaveBeenCalledWith(
-        "e-1",
+        { id: "e-1" },
         "r-1",
         "FileField",
       );

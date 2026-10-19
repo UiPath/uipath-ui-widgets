@@ -142,7 +142,7 @@ async function resolveSource(
     }
     const entities = new Entities(sdk);
     const blob = await entities.downloadAttachment(
-      source.entityId,
+      { id: source.entityId },
       source.recordId,
       source.fieldName,
     );

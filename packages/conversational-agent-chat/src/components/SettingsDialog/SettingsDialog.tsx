@@ -7,6 +7,7 @@ import {
 import type { ConversationalAgent } from "@uipath/uipath-typescript/conversational-agent";
 import { useWidgetTranslation } from "../../i18n/useWidgetTranslation";
 import type { InputSchema } from "../AgentSchemaForm/types";
+import { ConnectionsSection } from "./ConnectionsSection";
 import { InputsSection } from "./InputsSection";
 import { ProfileSection } from "./ProfileSection";
 
@@ -33,6 +34,12 @@ export interface SettingsDialogProps {
    * conversation switch.
    */
   inputsResetKey?: string;
+  /** Agent ID for loading personal connections. */
+  agentId?: number;
+  /** Folder ID for loading personal connections. */
+  folderId?: number;
+  /** Called when connections are saved (manual or OAuth). */
+  onConnectionsChanged?: () => void;
 }
 
 /**
@@ -48,6 +55,9 @@ export const SettingsDialog = ({
   initialInputs,
   onApplyInputs,
   inputsResetKey,
+  agentId,
+  folderId,
+  onConnectionsChanged,
 }: SettingsDialogProps) => {
   const { t } = useWidgetTranslation();
   const showInputs =
@@ -76,6 +86,24 @@ export const SettingsDialog = ({
                 initialValues={initialInputs}
                 onApplyInputs={onApplyInputs}
                 onApplied={onClose}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        )}
+        {agentId != null && folderId != null && (
+          <AccordionItem
+            value="connections"
+            className="rounded-md border-b-0 bg-accent"
+          >
+            <AccordionTrigger className="px-4 hover:no-underline">
+              {t("connections_title")}
+            </AccordionTrigger>
+            <AccordionContent className="px-4">
+              <ConnectionsSection
+                conversationalAgent={conversationalAgent}
+                agentId={agentId}
+                folderId={folderId}
+                onConnectionsChanged={onConnectionsChanged}
               />
             </AccordionContent>
           </AccordionItem>
