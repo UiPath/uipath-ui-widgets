@@ -81,6 +81,16 @@ A PDF viewer widget for UiPath coded apps.
 - 🧰 Prop-toggleable toolbar, selectable text, built-in loading/error states
 - 📦 pdf.js worker ships inside the package — no CDN or bundler configuration, works behind enterprise CSP/firewalls
 
+### [@uipath/ui-widgets-decisions-and-reasons](./packages/decisions-and-reasons)
+
+Preview components for capturing a reviewer's decision in a Coded Action App, a QuickForm or a document-validation task. Exported only from the `/preview` subpath.
+
+**Features:**
+
+- 🧾 `DecisionCaptureCodedActionApp`: reasons with a weight menu, an "Add a reason" row, a decision nothing pre-selects, final details that follow the decision, and a Next time rule with a scope
+- 🔽 `withReasonCapture`: one optional Why dropdown under every select field of a QuickForm schema
+- 📄 `DocumentReasonRow`: one optional reason row under a single edited document field
+
 ## 🚀 Getting Started
 
 ### Installation
@@ -201,7 +211,8 @@ uipath-ui-widgets/
 │   ├── external-auth/              # Provider-agnostic sign-in widget
 │   ├── multi-file-upload/          # Multi-file upload to storage buckets
 │   ├── pdf-viewer/                 # PDF viewer widget
-│   └── validation-station/         # Document Understanding Validation Station wrapper
+│   ├── validation-station/         # Document Understanding Validation Station wrapper
+│   └── decisions-and-reasons/      # HITL decision-capture widget
 ├── samples/                        # Sample applications
 └── package.json
 ```
