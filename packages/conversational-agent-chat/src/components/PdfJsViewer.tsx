@@ -14,18 +14,31 @@ import type { PDFDocumentProxy } from "pdfjs-dist";
  * in pdfjs source). This skips Worker creation entirely — #initialize() sees
  * the handler and calls #setupFakeWorker() immediately without attempting
  * new Worker().
+ *
+ * Assistant Desktop gets the legacy build: the default one calls built-ins newer
+ * than its embedded Chromium (e.g. Uint8Array#toHex, Chrome 140+).
  */
+const isAssistantDesktop = () => /UiPathAssistant\//.test(navigator.userAgent);
+
 const loadPdfJs = async () => {
-  const pdfjs = await import("pdfjs-dist");
+  const useLegacy = isAssistantDesktop();
+  const pdfjs = useLegacy
+    ? await import("pdfjs-dist/legacy/build/pdf.mjs")
+    : await import("pdfjs-dist");
   if (!(globalThis as Record<string, unknown>).pdfjsWorker) {
-    // @ts-expect-error - worker module has no type declarations
-    const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs");
+    const worker = useLegacy
+      ? // @ts-expect-error - worker module has no type declarations
+        await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs")
+      : // @ts-expect-error - worker module has no type declarations
+        await import("pdfjs-dist/build/pdf.worker.min.mjs");
     (globalThis as Record<string, unknown>).pdfjsWorker = worker;
   }
   // Ensure workerSrc is set as a fallback — prevents "No workerSrc specified"
   // error in any code path that checks it before the globalThis handler
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    pdfjs.GlobalWorkerOptions.workerSrc = "pdfjs-dist/build/pdf.worker.min.mjs";
+    pdfjs.GlobalWorkerOptions.workerSrc = useLegacy
+      ? "pdfjs-dist/legacy/build/pdf.worker.min.mjs"
+      : "pdfjs-dist/build/pdf.worker.min.mjs";
   }
   return pdfjs;
 };
