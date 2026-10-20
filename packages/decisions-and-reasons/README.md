@@ -21,6 +21,40 @@ npm install @uipath/ui-widgets-decisions-and-reasons
 - One button: "Agree · <proposedOutcome>" when nothing changed, otherwise "Record decision", with a note naming what is missing
 - A filed read-only state after completion
 
+## Prop-driven capture pieces
+
+Three pieces for apps that build their own layout. None of them needs a data source.
+
+| Piece               | What it is                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ClaimReview`       | One column of cards driven by task data: context, reasons with a weight menu, the decision (nothing pre-selected), final details that follow the decision, a rationale composed from the weighted reasons, Next time with a scope, What changed, and a collapsed record of how the decision was reached. Returns the decision and a payload through `onComplete(decision, payload)`. |
+| `withReasonCapture` | Takes a QuickForm schema and returns it with one optional "Why?" dropdown under every select field (`dropdown`, `radioGroup`, `checkbox`). A rule shows each one only when the value differs from the field's `defaultValue`.                                                                                                                                                        |
+| `DocumentReasonRow` | One optional row of reasons (Extraction misread, Not in the document, Rule doesn't fit, Other) for a single edited document field.                                                                                                                                                                                                                                                   |
+
+```tsx
+import {
+  ClaimReview,
+  FIXTURE_CLAIM,
+} from "@uipath/ui-widgets-decisions-and-reasons";
+import "@uipath/ui-widgets-decisions-and-reasons/DecisionsAndReasons.css";
+
+<ClaimReview
+  data={FIXTURE_CLAIM}
+  onChange={(payload) => service.setTaskData(payload)}
+  onComplete={(decision, payload) => service.completeTask(decision, payload)}
+/>;
+```
+
+`ClaimReview` input is `ClaimData`: the claim context, `recommendedDecision`, `reasons` (with `proposedWeight`, `source` and `sourceConfidence`), `fields` (final details with a `byDecision` value for each outcome), `nextTimeOptions` and `conditionOptions`. The payload adds `rationaleText`, `decidingReasons`, `nextTime*`, `changes`, `record`, `changeLog` and `timeOnTaskSeconds` to the reasons and fields it received.
+
+The record rows say how much each part changed (Kept, Lightly edited, Rewritten, Rejected or Untouched) and whether the reviewer looked at it. Opening a reason's menu or clicking its text counts as looking.
+
+```ts
+import { withReasonCapture } from "@uipath/ui-widgets-decisions-and-reasons";
+
+const { schema, added } = withReasonCapture(developerSchema);
+```
+
 ## Task fields
 
 | Section | Field                | Type                                        |
