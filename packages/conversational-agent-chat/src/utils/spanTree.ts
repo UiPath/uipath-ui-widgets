@@ -135,9 +135,9 @@ export function mergeToolCallTraceMeta(
         ? attributes.toolName
         : (existingMeta?.toolName as string | undefined),
     input: attributes.input ?? existingMeta?.input,
-    startTime: trace.startTime,
+    startTime: existingMeta?.startTime ?? trace.startTime,
     output: attributes.output ?? existingMeta?.output,
-    endTime: trace.endTime ?? existingMeta?.endTime,
+    endTime: existingMeta?.endTime ?? trace.endTime ?? undefined,
     isError: attributes.isError ?? existingMeta?.isError,
     displayMode,
     span: trace.spanNode,

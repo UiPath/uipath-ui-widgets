@@ -76,10 +76,6 @@ import {
   createClientSideToolRenderer,
   type ClientSideToolRenderer,
 } from "./components/ClientSideToolRenderer";
-import {
-  createToolCallRenderer,
-  type ToolCallRenderer,
-} from "./components/ToolCallRenderer";
 import { createConnectionReadinessRenderer } from "./components/ConnectionReadinessRenderer";
 import { ALLOWED_ATTACHMENTS } from "./constants/attachments";
 import "./ConversationalAgentChat.css";
@@ -202,13 +198,6 @@ export const ConversationalAgentChat = ({
     () => createClientSideToolRenderer(),
     [],
   );
-  const toolCallRenderer = useMemo<ToolCallRenderer>(
-    () => createToolCallRenderer(),
-    [],
-  );
-  const apolloLocaleRef = useRef<SupportedLocale>(
-    toApolloSupportedLocale(locale),
-  );
   const connectionReadinessRenderer = useMemo(
     () => createConnectionReadinessRenderer(),
     [],
@@ -226,7 +215,6 @@ export const ConversationalAgentChat = ({
     onEvaluationSetClickedRef.current = onEvaluationSetClicked;
     onUserMessageSentRef.current = onUserMessageSent;
     citationPreviewRef.current = citationPreview;
-    apolloLocaleRef.current = toApolloSupportedLocale(locale);
     toolConfirmationLabelsRef.current = {
       cancel: t("cancel"),
       confirm: t("tool_confirmation_confirm"),
@@ -282,6 +270,8 @@ export const ConversationalAgentChat = ({
   const tracePollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
     null,
   );
+  const tracePollInFlightRef = useRef<Promise<void> | null>(null);
+  const isMountedRef = useRef(false);
 
   const [chatService, setChatService] = useState<AutopilotChatService>();
   const [error, setError] = useState<string | null>(null);
@@ -373,6 +363,12 @@ export const ConversationalAgentChat = ({
     async (traceId: string) => {
       try {
         const spans = await new Traces(sdk).getById(traceId);
+        if (
+          !isMountedRef.current ||
+          currentConversation.current?.traceId !== traceId
+        ) {
+          return;
+        }
         applyTraceSpans(spans);
       } catch {
         // Transient errors: the next poll tick (or reopening) retries.
@@ -387,14 +383,14 @@ export const ConversationalAgentChat = ({
     const traceId = currentConversation.current?.traceId;
     if (!traceId || tracePollIntervalRef.current) return;
 
-    let inFlight = false;
     const tick = async () => {
-      if (inFlight) return;
-      inFlight = true;
+      if (tracePollInFlightRef.current) return;
+      const poll = fetchAndApplyTrace(traceId);
+      tracePollInFlightRef.current = poll;
       try {
-        await fetchAndApplyTrace(traceId);
+        await poll;
       } finally {
-        inFlight = false;
+        tracePollInFlightRef.current = null;
       }
     };
     void tick();
@@ -407,7 +403,12 @@ export const ConversationalAgentChat = ({
       clearInterval(tracePollIntervalRef.current);
       tracePollIntervalRef.current = null;
       const traceId = currentConversation.current?.traceId;
-      if (finalFetch && traceId) void fetchAndApplyTrace(traceId);
+      if (!finalFetch || !traceId) return;
+      const pendingPoll = tracePollInFlightRef.current;
+      void (async () => {
+        await pendingPoll;
+        await fetchAndApplyTrace(traceId);
+      })();
     },
     [fetchAndApplyTrace],
   );
@@ -513,14 +514,24 @@ export const ConversationalAgentChat = ({
             }
           >();
 
-          const isFullTraceMode = () =>
-            toolDisplayModeRef.current === "FullTrace";
+          // In FullTrace the SDK's tool call events still render the tool call,
+          // so it appears and completes even if trace fetches fail
+          const withTraceSpan = (
+            toolCallId: string,
+            meta: Record<string, unknown>,
+          ) => {
+            if (toolDisplayModeRef.current !== "FullTrace") return meta;
+            sentToolCallMetaJsonRef.current.delete(toolCallId);
+            const span = chatService
+              .getConversation()
+              ?.find((m) => m.id === toolCallId)?.meta?.span;
+            return span ? { ...meta, span } : meta;
+          };
 
           const sendToolCallSpinner = (toolCallId: string) => {
             const pending = pendingToolCalls.get(toolCallId);
             if (!pending || pending.spinnerSent) return;
             pending.spinnerSent = true;
-            if (isFullTraceMode()) return;
             chatService.sendResponse({
               id: toolCallId,
               content: t("performing_action_message", {
@@ -528,12 +539,12 @@ export const ConversationalAgentChat = ({
               }),
               created_at: pending.startTimeIso,
               widget: MessageWidget.ApolloAgentsToolCall,
-              meta: {
+              meta: withTraceSpan(toolCallId, {
                 toolName: pending.toolName,
                 input: pending.toolInput,
                 startTime: pending.startTimeIso,
                 displayMode: toolDisplayModeRef.current,
-              },
+              }),
             });
           };
 
@@ -615,10 +626,6 @@ export const ConversationalAgentChat = ({
               if (pending && !pending.spinnerSent) {
                 sendToolCallSpinner(toolCall.toolCallId);
               }
-              if (isFullTraceMode()) {
-                pendingToolCalls.delete(toolCall.toolCallId);
-                return;
-              }
               const endTimeIso = new Date().toISOString();
               chatService.sendResponse({
                 id: toolCall.toolCallId,
@@ -627,7 +634,7 @@ export const ConversationalAgentChat = ({
                 }),
                 created_at: endTimeIso,
                 widget: MessageWidget.ApolloAgentsToolCall,
-                meta: {
+                meta: withTraceSpan(toolCall.toolCallId, {
                   toolName: startEvent.toolName,
                   input: toolInput,
                   startTime: startTimeIso,
@@ -636,7 +643,7 @@ export const ConversationalAgentChat = ({
                   isError,
                   ...(cancelled && { cancelled: true }),
                   displayMode: toolDisplayModeRef.current,
-                },
+                }),
               });
               pendingToolCalls.delete(toolCall.toolCallId);
             };
@@ -1737,27 +1744,35 @@ export const ConversationalAgentChat = ({
     chatService?.setChatMode(mode);
   }, [chatService, mode]);
 
-  // Close the SDK session on unmount so the WebSocket doesn't linger.
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Close the SDK session and stop trace polling on unmount so neither lingers
   useEffect(() => {
     return () => {
       endActiveSession();
-      stopTracePolling(false);
+      if (tracePollIntervalRef.current) {
+        clearInterval(tracePollIntervalRef.current);
+        tracePollIntervalRef.current = null;
+      }
     };
-  }, [endActiveSession, stopTracePolling]);
+  }, [endActiveSession]);
 
-  // Release React state held by the imperative tool-confirmation, client-side tool and tool call roots.
+  // Release React state held by the imperative tool-confirmation and client-side tool roots.
   useEffect(() => {
     return () => {
       toolConfirmationRenderer.unmountAll();
       clientSideToolRenderer.unmountAll();
       connectionReadinessRenderer.unmountAll();
-      toolCallRenderer.unmountAll();
     };
   }, [
     toolConfirmationRenderer,
     clientSideToolRenderer,
     connectionReadinessRenderer,
-    toolCallRenderer,
   ]);
 
   // Register event handlers after chatService is available
@@ -1814,15 +1829,6 @@ export const ConversationalAgentChat = ({
             clientSideToolRenderer.render(container, message),
         });
         chatService.injectMessageRenderer({
-          name: MessageWidget.ApolloAgentsToolCall,
-          render: (container, message) =>
-            toolCallRenderer.render(
-              container,
-              message,
-              apolloLocaleRef.current,
-            ),
-        });
-        chatService.injectMessageRenderer({
           name: CONNECTION_READINESS_CARD,
           render: (container, message) =>
             connectionReadinessRenderer.render(container, message, {
@@ -1865,7 +1871,6 @@ export const ConversationalAgentChat = ({
     t,
     toolConfirmationRenderer,
     clientSideToolRenderer,
-    toolCallRenderer,
     connectionReadinessRenderer,
     fetchConnectionReadiness,
   ]);

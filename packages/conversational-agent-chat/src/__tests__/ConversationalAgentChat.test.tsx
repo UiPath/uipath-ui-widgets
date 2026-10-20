@@ -3517,7 +3517,7 @@ describe("ConversationalAgentChat", () => {
 
     // Sends a message and starts an assistant message that runs one tool call.
     const startToolCallMessage = async () => {
-      render(<ConversationalAgentChat {...defaultProps} />);
+      const { unmount } = render(<ConversationalAgentChat {...defaultProps} />);
       await waitFor(
         () => {
           expect(mockChatService.on).toHaveBeenCalledWith(
@@ -3551,6 +3551,7 @@ describe("ConversationalAgentChat", () => {
         }),
       );
       return {
+        unmount,
         endMessage: () => messageEndHandler?.(),
         endToolCall: (output: unknown) =>
           toolEndHandler?.({ output, isError: false }),
@@ -3561,6 +3562,10 @@ describe("ConversationalAgentChat", () => {
       mockChatService.sendResponse.mock.calls
         .map((call: any) => call[0])
         .filter((response: any) => response.id === id);
+
+    // Updates that came from the trace (they carry its span tree).
+    const traceResponses = () =>
+      toolCallResponses().filter((response: any) => response.meta?.span);
 
     beforeEach(() => {
       mockTracesGetById.mockReset().mockResolvedValue([]);
@@ -3595,10 +3600,10 @@ describe("ConversationalAgentChat", () => {
       await startToolCallMessage();
 
       await waitFor(() => {
-        expect(toolCallResponses()).toHaveLength(1);
+        expect(traceResponses()).toHaveLength(1);
       });
       expect(mockTracesGetById).toHaveBeenCalledWith("trace-1");
-      const [response] = toolCallResponses();
+      const [response] = traceResponses();
       expect(response.widget).toBe("apollo-agents-tool-call");
       expect(response.meta).toMatchObject({
         toolName: "search",
@@ -3608,13 +3613,40 @@ describe("ConversationalAgentChat", () => {
       });
     });
 
-    it("in FullTrace, leaves tool call start/end rendering to the trace", async () => {
+    it("in FullTrace, still renders the SDK's start and completion when trace fetches fail", async () => {
       mockAgentWithDisplayMode("FullTrace");
+      mockTracesGetById.mockRejectedValue(new Error("network"));
       const { endToolCall } = await startToolCallMessage();
+
+      expect(toolCallResponses()[0].meta).toMatchObject({
+        toolName: "search",
+        displayMode: "FullTrace",
+      });
+
       endToolCall("Search results");
 
-      await waitFor(() => expect(mockTracesGetById).toHaveBeenCalled());
-      expect(toolCallResponses()).toHaveLength(0);
+      const completed = toolCallResponses().at(-1);
+      expect(completed.meta).toMatchObject({
+        output: "Search results",
+        isError: false,
+        displayMode: "FullTrace",
+      });
+      expect(completed.meta.endTime).toEqual(expect.any(String));
+    });
+
+    it("in FullTrace, keeps the trace's span tree when the SDK completion arrives", async () => {
+      mockAgentWithDisplayMode("FullTrace");
+      mockTracesGetById.mockResolvedValue(traceSpans);
+      const { endToolCall } = await startToolCallMessage();
+      await waitFor(() => expect(traceResponses()).toHaveLength(1));
+      mockChatService.getConversation.mockReturnValue([traceResponses()[0]]);
+
+      endToolCall("Search results");
+
+      expect(toolCallResponses().at(-1).meta).toMatchObject({
+        output: "Search results",
+        span: { key: "runtime-tool-span" },
+      });
     });
 
     it("in FullTrace, stops polling on message end with one final fetch and skips unchanged tool calls", async () => {
@@ -3622,7 +3654,7 @@ describe("ConversationalAgentChat", () => {
       mockTracesGetById.mockResolvedValue(traceSpans);
       const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
       const { endMessage } = await startToolCallMessage();
-      await waitFor(() => expect(toolCallResponses()).toHaveLength(1));
+      await waitFor(() => expect(traceResponses()).toHaveLength(1));
       const fetchesBeforeEnd = mockTracesGetById.mock.calls.length;
 
       endMessage();
@@ -3632,8 +3664,99 @@ describe("ConversationalAgentChat", () => {
         expect(mockTracesGetById.mock.calls.length).toBe(fetchesBeforeEnd + 1),
       );
       // Same spans on the final fetch: nothing new is sent.
-      expect(toolCallResponses()).toHaveLength(1);
+      expect(traceResponses()).toHaveLength(1);
       clearIntervalSpy.mockRestore();
+    });
+
+    it("in FullTrace, runs the final fetch after a pending poll so the completed trace lands last", async () => {
+      mockAgentWithDisplayMode("FullTrace");
+      const completedSpans = [
+        ...traceSpans,
+        {
+          id: "integration-span",
+          parentId: "runtime-tool-span",
+          name: "Web Search",
+          spanType: "integrationTool",
+          startTime: "2026-01-01T00:00:03.000Z",
+          endTime: "2026-01-01T00:00:04.000Z",
+          status: "Ok",
+          attributes: {},
+        },
+      ];
+      let resolvePoll: (spans: unknown[]) => void = () => {};
+      mockTracesGetById
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              resolvePoll = resolve;
+            }),
+        )
+        .mockResolvedValue(completedSpans);
+      const { endMessage } = await startToolCallMessage();
+      await waitFor(() => expect(mockTracesGetById).toHaveBeenCalledTimes(1));
+
+      endMessage();
+      await act(async () => {});
+      // The final fetch waits for the pending poll.
+      expect(mockTracesGetById).toHaveBeenCalledTimes(1);
+
+      await act(async () => resolvePoll(traceSpans));
+      await waitFor(() => expect(mockTracesGetById).toHaveBeenCalledTimes(2));
+      await waitFor(() =>
+        expect(
+          traceResponses()
+            .at(-1)
+            .meta.span.children.map((c: any) => c.name),
+        ).toEqual(["Web Search"]),
+      );
+    });
+
+    const holdTraceRequest = () => {
+      const pending: { resolve: (spans: unknown[]) => void } = {
+        resolve: () => {},
+      };
+      mockTracesGetById.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            pending.resolve = resolve;
+          }),
+      );
+      return pending;
+    };
+
+    it("in FullTrace, drops a trace response that resolves after switching conversations", async () => {
+      mockAgentWithDisplayMode("FullTrace");
+      const pending = holdTraceRequest();
+      await startToolCallMessage();
+      await waitFor(() => expect(mockTracesGetById).toHaveBeenCalled());
+      const sentBefore = traceResponses().length;
+
+      const onOpenConversation = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "openConversation",
+      )?.[1];
+      await act(async () => onOpenConversation?.("conv-1"));
+      // The new conversation happens to show a message with the same id.
+      mockChatService.getConversation.mockReturnValue([
+        { id: "tool-1", meta: {} },
+      ]);
+      await act(async () => pending.resolve(traceSpans));
+
+      expect(traceResponses()).toHaveLength(sentBefore);
+    });
+
+    it("in FullTrace, drops a trace response that resolves after unmount", async () => {
+      mockAgentWithDisplayMode("FullTrace");
+      const pending = holdTraceRequest();
+      const { unmount } = await startToolCallMessage();
+      await waitFor(() => expect(mockTracesGetById).toHaveBeenCalled());
+
+      unmount();
+      mockChatService.getConversation.mockReturnValue([
+        { id: "tool-1", meta: {} },
+      ]);
+      await act(async () => pending.resolve(traceSpans));
+
+      expect(traceResponses()).toHaveLength(0);
     });
 
     it("in FullTrace, ignores trace tool calls that aren't in the conversation", async () => {
@@ -3664,6 +3787,34 @@ describe("ConversationalAgentChat", () => {
       await act(async () => {});
       expect(mockChatService.setError).not.toHaveBeenCalled();
     });
+  });
+
+  it("keeps the active session open when the locale changes, and ends it on unmount", async () => {
+    const { rerender, unmount } = render(
+      <ConversationalAgentChat {...defaultProps} locale="en" />,
+    );
+    await waitFor(
+      () => {
+        expect(mockChatService.on).toHaveBeenCalledWith(
+          "request",
+          expect.any(Function),
+        );
+      },
+      { timeout: 3000 },
+    );
+    const onSendMessage = mockChatService.on.mock.calls.find(
+      (call: any) => call[0] === "request",
+    )?.[1];
+    await onSendMessage?.({ content: "Test message", attachments: [] });
+    const sessionHelper = lastSessionHelper;
+    expect(sessionHelper).not.toBeNull();
+
+    rerender(<ConversationalAgentChat {...defaultProps} locale="de" />);
+    await act(async () => {});
+    expect(sessionHelper.sendSessionEnd).not.toHaveBeenCalled();
+
+    unmount();
+    expect(sessionHelper.sendSessionEnd).toHaveBeenCalled();
   });
 
   describe("stale singleton state reset", () => {
