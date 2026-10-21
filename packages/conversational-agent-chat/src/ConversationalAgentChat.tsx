@@ -265,8 +265,6 @@ export const ConversationalAgentChat = ({
   const traceSpansRef = useRef<SpanGetResponse[]>([]);
   // toolCallId -> JSON of the last-sent meta, so unchanged tool calls aren't re-sent each poll.
   const sentToolCallMetaJsonRef = useRef<Map<string, string>>(new Map());
-  // Tool calls created in the live exchange
-  const liveToolCallIdsRef = useRef<Set<string>>(new Set());
   const tracePollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
     null,
   );
@@ -326,14 +324,15 @@ export const ConversationalAgentChat = ({
       const conversation = chat.getConversation() ?? [];
 
       for (const trace of getToolCallTraces(spans)) {
+        // The trace only enriches tool call messages the SDK or history already
+        // created, so it can't show a tool call before its deferred spinner
+        // (e.g. while a confirmation is pending).
         const existing = conversation.find((m) => m.id === trace.toolCallId);
-        if (!existing && !liveToolCallIdsRef.current.has(trace.toolCallId)) {
-          continue;
-        }
+        if (!existing) continue;
 
         const meta = mergeToolCallTraceMeta(
           trace,
-          existing?.meta,
+          existing.meta,
           toolDisplayModeRef.current,
         );
         const metaJson = JSON.stringify(meta);
@@ -349,7 +348,7 @@ export const ConversationalAgentChat = ({
           content: t("performing_action_message", {
             action: meta.toolName ?? "",
           }),
-          created_at: existing?.created_at ?? trace.startTime,
+          created_at: existing.created_at ?? trace.startTime,
           widget: MessageWidget.ApolloAgentsToolCall,
           meta,
         });
@@ -418,7 +417,6 @@ export const ConversationalAgentChat = ({
     stopTracePolling(false);
     traceSpansRef.current = [];
     sentToolCallMetaJsonRef.current = new Map();
-    liveToolCallIdsRef.current = new Set();
   }, [stopTracePolling]);
 
   const setupExchangeHandlers = useCallback(
@@ -599,7 +597,6 @@ export const ConversationalAgentChat = ({
           };
 
           message.onToolCallStart((toolCall: ToolCallStream) => {
-            liveToolCallIdsRef.current.add(toolCall.toolCallId);
             const startEvent = toolCall.startEvent;
             const startTimeIso = new Date().toISOString();
             const toolInput = startEvent.input
