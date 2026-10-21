@@ -495,6 +495,36 @@ describe("utils", () => {
       expect(result[1].created_at).toBe("2024-01-01T10:00:01Z");
     });
 
+    it("should set the tool call display mode on tool call meta when given", () => {
+      const exchanges = [
+        {
+          exchangeId: "exc-1",
+          messages: [
+            {
+              messageId: "msg-1",
+              role: "assistant",
+              createdTime: "2024-01-01T10:00:00Z",
+              contentParts: [],
+              toolCalls: [
+                {
+                  toolCallId: "tc-1",
+                  name: "search",
+                  createdTime: "2024-01-01T10:00:01Z",
+                },
+              ],
+            },
+          ],
+        },
+      ] as any;
+
+      const [, toolCall] = mapExchangesToChatMessages(exchanges, "FullTrace");
+
+      expect(toolCall.meta.displayMode).toBe("FullTrace");
+      expect(mapExchangesToChatMessages(exchanges)[1].meta).not.toHaveProperty(
+        "displayMode",
+      );
+    });
+
     it("should handle multiple exchanges", () => {
       const exchanges = [
         {

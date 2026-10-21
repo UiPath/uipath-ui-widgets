@@ -48,6 +48,8 @@ import type {
   JSONValue,
   ToolCallConfirmationValue,
 } from "@uipath/uipath-typescript/conversational-agent";
+import { Traces } from "@uipath/uipath-typescript/traces";
+import type { SpanGetResponse } from "@uipath/uipath-typescript/traces";
 import {
   useCallback,
   useEffect,
@@ -96,6 +98,7 @@ import {
   normalizeInput,
   sortEvaluationSets,
 } from "./utils";
+import { getToolCallTraces, mergeToolCallTraceMeta } from "./utils/spanTree";
 import { trackTelemetry } from "./utils/telemetryUtils";
 import { getI18n } from "./i18n";
 import { resolveAgent as fetchAgentRelease } from "./utils/resolveAgent";
@@ -228,6 +231,7 @@ export const ConversationalAgentChat = ({
     onUserMessageSent,
     citationPreview,
     folderId,
+    locale,
     t,
   ]);
   // Rebuild the SDK service when sdk or externalUserId change. Skip the first run because the
@@ -254,8 +258,18 @@ export const ConversationalAgentChat = ({
   const exchangesCursor = useRef<{ value: string } | undefined>(undefined);
   const agentIdRef = useRef<number | undefined>(undefined);
   const agentKeyRef = useRef<string | undefined>(undefined);
+  const toolDisplayModeRef = useRef<string | undefined>(undefined);
   const isFlowAgentRef = useRef(false);
   const searchTextRef = useRef<string>("");
+  // Latest spans for the active conversation's trace, polled only in FullTrace mode
+  const traceSpansRef = useRef<SpanGetResponse[]>([]);
+  // toolCallId -> JSON of the last-sent meta, so unchanged tool calls aren't re-sent each poll.
+  const sentToolCallMetaJsonRef = useRef<Map<string, string>>(new Map());
+  const tracePollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
+  const tracePollInFlightRef = useRef<Promise<void> | null>(null);
+  const isMountedRef = useRef(false);
 
   const [chatService, setChatService] = useState<AutopilotChatService>();
   const [error, setError] = useState<string | null>(null);
@@ -298,6 +312,113 @@ export const ConversationalAgentChat = ({
     inputSchemaStateRef.current = inputSchemaState;
   }, [inputSchemaState]);
 
+  // Merge the trace's "conversationToolCall" spans into their tool call messages (keyed by toolCallId)
+  const applyTraceSpans = useCallback(
+    (spans: SpanGetResponse[]) => {
+      // Only FullTrace renders the span tree; other modes use the SDK's tool call events alone.
+      if (toolDisplayModeRef.current !== "FullTrace") return;
+      const chat = chatServiceRef.current;
+      if (!chat) return;
+      traceSpansRef.current = spans;
+
+      const conversation = chat.getConversation() ?? [];
+
+      for (const trace of getToolCallTraces(spans)) {
+        // The trace only enriches tool call messages the SDK or history already
+        // created, so it can't show a tool call before its deferred spinner
+        // (e.g. while a confirmation is pending).
+        const existing = conversation.find((m) => m.id === trace.toolCallId);
+        if (!existing) continue;
+
+        const meta = mergeToolCallTraceMeta(
+          trace,
+          existing.meta,
+          toolDisplayModeRef.current,
+        );
+        const metaJson = JSON.stringify(meta);
+        if (
+          sentToolCallMetaJsonRef.current.get(trace.toolCallId) === metaJson
+        ) {
+          continue;
+        }
+
+        chat.sendResponse({
+          ...existing,
+          id: trace.toolCallId,
+          content: t("performing_action_message", {
+            action: meta.toolName ?? "",
+          }),
+          created_at: existing.created_at ?? trace.startTime,
+          widget: MessageWidget.ApolloAgentsToolCall,
+          meta,
+        });
+        sentToolCallMetaJsonRef.current.set(trace.toolCallId, metaJson);
+      }
+    },
+    [t],
+  );
+
+  const fetchAndApplyTrace = useCallback(
+    async (traceId: string) => {
+      try {
+        const spans = await new Traces(sdk).getById(traceId);
+        if (
+          !isMountedRef.current ||
+          currentConversation.current?.traceId !== traceId
+        ) {
+          return;
+        }
+        applyTraceSpans(spans);
+      } catch {
+        // Transient errors: the next poll tick (or reopening) retries.
+      }
+    },
+    [sdk, applyTraceSpans],
+  );
+
+  // Live polling on FullTrace mode only.
+  const startTracePolling = useCallback(() => {
+    if (toolDisplayModeRef.current !== "FullTrace") return;
+    const traceId = currentConversation.current?.traceId;
+    if (!traceId || tracePollIntervalRef.current) return;
+
+    const tick = async () => {
+      if (tracePollInFlightRef.current) return;
+      const poll = fetchAndApplyTrace(traceId);
+      tracePollInFlightRef.current = poll;
+      try {
+        await poll;
+      } finally {
+        tracePollInFlightRef.current = null;
+      }
+    };
+    void tick();
+    tracePollIntervalRef.current = setInterval(tick, 1000);
+  }, [fetchAndApplyTrace]);
+
+  const stopTracePolling = useCallback(
+    (finalFetch: boolean) => {
+      if (!tracePollIntervalRef.current) return;
+      clearInterval(tracePollIntervalRef.current);
+      tracePollIntervalRef.current = null;
+      const traceId = currentConversation.current?.traceId;
+      if (!finalFetch || !traceId) return;
+      const pendingPoll = tracePollInFlightRef.current;
+      void (async () => {
+        await pendingPoll;
+        await fetchAndApplyTrace(traceId);
+      })();
+    },
+    [fetchAndApplyTrace],
+  );
+
+  // On leaving a conversation, stop polling
+  const resetTraceState = useCallback(() => {
+    stopTracePolling(false);
+    traceSpansRef.current = [];
+    sentToolCallMetaJsonRef.current = new Map();
+  }, [stopTracePolling]);
+
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
       if (!chatService) return;
@@ -311,6 +432,11 @@ export const ConversationalAgentChat = ({
 
       exchange.onMessageStart((message: MessageStream) => {
         if (message.startEvent.role === "assistant") {
+          if (toolDisplayModeRef.current === "FullTrace") {
+            startTracePolling();
+            message.onMessageEnd(() => stopTracePolling(true));
+          }
+
           const messageId = message.messageId;
           const messageTimestamp = message.startEvent.timestamp;
           const exchangeId = exchange.exchangeId;
@@ -386,6 +512,20 @@ export const ConversationalAgentChat = ({
             }
           >();
 
+          // In FullTrace the SDK's tool call events still render the tool call,
+          // so it appears and completes even if trace fetches fail
+          const withTraceSpan = (
+            toolCallId: string,
+            meta: Record<string, unknown>,
+          ) => {
+            if (toolDisplayModeRef.current !== "FullTrace") return meta;
+            sentToolCallMetaJsonRef.current.delete(toolCallId);
+            const span = chatService
+              .getConversation()
+              ?.find((m) => m.id === toolCallId)?.meta?.span;
+            return span ? { ...meta, span } : meta;
+          };
+
           const sendToolCallSpinner = (toolCallId: string) => {
             const pending = pendingToolCalls.get(toolCallId);
             if (!pending || pending.spinnerSent) return;
@@ -397,11 +537,12 @@ export const ConversationalAgentChat = ({
               }),
               created_at: pending.startTimeIso,
               widget: MessageWidget.ApolloAgentsToolCall,
-              meta: {
+              meta: withTraceSpan(toolCallId, {
                 toolName: pending.toolName,
                 input: pending.toolInput,
                 startTime: pending.startTimeIso,
-              },
+                displayMode: toolDisplayModeRef.current,
+              }),
             });
           };
 
@@ -490,7 +631,7 @@ export const ConversationalAgentChat = ({
                 }),
                 created_at: endTimeIso,
                 widget: MessageWidget.ApolloAgentsToolCall,
-                meta: {
+                meta: withTraceSpan(toolCall.toolCallId, {
                   toolName: startEvent.toolName,
                   input: toolInput,
                   startTime: startTimeIso,
@@ -498,7 +639,8 @@ export const ConversationalAgentChat = ({
                   endTime: endTimeIso,
                   isError,
                   ...(cancelled && { cancelled: true }),
-                },
+                  displayMode: toolDisplayModeRef.current,
+                }),
               });
               pendingToolCalls.delete(toolCall.toolCallId);
             };
@@ -597,6 +739,7 @@ export const ConversationalAgentChat = ({
       });
 
       exchange.onExchangeEnd(() => {
+        stopTracePolling(true);
         activeExchange.current = null;
         chatService.sendOutputStreamEvent({ turnComplete: true });
         chatService.setShowLoading(false);
@@ -604,7 +747,7 @@ export const ConversationalAgentChat = ({
         setHasMessages(true);
       });
     },
-    [chatService, t],
+    [chatService, startTracePolling, stopTracePolling, t],
   );
 
   const resolveAgent = useCallback(async (): Promise<
@@ -818,6 +961,7 @@ export const ConversationalAgentChat = ({
     activeExchange.current = null;
     exchangesCursor.current = undefined;
     storedAgentInputs.current = {};
+    resetTraceState();
     setHasMessages(false);
     connectionReadinessRenderer.unmountAll();
     // Re-show the InputsPage with a cleared form when the agent's schema has
@@ -834,6 +978,7 @@ export const ConversationalAgentChat = ({
     fetchConnectionReadiness,
     inputSchemaState,
     connectionReadinessRenderer,
+    resetTraceState,
   ]);
 
   const buildHistoryFilterOptions = useCallback(() => {
@@ -1105,16 +1250,26 @@ export const ConversationalAgentChat = ({
         if (!selectedConversation) return;
 
         endActiveSession();
+        resetTraceState();
         currentConversation.current = selectedConversation;
         session.current = null;
         exchangesCursor.current = undefined;
 
         connectionReadinessRenderer.unmountAll();
         const { exchanges } = await fetchExchanges(selectedConversation.id);
-        const messages = mapExchangesToChatMessages(exchanges);
+        const messages = mapExchangesToChatMessages(
+          exchanges,
+          toolDisplayModeRef.current,
+        );
         chatService.setConversation(messages);
         setHasMessages(messages.length > 0);
         fetchConnectionReadiness();
+        if (
+          toolDisplayModeRef.current === "FullTrace" &&
+          selectedConversation.traceId
+        ) {
+          void fetchAndApplyTrace(selectedConversation.traceId);
+        }
         trackTelemetry(
           TelemetryEvent.OpenConversation,
           TelemetryStatus.Success,
@@ -1135,8 +1290,10 @@ export const ConversationalAgentChat = ({
       chatService,
       connectionReadinessRenderer,
       endActiveSession,
+      fetchAndApplyTrace,
       fetchConnectionReadiness,
       fetchExchanges,
+      resetTraceState,
       t,
     ],
   );
@@ -1157,9 +1314,10 @@ export const ConversationalAgentChat = ({
         exchangesCursor.current,
       );
       chatService.prependOlderMessages(
-        mapExchangesToChatMessages(exchanges),
+        mapExchangesToChatMessages(exchanges, toolDisplayModeRef.current),
         !hasNextPage,
       );
+      applyTraceSpans(traceSpansRef.current);
     } catch (err) {
       chatService.prependOlderMessages([], true);
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -1168,7 +1326,7 @@ export const ConversationalAgentChat = ({
         error: errorMessage,
       });
     }
-  }, [chatService, fetchExchanges]);
+  }, [applyTraceSpans, chatService, fetchExchanges]);
 
   const initChat = useCallback(async () => {
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
@@ -1183,6 +1341,9 @@ export const ConversationalAgentChat = ({
       const agentRelease = await resolveAgent();
       agentIdRef.current = agentRelease?.id;
       agentKeyRef.current = agentRelease?.releaseKey;
+      toolDisplayModeRef.current =
+        (agentRelease?.appearance as { displayMode?: string } | undefined)
+          ?.displayMode ?? "InputsAndOutputs";
       isFlowAgentRef.current = isFlowAgent(agentRelease);
       const agentName = agentRelease?.name ?? "";
 
@@ -1428,7 +1589,15 @@ export const ConversationalAgentChat = ({
         exchangesCursor.current = undefined;
         const { exchanges } = await fetchExchanges(conversation.id);
         const messages = mapExchangesToChatMessages(exchanges);
-        chatServiceInstance.setConversation(messages);
+        chatServiceInstance.setConversation(
+          mapExchangesToChatMessages(exchanges, toolDisplayModeRef.current),
+        );
+        if (
+          toolDisplayModeRef.current === "FullTrace" &&
+          conversation.traceId
+        ) {
+          void fetchAndApplyTrace(conversation.traceId);
+        }
         setHasMessages(messages.length > 0);
       } else {
         // AutopilotChatService is a singleton, so it may still hold the
@@ -1445,6 +1614,7 @@ export const ConversationalAgentChat = ({
     }
   }, [
     agentId,
+    fetchAndApplyTrace,
     folderId,
     existingConversationId,
     externalUserId,
@@ -1470,6 +1640,7 @@ export const ConversationalAgentChat = ({
 
   const onStopResponse = useCallback(() => {
     if (!chatService) return;
+    stopTracePolling(true);
     if (activeExchange.current) {
       // Flows own their exchange; a client exchange end strands them. Switching
       // conversations still fires StopResponse.
@@ -1481,7 +1652,7 @@ export const ConversationalAgentChat = ({
     chatService.sendOutputStreamEvent({ turnComplete: true });
     chatService.setShowLoading(false);
     chatService.setWaiting(false);
-  }, [chatService]);
+  }, [chatService, stopTracePolling]);
 
   const onCustomHeaderActionClicked = useCallback(
     (action: AutopilotChatCustomHeaderAction) => {
@@ -1570,10 +1741,21 @@ export const ConversationalAgentChat = ({
     chatService?.setChatMode(mode);
   }, [chatService, mode]);
 
-  // Close the SDK session on unmount so the WebSocket doesn't linger.
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Close the SDK session and stop trace polling on unmount so neither lingers
   useEffect(() => {
     return () => {
       endActiveSession();
+      if (tracePollIntervalRef.current) {
+        clearInterval(tracePollIntervalRef.current);
+        tracePollIntervalRef.current = null;
+      }
     };
   }, [endActiveSession]);
 
