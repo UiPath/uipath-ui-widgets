@@ -935,6 +935,8 @@ export const ConversationalAgentChat = ({
       try {
         // required for debug-mode hosts that need to gate agent execution on the first user message
         onUserMessageSentRef.current?.({ content: data.content });
+        // Clearing also unmounts a dismissed banner; Apollo's alert keeps its hidden state otherwise.
+        chatService?.clearError();
         setHasMessages(true);
         setConnectionReadiness(null);
         const sessionHelper = await getSessionHelper();
@@ -1475,13 +1477,14 @@ export const ConversationalAgentChat = ({
       // conversations still fires StopResponse.
       if (!isFlowAgentRef.current) {
         activeExchange.current.sendExchangeEnd();
+        chatService.setError(t("response_stopped_message"), "warn");
       }
       activeExchange.current = null;
     }
     chatService.sendOutputStreamEvent({ turnComplete: true });
     chatService.setShowLoading(false);
     chatService.setWaiting(false);
-  }, [chatService]);
+  }, [chatService, t]);
 
   const onCustomHeaderActionClicked = useCallback(
     (action: AutopilotChatCustomHeaderAction) => {

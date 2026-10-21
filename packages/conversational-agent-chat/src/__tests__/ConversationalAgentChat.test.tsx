@@ -942,6 +942,52 @@ describe("ConversationalAgentChat", () => {
 
       expect(startedExchange?.sendExchangeEnd).toHaveBeenCalledTimes(1);
     });
+
+    it("should show the response stopped warning on StopResponse for non-Flow agents", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await sendThenStop();
+
+      expect(mockChatService.setError).toHaveBeenCalledWith(
+        "Response stopped",
+        "warn",
+      );
+    });
+
+    it("should not show the response stopped warning on StopResponse for a Flow", async () => {
+      mockGetById.mockResolvedValue(flowAgent());
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await sendThenStop();
+
+      expect(mockChatService.setError).not.toHaveBeenCalledWith(
+        "Response stopped",
+        "warn",
+      );
+    });
+
+    it("should not show the response stopped warning on StopResponse without an active response", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "stopResponse",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+      const onStopResponse = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "stopResponse",
+      )?.[1];
+      onStopResponse?.();
+
+      expect(mockChatService.setError).not.toHaveBeenCalledWith(
+        "Response stopped",
+        "warn",
+      );
+    });
   });
 
   it("should enable paginatedHistory in config", async () => {
@@ -1510,6 +1556,28 @@ describe("ConversationalAgentChat", () => {
         },
         { timeout: 3000 },
       );
+    });
+
+    it("should clear the previous error banner when a message is sent", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(
+        () => {
+          expect(mockChatService.on).toHaveBeenCalledWith(
+            "request",
+            expect.any(Function),
+          );
+        },
+        { timeout: 3000 },
+      );
+      mockChatService.clearError.mockClear();
+
+      const onSendMessage = mockChatService.on.mock.calls.find(
+        (call: any) => call[0] === "request",
+      )?.[1];
+      await onSendMessage?.({ content: "Hello", attachments: [] });
+
+      expect(mockChatService.clearError).toHaveBeenCalled();
     });
 
     it("should send message when request event is triggered", async () => {

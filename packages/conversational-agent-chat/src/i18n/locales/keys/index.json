@@ -357,5 +357,6 @@
   "connection_readiness_reconnect": "connection_readiness_reconnect",
   "connection_readiness_broken_status": "connection_readiness_broken_status",
   "connection_readiness_connection_broken": "connection_readiness_connection_broken",
-  "connection_readiness_connection_broken_plural": "connection_readiness_connection_broken_plural"
+  "connection_readiness_connection_broken_plural": "connection_readiness_connection_broken_plural",
+  "response_stopped_message": "response_stopped_message"
 }
