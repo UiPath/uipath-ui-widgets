@@ -284,10 +284,11 @@ export const ProfileSection = ({
           onChange={handleChange("company")}
           className="col-span-2"
         />
-        <div className="flex flex-col gap-1.5">
+        <div className="col-span-2 flex min-w-0 flex-col gap-1.5">
           <Label id={countryLabelId} className="text-sm text-muted-foreground">
             {t("country_label")}
           </Label>
+          {/* Full-width rows: Combobox defaults to a fixed 280px trigger and its label can't truncate, so long timezones overflow a half-width column. */}
           <Combobox
             items={countryItems}
             value={countryValue}
@@ -295,9 +296,10 @@ export const ProfileSection = ({
             placeholder={t("combobox_placeholder")}
             searchPlaceholder={t("combobox_search_placeholder")}
             emptyText={t("combobox_empty")}
+            className="w-full overflow-hidden"
           />
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="col-span-2 flex min-w-0 flex-col gap-1.5">
           <Label id={timezoneLabelId} className="text-sm text-muted-foreground">
             {t("timezone_label")}
           </Label>
@@ -308,6 +310,7 @@ export const ProfileSection = ({
             placeholder={t("combobox_placeholder")}
             searchPlaceholder={t("combobox_search_placeholder")}
             emptyText={t("combobox_empty")}
+            className="w-full overflow-hidden"
           />
         </div>
       </div>

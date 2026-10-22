@@ -49,6 +49,21 @@ describe("ProfileSection", () => {
     expect(screen.getByDisplayValue("Test Company")).toBeInTheDocument();
   });
 
+  it("lays out the country and timezone dropdowns as full-width rows", async () => {
+    const { agent } = makeAgent();
+    render(<ProfileSection conversationalAgent={agent} />);
+    await screen.findByDisplayValue("Test User");
+
+    const dropdowns = screen.getAllByRole("combobox");
+    expect(dropdowns).toHaveLength(2);
+    for (const dropdown of dropdowns) {
+      expect(dropdown).toHaveClass("w-full");
+      expect(dropdown).not.toHaveClass("w-[280px]");
+      expect(dropdown).toHaveClass("overflow-hidden");
+      expect(dropdown.parentElement).toHaveClass("col-span-2");
+    }
+  });
+
   it("disables save until a field is edited", async () => {
     const { agent } = makeAgent();
     render(<ProfileSection conversationalAgent={agent} />);
