@@ -357,5 +357,8 @@
   "connection_readiness_reconnect": "Reconnect",
   "connection_readiness_broken_status": "{{name}} · {{status}}",
   "connection_readiness_connection_broken": "{{count}} connection needs fixing",
-  "connection_readiness_connection_broken_plural": "{{count}} connections need fixing"
+  "connection_readiness_connection_broken_plural": "{{count}} connections need fixing",
+  "conversation_ended_completed": "This conversation has ended. Start a new chat to talk to your agent.",
+  "conversation_ended_failed": "This conversation ended due to an error. Start a new chat to try again.",
+  "conversation_ended_cancelled": "This conversation was cancelled. Start a new chat to talk to your agent."
 }
