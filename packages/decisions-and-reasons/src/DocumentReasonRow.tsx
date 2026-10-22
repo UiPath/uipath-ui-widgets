@@ -7,6 +7,7 @@ interface ChipProps {
   pressed: boolean;
   disabled?: boolean;
   onToggle: () => void;
+  signal?: Record<string, string>;
   children: ReactNode;
 }
 
@@ -14,9 +15,11 @@ export const Chip: FC<ChipProps> = ({
   pressed,
   disabled,
   onToggle,
+  signal,
   children,
 }) => (
   <Toggle
+    {...signal}
     variant="outline"
     size="xs"
     pressed={pressed}

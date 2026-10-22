@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { DECISIONS, KIND_PARTS, SCOPES, WEIGHTS } from "./types";
 import type {
   CaptureLogEntry,
@@ -18,7 +18,14 @@ import type {
   ReviewEvent,
   ReviewState,
   ScopeId,
+  SetBy,
+  PartSeed,
+  UseCasePart,
+  UseCasePayload,
+  UseCaseSaved,
+  UseCaseSpec,
   Weight,
+  WhyPick,
 } from "./types";
 
 const lev = (a: string, b: string) => {
@@ -99,7 +106,11 @@ export const fieldValue = (
   agent: string,
 ) => state.fieldVals[f.id] ?? byD(f.byDecision, state.decision ?? agent);
 
-const fieldHow = (proposed: string, v: string, wasLooked: boolean): HowMuch => {
+export const fieldHow = (
+  proposed: string,
+  v: string,
+  wasLooked: boolean,
+): HowMuch => {
   if (v === proposed) return wasLooked ? "Kept" : "Untouched";
   if (!v.trim()) return "Rejected";
   return lev(proposed, v) / Math.max(proposed.length, v.length, 1) <= 0.3
@@ -319,7 +330,7 @@ export const buildRecordRows = (
   return rows;
 };
 
-const DASH = "—";
+export const DASH = "—";
 
 export const addedReasonId = (count: number, now: number) =>
   `added-${count}-${now}`;
@@ -327,7 +338,7 @@ export const addedReasonId = (count: number, now: number) =>
 const outcomeText = ({ weight, reason }: ReasonOutcome) =>
   reason ? `${weight} · ${reason}` : weight;
 
-const sourceText = (source: RecordSource | null) => {
+export const sourceText = (source: RecordSource | null) => {
   if (!source) return "";
   if (source.kind === "reviewer") return "Reviewer";
   if (source.kind === "followsDecision") return "Follows decision";
@@ -336,7 +347,7 @@ const sourceText = (source: RecordSource | null) => {
     : source.name;
 };
 
-const cut = (x: string, max: number) =>
+export const cut = (x: string, max: number) =>
   x.length > max ? `${x.slice(0, max)}...` : x;
 
 const scopeSentence = (scope: ScopeId, conditions: string[]) =>
@@ -812,4 +823,431 @@ export function withReasonCapture<S extends ReasonCaptureSchema>(
   });
 
   return { schema: { ...schema, fields }, added };
+}
+
+export const whyText = (pick: WhyPick) =>
+  pick.why === "Other" ? pick.note || "Other" : (pick.why ?? "");
+
+export const partChanged = (p: UseCasePart) => p.value !== p.proposed;
+
+export const partSetBy = (p: UseCasePart): SetBy =>
+  partChanged(p) ? "reviewer" : "model";
+
+export const partHow = (p: UseCasePart): HowMuch =>
+  fieldHow(p.proposed, p.value, p.looked);
+
+export const outcomeLabel = (spec: UseCaseSpec, id: string) =>
+  spec.outcomes.find((o) => o.id === id)?.label ?? id;
+
+export type UseCaseSnapshot = {
+  values: Record<string, string>;
+  whys: Record<string, WhyPick>;
+  looked: Record<string, boolean>;
+  outcome: string | null;
+  outcomeWhy: WhyPick;
+};
+
+export const applyParts = (
+  seeds: PartSeed[],
+  values: Record<string, string>,
+  whys: Record<string, WhyPick>,
+  looked: Record<string, boolean>,
+): UseCasePart[] =>
+  seeds.map((s) => ({
+    ...s,
+    value: values[s.id] ?? s.proposed,
+    looked: !!looked[s.id],
+    why: whys[s.id]?.why ?? null,
+    note: whys[s.id]?.note ?? "",
+  }));
+
+const reviewerReason = (
+  id: string,
+  title: string,
+  detail: string,
+  supports: string,
+): ClaimReason => ({
+  id,
+  title,
+  detail,
+  supports,
+  proposedWeight: "High",
+  weight: "High",
+  added: true,
+  source: "Reviewer",
+});
+
+const caseReasons = (
+  spec: UseCaseSpec,
+  parts: UseCasePart[],
+  outcome: string | null,
+  outcomeWhy: WhyPick,
+): ClaimReason[] => {
+  const model = spec.reasons.map((r): ClaimReason => {
+    const part = parts.find((p) => p.id === r.partId);
+    const item: ClaimReason = {
+      id: r.id,
+      title: r.title,
+      detail: r.detail,
+      supports: part?.proposed ?? spec.recommended,
+      proposedWeight: "High",
+      weight: part && partChanged(part) ? "Not relevant" : "High",
+    };
+    if (r.source) item.source = r.source;
+    if (r.confidence !== undefined) item.sourceConfidence = r.confidence;
+    return item;
+  });
+  const fromParts = parts
+    .filter((p) => p.why)
+    .map((p) =>
+      reviewerReason(
+        `why-${p.id}`,
+        whyText({ why: p.why, note: p.note }),
+        p.label,
+        p.value,
+      ),
+    );
+  const fromOutcome =
+    outcome && outcomeWhy.why
+      ? [reviewerReason("why-outcome", whyText(outcomeWhy), "Outcome", outcome)]
+      : [];
+  return [...model, ...fromParts, ...fromOutcome];
+};
+
+const caseRationale = (
+  spec: UseCaseSpec,
+  parts: UseCasePart[],
+  outcome: string | null,
+  reasons: ClaimReason[],
+) => {
+  if (!outcome) return "";
+  const corrected = parts.filter(partChanged).map((p) => p.label);
+  const because = reasons.filter((r) => r.added).map((r) => r.title);
+  return `${outcomeLabel(spec, outcome)}.${corrected.length ? ` Corrected: ${corrected.join("; ")}.` : ""}${because.length ? ` Because: ${because.join("; ")}.` : ""}`;
+};
+
+const caseChanges = (
+  spec: UseCaseSpec,
+  parts: UseCasePart[],
+  outcome: string | null,
+) => [
+  ...(outcome && outcome !== spec.recommended
+    ? [
+        `${KIND_PARTS.decision}: ${outcomeLabel(spec, spec.recommended)} → ${outcomeLabel(spec, outcome)} (Rejected)`,
+      ]
+    : []),
+  ...parts
+    .filter(partChanged)
+    .map(
+      (p) =>
+        `${KIND_PARTS.field} · ${p.label}: ${cut(p.proposed, 60) || DASH} → ${cut(p.value, 60) || DASH} (${partHow(p)})`,
+    ),
+];
+
+const caseRecord = (
+  spec: UseCaseSpec,
+  parts: UseCasePart[],
+  outcome: string | null,
+): CaptureRecordRow[] => {
+  const proposer = (name?: string, confidence?: number) =>
+    name ? sourceText({ kind: "proposer", name, confidence }) : "";
+  return [
+    {
+      part: KIND_PARTS.decision,
+      proposed: outcomeLabel(spec, spec.recommended),
+      submitted: outcome ? outcomeLabel(spec, outcome) : DASH,
+      howMuch: !outcome
+        ? "Untouched"
+        : outcome === spec.recommended
+          ? "Kept"
+          : "Rejected",
+      source: proposer(spec.proposedBy),
+      lookedAt: !!outcome,
+      scope: DASH,
+    },
+    ...parts.map((p) => ({
+      part: `${KIND_PARTS.field}: ${p.label}`,
+      proposed: p.proposed || DASH,
+      submitted: p.value || DASH,
+      howMuch: partHow(p),
+      source:
+        partSetBy(p) === "reviewer"
+          ? sourceText({ kind: "reviewer" })
+          : proposer(p.source ?? spec.proposedBy, p.confidence),
+      lookedAt: p.looked || partChanged(p),
+      scope: DASH,
+    })),
+  ];
+};
+
+export const buildUseCasePayload = ({
+  spec,
+  parts,
+  outcome,
+  outcomeWhy,
+  log,
+  reviewerId,
+  startedAt,
+}: {
+  spec: UseCaseSpec;
+  parts: UseCasePart[];
+  outcome: string | null;
+  outcomeWhy: WhyPick;
+  log: CaptureLogEntry[];
+  reviewerId: string;
+  startedAt: number;
+}): UseCasePayload => {
+  const reasons = caseReasons(spec, parts, outcome, outcomeWhy);
+  return {
+    decision: outcome,
+    reasons,
+    rationaleText: caseRationale(spec, parts, outcome, reasons),
+    decidingReasons: reasons
+      .filter((r) => r.weight === "High")
+      .map((r) => r.id),
+    fields: parts.map((p) => ({
+      id: p.id,
+      label: p.label,
+      kind: p.kind,
+      byDecision: { [spec.recommended]: p.proposed },
+      value: p.value,
+      setBy: partSetBy(p),
+    })),
+    changes: caseChanges(spec, parts, outcome),
+    record: caseRecord(spec, parts, outcome),
+    reviewerId,
+    timeOnTaskSeconds: Math.round((Date.now() - startedAt) / 1000),
+    changeLog: log,
+  };
+};
+
+export type UseCaseCaptureOptions = {
+  spec: UseCaseSpec;
+  seeds: PartSeed[];
+  reviewerId?: string;
+  readOnly?: boolean;
+  saved?: UseCaseSaved;
+  keep?: (p: UseCasePart) => boolean;
+  gate?: (
+    parts: UseCasePart[],
+    outcome: string,
+    outcomeWhy: WhyPick,
+  ) => string | null;
+  onChange?: (payload: UseCasePayload) => void;
+  onComplete: (
+    outcome: string,
+    payload: UseCasePayload,
+  ) => Promise<void> | void;
+};
+
+export type UseCaseCaptureModel = ReturnType<typeof useUseCaseCapture>;
+
+const EMPTY_WHY: WhyPick = { why: null, note: "" };
+
+export function useUseCaseCapture({
+  spec,
+  seeds,
+  reviewerId = "",
+  readOnly = false,
+  saved,
+  keep = () => true,
+  gate,
+  onChange,
+  onComplete,
+}: UseCaseCaptureOptions) {
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    readOnly ? { ...saved?.values } : {},
+  );
+  const [whys, setWhys] = useState<Record<string, WhyPick>>(() =>
+    readOnly ? { ...saved?.whys } : {},
+  );
+  const [looked, setLooked] = useState<Record<string, boolean>>(() =>
+    readOnly ? Object.fromEntries(seeds.map((s) => [s.id, true])) : {},
+  );
+  const [outcome, setOutcome] = useState<string | null>(() =>
+    readOnly ? (saved?.outcome ?? null) : null,
+  );
+  const [outcomeWhy, setOutcomeWhy] = useState<WhyPick>(() =>
+    readOnly ? { why: saved?.outcomeWhy ?? null, note: "" } : EMPTY_WHY,
+  );
+  const [log, setLog] = useState<CaptureLogEntry[]>([]);
+  const [done, setDone] = useState(readOnly);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [startedAt] = useState(() => Date.now());
+  const [root, setRoot] = useState<HTMLDivElement | null>(null);
+  const settled = useRef<Record<string, string>>({});
+
+  const current: UseCaseSnapshot = {
+    values,
+    whys,
+    looked,
+    outcome,
+    outcomeWhy,
+  };
+  const partsOf = (s: UseCaseSnapshot) =>
+    applyParts(seeds, s.values, s.whys, s.looked);
+  const parts = partsOf(current);
+  const elapsedSeconds = () => Math.round((Date.now() - startedAt) / 1000);
+
+  const payloadOf = (
+    over: Partial<UseCaseSnapshot> = {},
+    nextLog: CaptureLogEntry[] = log,
+  ) => {
+    const s = { ...current, ...over };
+    return buildUseCasePayload({
+      spec,
+      parts: partsOf(s).filter(keep),
+      outcome: s.outcome,
+      outcomeWhy: s.outcomeWhy,
+      log: nextLog,
+      reviewerId,
+      startedAt,
+    });
+  };
+
+  const labelOf = (id: string) => seeds.find((s) => s.id === id)?.label ?? id;
+  const valueOf = (id: string) =>
+    values[id] ?? seeds.find((s) => s.id === id)?.proposed ?? "";
+
+  const commit = (what: string, over: Partial<UseCaseSnapshot>) => {
+    const next = { ...current, ...over };
+    const entry: CaptureLogEntry = {
+      step: log.length + 1,
+      what,
+      atSecond: elapsedSeconds(),
+      lookedAt: Object.keys(next.looked).map(labelOf),
+    };
+    const nextLog = [...log, entry];
+    setValues(next.values);
+    setWhys(next.whys);
+    setLooked(next.looked);
+    setOutcome(next.outcome);
+    setOutcomeWhy(next.outcomeWhy);
+    setLog(nextLog);
+    onChange?.(payloadOf(over, nextLog));
+  };
+
+  const lookAt = (id: string) =>
+    setLooked((o) => (o[id] ? o : { ...o, [id]: true }));
+
+  const pickMany = (
+    patch: Record<string, string | null>,
+    lookId: string,
+    what: string,
+  ) => {
+    const next = { ...values };
+    Object.entries(patch).forEach(([id, v]) => {
+      if (v === null) delete next[id];
+      else next[id] = v;
+    });
+    commit(what, { values: next, looked: { ...looked, [lookId]: true } });
+  };
+
+  const pick = (id: string, value: string) =>
+    pickMany(
+      { [id]: value },
+      id,
+      `${KIND_PARTS.field}: ${labelOf(id)}, ${valueOf(id)} → ${value}`,
+    );
+
+  const edit = (id: string, value: string) =>
+    setValues((v) => ({ ...v, [id]: value }));
+
+  const settle = (id: string) => {
+    const value = values[id];
+    if (value === undefined || settled.current[id] === value) return;
+    settled.current[id] = value;
+    const from = seeds.find((s) => s.id === id)?.proposed ?? "";
+    commit(`${KIND_PARTS.field}: ${labelOf(id)}, ${from} → ${value}`, {
+      looked: { ...looked, [id]: true },
+    });
+  };
+
+  const toggleWhy = (id: string, why: string) => {
+    const now = whys[id] ?? EMPTY_WHY;
+    commit(`Why: ${labelOf(id)}, ${why}`, {
+      whys: {
+        ...whys,
+        [id]: { why: now.why === why ? null : why, note: now.note },
+      },
+    });
+  };
+
+  const editNote = (id: string, note: string) =>
+    setWhys((w) => ({ ...w, [id]: { why: w[id]?.why ?? null, note } }));
+
+  const choose = (id: string) =>
+    commit(`Decision: ${outcomeLabel(spec, id)}`, {
+      outcome: id,
+      outcomeWhy: id === outcome ? outcomeWhy : EMPTY_WHY,
+    });
+
+  const toggleOutcomeWhy = (why: string) =>
+    commit(`Why: ${outcome ? outcomeLabel(spec, outcome) : ""}, ${why}`, {
+      outcomeWhy: {
+        why: outcomeWhy.why === why ? null : why,
+        note: outcomeWhy.note,
+      },
+    });
+
+  const editOutcomeNote = (note: string) =>
+    setOutcomeWhy((w) => ({ ...w, note }));
+
+  const requiresReason = !!spec.outcomes.find((o) => o.id === outcome)
+    ?.requiresReason;
+  const blocker = !outcome
+    ? null
+    : requiresReason && !whyText(outcomeWhy)
+      ? "Pick a reason for this outcome."
+      : (gate?.(parts, outcome, outcomeWhy) ?? null);
+
+  const submit = async () => {
+    if (!outcome || blocker) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onComplete(outcome, payloadOf());
+      setDone(true);
+    } catch (e) {
+      setError(
+        e instanceof Error && e.message
+          ? e.message
+          : "Could not complete the task. Try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return {
+    spec,
+    parts,
+    root,
+    setRoot,
+    outcome,
+    outcomeWhy,
+    whys,
+    looked,
+    log,
+    done,
+    busy,
+    error,
+    blocker,
+    locked: done || readOnly,
+    changed: parts.filter(partChanged),
+    payload: () => payloadOf(),
+    elapsedSeconds,
+    lookAt,
+    pick,
+    pickMany,
+    edit,
+    settle,
+    toggleWhy,
+    editNote,
+    choose,
+    toggleOutcomeWhy,
+    editOutcomeNote,
+    submit,
+  };
 }

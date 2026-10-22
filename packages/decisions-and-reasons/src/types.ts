@@ -41,6 +41,7 @@ export type FinalDetailField = {
   kind: string;
   byDecision: Record<string, string>;
   value?: string;
+  setBy?: SetBy;
 };
 
 export type ClaimData = {
@@ -233,3 +234,110 @@ export const DOCUMENT_REASONS = [
   "Rule doesn't fit",
   "Other",
 ] as const;
+
+export const CONTRACT_VERDICTS = [
+  "Correct",
+  "Extraction wrong",
+  "System value wrong",
+] as const;
+
+export const CONTRACT_NOTE_REASONS = [
+  "Misread number",
+  "Superseded by an amendment",
+  "Wrong clause cited",
+  "System record out of date",
+  "Other",
+] as const;
+
+export const DOCUMENT_REJECT_REASONS = [
+  "Not a supported document",
+  "Duplicate submission",
+  "Illegible scan",
+  "Supplier not recognised",
+  "Other",
+] as const;
+
+export const TRIAGE_SEND_BACK_REASONS = [
+  "Missing details",
+  "Needs a reply from the requester",
+  "Belongs to another process",
+  "Other",
+] as const;
+
+export type ContractVerdict = (typeof CONTRACT_VERDICTS)[number];
+
+export type SetBy = "model" | "reviewer";
+
+export type WhyPick = { why: string | null; note: string };
+
+export type UseCaseOutcome = {
+  id: string;
+  label: string;
+  description: string;
+  reasons?: readonly string[];
+  requiresReason?: boolean;
+};
+
+export type PartSeed = {
+  id: string;
+  label: string;
+  kind: string;
+  proposed: string;
+  confidence?: number;
+  source?: string;
+};
+
+export type UseCasePart = PartSeed & {
+  value: string;
+  looked: boolean;
+  why: string | null;
+  note: string;
+};
+
+export type UseCaseReason = {
+  id: string;
+  title: string;
+  detail: string;
+  partId?: string;
+  source?: string;
+  confidence?: number;
+};
+
+export type UseCaseSpec = {
+  outcomes: UseCaseOutcome[];
+  recommended: string;
+  proposedBy?: string;
+  reasons: UseCaseReason[];
+};
+
+export type UseCaseSaved = {
+  outcome?: string;
+  outcomeWhy?: string;
+  values?: Record<string, string>;
+  whys?: Record<string, WhyPick>;
+};
+
+export type UseCasePayload = {
+  decision: string | null;
+  reasons: ClaimReason[];
+  rationaleText: string;
+  decidingReasons: string[];
+  fields: FinalDetailField[];
+  changes: string[];
+  record: CaptureRecordRow[];
+  reviewerId: string;
+  timeOnTaskSeconds: number;
+  changeLog: CaptureLogEntry[];
+};
+
+export interface UseCaseProps<Data> {
+  data: Data;
+  readOnly?: boolean;
+  reviewerId?: string;
+  saved?: UseCaseSaved;
+  onChange?: (payload: UseCasePayload) => void;
+  onComplete: (
+    outcome: string,
+    payload: UseCasePayload,
+  ) => Promise<void> | void;
+}
