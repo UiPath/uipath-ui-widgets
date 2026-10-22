@@ -357,5 +357,6 @@
   "connection_readiness_reconnect": "Reconnect",
   "connection_readiness_broken_status": "{{name}} · {{status}}",
   "connection_readiness_connection_broken": "{{count}} connection needs fixing",
-  "connection_readiness_connection_broken_plural": "{{count}} connections need fixing"
+  "connection_readiness_connection_broken_plural": "{{count}} connections need fixing",
+  "response_stopped_message": "Response stopped"
 }
