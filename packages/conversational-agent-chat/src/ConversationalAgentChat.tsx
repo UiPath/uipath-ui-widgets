@@ -33,6 +33,7 @@ import {
   ConversationEndReason,
   ErrorStartHandlerArgs,
   ExchangeGetResponse,
+  ConnectionState,
   ExchangeStream,
   FeedbackRating,
   MessageStream,
@@ -43,10 +44,13 @@ import {
 } from "@uipath/uipath-typescript/conversational-agent";
 import type {
   AgentGetByIdResponse,
+  AvailableConnectionsResponse,
   JSONObject,
   JSONValue,
   ToolCallConfirmationValue,
 } from "@uipath/uipath-typescript/conversational-agent";
+import { Traces } from "@uipath/uipath-typescript/traces";
+import type { SpanGetResponse } from "@uipath/uipath-typescript/traces";
 import {
   useCallback,
   useEffect,
@@ -63,6 +67,7 @@ import type { InputSchema } from "./components/AgentSchemaForm/types";
 import { FeedbackDialog } from "./components/FeedbackDialog";
 import { Loader } from "./components/Loader";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { type ConnectorReadiness } from "./components/ConnectionReadinessCard";
 import type { ToolConfirmationLabels } from "./components/ToolConfirmation";
 import {
   createToolConfirmationRenderer,
@@ -72,6 +77,7 @@ import {
   createClientSideToolRenderer,
   type ClientSideToolRenderer,
 } from "./components/ClientSideToolRenderer";
+import { createConnectionReadinessRenderer } from "./components/ConnectionReadinessRenderer";
 import { ALLOWED_ATTACHMENTS } from "./constants/attachments";
 import "./ConversationalAgentChat.css";
 import {
@@ -87,11 +93,13 @@ import {
   createFileKey,
   getConversationHistoryDisplayItems,
   getFirstRunExperience,
+  isFlowAgent,
   mapCitationSource,
   mapExchangesToChatMessages,
   normalizeInput,
   sortEvaluationSets,
 } from "./utils";
+import { getToolCallTraces, mergeToolCallTraceMeta } from "./utils/spanTree";
 import { trackTelemetry } from "./utils/telemetryUtils";
 import { getI18n } from "./i18n";
 import { resolveAgent as fetchAgentRelease } from "./utils/resolveAgent";
@@ -102,6 +110,8 @@ import FilePreviewer from "./components/FilePreviewer";
 const i18n = getI18n();
 
 const TOOL_CONFIRMATION_WIDGET_ID_PREFIX = "confirmation-";
+const CONNECTION_READINESS_CARD = "cas-connection-readiness";
+const CONNECTION_READINESS_CARD_ID = "connection-readiness-card";
 // Exchanges per page when lazily loading a conversation's history. Pages are
 // fetched newest-first and prepended as the user scrolls toward the top.
 const EXCHANGES_PAGE_SIZE = 15;
@@ -189,6 +199,10 @@ export const ConversationalAgentChat = ({
     () => createClientSideToolRenderer(),
     [],
   );
+  const connectionReadinessRenderer = useMemo(
+    () => createConnectionReadinessRenderer(),
+    [],
+  );
   // useLayoutEffect is ok here because the work is minimal enough that the cost is essentially zero
   // needed because React 19 doesn't support ref writes on render
 
@@ -218,6 +232,7 @@ export const ConversationalAgentChat = ({
     onUserMessageSent,
     citationPreview,
     folderId,
+    locale,
     t,
   ]);
   // Rebuild the SDK service when sdk or externalUserId change. Skip the first run because the
@@ -247,7 +262,18 @@ export const ConversationalAgentChat = ({
   const exchangesCursor = useRef<{ value: string } | undefined>(undefined);
   const agentIdRef = useRef<number | undefined>(undefined);
   const agentKeyRef = useRef<string | undefined>(undefined);
+  const toolDisplayModeRef = useRef<string | undefined>(undefined);
+  const isFlowAgentRef = useRef(false);
   const searchTextRef = useRef<string>("");
+  // Latest spans for the active conversation's trace, polled only in FullTrace mode
+  const traceSpansRef = useRef<SpanGetResponse[]>([]);
+  // toolCallId -> JSON of the last-sent meta, so unchanged tool calls aren't re-sent each poll.
+  const sentToolCallMetaJsonRef = useRef<Map<string, string>>(new Map());
+  const tracePollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
+  const tracePollInFlightRef = useRef<Promise<void> | null>(null);
+  const isMountedRef = useRef(false);
 
   const [chatService, setChatService] = useState<AutopilotChatService>();
   const [error, setError] = useState<string | null>(null);
@@ -271,11 +297,15 @@ export const ConversationalAgentChat = ({
   } | null>(null);
   const citationPreviewRef = useRef(citationPreview);
   const [hasMessages, setHasMessages] = useState(false);
+  const [connectionReadiness, setConnectionReadiness] = useState<
+    ConnectorReadiness[] | null
+  >(null);
   const [themeRoot, setThemeRoot] = useState<HTMLDivElement | null>(null);
   const onEvaluationSetClickedRef = useRef(onEvaluationSetClicked);
   const onUserMessageSentRef = useRef(onUserMessageSent);
   const chatServiceRef = useRef<AutopilotChatService | null>(null);
   const settingsRootRef = useRef<Root | null>(null);
+  const autoBindTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Last-applied agent inputs for the active conversation. Pre-populates the
   // settings inputs form when reopened; cleared on New Chat.
   const storedAgentInputs = useRef<Record<string, unknown>>({});
@@ -285,6 +315,113 @@ export const ConversationalAgentChat = ({
   useLayoutEffect(() => {
     inputSchemaStateRef.current = inputSchemaState;
   }, [inputSchemaState]);
+
+  // Merge the trace's "conversationToolCall" spans into their tool call messages (keyed by toolCallId)
+  const applyTraceSpans = useCallback(
+    (spans: SpanGetResponse[]) => {
+      // Only FullTrace renders the span tree; other modes use the SDK's tool call events alone.
+      if (toolDisplayModeRef.current !== "FullTrace") return;
+      const chat = chatServiceRef.current;
+      if (!chat) return;
+      traceSpansRef.current = spans;
+
+      const conversation = chat.getConversation() ?? [];
+
+      for (const trace of getToolCallTraces(spans)) {
+        // The trace only enriches tool call messages the SDK or history already
+        // created, so it can't show a tool call before its deferred spinner
+        // (e.g. while a confirmation is pending).
+        const existing = conversation.find((m) => m.id === trace.toolCallId);
+        if (!existing) continue;
+
+        const meta = mergeToolCallTraceMeta(
+          trace,
+          existing.meta,
+          toolDisplayModeRef.current,
+        );
+        const metaJson = JSON.stringify(meta);
+        if (
+          sentToolCallMetaJsonRef.current.get(trace.toolCallId) === metaJson
+        ) {
+          continue;
+        }
+
+        chat.sendResponse({
+          ...existing,
+          id: trace.toolCallId,
+          content: t("performing_action_message", {
+            action: meta.toolName ?? "",
+          }),
+          created_at: existing.created_at ?? trace.startTime,
+          widget: MessageWidget.ApolloAgentsToolCall,
+          meta,
+        });
+        sentToolCallMetaJsonRef.current.set(trace.toolCallId, metaJson);
+      }
+    },
+    [t],
+  );
+
+  const fetchAndApplyTrace = useCallback(
+    async (traceId: string) => {
+      try {
+        const spans = await new Traces(sdk).getById(traceId);
+        if (
+          !isMountedRef.current ||
+          currentConversation.current?.traceId !== traceId
+        ) {
+          return;
+        }
+        applyTraceSpans(spans);
+      } catch {
+        // Transient errors: the next poll tick (or reopening) retries.
+      }
+    },
+    [sdk, applyTraceSpans],
+  );
+
+  // Live polling on FullTrace mode only.
+  const startTracePolling = useCallback(() => {
+    if (toolDisplayModeRef.current !== "FullTrace") return;
+    const traceId = currentConversation.current?.traceId;
+    if (!traceId || tracePollIntervalRef.current) return;
+
+    const tick = async () => {
+      if (tracePollInFlightRef.current) return;
+      const poll = fetchAndApplyTrace(traceId);
+      tracePollInFlightRef.current = poll;
+      try {
+        await poll;
+      } finally {
+        tracePollInFlightRef.current = null;
+      }
+    };
+    void tick();
+    tracePollIntervalRef.current = setInterval(tick, 1000);
+  }, [fetchAndApplyTrace]);
+
+  const stopTracePolling = useCallback(
+    (finalFetch: boolean) => {
+      if (!tracePollIntervalRef.current) return;
+      clearInterval(tracePollIntervalRef.current);
+      tracePollIntervalRef.current = null;
+      const traceId = currentConversation.current?.traceId;
+      if (!finalFetch || !traceId) return;
+      const pendingPoll = tracePollInFlightRef.current;
+      void (async () => {
+        await pendingPoll;
+        await fetchAndApplyTrace(traceId);
+      })();
+    },
+    [fetchAndApplyTrace],
+  );
+
+  // On leaving a conversation, stop polling
+  const resetTraceState = useCallback(() => {
+    stopTracePolling(false);
+    traceSpansRef.current = [];
+    sentToolCallMetaJsonRef.current = new Map();
+  }, [stopTracePolling]);
 
   const setupExchangeHandlers = useCallback(
     (exchange: ExchangeStream) => {
@@ -299,6 +436,11 @@ export const ConversationalAgentChat = ({
 
       exchange.onMessageStart((message: MessageStream) => {
         if (message.startEvent.role === "assistant") {
+          if (toolDisplayModeRef.current === "FullTrace") {
+            startTracePolling();
+            message.onMessageEnd(() => stopTracePolling(true));
+          }
+
           const messageId = message.messageId;
           const messageTimestamp = message.startEvent.timestamp;
           const exchangeId = exchange.exchangeId;
@@ -374,6 +516,20 @@ export const ConversationalAgentChat = ({
             }
           >();
 
+          // In FullTrace the SDK's tool call events still render the tool call,
+          // so it appears and completes even if trace fetches fail
+          const withTraceSpan = (
+            toolCallId: string,
+            meta: Record<string, unknown>,
+          ) => {
+            if (toolDisplayModeRef.current !== "FullTrace") return meta;
+            sentToolCallMetaJsonRef.current.delete(toolCallId);
+            const span = chatService
+              .getConversation()
+              ?.find((m) => m.id === toolCallId)?.meta?.span;
+            return span ? { ...meta, span } : meta;
+          };
+
           const sendToolCallSpinner = (toolCallId: string) => {
             const pending = pendingToolCalls.get(toolCallId);
             if (!pending || pending.spinnerSent) return;
@@ -385,11 +541,12 @@ export const ConversationalAgentChat = ({
               }),
               created_at: pending.startTimeIso,
               widget: MessageWidget.ApolloAgentsToolCall,
-              meta: {
+              meta: withTraceSpan(toolCallId, {
                 toolName: pending.toolName,
                 input: pending.toolInput,
                 startTime: pending.startTimeIso,
-              },
+                displayMode: toolDisplayModeRef.current,
+              }),
             });
           };
 
@@ -478,7 +635,7 @@ export const ConversationalAgentChat = ({
                 }),
                 created_at: endTimeIso,
                 widget: MessageWidget.ApolloAgentsToolCall,
-                meta: {
+                meta: withTraceSpan(toolCall.toolCallId, {
                   toolName: startEvent.toolName,
                   input: toolInput,
                   startTime: startTimeIso,
@@ -486,7 +643,8 @@ export const ConversationalAgentChat = ({
                   endTime: endTimeIso,
                   isError,
                   ...(cancelled && { cancelled: true }),
-                },
+                  displayMode: toolDisplayModeRef.current,
+                }),
               });
               pendingToolCalls.delete(toolCall.toolCallId);
             };
@@ -585,6 +743,7 @@ export const ConversationalAgentChat = ({
       });
 
       exchange.onExchangeEnd(() => {
+        stopTracePolling(true);
         activeExchange.current = null;
         chatService.sendOutputStreamEvent({ turnComplete: true });
         chatService.setShowLoading(false);
@@ -592,7 +751,7 @@ export const ConversationalAgentChat = ({
         setHasMessages(true);
       });
     },
-    [chatService, t],
+    [chatService, startTracePolling, stopTracePolling, t],
   );
 
   const resolveAgent = useCallback(async (): Promise<
@@ -805,6 +964,53 @@ export const ConversationalAgentChat = ({
     session.current = null;
   }, []);
 
+  // Shared helper: fetch connection readiness and update state.
+  const fetchConnectionReadiness = useCallback(() => {
+    const capturedAgentId = agentIdRef.current;
+    const capturedFolderId = folderIdRef.current;
+    if (capturedAgentId == null || capturedFolderId == null) return;
+    const capturedInitKey = initializedFor.current;
+
+    const applyReadiness = (items: AvailableConnectionsResponse) => {
+      if (initializedFor.current !== capturedInitKey) return;
+      if (items.length === 0) {
+        setConnectionReadiness(null);
+        return;
+      }
+      const readiness: ConnectorReadiness[] = items.map((item) => {
+        const selectedConn = item.currentConnectionId
+          ? item.connections?.find((c) => c.id === item.currentConnectionId)
+          : undefined;
+        return {
+          connectorKey: item.connectorKey,
+          connectorName: item.connectorName ?? item.connectorKey,
+          connectorImage: item.connectorImage,
+          isConfigurable: item.isConfigurable !== false,
+          currentConnectionId: item.currentConnectionId,
+          currentConnectionName: item.currentConnectionName,
+          currentConnectionState:
+            selectedConn?.state ??
+            (item.currentConnectionId ? ConnectionState.Expired : undefined),
+          connectionsUrl: item.connectionsUrl,
+        };
+      });
+      const hasUnresolved = readiness.some(
+        (c) =>
+          c.isConfigurable &&
+          (!c.currentConnectionId ||
+            c.currentConnectionState !== ConnectionState.Enabled),
+      );
+      setConnectionReadiness(hasUnresolved ? readiness : null);
+    };
+    agentService.current
+      .getAvailableConnections(capturedAgentId, capturedFolderId)
+      .then(applyReadiness)
+      .catch(() => {
+        if (initializedFor.current !== capturedInitKey) return;
+        setConnectionReadiness(null);
+      });
+  }, []);
+
   const onNewChat = useCallback(() => {
     endActiveSession();
     clearEndedState();
@@ -813,7 +1019,9 @@ export const ConversationalAgentChat = ({
     activeExchange.current = null;
     exchangesCursor.current = undefined;
     storedAgentInputs.current = {};
+    resetTraceState();
     setHasMessages(false);
+    connectionReadinessRenderer.unmountAll();
     // Re-show the InputsPage with a cleared form when the agent's schema has
     // required inputs. Bumping the counter forces an unmount/remount via the
     // key on <InputsPage>, which resets internal form state.
@@ -821,8 +1029,16 @@ export const ConversationalAgentChat = ({
       setInputsInstance((n) => n + 1);
       setShowInputPage(true);
     }
+    fetchConnectionReadiness();
     trackTelemetry(TelemetryEvent.NewChat, TelemetryStatus.Success);
-  }, [clearEndedState, endActiveSession, inputSchemaState]);
+  }, [
+    clearEndedState,
+    endActiveSession,
+    fetchConnectionReadiness,
+    inputSchemaState,
+    connectionReadinessRenderer,
+    resetTraceState,
+  ]);
 
   const buildHistoryFilterOptions = useCallback(() => {
     // The SDK's URL builder calls value.toString() without a null check, so
@@ -931,6 +1147,8 @@ export const ConversationalAgentChat = ({
       try {
         // required for debug-mode hosts that need to gate agent execution on the first user message
         onUserMessageSentRef.current?.({ content: data.content });
+        setHasMessages(true);
+        setConnectionReadiness(null);
         const sessionHelper = await getSessionHelper();
         const exchange = sessionHelper.startExchange();
         chatService?.setWaiting(true);
@@ -1099,18 +1317,30 @@ export const ConversationalAgentChat = ({
         if (!selectedConversation) return;
 
         endActiveSession();
+        resetTraceState();
         currentConversation.current = selectedConversation;
         session.current = null;
         exchangesCursor.current = undefined;
 
+        connectionReadinessRenderer.unmountAll();
         const { exchanges } = await fetchExchanges(selectedConversation.id);
-        const messages = mapExchangesToChatMessages(exchanges);
+        const messages = mapExchangesToChatMessages(
+          exchanges,
+          toolDisplayModeRef.current,
+        );
         chatService.setConversation(messages);
         setHasMessages(messages.length > 0);
         if (selectedConversation.endedTime) {
           applyEndedState(selectedConversation.endReason);
         } else {
           endReasonRef.current = null;
+        }
+        fetchConnectionReadiness();
+        if (
+          toolDisplayModeRef.current === "FullTrace" &&
+          selectedConversation.traceId
+        ) {
+          void fetchAndApplyTrace(selectedConversation.traceId);
         }
         trackTelemetry(
           TelemetryEvent.OpenConversation,
@@ -1128,7 +1358,17 @@ export const ConversationalAgentChat = ({
         chatService.setError(t("error_open_conversation", { errorMessage }));
       }
     },
-    [applyEndedState, chatService, endActiveSession, fetchExchanges, t],
+    [
+      applyEndedState,
+      chatService,
+      connectionReadinessRenderer,
+      endActiveSession,
+      fetchAndApplyTrace,
+      fetchConnectionReadiness,
+      fetchExchanges,
+      resetTraceState,
+      t,
+    ],
   );
 
   // Apollo fires this when the user scrolls to the top of the message list.
@@ -1147,9 +1387,10 @@ export const ConversationalAgentChat = ({
         exchangesCursor.current,
       );
       chatService.prependOlderMessages(
-        mapExchangesToChatMessages(exchanges),
+        mapExchangesToChatMessages(exchanges, toolDisplayModeRef.current),
         !hasNextPage,
       );
+      applyTraceSpans(traceSpansRef.current);
     } catch (err) {
       chatService.prependOlderMessages([], true);
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -1158,16 +1399,25 @@ export const ConversationalAgentChat = ({
         error: errorMessage,
       });
     }
-  }, [chatService, fetchExchanges]);
+  }, [applyTraceSpans, chatService, fetchExchanges]);
 
   const initChat = useCallback(async () => {
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
     try {
       initializedFor.current = initKey;
+      setConnectionReadiness(null);
+      if (autoBindTimeoutRef.current) {
+        clearTimeout(autoBindTimeoutRef.current);
+        autoBindTimeoutRef.current = null;
+      }
 
       const agentRelease = await resolveAgent();
       agentIdRef.current = agentRelease?.id;
       agentKeyRef.current = agentRelease?.releaseKey;
+      toolDisplayModeRef.current =
+        (agentRelease?.appearance as { displayMode?: string } | undefined)
+          ?.displayMode ?? "InputsAndOutputs";
+      isFlowAgentRef.current = isFlowAgent(agentRelease);
       const agentName = agentRelease?.name ?? "";
 
       // In debug mode the agent (and its derived schema) may not be resolvable,
@@ -1202,6 +1452,17 @@ export const ConversationalAgentChat = ({
         firstRunExperienceRef.current,
         agentRelease?.appearance,
       );
+
+      // Fetch connection readiness (fire-and-forget; card is optional)
+      if (agentRelease) {
+        fetchConnectionReadiness();
+        // Re-fetch after a delay to pick up server-side auto-bind results
+        autoBindTimeoutRef.current = setTimeout(() => {
+          autoBindTimeoutRef.current = null;
+          if (initializedFor.current !== initKey) return;
+          fetchConnectionReadiness();
+        }, 1500);
+      }
 
       // Persists agent inputs against the active conversation via
       // updateConversation. Server-side this applies to all subsequent
@@ -1250,11 +1511,17 @@ export const ConversationalAgentChat = ({
             <SettingsDialog
               profileResetKey={profileResetKey}
               conversationalAgent={agentService.current}
-              onClose={() => chatServiceRef.current?.toggleSettings(false)}
+              onClose={() => {
+                chatServiceRef.current?.toggleSettings(false);
+                fetchConnectionReadiness();
+              }}
               inputSchema={inputSchemaStateRef.current}
               initialInputs={storedAgentInputs.current}
               onApplyInputs={handleApplySettingsInputs}
               inputsResetKey={inputsResetKey}
+              agentId={agentIdRef.current}
+              folderId={folderIdRef.current}
+              onConnectionsChanged={fetchConnectionReadiness}
             />
           </PortalContainerProvider>,
         );
@@ -1372,6 +1639,7 @@ export const ConversationalAgentChat = ({
             renameChat: false,
             ...(!agentId ? { newChat: true, history: true } : {}),
             ...disabledFeaturesRef.current,
+            ...(isFlowAgentRef.current ? { stopResponse: true } : {}),
           },
         },
       });
@@ -1387,16 +1655,27 @@ export const ConversationalAgentChat = ({
         chatServiceInstance.setAllowedAttachments(ALLOWED_ATTACHMENTS);
       }
 
+      // Clean up any existing readiness roots before replacing the conversation
+      connectionReadinessRenderer.unmountAll();
+
       if (existingConversationId) {
         const conversation = await getConversation();
         exchangesCursor.current = undefined;
         const { exchanges } = await fetchExchanges(conversation.id);
+        const messages = mapExchangesToChatMessages(exchanges);
         chatServiceInstance.setConversation(
-          mapExchangesToChatMessages(exchanges),
+          mapExchangesToChatMessages(exchanges, toolDisplayModeRef.current),
         );
         if (conversation.endedTime) {
           applyEndedState(conversation.endReason);
         }
+        if (
+          toolDisplayModeRef.current === "FullTrace" &&
+          conversation.traceId
+        ) {
+          void fetchAndApplyTrace(conversation.traceId);
+        }
+        setHasMessages(messages.length > 0);
       } else {
         // AutopilotChatService is a singleton, so it may still hold the
         // previous agent's messages. Reset before showing the new agent.
@@ -1413,6 +1692,7 @@ export const ConversationalAgentChat = ({
   }, [
     agentId,
     applyEndedState,
+    fetchAndApplyTrace,
     folderId,
     existingConversationId,
     externalUserId,
@@ -1422,6 +1702,8 @@ export const ConversationalAgentChat = ({
     readOnly,
     resolveAgent,
     getConversation,
+    fetchConnectionReadiness,
+    connectionReadinessRenderer,
     fetchExchanges,
     t,
     toasterId,
@@ -1436,14 +1718,19 @@ export const ConversationalAgentChat = ({
 
   const onStopResponse = useCallback(() => {
     if (!chatService) return;
+    stopTracePolling(true);
     if (activeExchange.current) {
-      activeExchange.current.sendExchangeEnd();
+      // Flows own their exchange; a client exchange end strands them. Switching
+      // conversations still fires StopResponse.
+      if (!isFlowAgentRef.current) {
+        activeExchange.current.sendExchangeEnd();
+      }
       activeExchange.current = null;
     }
     chatService.sendOutputStreamEvent({ turnComplete: true });
     chatService.setShowLoading(false);
     chatService.setWaiting(false);
-  }, [chatService]);
+  }, [chatService, stopTracePolling]);
 
   const onCustomHeaderActionClicked = useCallback(
     (action: AutopilotChatCustomHeaderAction) => {
@@ -1517,6 +1804,10 @@ export const ConversationalAgentChat = ({
         settingsRootRef.current.unmount();
         settingsRootRef.current = null;
       }
+      if (autoBindTimeoutRef.current) {
+        clearTimeout(autoBindTimeoutRef.current);
+        autoBindTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -1528,10 +1819,21 @@ export const ConversationalAgentChat = ({
     chatService?.setChatMode(mode);
   }, [chatService, mode]);
 
-  // Close the SDK session on unmount so the WebSocket doesn't linger.
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Close the SDK session and stop trace polling on unmount so neither lingers
   useEffect(() => {
     return () => {
       endActiveSession();
+      if (tracePollIntervalRef.current) {
+        clearInterval(tracePollIntervalRef.current);
+        tracePollIntervalRef.current = null;
+      }
     };
   }, [endActiveSession]);
 
@@ -1540,8 +1842,13 @@ export const ConversationalAgentChat = ({
     return () => {
       toolConfirmationRenderer.unmountAll();
       clientSideToolRenderer.unmountAll();
+      connectionReadinessRenderer.unmountAll();
     };
-  }, [toolConfirmationRenderer, clientSideToolRenderer]);
+  }, [
+    toolConfirmationRenderer,
+    clientSideToolRenderer,
+    connectionReadinessRenderer,
+  ]);
 
   // Register event handlers after chatService is available
   useEffect(() => {
@@ -1596,6 +1903,17 @@ export const ConversationalAgentChat = ({
           render: (container, message) =>
             clientSideToolRenderer.render(container, message),
         });
+        chatService.injectMessageRenderer({
+          name: CONNECTION_READINESS_CARD,
+          render: (container, message) =>
+            connectionReadinessRenderer.render(container, message, {
+              conversationalAgent: agentService.current,
+              onAllConnected: () => setConnectionReadiness(null),
+              onOpenSettings: () =>
+                chatServiceRef.current?.toggleSettings(true),
+              onConnectionsChanged: fetchConnectionReadiness,
+            }),
+        });
       } catch (err) {
         const message =
           err instanceof Error ? err.message : t("error_load_history");
@@ -1628,6 +1946,62 @@ export const ConversationalAgentChat = ({
     t,
     toolConfirmationRenderer,
     clientSideToolRenderer,
+    connectionReadinessRenderer,
+    fetchConnectionReadiness,
+  ]);
+
+  // Inject/update/remove the connection readiness card as a message in the
+  // conversation — matching CAS positioning inside the scroll area.
+  useEffect(() => {
+    if (!chatService) return;
+    const conversation = chatService.getConversation() ?? [];
+    const existingIndex = conversation.findIndex(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (m: any) => m.id === CONNECTION_READINESS_CARD_ID,
+    );
+
+    if (connectionReadiness) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cardMessage: any = {
+        id: CONNECTION_READINESS_CARD_ID,
+        content: " ",
+        created_at: new Date().toISOString(),
+        role: "assistant",
+        widget: CONNECTION_READINESS_CARD,
+        done: true,
+        disableActions: true,
+        meta: {
+          connectors: connectionReadiness,
+          agentId: agentIdRef.current,
+          folderId: folderIdRef.current,
+          defaultCollapsed: hasMessages,
+        },
+      };
+      if (existingIndex >= 0) {
+        const updated = [...conversation];
+        updated[existingIndex] = cardMessage;
+        chatService.setConversation(updated);
+      } else if (hasMessages) {
+        // Append so the card appears near the bottom where the user is
+        chatService.setConversation([...conversation, cardMessage]);
+      } else {
+        // Fresh conversation — card goes first, before welcome message
+        chatService.setConversation([cardMessage, ...conversation]);
+      }
+    } else if (existingIndex >= 0) {
+      // Defer unmount — the card's onAllConnected effect may still be
+      // executing inside this root's React tree when this runs.
+      queueMicrotask(() => connectionReadinessRenderer.unmountAll());
+      chatService.setConversation(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        conversation.filter((m: any) => m.id !== CONNECTION_READINESS_CARD_ID),
+      );
+    }
+  }, [
+    chatService,
+    connectionReadiness,
+    hasMessages,
+    connectionReadinessRenderer,
   ]);
 
   useEffect(() => {
@@ -1734,16 +2108,18 @@ export const ConversationalAgentChat = ({
           )}
 
           {!error && chatService && !showInputPage && (
-            <ApChat
-              key={locale}
-              chatServiceInstance={chatService}
-              locale={toApolloSupportedLocale(locale)}
-              theme={theme}
-              enableInternalThemeProvider
-              // Keep Apollo's tooltips, menus and history popover inside the
-              // themed wrapper; portalled to <body> they'd lose the theme tokens.
-              portalContainer={themeRoot ?? undefined}
-            />
+            <>
+              <ApChat
+                key={locale}
+                chatServiceInstance={chatService}
+                locale={toApolloSupportedLocale(locale)}
+                theme={theme}
+                enableInternalThemeProvider
+                // Keep Apollo's tooltips, menus and history popover inside the
+                // themed wrapper; portalled to <body> they'd lose the theme tokens.
+                portalContainer={themeRoot ?? undefined}
+              />
+            </>
           )}
 
           <FeedbackDialog

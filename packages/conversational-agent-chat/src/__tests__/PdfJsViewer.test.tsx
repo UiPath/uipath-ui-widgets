@@ -9,6 +9,7 @@ import {
   vi,
 } from "vitest";
 import * as pdfjs from "pdfjs-dist";
+import * as pdfjsLegacy from "pdfjs-dist/legacy/build/pdf.mjs";
 
 import PdfJsViewer from "../components/PdfJsViewer";
 import { initI18n } from "../i18n";
@@ -19,6 +20,11 @@ vi.mock("pdfjs-dist", () => ({
   getDocument: vi.fn(),
 }));
 vi.mock("pdfjs-dist/build/pdf.worker.min.mjs", () => ({ default: {} }));
+vi.mock("pdfjs-dist/legacy/build/pdf.mjs", () => ({
+  GlobalWorkerOptions: { workerSrc: "" },
+  getDocument: vi.fn(),
+}));
+vi.mock("pdfjs-dist/legacy/build/pdf.worker.min.mjs", () => ({ default: {} }));
 
 const makePage = () => ({
   getViewport: () => ({ width: 600, height: 800 }),
@@ -41,6 +47,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  vi.clearAllMocks();
   // jsdom stubs: canvas 2d context, scrollIntoView, and synchronous rAF.
   HTMLCanvasElement.prototype.getContext = vi.fn(() => ({}) as never);
   Element.prototype.scrollIntoView = vi.fn();
@@ -100,5 +107,36 @@ describe("PdfJsViewer", () => {
     expect(
       await screen.findByText("Failed to load file preview."),
     ).toBeInTheDocument();
+  });
+
+  it("uses the legacy pdf.js build in Assistant Desktop", async () => {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 Chrome/130.0.0.0 Electron/33.0.0 UiPathAssistant/25.10.0",
+    );
+    vi.mocked(pdfjsLegacy.getDocument).mockReturnValue({
+      promise: Promise.resolve(makeDoc(1)),
+    } as never);
+
+    const { container } = render(<PdfJsViewer file={pdfFile()} />);
+
+    await waitFor(() =>
+      expect(container.querySelectorAll("canvas")).toHaveLength(1),
+    );
+    expect(pdfjsLegacy.getDocument).toHaveBeenCalled();
+    expect(pdfjs.getDocument).not.toHaveBeenCalled();
+  });
+
+  it("uses the default pdf.js build outside Assistant Desktop", async () => {
+    vi.mocked(pdfjs.getDocument).mockReturnValue({
+      promise: Promise.resolve(makeDoc(1)),
+    } as never);
+
+    const { container } = render(<PdfJsViewer file={pdfFile()} />);
+
+    await waitFor(() =>
+      expect(container.querySelectorAll("canvas")).toHaveLength(1),
+    );
+    expect(pdfjs.getDocument).toHaveBeenCalled();
+    expect(pdfjsLegacy.getDocument).not.toHaveBeenCalled();
   });
 });

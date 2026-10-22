@@ -228,6 +228,7 @@ const mapContentPartsToChatContentPartsAndAttachments = (
 
 export const mapExchangesToChatMessages = (
   exchanges: ExchangeGetResponse[],
+  displayMode?: string,
 ): AutopilotChatMessage[] =>
   exchanges.flatMap((exchange) =>
     exchange.messages.flatMap((message) => {
@@ -274,12 +275,17 @@ export const mapExchangesToChatMessages = (
           endTime: toolCall.result?.timestamp,
           isError: toolCall.result?.isError,
           exchangeId: exchange.exchangeId,
+          ...(displayMode && { displayMode }),
         },
       }));
 
       return [mainMessage, ...toolCallMessages];
     }),
   );
+
+export const isFlowAgent = (
+  agent: AgentGetByIdResponse | null | undefined,
+): boolean => agent?.processType === "Flow";
 
 /**
  * Sorts evaluation sets: non-disabled first (default first within non-disabled),

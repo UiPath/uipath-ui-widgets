@@ -45,6 +45,7 @@ export interface DisabledFeatures {
   newChat?: boolean;
   htmlPreview?: boolean;
   renameChat?: boolean;
+  stopResponse?: boolean;
 }
 
 /** @internal */

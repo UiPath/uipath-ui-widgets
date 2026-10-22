@@ -1,6 +1,6 @@
 {
   "name": "@uipath/ui-widgets-datatable",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A simple React datatable component",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -42,7 +42,7 @@
     "registry": "https://npm.pkg.github.com"
   },
   "peerDependencies": {
-    "@uipath/uipath-typescript": "^1.4.1",
+    "@uipath/uipath-typescript": "^1.7.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

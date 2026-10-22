@@ -70,7 +70,32 @@ beforeEach(() => {
   zipCalls.length = 0;
 });
 
+describe("saveValidatedDataAsDraft with an IXP extraction", () => {
+  it("refuses it, since the next bucket load reads the file as an ExtractionResult", async () => {
+    const result = await saveValidatedDataAsDraft(makeSdk(), makeData(), {
+      validatedData: { output: {}, attribution: {} },
+    } as any);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("saveProcessedDocumentAsDraft");
+    expect(mockUploadFile).not.toHaveBeenCalled();
+  });
+});
+
 describe("submitValidatedData", () => {
+  it("refuses an IXP extraction, which DU post-processing cannot take", async () => {
+    const result = await submitValidatedData(
+      makeSdk(),
+      makeData(),
+      makeRequest({ validatedData: { output: {}, attribution: {} } }),
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("submitProcessedDocument");
+    expect(mockProcessExtractedData).not.toHaveBeenCalled();
+    expect(mockUploadFile).not.toHaveBeenCalled();
+  });
+
   describe("validation", () => {
     it("returns error when BucketId is missing", async () => {
       const result = await submitValidatedData(
