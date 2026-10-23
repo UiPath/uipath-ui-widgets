@@ -14,6 +14,7 @@ on:
           - validation-station
           - external-auth
           - pdf-viewer
+          - decisions-and-reasons
       tag:
         description: |-
           · latest: stable release to npm + GitHub Packages and Storybook deploy (needs approval)
