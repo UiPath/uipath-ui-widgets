@@ -140,6 +140,7 @@ export const ConversationalAgentChat = ({
   locale = "en",
   theme: themeProp,
   mode = AutopilotChatMode.Embedded,
+  renderer = "material",
   readOnly = false,
   overrideLabels,
   firstRunExperience,
@@ -182,6 +183,7 @@ export const ConversationalAgentChat = ({
   const initializedFor = useRef<string | null>(null);
   const themeRef = useRef(theme);
   const modeRef = useRef(mode);
+  const rendererRef = useRef(renderer);
   const overrideLabelsRef = useRef(overrideLabels);
   const disabledFeaturesRef = useRef(disabledFeatures);
   const firstRunExperienceRef = useRef(firstRunExperience);
@@ -208,6 +210,7 @@ export const ConversationalAgentChat = ({
   useLayoutEffect(() => {
     themeRef.current = theme;
     modeRef.current = mode;
+    rendererRef.current = renderer;
     overrideLabelsRef.current = overrideLabels;
     disabledFeaturesRef.current = disabledFeatures;
     firstRunExperienceRef.current = firstRunExperience;
@@ -224,6 +227,7 @@ export const ConversationalAgentChat = ({
   }, [
     theme,
     mode,
+    renderer,
     overrideLabels,
     disabledFeatures,
     firstRunExperience,
@@ -1460,6 +1464,7 @@ export const ConversationalAgentChat = ({
         instanceName: `agent-${agentId}-${folderId}`,
         config: {
           mode: modeRef.current,
+          renderer: rendererRef.current,
           locale: toApolloSupportedLocale(locale),
           theme: themeRef.current,
           readOnly,
@@ -1743,6 +1748,10 @@ export const ConversationalAgentChat = ({
   useEffect(() => {
     chatService?.setChatMode(mode);
   }, [chatService, mode]);
+
+  useEffect(() => {
+    chatService?.setRenderer(renderer);
+  }, [chatService, renderer]);
 
   useEffect(() => {
     isMountedRef.current = true;
