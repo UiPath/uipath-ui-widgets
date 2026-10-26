@@ -358,6 +358,7 @@
   "connection_readiness_broken_status": "connection_readiness_broken_status",
   "connection_readiness_connection_broken": "connection_readiness_connection_broken",
   "connection_readiness_connection_broken_plural": "connection_readiness_connection_broken_plural",
+  "response_stopped_message": "response_stopped_message",
   "conversation_ended_completed": "conversation_ended_completed",
   "conversation_ended_failed": "conversation_ended_failed",
   "conversation_ended_cancelled": "conversation_ended_cancelled"
