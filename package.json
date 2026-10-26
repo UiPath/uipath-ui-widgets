@@ -46,7 +46,7 @@
     "@uipath/ui-widgets-multi-file-upload": "file:./packages/multi-file-upload/dist",
     "@uipath/ui-widgets-pdf-viewer": "file:./packages/pdf-viewer/dist",
     "@uipath/ui-widgets-validation-station": "file:./packages/validation-station/dist",
-    "@uipath/uipath-typescript": "^1.8.1",
+    "@uipath/uipath-typescript": "^1.8.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "socket.io-client": "^4.8.3"

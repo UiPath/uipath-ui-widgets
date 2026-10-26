@@ -30,6 +30,7 @@ import {
   ContentPartStream,
   ConversationalAgent,
   ConversationCreateResponse,
+  ConversationEndReason,
   ErrorStartHandlerArgs,
   ExchangeGetResponse,
   ConnectionState,
@@ -253,6 +254,9 @@ export const ConversationalAgentChat = ({
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
   const uploadedAttachments = useRef(new Map<string, AttachFileOutput>());
   const conversationsCursor = useRef<{ value: string } | undefined>(undefined);
+  // Why the active conversation ended, or null while it's open. A ref so the
+  // send handler reads the current value without re-registering.
+  const endReasonRef = useRef<ConversationEndReason | null>(null);
   // Cursor for the active conversation's exchange history. Reset whenever a
   // conversation is opened/started; undefined means no older pages remain.
   const exchangesCursor = useRef<{ value: string } | undefined>(undefined);
@@ -840,6 +844,38 @@ export const ConversationalAgentChat = ({
       t,
     ]);
 
+  const showEndedBanner = useCallback(
+    (reason: ConversationEndReason) => {
+      const message =
+        reason === ConversationEndReason.Failed
+          ? t("conversation_ended_failed")
+          : reason === ConversationEndReason.Cancelled
+            ? t("conversation_ended_cancelled")
+            : t("conversation_ended_completed");
+      // Clearing also unmounts a dismissed banner; Apollo's alert keeps its hidden state otherwise.
+      chatServiceRef.current?.clearError();
+      chatServiceRef.current?.setError(
+        message,
+        reason === ConversationEndReason.Completed ? "warn" : "error",
+      );
+    },
+    [t],
+  );
+
+  const applyEndedState = useCallback(
+    (reason?: ConversationEndReason) => {
+      endReasonRef.current = reason ?? ConversationEndReason.Completed;
+      showEndedBanner(endReasonRef.current);
+    },
+    [showEndedBanner],
+  );
+
+  const clearEndedState = useCallback(() => {
+    if (!endReasonRef.current) return;
+    endReasonRef.current = null;
+    chatServiceRef.current?.clearError();
+  }, []);
+
   const getSessionHelper = useCallback(async (): Promise<SessionStream> => {
     if (session.current) {
       return session.current;
@@ -861,6 +897,23 @@ export const ConversationalAgentChat = ({
           c.id === conversation.id ? { ...c, label } : c,
         ),
       );
+    });
+    sessionHelper.onConversationEnd(({ reason }) => {
+      const endReason = reason ?? ConversationEndReason.Completed;
+      const endedTime = new Date().toISOString();
+      // Mark it ended in the history list so reopening it later shows the ended state.
+      setConversationHistory(
+        pastConversations.current.map((c) =>
+          c.id === conversation.id ? { ...c, endedTime, endReason } : c,
+        ),
+      );
+      if (currentConversation.current?.id !== conversation.id) return;
+      currentConversation.current = {
+        ...currentConversation.current,
+        endedTime,
+        endReason,
+      };
+      applyEndedState(endReason);
     });
     // Buffer outgoing events until the server confirms the session is started,
     // then flush — so a send never blocks on the sessionStarted round-trip.
@@ -891,7 +944,13 @@ export const ConversationalAgentChat = ({
       chatService?.setError(error.message || t("error_generic"));
     });
     return sessionHelper;
-  }, [chatService, getConversation, setConversationHistory, t]);
+  }, [
+    applyEndedState,
+    chatService,
+    getConversation,
+    setConversationHistory,
+    t,
+  ]);
 
   // End the session on conversation switch/unmount so a reopen starts fresh and
   // gets a new `sessionStarted` — reusing a stale session hangs the send. The
@@ -956,6 +1015,7 @@ export const ConversationalAgentChat = ({
 
   const onNewChat = useCallback(() => {
     endActiveSession();
+    clearEndedState();
     currentConversation.current = null;
     session.current = null;
     activeExchange.current = null;
@@ -974,6 +1034,7 @@ export const ConversationalAgentChat = ({
     fetchConnectionReadiness();
     trackTelemetry(TelemetryEvent.NewChat, TelemetryStatus.Success);
   }, [
+    clearEndedState,
     endActiveSession,
     fetchConnectionReadiness,
     inputSchemaState,
@@ -1077,6 +1138,14 @@ export const ConversationalAgentChat = ({
 
   const onSendMessage = useCallback(
     async (data: AutopilotChatMessage) => {
+      // An ended conversation accepts no input. Apollo has already added the
+      // request bubble and loading state before this runs, and has no pre-hook
+      // for sends, so re-show the banner and undo the loading state.
+      if (endReasonRef.current) {
+        showEndedBanner(endReasonRef.current);
+        chatService?.stopResponse();
+        return;
+      }
       try {
         // required for debug-mode hosts that need to gate agent execution on the first user message
         onUserMessageSentRef.current?.({ content: data.content });
@@ -1119,7 +1188,7 @@ export const ConversationalAgentChat = ({
         chatService?.setError(t("error_send_message", { errorMessage }));
       }
     },
-    [chatService, getSessionHelper, setupExchangeHandlers, t],
+    [chatService, getSessionHelper, setupExchangeHandlers, showEndedBanner, t],
   );
 
   const processAttachmentsInBatch = useCallback(
@@ -1265,6 +1334,11 @@ export const ConversationalAgentChat = ({
         );
         chatService.setConversation(messages);
         setHasMessages(messages.length > 0);
+        if (selectedConversation.endedTime) {
+          applyEndedState(selectedConversation.endReason);
+        } else {
+          endReasonRef.current = null;
+        }
         fetchConnectionReadiness();
         if (
           toolDisplayModeRef.current === "FullTrace" &&
@@ -1289,6 +1363,7 @@ export const ConversationalAgentChat = ({
       }
     },
     [
+      applyEndedState,
       chatService,
       connectionReadinessRenderer,
       endActiveSession,
@@ -1578,6 +1653,7 @@ export const ConversationalAgentChat = ({
       // Singleton keeps the previous conversation's unsent draft and error banner; drop both before the awaits.
       chatServiceInstance.setPrompt("");
       chatServiceInstance.clearError();
+      endReasonRef.current = null;
 
       if (!disabledFeaturesRef.current?.attachments) {
         chatServiceInstance.setAllowedAttachments(ALLOWED_ATTACHMENTS);
@@ -1594,6 +1670,9 @@ export const ConversationalAgentChat = ({
         chatServiceInstance.setConversation(
           mapExchangesToChatMessages(exchanges, toolDisplayModeRef.current),
         );
+        if (conversation.endedTime) {
+          applyEndedState(conversation.endReason);
+        }
         if (
           toolDisplayModeRef.current === "FullTrace" &&
           conversation.traceId
@@ -1616,6 +1695,7 @@ export const ConversationalAgentChat = ({
     }
   }, [
     agentId,
+    applyEndedState,
     fetchAndApplyTrace,
     folderId,
     existingConversationId,
