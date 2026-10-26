@@ -852,6 +852,8 @@ export const ConversationalAgentChat = ({
           : reason === ConversationEndReason.Cancelled
             ? t("conversation_ended_cancelled")
             : t("conversation_ended_completed");
+      // Clearing also unmounts a dismissed banner; Apollo's alert keeps its hidden state otherwise.
+      chatServiceRef.current?.clearError();
       chatServiceRef.current?.setError(
         message,
         reason === ConversationEndReason.Completed ? "warn" : "error",

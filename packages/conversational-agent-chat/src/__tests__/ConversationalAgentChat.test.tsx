@@ -2667,6 +2667,7 @@ describe("ConversationalAgentChat", () => {
       const startExchange = lastSessionHelper.startExchange;
       startExchange.mockClear();
       mockChatService.setError.mockClear();
+      mockChatService.clearError.mockClear();
 
       await getHandler("request")({ content: "Still there?", attachments: [] });
 
@@ -2676,6 +2677,10 @@ describe("ConversationalAgentChat", () => {
         ENDED_COMPLETED,
         "warn",
       );
+      // Clearing first re-shows a banner the user dismissed.
+      expect(
+        mockChatService.clearError.mock.invocationCallOrder[0],
+      ).toBeLessThan(mockChatService.setError.mock.invocationCallOrder[0]);
     });
 
     it("should restore the ended state when reopening the conversation from history", async () => {
