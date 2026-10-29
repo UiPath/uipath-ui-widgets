@@ -7,6 +7,7 @@ import { NextTimeSection } from "../shared/NextTimeSection";
 import { OutcomePicker } from "../shared/OutcomePicker";
 import { ReasonsSection } from "../shared/ReasonsSection";
 import { ReviewShell } from "../shared/ReviewShell";
+import { TaskTags } from "../shared/TaskTags";
 import { useDecisionCapture } from "../../hooks/useDecisionCapture";
 import { outcomeLabel, recommendedId } from "../../utils/outcomes";
 import { signal } from "../../utils/signals";
@@ -21,6 +22,8 @@ export function CaseAssessment(props: CaseAssessmentProps) {
     reasons,
     fields = [],
     nextTime,
+    taskTags,
+    defaultReasons,
     show = {},
     copy,
     aside,
@@ -82,7 +85,11 @@ export function CaseAssessment(props: CaseAssessmentProps) {
           ))}
         </div>
       </Card>
-      <ReasonsSection reasonOptions={reasonOptions} />
+      <ReasonsSection
+        reasonOptions={reasonOptions}
+        defaultReasons={defaultReasons}
+      />
+      {taskTags && <TaskTags options={taskTags} />}
       <OutcomePicker noun={noun}>
         {fields.length > 0 && (
           <div className="space-y-3 border-t border-border-de-emp pt-3">

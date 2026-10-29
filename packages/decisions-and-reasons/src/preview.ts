@@ -16,6 +16,8 @@ export { PartReasons } from "./components/shared/PartReasons";
 export { ConfirmButton } from "./components/shared/ConfirmButton";
 export { ProposalInput } from "./components/shared/ProposalInput";
 export { ReasonsSection } from "./components/shared/ReasonsSection";
+export { ReasonTags } from "./components/shared/ReasonTags";
+export { TaskTags } from "./components/shared/TaskTags";
 export { NextTimeSection } from "./components/shared/NextTimeSection";
 export { ChangesSummary } from "./components/shared/ChangesSummary";
 export { RecordDrawer } from "./components/shared/RecordDrawer";

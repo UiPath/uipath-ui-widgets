@@ -4,10 +4,12 @@ import { useCapture } from "../../hooks/useCapture";
 import { NOT_RELEVANT_WHYS } from "../../models/constants";
 import { AddReasonForm } from "./AddReasonForm";
 import { ReasonRow } from "./ReasonRow";
+import { ReasonTags } from "./ReasonTags";
 
-export const ReasonsSection: FC<{ reasonOptions?: readonly string[] }> = ({
-  reasonOptions = NOT_RELEVANT_WHYS,
-}) => {
+export const ReasonsSection: FC<{
+  reasonOptions?: readonly string[];
+  defaultReasons?: readonly string[];
+}> = ({ reasonOptions = NOT_RELEVANT_WHYS, defaultReasons }) => {
   const { reasons, locked } = useCapture();
 
   return (
@@ -22,7 +24,11 @@ export const ReasonsSection: FC<{ reasonOptions?: readonly string[] }> = ({
           />
         ))}
       </div>
-      {!locked && <AddReasonForm />}
+      {defaultReasons ? (
+        <ReasonTags options={defaultReasons} />
+      ) : (
+        !locked && <AddReasonForm />
+      )}
     </Card>
   );
 };

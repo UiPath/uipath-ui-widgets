@@ -106,7 +106,14 @@ export type PayloadInput = {
 } & Partial<
   Pick<
     ReviewState,
-    "weights" | "reasonWhys" | "added" | "looked" | "lesson" | "scope" | "conds"
+    | "weights"
+    | "reasonWhys"
+    | "added"
+    | "looked"
+    | "lesson"
+    | "scope"
+    | "conds"
+    | "tags"
   >
 >;
 
@@ -122,6 +129,7 @@ export const buildPayload = ({
   lesson = null,
   scope = "like",
   conds = {},
+  tags = [],
   ...reasonState
 }: PayloadInput): ReviewPayload => {
   const views = resolveReasons(spec, parts, reasonState);
@@ -141,6 +149,7 @@ export const buildPayload = ({
   return {
     decision: outcome,
     reasons,
+    taskTags: tags,
     rationaleText: rationaleOf(spec, parts, outcome, reasons, deciding),
     decidingReasons: deciding.map((reason) => reason.id),
     fields: parts.map((part) => ({

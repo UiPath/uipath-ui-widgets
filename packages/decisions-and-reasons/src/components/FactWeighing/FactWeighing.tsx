@@ -12,7 +12,7 @@ import { useDecisionCapture } from "../../hooks/useDecisionCapture";
 import { recommendedId } from "../../utils/outcomes";
 import { signal } from "../../utils/signals";
 
-const NO_RATIONALE: FactRationale = { tags: [], text: "" };
+const NO_RATIONALE: FactRationale = { text: "" };
 
 export function FactWeighing(props: FactWeighingProps) {
   const {

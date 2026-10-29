@@ -17,6 +17,7 @@ import { useCaptureState } from "./useCaptureState";
 import { useFieldActions } from "./useFieldActions";
 import { useOutcomeActions } from "./useOutcomeActions";
 import { useReasonActions } from "./useReasonActions";
+import { useTagActions } from "./useTagActions";
 import { useSubmission } from "./useSubmission";
 
 export type ReviewCaptureOptions = {
@@ -80,6 +81,8 @@ export function useDecisionCapture({
     commit,
   });
 
+  const tagActions = useTagActions({ state, commit });
+
   const blocker = completionBlocker(
     findOutcome(spec.outcomes, outcome),
     outcomeWhy,
@@ -131,6 +134,7 @@ export function useDecisionCapture({
     ...fieldActions,
     ...outcomeActions,
     ...reasonActions,
+    ...tagActions,
     ...submission,
   };
 }
