@@ -12,7 +12,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "The reviewer weighs each fact on a five-point scale from fraud to legitimate, next to the agent's read, then decides and gives a reason.",
+          "The reviewer weighs each fact on a five-point scale from fraud to legitimate, next to the agent's read, then decides and picks at least one reason from a dropdown, or types their own.",
       },
     },
   },

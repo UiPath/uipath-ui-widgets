@@ -92,6 +92,7 @@ export type ReviewState = {
   lesson: string | null;
   scope: ScopeId;
   conds: Record<string, boolean>;
+  tags: string[];
 };
 
 export type ReviewSaved = {
@@ -104,6 +105,7 @@ export type ReviewSaved = {
   lesson?: string;
   scope?: ScopeId;
   conditions?: string[];
+  tags?: string[];
 };
 
 export type ChangeRow = {

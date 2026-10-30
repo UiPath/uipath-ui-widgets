@@ -7,13 +7,12 @@ import {
   Card,
   Label,
   Textarea,
-  Toggle,
 } from "@uipath/apollo-wind";
 import { useCapture } from "../../hooks/useCapture";
 import { findOutcome } from "../../utils/outcomes";
 import { signal } from "../../utils/signals";
-import { CHIP_CLASS } from "../shared/styles";
-import { missingItems, toggleTag } from "./facts";
+import { ReasonTags } from "../shared/ReasonTags";
+import { missingItems } from "./facts";
 import type { FactRationale, FactWeighingPayload } from "./types";
 
 const PAYLOAD_PREVIEW_INDENT = 2;
@@ -26,8 +25,8 @@ export const RationaleCard: FC<{
 }> = ({ options, rationale, payload, onRationale }) => {
   const id = useId();
   const [open, setOpen] = useState(false);
-  const { spec, outcome, locked, busy, error, submit } = useCapture();
-  const missing = missingItems(outcome, rationale);
+  const { spec, outcome, locked, busy, error, submit, state } = useCapture();
+  const missing = missingItems(outcome, state.added.length);
   const chosen = findOutcome(spec.outcomes, outcome);
 
   return (
@@ -35,30 +34,10 @@ export const RationaleCard: FC<{
       <div>
         <h3 className="text-base font-semibold">Rationale</h3>
         <p className="text-xs text-muted-foreground">
-          Why this decision? Pick one or more.
+          Why this decision? Pick at least one reason.
         </p>
       </div>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map((option) => (
-          <Toggle
-            key={option}
-            {...signal.rationale}
-            variant="outline"
-            size="xs"
-            className={CHIP_CLASS}
-            disabled={locked}
-            pressed={rationale.tags.includes(option)}
-            onPressedChange={() =>
-              onRationale({
-                ...rationale,
-                tags: toggleTag(rationale.tags, option),
-              })
-            }
-          >
-            {option}
-          </Toggle>
-        ))}
-      </div>
+      <ReasonTags options={options} />
       <div className="space-y-1">
         <Label
           htmlFor={id}

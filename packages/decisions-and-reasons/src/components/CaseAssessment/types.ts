@@ -24,4 +24,6 @@ export interface CaseAssessmentProps
   reasons: CaseReason[];
   fields?: CaseField[];
   nextTime?: NextTime;
+  taskTags?: readonly string[];
+  defaultReasons?: readonly string[];
 }

@@ -3,25 +3,15 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FactWeighing } from "../components/FactWeighing/FactWeighing";
 import { FIXTURE_FACTS } from "../fixtures/factWeighing";
-import {
-  groupFacts,
-  missingItems,
-  toggleTag,
-} from "../components/FactWeighing/facts";
+import { groupFacts, missingItems } from "../components/FactWeighing/facts";
 
 describe("fact weighing helpers", () => {
   it("lists what is still needed", () => {
-    expect(missingItems(null, { tags: [], text: " " })).toEqual([
-      "a decision",
-      "a reason tag",
-      "a rationale",
-    ]);
-    expect(missingItems("Decline", { tags: ["x"], text: "y" })).toEqual([]);
+    expect(missingItems(null, 0)).toEqual(["a decision", "a reason"]);
+    expect(missingItems("Decline", 1)).toEqual([]);
   });
 
-  it("toggles tags and groups facts in order", () => {
-    expect(toggleTag(["a"], "b")).toEqual(["a", "b"]);
-    expect(toggleTag(["a", "b"], "a")).toEqual(["b"]);
+  it("groups facts in order", () => {
     expect(groupFacts(FIXTURE_FACTS.items).map((g) => g.group)).toEqual([
       "Order",
       "Account",
@@ -32,12 +22,10 @@ describe("fact weighing helpers", () => {
 });
 
 describe("FactWeighing outputs", () => {
-  it("filters to the facts the agent cited", async () => {
-    const user = userEvent.setup();
+  it("lists every fact in one list without tabs", () => {
     render(<FactWeighing {...FIXTURE_FACTS} onComplete={vi.fn()} />);
-    expect(screen.getByRole("tab", { name: "All facts (11)" })).toBeVisible();
-    await user.click(screen.getByRole("tab", { name: "Agent cited (7)" }));
-    expect(screen.queryByText("Promo code")).toBeNull();
+    expect(screen.queryByRole("tab")).toBeNull();
+    expect(screen.getByText("Promo code")).toBeVisible();
     expect(screen.getByText("Order total")).toBeVisible();
   });
 
@@ -55,7 +43,7 @@ describe("FactWeighing outputs", () => {
     const submit = screen.getByRole("button", { name: "Submit" });
     expect(submit).toBeDisabled();
     expect(
-      screen.getByText("Still needed: a decision, a reason tag, a rationale"),
+      screen.getByText("Still needed: a decision, a reason"),
     ).toBeVisible();
 
     await user.click(
@@ -65,24 +53,27 @@ describe("FactWeighing outputs", () => {
       screen.getByRole("radio", { name: /^Order total: Leans legitimate/ }),
     );
     await user.click(screen.getByRole("button", { name: /^Decline/ }));
-    await user.click(
-      screen.getByRole("button", { name: "Promo abuse or reseller ring" }),
-    );
     expect(submit).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Pick a reason" }));
+    await user.click(
+      await screen.findByRole("menuitem", {
+        name: "Promo abuse or reseller ring",
+      }),
+    );
+    expect(submit).toBeEnabled();
     await user.type(
       screen.getByLabelText("Your reason, in your own words"),
       "Reseller pattern",
     );
-    expect(submit).toBeEnabled();
     await user.click(submit);
 
     const [outcome, payload] = onComplete.mock.calls[0];
     expect(outcome).toBe("Decline");
     expect(payload.reviewerId).toBe("reviewer-1");
-    expect(payload.rationale).toEqual({
-      tags: ["Promo abuse or reseller ring"],
-      text: "Reseller pattern",
-    });
+    expect(payload.rationale).toEqual({ text: "Reseller pattern" });
+    expect(
+      payload.reasons.map((reason: { title: string }) => reason.title),
+    ).toEqual(["Promo abuse or reseller ring"]);
     const fact = (id: string) =>
       payload.facts.find((f: { id: string }) => f.id === id);
     expect(fact("promo-code")).toMatchObject({

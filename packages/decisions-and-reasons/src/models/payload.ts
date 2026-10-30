@@ -36,6 +36,7 @@ export type PayloadField = {
 export type ReviewPayload = {
   decision: string | null;
   reasons: PayloadReason[];
+  taskTags: string[];
   rationaleText: string;
   decidingReasons: string[];
   fields: PayloadField[];

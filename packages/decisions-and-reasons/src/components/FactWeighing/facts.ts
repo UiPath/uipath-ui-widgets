@@ -24,20 +24,10 @@ export const withFactWeighing = (
   };
 };
 
-export const missingItems = (
-  outcome: string | null,
-  rationale: FactRationale,
-) =>
-  [
-    !outcome && "a decision",
-    rationale.tags.length === 0 && "a reason tag",
-    !rationale.text.trim() && "a rationale",
-  ].filter((missing): missing is string => !!missing);
-
-export const toggleTag = (tags: string[], tag: string) =>
-  tags.includes(tag)
-    ? tags.filter((current) => current !== tag)
-    : [...tags, tag];
+export const missingItems = (outcome: string | null, reasonCount: number) =>
+  [!outcome && "a decision", reasonCount === 0 && "a reason"].filter(
+    (missing): missing is string => !!missing,
+  );
 
 export const groupFacts = (items: FactItem[]) =>
   [...new Set(items.map((item) => item.group))].map((group) => ({

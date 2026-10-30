@@ -37,6 +37,37 @@ export const WithRecord: Story = {
   ),
 };
 
+export const WithTaskTags: Story = {
+  render: () => (
+    <CaseAssessment
+      {...FIXTURE_CASE}
+      taskTags={[
+        "Water damage",
+        "Repeat claimant",
+        "Missing photos",
+        "Policy exclusion",
+        "Goodwill candidate",
+      ]}
+      onComplete={complete}
+    />
+  ),
+};
+
+export const WithReasonTags: Story = {
+  render: () => (
+    <CaseAssessment
+      {...FIXTURE_CASE}
+      defaultReasons={[
+        "Manufacturing defect",
+        "Installer error",
+        "Above plan ceiling",
+        "Clean claim history",
+      ]}
+      onComplete={complete}
+    />
+  ),
+};
+
 export const ReadOnly: Story = {
   render: () => (
     <CaseAssessment

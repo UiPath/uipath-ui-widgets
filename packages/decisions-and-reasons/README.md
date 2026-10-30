@@ -14,14 +14,14 @@ npm install @uipath/ui-widgets-decisions-and-reasons
 
 Everything is exported from the `/preview` subpath, so an app opts in by importing from it.
 
-| Export                 | The reviewer's job                                                                | Layout                                                                                                                                                |
-| ---------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CaseAssessment`       | Weigh the reasons in a case and decide its outcome, for example claims or refunds | Reasons with weights and Add a reason, outcome cards, final details that follow the outcome, Next time with a scope                                   |
-| `SourceComparison`     | Compare extracted values against a system of record, field by field               | Sections of field rows: extracted value beside the system-of-record value, verdict and corrected value, citation, optional QC lane, coverage bar      |
-| `ExtractionValidation` | Confirm or correct values extracted from a document                               | Fields with confidence (low highlighted), line-item table, Validate or Reject with reason chips                                                       |
-| `TriageRouting`        | Confirm or change the category, priority and team the agent picked                | One row per label with option chips and the agent's reason, Confirm or Send back                                                                      |
-| `DraftEditing`         | Accept, edit or rewrite agent-written text                                        | Editable draft with the original kept, an edit indicator (kept, edited, cleared), reason-for-edit chips, Send, Revise or Reject                       |
-| `FactWeighing`         | Weigh each fact in a case from fraud to legitimate, beside the agent's read       | Facts grouped by section on a five-point scale, the agent's recommendation, Approve or Decline, reason chips and a rationale, a saved-payload preview |
+| Export                 | The reviewer's job                                                                | Layout                                                                                                                                                                                   |
+| ---------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CaseAssessment`       | Weigh the reasons in a case and decide its outcome, for example claims or refunds | Reasons with weights and Add a reason, outcome cards, final details that follow the outcome, Next time with a scope                                                                      |
+| `SourceComparison`     | Compare extracted values against a system of record, field by field               | Sections of field rows: extracted value beside the system-of-record value, verdict and corrected value, citation, optional QC lane, coverage bar                                         |
+| `ExtractionValidation` | Confirm or correct values extracted from a document                               | Fields with confidence (low highlighted), line-item table, Validate or Reject with reason chips                                                                                          |
+| `TriageRouting`        | Confirm or change the category, priority and team the agent picked                | One row per label with option chips and the agent's reason, Confirm or Send back                                                                                                         |
+| `DraftEditing`         | Accept, edit or rewrite agent-written text                                        | Editable draft with the original kept, an edit indicator (kept, edited, cleared), reason-for-edit chips, Send, Revise or Reject                                                          |
+| `FactWeighing`         | Weigh each fact in a case from fraud to legitimate, beside the agent's read       | Facts grouped by section on a five-point scale, the agent's recommendation, Approve or Decline, a reason dropdown with an Other entry and an optional rationale, a saved-payload preview |
 
 Two smaller pieces sit beside them:
 
@@ -48,18 +48,20 @@ import "@uipath/ui-widgets-decisions-and-reasons/DecisionsAndReasons.css";
 
 Every format takes the same props. The payload contract, the `data-signal-*` markup and the rule that no outcome is pre-selected are fixed.
 
-| Prop                           | What it changes                                                                                               |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `fields`, `reasons`, `labels`  | The items to review, with their kinds, groups, labels and copy. Which one a format takes is in its props type |
-| `outcomes`                     | The outcome cards, with `recommended`, `requiresReason` and `requiresCoverage`                                |
-| `reasonOptions`                | The reason chip vocabulary                                                                                    |
-| `show`                         | Optional pieces: `confidence`, `citation`, `qcLane`, `nextTime`, `comparison`, `record`                       |
-| `copy`                         | A few labels, such as the noun used for the outcome                                                           |
-| `aside`                        | A node rendered beside the form, for example a PDF viewer                                                     |
-| `renderField(field, default)`  | Replaces how one field renders                                                                                |
-| `className`                    | Added to the root element                                                                                     |
-| `onChange(payload)`            | Called as the reviewer changes something, so the host can save the task data                                  |
-| `onComplete(outcome, payload)` | Called with the clicked outcome id and the payload                                                            |
+| Prop                           | What it changes                                                                                                       |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `fields`, `reasons`, `labels`  | The items to review, with their kinds, groups, labels and copy. Which one a format takes is in its props type         |
+| `outcomes`                     | The outcome cards, with `recommended`, `requiresReason` and `requiresCoverage`                                        |
+| `taskTags`                     | `CaseAssessment` only: predefined task tags the reviewer can tap, alongside the reasons, plus a field for their own   |
+| `defaultReasons`               | `CaseAssessment` only: a dropdown of default reasons with an Other entry for their own, replacing the add reason form |
+| `reasonOptions`                | The reason chip vocabulary                                                                                            |
+| `show`                         | Optional pieces: `confidence`, `citation`, `qcLane`, `nextTime`, `comparison`, `record`                               |
+| `copy`                         | A few labels, such as the noun used for the outcome                                                                   |
+| `aside`                        | A node rendered beside the form, for example a PDF viewer                                                             |
+| `renderField(field, default)`  | Replaces how one field renders                                                                                        |
+| `className`                    | Added to the root element                                                                                             |
+| `onChange(payload)`            | Called as the reviewer changes something, so the host can save the task data                                          |
+| `onComplete(outcome, payload)` | Called with the clicked outcome id and the payload                                                                    |
 
 ```tsx
 <SourceComparison
@@ -95,6 +97,7 @@ Each part keeps its proposed value and its final value, and says who set it, so 
 | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `decision`                                                          | The outcome id, or null before one is picked                                                                               |
 | `fields`                                                            | Per part: `byDecision` (proposed), `value` (final) and `setBy` (`model` or `reviewer`)                                     |
+| `taskTags`                                                          | The task tags the reviewer tapped or typed, in the order added                                                             |
 | `reasons`, `decidingReasons`, `rationaleText`                       | The reasons with their weights, the ones that decided, and a generated sentence, never shown                               |
 | `changes`, `record`, `changeLog`, `timeOnTaskSeconds`               | What happened to each part (Kept, Changed, Rejected, Added, Untouched), whether it was looked at, and the order of changes |
 | `nextTimeId`, `nextTimeText`, `nextTimeScope`, `nextTimeConditions` | The Next time rule of `CaseAssessment`, empty elsewhere                                                                    |

@@ -27,6 +27,7 @@ const blankState = (spec: ReviewSpec): ReviewState => ({
       .slice(0, DEFAULT_SELECTED_CONDITIONS)
       .map((condition) => condition.id),
   ),
+  tags: [],
 });
 
 const savedState = (
@@ -53,6 +54,7 @@ const savedState = (
           label,
       ),
     ),
+    tags: [...(saved?.tags ?? [])],
   };
 };
 

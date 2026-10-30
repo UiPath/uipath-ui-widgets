@@ -27,7 +27,7 @@ export type FactRecommendation = {
   evidence: string[];
 };
 
-export type FactRationale = { tags: string[]; text: string };
+export type FactRationale = { text: string };
 
 export type FactWeight = {
   id: string;
