@@ -1,6 +1,6 @@
 {
   "name": "@uipath/ui-widgets-decisions-and-reasons",
-  "version": "1.0.0",
+  "version": "1.0.1-dev.0",
   "description": "Preview components for capturing a reviewer's decision in a Coded Action App, one per review job (case assessment, source comparison, extraction validation, triage routing, draft editing), a Why dropdown for QuickForm selects and a reason row for edited document fields.",
   "main": "dist/preview.js",
   "module": "dist/preview.js",
