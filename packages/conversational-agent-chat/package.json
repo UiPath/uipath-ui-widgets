@@ -1,6 +1,6 @@
 {
   "name": "@uipath/ui-widgets-conversational-agent-chat",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "description": "A React conversational agent chat component",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -45,7 +45,7 @@
   "peerDependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "@uipath/uipath-typescript": "^1.8.2"
+    "@uipath/uipath-typescript": "^1.8.3"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.0",
