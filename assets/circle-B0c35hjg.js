@@ -1,0 +1,1 @@
+import{c}from"./index-BbaDf3V7.js";const e=[["path",{d:"M20 6 9 17l-5-5",key:"1gmf2c"}]],t=c("check",e);const o=[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}]],a=c("circle",o);export{a as C,t as a};
