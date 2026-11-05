@@ -1,4 +1,7 @@
-import { AutopilotChatMode } from "@uipath/apollo-react/material/components";
+import {
+  AutopilotChatMode,
+  type AutopilotChatRenderer,
+} from "@uipath/apollo-react/material/components";
 import { UiPath } from "@uipath/uipath-typescript/core";
 import type { ConversationJobStartOverrides } from "@uipath/uipath-typescript/conversational-agent";
 import type { InputSchema } from "./components/AgentSchemaForm/types";
@@ -86,6 +89,11 @@ export interface ConversationalAgentChatProps {
   locale?: Locale;
   theme?: "light" | "dark" | "light-hc" | "dark-hc";
   mode?: AutopilotChatMode;
+  /**
+   * Apollo chat renderer. Defaults to "material"; "wind" is being evaluated.
+   * @internal
+   */
+  renderer?: AutopilotChatRenderer;
   readOnly?: boolean;
   overrideLabels?: OverrideLabels;
   /**

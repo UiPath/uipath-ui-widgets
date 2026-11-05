@@ -52,6 +52,7 @@ const createMockChatService = () => {
     setLocale: vi.fn(),
     setTheme: vi.fn(),
     setChatMode: vi.fn(),
+    setRenderer: vi.fn(),
     getLocale: vi.fn().mockReturnValue("en"),
     injectMessageRenderer: vi.fn(),
     sendOutputStreamEvent: vi.fn(),
