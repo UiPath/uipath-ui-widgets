@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { AutopilotChatMode } from "@uipath/apollo-react/material/components";
 import { UiPath } from "@uipath/uipath-typescript/core";
 import { useEffect, useState } from "react";
 import { ConversationalAgentChat } from "./ConversationalAgentChat";
@@ -233,6 +234,16 @@ function App() {
       control: "select",
       options: ["light", "dark", "light-hc", "dark-hc"],
     },
+    mode: {
+      description: "Chat layout mode",
+      control: "select",
+      options: Object.values(AutopilotChatMode),
+    },
+    renderer: {
+      description: "Apollo chat renderer",
+      control: "inline-radio",
+      options: ["material", "wind"],
+    },
     readOnly: {
       description: "When true, disables user input",
       control: "boolean",
@@ -272,6 +283,8 @@ function App() {
     folderId: 0,
     locale: "en",
     theme: "light",
+    mode: AutopilotChatMode.Embedded,
+    renderer: "material",
     readOnly: false,
     overrideLabels: undefined,
     existingConversationId: undefined,

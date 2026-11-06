@@ -11,6 +11,13 @@
 @source "../../../node_modules/@uipath/apollo-wind/dist/lib/*.js";
 @source "../../../node_modules/@uipath/apollo-wind/dist/components/ui/layout/*.js";
 @source "../../../node_modules/@uipath/apollo-wind/dist/components/ui/{accordion,alert,avatar,badge,button,card,collapsible,combobox,command,dialog,input,input-group,label,popover,portal-container,radio-group,search,select,sonner,spinner,textarea}.js";
+// Wind chat renderer and the apollo-wind modules it reaches (direct and transitive).
+@source "../node_modules/@uipath/apollo-react/dist/chat/**/*.js";
+@source "../node_modules/@uipath/apollo-wind/dist/components/ui/{attachment,bubble,chat-composer,chat-hero,citation,code-block,disclosure-tree,dropdown-menu,dropzone-overlay,empty-state,file-validation,form-field,hover-card,info-tooltip,input-group-context,live-region,loading-dots,markdown,message,message-actions,prompt-suggestions,skeleton,sources,thinking-indicator,toggle,tool-call,tooltip}.js";
+@source "../node_modules/@uipath/apollo-wind/dist/components/ui/{json-tree-view,message-scroller}/**/*.js";
+@source "../../../node_modules/@uipath/apollo-react/dist/chat/**/*.js";
+@source "../../../node_modules/@uipath/apollo-wind/dist/components/ui/{attachment,bubble,chat-composer,chat-hero,citation,code-block,disclosure-tree,dropdown-menu,dropzone-overlay,empty-state,file-validation,form-field,hover-card,info-tooltip,input-group-context,live-region,loading-dots,markdown,message,message-actions,prompt-suggestions,skeleton,sources,thinking-indicator,toggle,tool-call,tooltip}.js";
+@source "../../../node_modules/@uipath/apollo-wind/dist/components/ui/{json-tree-view,message-scroller}/**/*.js";
 @source "../dist/**/*.{js,css}";
 
 .uipath-conversational-agent-chat {
@@ -33,6 +40,8 @@
   // Carries the `theme` class (see ConversationalAgentChat.tsx), so anything
   // that reads Apollo tokens — including the border — must sit on or below it.
   .uipath-cas-theme {
+    // Wind's embedded chat root is `absolute inset-0` and needs a positioned ancestor.
+    position: relative;
     display: flex;
     flex-direction: column;
     border: 1px solid var(--color-border-de-emp);
@@ -42,6 +51,11 @@
     > * {
       flex: 1 1 auto;
       min-height: 0;
+    }
+
+    // Wind portals its overlay layer here (z-1300); growing it would cover the chat and eat clicks.
+    > [data-slot="wind-chat-overlays"] {
+      flex: none;
     }
   }
 
