@@ -358,5 +358,8 @@
   "connection_readiness_broken_status": "{{name}} · {{status}}",
   "connection_readiness_connection_broken": "A ligação {{count}} precisa de ser corrigida",
   "connection_readiness_connection_broken_plural": "{{count}} ligações precisam de ser corrigidas",
-  "response_stopped_message": "Resposta parada"
+  "response_stopped_message": "Resposta parada",
+  "conversation_ended_completed": "Esta conversa terminou. Inicie um novo chat para falar com o seu agente.",
+  "conversation_ended_failed": "Esta conversa terminou devido a um erro. Inicie um novo chat para tentar novamente.",
+  "conversation_ended_cancelled": "Esta conversa foi cancelada. Inicie um novo chat para falar com o seu agente."
 }

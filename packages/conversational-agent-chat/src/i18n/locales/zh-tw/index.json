@@ -358,5 +358,8 @@
   "connection_readiness_broken_status": "{{name}} · {{status}}",
   "connection_readiness_connection_broken": "{{count}} 連線需要修復",
   "connection_readiness_connection_broken_plural": "{{count}} 個連線需要修復",
-  "response_stopped_message": "已停止回應"
+  "response_stopped_message": "已停止回應",
+  "conversation_ended_completed": "此對話已結束。開始新的聊天，以與您的代理程式交談。",
+  "conversation_ended_failed": "發生錯誤，此對話已結束。開始新的聊天以重試。",
+  "conversation_ended_cancelled": "此對話已取消。開始新的聊天，以與您的代理程式交談。"
 }
