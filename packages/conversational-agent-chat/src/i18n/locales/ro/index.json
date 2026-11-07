@@ -358,5 +358,8 @@
   "connection_readiness_broken_status": "{{name}} · {{status}}",
   "connection_readiness_connection_broken": "Conexiunea {{count}} necesită remediere",
   "connection_readiness_connection_broken_plural": "{{count}} conexiuni necesită remediere",
-  "response_stopped_message": "Răspuns oprit"
+  "response_stopped_message": "Răspuns oprit",
+  "conversation_ended_completed": "Această conversație s-a încheiat. Începeți un chat nou pentru a vorbi cu agentul dvs.",
+  "conversation_ended_failed": "Această conversație s-a încheiat din cauza unei erori. Începeți un chat nou pentru a încerca din nou.",
+  "conversation_ended_cancelled": "Această conversație a fost anulată. Începeți un chat nou pentru a vorbi cu agentul dvs."
 }

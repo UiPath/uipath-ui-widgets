@@ -358,5 +358,8 @@
   "connection_readiness_broken_status": "{{name}} · {{status}}",
   "connection_readiness_connection_broken": "{{count}} 연결을 수정해야 합니다",
   "connection_readiness_connection_broken_plural": "{{count}} 개의 연결 수정 필요",
-  "response_stopped_message": "응답 중지됨"
+  "response_stopped_message": "응답 중지됨",
+  "conversation_ended_completed": "이 대화는 종료되었습니다. 새 채팅을 시작하여 에이전트와 대화하십시오.",
+  "conversation_ended_failed": "이 대화는 오류로 인해 종료되었습니다. 새 채팅을 시작하고 다시 시도하십시오.",
+  "conversation_ended_cancelled": "이 대화는 취소되었습니다. 새 채팅을 시작하여 에이전트와 대화하십시오."
 }
