@@ -23,7 +23,11 @@ import { pdfjs } from "react-pdf";
 //
 // Escape hatch: a consumer with an exotic setup can still override this by
 // assigning `pdfjs.GlobalWorkerOptions.workerSrc` after importing the widget.
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "./pdf.worker.min.mjs",
-  import.meta.url,
-).toString();
+//
+// Keep the URL in its own `const`. Assigning `new URL(...)` straight to
+// `workerSrc` is miscompiled by Vite 8 when the app sets `base: './'` (which
+// every coded app does): the build emits the worker but rewrites the
+// statement to `workerSrc = new URL(workerSrc, import.meta.url)`, so pdf.js
+// falls back to `./pdf.worker.mjs`, which does not exist, and no PDF renders.
+const workerUrl = new URL("./pdf.worker.min.mjs", import.meta.url);
+pdfjs.GlobalWorkerOptions.workerSrc = workerUrl.toString();
