@@ -1,1 +1,0 @@
-import{i as c}from"./portal-container-B1ML2gN0.js";const e=[["path",{d:"M20 6 9 17l-5-5",key:"1gmf2c"}]],r=c("check",e);const o=[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}]],t=c("circle",o);export{t as C,r as a};
