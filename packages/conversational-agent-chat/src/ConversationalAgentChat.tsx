@@ -1455,10 +1455,11 @@ export const ConversationalAgentChat = ({
 
       // Resolve the first-run experience: the host-provided config wins so
       // callers can override the welcome copy and starting prompts, falling
-      // back to the agent's own appearance.
+      // back to the agent's own appearance, then to the agent's name.
       const firstRunExperienceConfig = getFirstRunExperience(
         firstRunExperienceRef.current,
         agentRelease?.appearance,
+        agentName,
       );
 
       // Fetch connection readiness (fire-and-forget; card is optional)
