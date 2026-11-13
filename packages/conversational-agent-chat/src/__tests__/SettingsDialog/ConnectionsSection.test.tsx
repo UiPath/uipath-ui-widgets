@@ -449,6 +449,107 @@ describe("ConnectionsSection", () => {
     expect(keys).not.toContain("shared-service");
   });
 
+  // --- Picker highlight / defaultValue ---
+
+  it("highlights the selected connection on open, not the first item", async () => {
+    const user = userEvent.setup();
+    // Selected connection (conn-2) comes AFTER conn-1 in the same group
+    const connectionsWithSecondSelected = [
+      {
+        connectorKey: "google-drive",
+        connectorName: "Google Drive",
+        connectorImage: "https://example.com/drive.png",
+        resourceKeys: ["drive.files"],
+        currentConnectionId: "conn-2",
+        currentConnectionName: "work@company.com",
+        configurationUrl: "https://example.com/config",
+        connectionsUrl: "https://example.com/connections",
+        isConfigurable: true,
+        connections: [
+          {
+            id: "conn-1",
+            name: "john@example.com",
+            state: ConnectionState.Enabled,
+            isDefault: false,
+            personalWorkspace: false,
+            folderKey: "f1",
+            folderName: "Shared",
+          },
+          {
+            id: "conn-2",
+            name: "work@company.com",
+            state: ConnectionState.Enabled,
+            isDefault: true,
+            personalWorkspace: false,
+            folderKey: "f1",
+            folderName: "Shared",
+          },
+        ],
+      },
+    ];
+    const { agent } = makeAgent(connectionsWithSecondSelected);
+    render(
+      <ConnectionsSection
+        conversationalAgent={agent}
+        agentId={1}
+        folderId={2}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("work@company.com")).toBeInTheDocument();
+    });
+
+    // Open the picker
+    await user.click(screen.getByText("work@company.com"));
+
+    // The selected connection should have aria-selected="true"
+    const selectedOption = screen.getByRole("option", {
+      name: "work@company.com",
+    });
+    expect(selectedOption).toHaveAttribute("aria-selected", "true");
+
+    // The first (non-selected) connection should NOT be aria-selected
+    const firstOption = screen.getByRole("option", {
+      name: "john@example.com",
+    });
+    expect(firstOption).not.toHaveAttribute("aria-selected", "true");
+  });
+
+  it("updates highlight default when selection changes and picker reopens", async () => {
+    const user = userEvent.setup();
+    const { agent } = makeAgent();
+    render(
+      <ConnectionsSection
+        conversationalAgent={agent}
+        agentId={1}
+        folderId={2}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("john@example.com")).toBeInTheDocument();
+    });
+
+    // Open picker and select a different connection
+    await user.click(screen.getByText("john@example.com"));
+    await user.click(screen.getByText("work@company.com"));
+
+    // Picker closes after selection; reopen it
+    await user.click(screen.getByText("work@company.com"));
+
+    // The newly selected connection should now be highlighted
+    const newSelected = screen.getByRole("option", {
+      name: "work@company.com",
+    });
+    expect(newSelected).toHaveAttribute("aria-selected", "true");
+
+    const oldSelected = screen.getByRole("option", {
+      name: "john@example.com",
+    });
+    expect(oldSelected).not.toHaveAttribute("aria-selected", "true");
+  });
+
   // --- OAuth connect flow ---
 
   it("starts OAuth flow and shows connecting state", async () => {
