@@ -1455,10 +1455,13 @@ export const ConversationalAgentChat = ({
 
       // Resolve the first-run experience: the host-provided config wins so
       // callers can override the welcome copy and starting prompts, falling
-      // back to the agent's own appearance.
+      // back to the agent's own appearance. Full screen then falls back to the
+      // agent's name, so it always opens on the centered first-run screen; the
+      // other modes already show the name in their header.
       const firstRunExperienceConfig = getFirstRunExperience(
         firstRunExperienceRef.current,
         agentRelease?.appearance,
+        modeRef.current === AutopilotChatMode.FullScreen ? agentName : "",
       );
 
       // Fetch connection readiness (fire-and-forget; card is optional)

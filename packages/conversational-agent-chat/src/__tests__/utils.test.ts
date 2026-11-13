@@ -5,6 +5,7 @@ import {
   normalizeInput,
   convertAttachmentToFile,
   getConversationHistoryDisplayItems,
+  getFirstRunExperience,
   isFlowAgent,
   mapExchangesToChatMessages,
 } from "../utils";
@@ -844,6 +845,66 @@ describe("utils", () => {
       expect(isFlowAgent({} as any)).toBe(false);
       expect(isFlowAgent(null)).toBe(false);
       expect(isFlowAgent(undefined)).toBe(false);
+    });
+  });
+
+  describe("getFirstRunExperience", () => {
+    const appearance = (fields: Record<string, unknown>) => fields as any;
+
+    it("prefers the host config over the agent's appearance", () => {
+      const config = { title: "Host title", description: "", suggestions: [] };
+
+      expect(
+        getFirstRunExperience(
+          config,
+          appearance({ welcomeTitle: "Agent title" }),
+          "Agent",
+        ),
+      ).toBe(config);
+    });
+
+    it("maps the agent's appearance", () => {
+      expect(
+        getFirstRunExperience(
+          undefined,
+          appearance({
+            welcomeTitle: "Welcome",
+            welcomeDescription: "Ask me anything",
+            startingPrompts: [{ displayPrompt: "Hi", actualPrompt: "Say hi" }],
+          }),
+          "Agent",
+        ),
+      ).toEqual({
+        title: "Welcome",
+        description: "Ask me anything",
+        suggestions: [{ label: "Hi", prompt: "Say hi" }],
+      });
+    });
+
+    it("uses the agent's name as the title when there is no appearance", () => {
+      expect(getFirstRunExperience(undefined, undefined, "Agent")).toEqual({
+        title: "Agent",
+        description: "",
+        suggestions: undefined,
+      });
+    });
+
+    it("uses the agent's name when the appearance has no welcome title", () => {
+      expect(
+        getFirstRunExperience(
+          undefined,
+          appearance({ welcomeTitle: "", welcomeDescription: "Ask me" }),
+          "Agent",
+        ),
+      ).toEqual({
+        title: "Agent",
+        description: "Ask me",
+        suggestions: undefined,
+      });
+    });
+
+    it("returns undefined when there is nothing to show", () => {
+      expect(getFirstRunExperience(undefined, undefined, "")).toBeUndefined();
     });
   });
 });
