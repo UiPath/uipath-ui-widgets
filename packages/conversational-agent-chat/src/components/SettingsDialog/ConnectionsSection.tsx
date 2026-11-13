@@ -411,7 +411,7 @@ export const ConnectionsSection = ({
                         align="start"
                         onOpenAutoFocus={(e) => e.preventDefault()}
                       >
-                        <Command shouldFilter={false}>
+                        <Command shouldFilter={false} value={selectedId ?? ""}>
                           <div className="flex items-center gap-2 border-b px-2">
                             <CommandInput
                               placeholder={t("connections_search_placeholder")}
