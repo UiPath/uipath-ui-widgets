@@ -358,5 +358,8 @@
   "connection_readiness_broken_status": "{{name}}, à {{status}}",
   "connection_readiness_connection_broken": "{{count}} connexion est en attente de la résolution d’un problème",
   "connection_readiness_connection_broken_plural": "{{count}} connexions sont en attente de la résolution d’un problème",
-  "response_stopped_message": "Réponse arrêtée"
+  "response_stopped_message": "Réponse arrêtée",
+  "conversation_ended_completed": "La conversation s’est terminée. Démarrez une nouvelle conversation pour parler à votre agent.",
+  "conversation_ended_failed": "Cette conversation s’est terminée en raison d’une erreur. Démarrez une nouvelle conversation pour réessayer.",
+  "conversation_ended_cancelled": "Cette conversation a été annulée. Démarrez une nouvelle conversation pour parler à votre agent."
 }

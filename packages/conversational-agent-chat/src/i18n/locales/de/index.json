@@ -358,5 +358,8 @@
   "connection_readiness_broken_status": "{{name}} · {{status}}",
   "connection_readiness_connection_broken": "{{count}} Verbindung muss repariert werden",
   "connection_readiness_connection_broken_plural": "{{count}} Verbindungen müssen repariert werden",
-  "response_stopped_message": "Antwort angehalten"
+  "response_stopped_message": "Antwort angehalten",
+  "conversation_ended_completed": "Diese Konversation ist beendet. Starten Sie einen neuen Chat, um mit Ihrem Agent zu sprechen.",
+  "conversation_ended_failed": "Diese Konversation wurde aufgrund eines Fehlers beendet. Starten Sie einen neuen Chat, um es erneut zu versuchen.",
+  "conversation_ended_cancelled": "Diese Konversation wurde abgebrochen. Starten Sie einen neuen Chat, um mit Ihrem Agent zu sprechen."
 }

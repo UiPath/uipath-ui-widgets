@@ -358,5 +358,8 @@
   "connection_readiness_broken_status": "{{name}} · {{status}}",
   "connection_readiness_connection_broken": "{{count}} bağlantısının düzeltilmesi gerekiyor",
   "connection_readiness_connection_broken_plural": "{{count}} bağlantının düzeltilmesi gerekiyor",
-  "response_stopped_message": "Yanıt durduruldu"
+  "response_stopped_message": "Yanıt durduruldu",
+  "conversation_ended_completed": "Bu görüşme sona erdi. Temsilcinizle görüşmek için yeni bir sohbet başlatın.",
+  "conversation_ended_failed": "Bu görüşme bir hata nedeniyle sona erdi. Tekrar denemek için yeni bir sohbet başlatın.",
+  "conversation_ended_cancelled": "Bu görüşme iptal edildi. Temsilcinizle görüşmek için yeni bir sohbet başlatın."
 }

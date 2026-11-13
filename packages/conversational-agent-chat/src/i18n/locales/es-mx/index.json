@@ -358,5 +358,8 @@
   "connection_readiness_broken_status": "{{name}} · {{status}}",
   "connection_readiness_connection_broken": "{{count}} conexión necesita reparación",
   "connection_readiness_connection_broken_plural": "{{count}} conexiones necesitan reparación",
-  "response_stopped_message": "Respuesta detenida"
+  "response_stopped_message": "Respuesta detenida",
+  "conversation_ended_completed": "Esta conversación ha finalizado. Inicie un nuevo chat para hablar con su agente.",
+  "conversation_ended_failed": "Esta conversación ha finalizado debido a un error. Inicie un nuevo chat para probar de nuevo.",
+  "conversation_ended_cancelled": "Esta conversación se ha cancelado. Inicie un nuevo chat para hablar con su agente."
 }
