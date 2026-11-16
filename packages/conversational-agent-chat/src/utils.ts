@@ -26,23 +26,30 @@ import { EvaluationSet, FirstRunExperience, MessageWidget } from "./types";
  * takes precedence — callers can override the welcome copy and starting prompts,
  * and the agent's appearance is the fallback. Precedence is whole-object:
  * whichever source is used supplies every field.
+ *
+ * Without a welcome title (or any appearance), the agent's name is the title, so
+ * the chat still opens on the first-run screen. The description and starting
+ * prompts show only when the appearance sets them.
  */
 export const getFirstRunExperience = (
   config: FirstRunExperience | undefined,
   appearance: AgentGetByIdResponse["appearance"],
+  agentName = "",
 ): FirstRunExperience | undefined => {
-  const mappedAppearance: FirstRunExperience | undefined = appearance
-    ? {
-        title: appearance.welcomeTitle ?? "",
-        description: appearance.welcomeDescription ?? "",
-        suggestions: appearance.startingPrompts?.map((prompt) => ({
-          label: prompt.displayPrompt,
-          prompt: prompt.actualPrompt,
-        })),
-      }
-    : undefined;
+  if (config) {
+    return config;
+  }
 
-  return config ?? mappedAppearance;
+  const title = appearance?.welcomeTitle || agentName;
+  const description = appearance?.welcomeDescription ?? "";
+  const suggestions = appearance?.startingPrompts?.map((prompt) => ({
+    label: prompt.displayPrompt,
+    prompt: prompt.actualPrompt,
+  }));
+
+  return title || description || suggestions?.length
+    ? { title, description, suggestions }
+    : undefined;
 };
 
 export const createFileKey = (attachment: AutopilotChatFileInfo) => {

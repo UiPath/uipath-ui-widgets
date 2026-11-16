@@ -683,6 +683,43 @@ describe("ConversationalAgentChat", () => {
     );
   });
 
+  describe("first-run title without appearance settings", () => {
+    const renderWithoutAppearance = async (mode?: string) => {
+      const { AutopilotChatService } =
+        await import("@uipath/apollo-react/material/components");
+      mockGetById.mockResolvedValue({
+        id: 12345,
+        releaseKey: "11111111-2222-3333-4444-555555555555",
+        name: "Test Agent",
+        folderId: 100,
+      });
+
+      render(
+        <ConversationalAgentChat {...defaultProps} {...(mode && { mode })} />,
+      );
+
+      await waitFor(
+        () => expect(AutopilotChatService.Instantiate).toHaveBeenCalled(),
+        { timeout: 3000 },
+      );
+      return vi.mocked(AutopilotChatService.Instantiate).mock.lastCall?.[0]
+        ?.config?.firstRunExperience;
+    };
+
+    it("uses the agent's name in full screen", async () => {
+      const { AutopilotChatMode } =
+        await import("@uipath/apollo-react/material/components");
+
+      expect(
+        await renderWithoutAppearance(AutopilotChatMode.FullScreen),
+      ).toEqual({ title: "Test Agent", description: "", suggestions: [] });
+    });
+
+    it("shows no first run in embedded mode", async () => {
+      expect(await renderWithoutAppearance()).toBeUndefined();
+    });
+  });
+
   it("should render with default locale 'en' when no locale prop is provided", async () => {
     render(<ConversationalAgentChat {...defaultProps} />);
 
