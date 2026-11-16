@@ -41,6 +41,23 @@ if (targets.length === 0) {
   process.exit(0);
 }
 
+// How to run `npm run build` in a workspace. Under `npm run build`, npm sets
+// `npm_execpath` to its own CLI script, so running that with this Node needs no
+// shell on any platform. Run directly (`node scripts/build-workspaces.mjs`),
+// fall back to `npm` on PATH — through a shell on Windows, where it is an
+// `npm.cmd` shim that `spawn` cannot run otherwise. The command is a fixed
+// literal, so nothing caller-controlled reaches the shell.
+const npmExecPath = process.env.npm_execpath;
+const buildCommand = npmExecPath
+  ? {
+      file: process.execPath,
+      args: [npmExecPath, "run", "build"],
+      shell: false,
+    }
+  : process.platform === "win32"
+    ? { file: "npm run build", args: [], shell: true }
+    : { file: "npm", args: ["run", "build"], shell: false };
+
 const tagWidth = Math.max(...targets.map((t) => t.name.length));
 const results = [];
 
@@ -50,9 +67,10 @@ const runBuild = (target, color) =>
     const start = Date.now();
     console.log(`\n${tag} ${c.bold}building...${c.reset}`);
 
-    const child = spawn("npm", ["run", "build"], {
+    const child = spawn(buildCommand.file, buildCommand.args, {
       cwd: target.cwd,
       env: process.env,
+      shell: buildCommand.shell,
     });
 
     const prefix = (stream, isErr) => {
@@ -65,7 +83,23 @@ const runBuild = (target, color) =>
     prefix(child.stdout, false);
     prefix(child.stderr, true);
 
+    // A failed spawn (npm not found, say) fails this package instead of
+    // crashing the run. Node may follow it with `close`, so report once.
+    let reported = false;
+    child.on("error", (error) => {
+      console.error(
+        `${tag} ${c.red}could not start: ${error.message}${c.reset}`,
+      );
+      if (reported) return;
+      reported = true;
+      const duration = ((Date.now() - start) / 1000).toFixed(1);
+      results.push({ name: target.name, ok: false, code: null, duration });
+      done();
+    });
+
     child.on("close", (code) => {
+      if (reported) return;
+      reported = true;
       const duration = ((Date.now() - start) / 1000).toFixed(1);
       const ok = code === 0;
       const status = ok
