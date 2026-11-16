@@ -30,6 +30,18 @@ export const widgets: Widget[] = [
       "Paste an IXP `ProcessedDocument` and review it — widget-driven, or host-driven with `fetchProcessedDocumentArtifacts` and the save functions — with every save outcome logged.",
   },
   {
+    id: "classification-station",
+    title: "Classification Station",
+    description:
+      "Review document classification tasks: confirm or correct how a file was split into documents and which type each one is, with the split and the write-back handled by the widget.",
+  },
+  {
+    id: "document-viewer",
+    title: "Document Viewer",
+    description:
+      "The Document Understanding viewer on its own, over a validation task's document — page navigation from the host, and the reviewer's selection read back and pinned as a highlight.",
+  },
+  {
     id: "invoice-review-workspace",
     title: "Invoice Review Workspace",
     description:

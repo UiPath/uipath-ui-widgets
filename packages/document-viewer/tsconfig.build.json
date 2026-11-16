@@ -1,0 +1,18 @@
+{
+  // Emit config used by `npm run build`. Extends the editor tsconfig but turns
+  // emit back on and excludes tests/stories so only library source lands in dist.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "./src"
+  },
+  "include": ["src"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "test"
+  ]
+}

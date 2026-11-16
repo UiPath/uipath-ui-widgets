@@ -356,7 +356,11 @@ function ValidationStationPage({ uipathSdk }: ValidationStationPageProps) {
               setLoadedTaskId(loaded ? selectedTask.id : null);
               if (loaded) setFeedback(null);
             }}
-            onExtractionResultChanged={setExtraction}
+            onExtractionResultChanged={(result) => {
+              // A bucket task is always a Document Understanding document; an
+              // IXP one (`output`) never reaches this page.
+              if (!("output" in result)) setExtraction(result);
+            }}
             onSetFieldValueByPathResult={report("Value set")}
             onSelectAndFocusFieldValueByPathResult={report(
               "Field selected and focused",

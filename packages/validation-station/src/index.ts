@@ -22,9 +22,11 @@ export type {
   IVsSaveExceptionReportRequest,
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveValidatedDataRequest,
+  IVsTaxonomyFieldFocusRequestMessage,
   IVsWcMessage,
   IxpDocumentArtifacts,
   IXPExtraction,
+  IXPReviewedExtraction,
   IXPTaxonomy,
   SaveValidatedDataResult,
   SelectAndFocusFieldValueByPath,
@@ -32,6 +34,7 @@ export type {
   SetFieldValueByPath,
   SetFieldValueByPathResult,
   ValidationStationEventProps,
+  ValidationStationIntendedUse,
   ValidationStationArtifacts,
   ValidationStationProps,
   VsSaveResultEventProps,
@@ -54,6 +57,8 @@ export {
   saveProcessedDocumentAsDraft,
   submitProcessedDocument,
 } from "./processedDocument/save.js";
+export { toValidatedProcessedDocument } from "./processedDocument/review.js";
+export type { ValidatedProcessedDocument } from "./processedDocument/review.js";
 export type {
   ProcessedDocument,
   ProcessedDocumentMetadata,

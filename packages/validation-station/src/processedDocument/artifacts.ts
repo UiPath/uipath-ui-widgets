@@ -1,11 +1,14 @@
-import type { IXPExtraction } from "@uipath/du-validation-station-wc";
+import type {
+  IXPExtraction,
+  IXPReviewedExtraction,
+} from "@uipath/du-validation-station-wc";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import { gunzipSync, strFromU8 } from "fflate";
 import type { IxpDocumentArtifacts } from "../types.js";
 import { parseDigitizedDocument } from "./dom.js";
 import { validateProcessedDocument } from "./payload.js";
 import { type PlatformClient, createPlatformClient } from "./platformClient.js";
-import { parseReview } from "./review.js";
+import { parseReview, toReviewedExtraction } from "./review.js";
 import { resolveDocumentArtifacts } from "./spans.js";
 import type {
   ArtifactRef,
@@ -38,15 +41,16 @@ const gunzipToText = (data: ArrayBuffer): string =>
   strFromU8(gunzipSync(new Uint8Array(data)));
 
 // A failed lookup fails the load: opening on the payload's result instead
-// would let the next save overwrite the reviewer's draft with it.
+// would let the next save overwrite the reviewer's draft with it. Without a
+// draft, the payload's own `confirmations` open confirmed.
 async function resultToOpenOn(
   client: PlatformClient,
   anchor: FeedbackAnchor,
   payloadResult: IXPExtraction,
-): Promise<IXPExtraction> {
+): Promise<IXPReviewedExtraction> {
   const record = await client.findFeedback(anchor);
   const recorded = record?.metadata ? parseReview(record.metadata) : null;
-  return recorded ?? payloadResult;
+  return recorded ?? toReviewedExtraction(payloadResult);
 }
 
 // Loads under way, by SDK and payload. React's StrictMode runs effects twice in

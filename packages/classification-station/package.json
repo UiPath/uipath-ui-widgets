@@ -1,0 +1,69 @@
+{
+  "name": "@uipath/ui-widgets-classification-station",
+  "version": "1.0.0-rc.0",
+  "description": "A React component for UiPath Document Understanding Classification Station.",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prepack": "rimraf *.tgz",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage --run"
+  },
+  "keywords": [
+    "react",
+    "classification-station",
+    "classification",
+    "document-understanding",
+    "ui-widgets"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/UiPath/uipath-ui-widgets.git",
+    "directory": "packages/classification-station"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "peerDependencies": {
+    "@uipath/uipath-typescript": "^1.5.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/ui": "^4.0.18",
+    "jsdom": "^25.0.1",
+    "rimraf": "^6.0.1",
+    "typescript": "~5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "@uipath/du-classification-station-wc": "1.0.0-rc.2",
+    "@uipath/du-utils": "1.0.0-rc.3",
+    "fflate": "^0.8.2"
+  }
+}

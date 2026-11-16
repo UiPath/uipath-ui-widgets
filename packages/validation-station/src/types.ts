@@ -13,13 +13,17 @@ import type {
   IVsSaveExceptionReportRequest,
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveValidatedDataRequest,
+  IVsTaxonomyFieldFocusRequestMessage,
   IVsWcMessage,
   IXPExtraction,
+  IXPReviewedExtraction,
   IXPTaxonomy,
   SelectAndFocusFieldValueByPath,
   SelectAndFocusFieldValueByPathResult,
   SetFieldValueByPath,
   SetFieldValueByPathResult,
+  ValidationStationIntendedUse,
+  WcTheme,
 } from "@uipath/du-validation-station-wc";
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import type { SaveValidatedDataResult } from "./saveValidatedDataUtil.js";
@@ -46,16 +50,29 @@ export type {
   IVsSaveExceptionReportRequest,
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveValidatedDataRequest,
+  // `onWcMessage` members: the `taxonomy-field-focus-request` message.
+  IVsTaxonomyFieldFocusRequestMessage,
   IVsWcMessage,
-  // The IXP representation `ValidationStation` also takes.
+  // The IXP representation `ValidationStation` also takes. An
+  // `IXPReviewedExtraction` is an `IXPExtraction` plus the reviewer's
+  // `confirmations` — what an IXP draft and `onExtractionResultChanged` carry.
   IXPExtraction,
+  IXPReviewedExtraction,
   IXPTaxonomy,
   SaveValidatedDataResult,
   SelectAndFocusFieldValueByPath,
   SelectAndFocusFieldValueByPathResult,
   SetFieldValueByPath,
   SetFieldValueByPathResult,
+  // The values of `options.intendedUse`.
+  ValidationStationIntendedUse,
 };
+
+/**
+ * Theme id every DU element accepts. `future-light` and `future-dark` are the
+ * Apollo Modern themes. The web component's own `WcTheme`.
+ */
+export type DuTheme = WcTheme;
 
 export enum TelemetryEvent {
   Load = "ValidationStation.Load",
@@ -88,8 +105,6 @@ export enum ValidationStationLanguage {
   ChineseSimplified = "zh-CN",
   ChineseTraditional = "zh-TW",
 }
-
-export type DuTheme = "light" | "dark" | "light-hc" | "dark-hc";
 
 /**
  * The inputs every DU element takes, whichever one you render — as opposed to
@@ -149,9 +164,19 @@ export interface IxpDocumentArtifacts extends Omit<
   "taxonomy" | "extractionResult" | "predictedExtractionResult"
 > {
   taxonomy: IXPTaxonomy;
-  extractionResult: IXPExtraction;
-  /** None: the web component takes a prediction in the Document Understanding representation only. */
-  predictedExtractionResult?: never;
+  /**
+   * The result to review. Its optional `confirmations` (JSON Pointers into
+   * `attribution`) open those values confirmed; a bare `IXPExtraction` opens
+   * with nothing confirmed.
+   */
+  extractionResult: IXPReviewedExtraction;
+  /**
+   * The model's prediction, in the IXP representation like `extractionResult`
+   * — never with `confirmations`. Drives `EnablePredictionDiff`, as on
+   * {@link DuDocumentArtifacts}. Pre-fetched only: a Flow `ProcessedDocument`
+   * carries no prediction, so self-fetching leaves it unset.
+   */
+  predictedExtractionResult?: IXPExtraction | null;
 }
 
 /** The artifacts `ValidationStation` takes: either representation. */
@@ -176,8 +201,10 @@ export interface DuSaveCallbacks {
    * (bucket-backed document) and `submitProcessedDocument` (Flow document) do
    * what the widget would have done.
    *
-   * For a `processedDocument`, `request.validatedData` is an `IXPExtraction`:
-   * complete the task with it whatever `result` says.
+   * For a `processedDocument`, `result.processedDocument` is the validated
+   * document — the payload with its `result` replaced by
+   * `request.validatedData`: complete the task with it, verbatim, whatever
+   * `result.success` says.
    */
   onSubmit?: (
     request: IVsSaveValidatedDataRequest,
@@ -255,11 +282,17 @@ export interface VsStateEventProps {
   ) => void;
   /**
    * The element's message bus (`ui-du-vs-wc-message`): typed messages,
-   * discriminated on `type`. Today these are the value-indicator overlay's
-   * `indicator-overlay-show` / `indicator-overlay-hide`, for a host rendering
-   * its own popover — hide the built-in one with
-   * `::part(indicator-overlay) { display: none }`. `instanceId` tells elements
-   * apart when several report to one handler.
+   * discriminated on `type`, so switch on it and ignore types you don't know:
+   *
+   * - `indicator-overlay-show` / `indicator-overlay-hide` — the value-indicator
+   *   overlay, for a host rendering its own popover (hide the built-in one with
+   *   `::part(indicator-overlay) { display: none }`).
+   * - `taxonomy-field-focus-request` — an annotator clicked *Edit instructions*
+   *   on a prediction-diff warning; open `fieldId` of `documentTypeId` in your
+   *   taxonomy editor. Sent only with `options.intendedUse:
+   *   'document-annotation'`, and not by the table editor.
+   *
+   * `instanceId` tells elements apart when several report to one handler.
    */
   onWcMessage?: (message: IVsWcMessage) => void;
 }
@@ -284,6 +317,19 @@ export interface VsSaveResultEventProps {
  */
 export interface ValidationStationEventProps
   extends VsStateEventProps, VsSaveResultEventProps {
+  /**
+   * Every change to the extraction result, in the representation the document
+   * was supplied in: an `ExtractionResult` for a Document Understanding
+   * document, an {@link IXPReviewedExtraction} (with the current
+   * `confirmations`) for an IXP one. Feed it back as `extractionResult` to
+   * reopen with those confirmations.
+   *
+   * Requires `options={{ emitDtoStateChanges: true }}`; the element defaults
+   * the flag to `false`.
+   */
+  onExtractionResultChanged?: (
+    result: DuFramework.ExtractionResult | IXPReviewedExtraction,
+  ) => void;
   /**
    * Validity changed. `true` when no critical (Must) business rule is broken and
    * no field value fails validation — the element weighs both, and counts every

@@ -8,7 +8,10 @@ import type { SaveValidatedDataResult } from "../saveValidatedDataUtil.js";
 import { describeForHost } from "./errors.js";
 import { validateProcessedDocument } from "./payload.js";
 import { createPlatformClient } from "./platformClient.js";
-import { serializeReview } from "./review.js";
+import {
+  toValidatedProcessedDocument,
+  type ValidatedProcessedDocument,
+} from "./review.js";
 import type { FeedbackWrite, ProcessedDocument } from "./types.js";
 
 // Saves for one span run one at a time: find-then-create is not atomic, so two
@@ -51,25 +54,43 @@ async function recordReview(
 }
 
 /**
- * Records a submitted {@link ProcessedDocument} review. The downstream Flow
- * node reads the result from the task completion, so complete the task with
- * `request.validatedData` whatever the outcome.
+ * Records a submitted {@link ProcessedDocument} review, and returns the
+ * validated document as `result.processedDocument`: the payload with its
+ * `result` replaced by `request.validatedData` and `metadata.hitl.draft:
+ * false`. The downstream Flow node reads it from the task completion, so
+ * complete the task with that document, verbatim, whatever `success` says —
+ * a failed record write does not stop the review from completing.
  */
-export function submitProcessedDocument(
+export async function submitProcessedDocument(
   sdk: UiPath,
   processedDocument: ProcessedDocument,
   request: IVsSaveValidatedDataRequest,
 ): Promise<SaveValidatedDataResult> {
-  return recordReview(sdk, processedDocument, () => ({
+  let validated: ValidatedProcessedDocument;
+  try {
+    // An invalid payload is refused before anything is built, so a host never
+    // completes a task with a document the station could not have reviewed.
+    validateProcessedDocument(processedDocument);
+    validated = toValidatedProcessedDocument(
+      processedDocument,
+      request.validatedData,
+      false,
+    );
+  } catch (error) {
+    return { success: false, error: describeForHost(error) };
+  }
+  const outcome = await recordReview(sdk, processedDocument, () => ({
     isPositive: true,
-    metadata: serializeReview(request.validatedData, false),
+    metadata: JSON.stringify(validated),
   }));
+  return { ...outcome, processedDocument: validated };
 }
 
 /**
  * Saves a draft of a {@link ProcessedDocument} review; the next load opens on
- * it. Writes the same record as a submit, flagged `draft` — what makes a
- * submit final is the host completing the task.
+ * it, with the reviewer's confirmations. Writes the same record as a submit,
+ * flagged `metadata.hitl.draft: true` — what makes a submit final is the host
+ * completing the task.
  */
 export function saveProcessedDocumentAsDraft(
   sdk: UiPath,
@@ -78,7 +99,13 @@ export function saveProcessedDocumentAsDraft(
 ): Promise<SaveValidatedDataResult> {
   return recordReview(sdk, processedDocument, () => ({
     isPositive: true,
-    metadata: serializeReview(request.validatedData, true),
+    metadata: JSON.stringify(
+      toValidatedProcessedDocument(
+        processedDocument,
+        request.validatedData,
+        true,
+      ),
+    ),
   }));
 }
 

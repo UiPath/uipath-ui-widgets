@@ -12,6 +12,8 @@ on:
           - datatable
           - conversational-agent-chat
           - validation-station
+          - classification-station
+          - document-viewer
           - external-auth
           - pdf-viewer
           - decisions-and-reasons

@@ -48,7 +48,7 @@ export interface DocumentArtifactRefs {
 /** An edit replaces the whole record, so an absent field is sent as `null`. */
 export interface FeedbackWrite {
   isPositive: boolean;
-  /** A serialized {@link RecordedReview}. */
+  /** A serialized `ValidatedProcessedDocument`. */
   metadata?: string;
   comment?: string;
 }
