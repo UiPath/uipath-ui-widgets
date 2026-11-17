@@ -631,7 +631,7 @@ What it does need is the package copied into `public/`, which Vite serves verbat
     "prebuild": "npm run stage-du-wc"
   },
   "devDependencies": {
-    "@uipath/du-validation-station-wc": "1.0.0-rc.5"
+    "@uipath/du-validation-station-wc": "1.0.0-rc.6"
   }
 }
 ```
@@ -665,11 +665,29 @@ so `includeFonts: true` against one of those links the Apollo fonts too.
 - **CSP.** Serving from your own origin needs no more than `script-src 'self'`. A separate origin must be added to `script-src` and `style-src`, and note that the loader offers no Subresource Integrity hook — self-hosting avoids that exposure entirely.
 - **Version skew.** The URL decides which web component version actually runs, and it is not checked against the installed `@uipath/du-validation-station-wc`. Keep the hosted copy in step with the version this package's types are built against.
 
-## Web component 1.0.0-rc.5
+## Web component 1.0.0-rc.6
 
-The widgets now render `@uipath/du-validation-station-wc` `1.0.0-rc.5`. Keep the
+The widgets now render `@uipath/du-validation-station-wc` `1.0.0-rc.6`. Keep the
 hosted copy in step (see _Version skew_ above). No prop of this package was
 removed or renamed, but the web component changes a few things you will see.
+
+From rc.6:
+
+- **A `ProcessedDocument` opens in the modern display mode.** It carries no
+  customizations, so it previously opened in compact.
+- **New UI, on by default in compact and modern:** a "_3 of 10 confirmed_"
+  counter in the field filter bar, and a _Replace value_ button on filled
+  fields and table cells that replaces the value with the words selected in
+  the document.
+- **New options:**
+  `documentViewerOptions.floatingButtonsOptions.showDownloadButton` adds a
+  _Download document_ entry to the viewer's menu, which saves the original
+  file; `options.hideDiscardButton` hides the _Discard_ button and its
+  keyboard shortcut, for a host that offers its own discard. Both are off by
+  default.
+
+The full list is in the web component's
+[changelog](https://www.npmjs.com/package/@uipath/du-validation-station-wc?activeTab=code).
 
 > **Warning: The Flow review record and the task completion changed**
 > This release follows the Angular Validation Station in how a `ProcessedDocument` review is recorded and completed. A review is now stored as the validated `ProcessedDocument` (`metadata.hitl.draft` telling a draft from a submit) instead of `{ draft, extraction }`, and a draft saved in the old envelope no longer reopens — the document opens on the payload's `result`. Complete the task with a submit's `result.processedDocument` rather than `request.validatedData`. See [IXP (`ProcessedDocument`)](#ixp-processeddocument).
