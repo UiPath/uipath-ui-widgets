@@ -11,6 +11,8 @@
     "packages/datatable",
     "packages/conversational-agent-chat",
     "packages/validation-station",
+    "packages/classification-station",
+    "packages/document-viewer",
     "packages/external-auth",
     "packages/pdf-viewer",
     "packages/decisions-and-reasons"
@@ -41,6 +43,8 @@
     "@emotion/styled": "^11.14.1",
     "@fontsource/roboto": "^5.2.9",
     "@mui/material": "^7.3.5",
+    "@uipath/ui-widgets-classification-station": "file:./packages/classification-station/dist",
+    "@uipath/ui-widgets-document-viewer": "file:./packages/document-viewer/dist",
     "@uipath/ui-widgets-external-auth": "file:./packages/external-auth/dist",
     "@uipath/ui-widgets-conversational-agent-chat": "file:./packages/conversational-agent-chat/dist",
     "@uipath/ui-widgets-datatable": "file:./packages/datatable/dist",

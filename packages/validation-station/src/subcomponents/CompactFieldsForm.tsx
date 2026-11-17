@@ -76,7 +76,9 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
       { onSubmit, onSaveAsDraft, onReportException },
     );
 
-  const ref = useWcRef<ICompactFieldsFormStandaloneWcEventMap>(
+  // Its artifacts are always the Document Understanding representation, so its
+  // events carry that one only.
+  const ref = useWcRef<ICompactFieldsFormStandaloneWcEventMap<"du">>(
     {
       loaded: onLoaded,
       dirty: onDirtyChange,

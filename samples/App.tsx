@@ -1,8 +1,10 @@
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import { useEffect, useState } from "react";
 import "./App.css";
+import ClassificationStationPage from "./pages/ClassificationStationPage";
 import ConversationalAgentPage from "./pages/ConversationalAgentPage";
 import DataTablePage from "./pages/DataTablePage";
+import DocumentViewerPage from "./pages/DocumentViewerPage";
 import HomePage from "./pages/HomePage";
 import InvoiceReviewWorkspacePage from "./pages/InvoiceReviewWorkspace";
 import MultiFileUploadPage from "./pages/MultiFileUploadPage";
@@ -42,6 +44,12 @@ function App({ uipathSdk }: AppProps) {
       break;
     case "validation-station-ixp":
       page = <ValidationStationIxpPage uipathSdk={uipathSdk} />;
+      break;
+    case "classification-station":
+      page = <ClassificationStationPage uipathSdk={uipathSdk} />;
+      break;
+    case "document-viewer":
+      page = <DocumentViewerPage uipathSdk={uipathSdk} />;
       break;
     case "invoice-review-workspace":
       page = <InvoiceReviewWorkspacePage uipathSdk={uipathSdk} />;

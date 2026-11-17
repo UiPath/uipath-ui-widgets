@@ -105,11 +105,14 @@ Every bucket call is scoped to the folder `data` names — `FolderId`, or `Folde
 The two modes can be mixed: pass `artifacts` **and** `sdk` + `data` to skip the fetch while keeping the built-in write-back — `onSubmit` then receives the outcome as well.
 
 > **Info: `DuDocumentArtifacts`**
-> `{ taxonomy, extractionResult, predictedExtractionResult?, dom, text, customizationInfo, original }` — `original` is the base64-encoded document the viewer renders. In `DuDocumentArtifacts`, `taxonomy` and `extractionResult` are UiPath DU contracts. `ValidationStation` also takes `IxpDocumentArtifacts`, the same shape with both in the IXP representation (an `IXPTaxonomy` JSON Schema and an `IXPExtraction`) and no `predictedExtractionResult`; the subcomponents take `DuDocumentArtifacts` only.
+> `{ taxonomy, extractionResult, predictedExtractionResult?, dom, text, customizationInfo, original }` — `original` is the base64-encoded document the viewer renders. In `DuDocumentArtifacts`, `taxonomy` and `extractionResult` are UiPath DU contracts. `ValidationStation` also takes `IxpDocumentArtifacts`, the same shape with all three in the IXP representation (an `IXPTaxonomy` JSON Schema, an `IXPReviewedExtraction` — an `IXPExtraction` plus optional `confirmations` — and an optional `IXPExtraction` prediction); the subcomponents take `DuDocumentArtifacts` only.
 
 ### Comparing against the prediction
 
-`predictedExtractionResult` is the model's prediction — the extraction output nobody edited — as opposed to `extractionResult`, the result the user reviews. Self-fetching fills it from `AutomaticExtractionResultsPath`; in pre-fetched mode it is optional, and a hand-built `DuDocumentArtifacts` without it is still valid. It is a UiPath DU contract, so only a Document Understanding document carries one — an IXP document (including a Flow `ProcessedDocument`) has no prediction.
+`predictedExtractionResult` is the model's prediction — the extraction output nobody edited — as opposed to `extractionResult`, the result the user reviews. Self-fetching fills it from `AutomaticExtractionResultsPath`; in pre-fetched mode it is optional, and a hand-built `DuDocumentArtifacts` without it is still valid. Supply it in the same representation as `extractionResult`: an `IXPExtraction` on `IxpDocumentArtifacts`. A Flow `ProcessedDocument` carries no prediction, so self-fetching one leaves it unset.
+
+> **Warning: Change it together with `extractionResult`**
+> Once the element has paired a prediction with the loaded values, assigning a different `predictedExtractionResult` (or `null`) on its own reloads the last `extractionResult` it was fed and drops unsaved edits. With `EnablePredictionDiff` on, the element also inserts predicted rows and values the result lacks, as unconfirmed values the user confirms or deletes.
 
 By itself it changes nothing visible. It drives the `EnablePredictionDiff` customization flag (compact mode, on `ValidationStation`, `CompactFieldsForm` and `CompactTableEditor`): where the prediction differs from the current values, the element shows the predicted value with a button that takes it over. Like every customization flag, it lives under `FeatureCustomization` in `customizationInfo` — typed by the exported `ICustomizationInfoDTO` / `IFeatureCustomization`:
 
@@ -189,26 +192,26 @@ A Flow IDP node emits a `ProcessedDocument` rather than a `ContentValidationData
 <ValidationStation
   sdk={sdk}
   processedDocument={task.data}
-  onSubmit={(request) => completeTask(request.validatedData)}
+  onSubmit={(request, result) => completeTask(result?.processedDocument)}
 />
 ```
 
-- **Loading.** The document opens on the result last saved against the producing span (a draft), else on the payload's `result`. `documentId` defaults to `metadata.traceId`.
-- **Saving.** Submit and draft record the review against the producing span; report-as-exception records a rejection with the reason. `onSubmit`, `onSaveAsDraft` and `onReportException` receive the outcome as their second argument. `request.validatedData` is an `IXPExtraction`.
-- **Record format.** A review is stored as `{ draft, extraction }` — `draft: true` for a draft, `false` for a submit — the shape the Angular Validation Station uses, so either reopens a review the other saved. A record in any other shape is ignored on load.
-- **Completing the task is yours.** The downstream Flow node reads the validated result from the task completion, so complete it with `request.validatedData` whatever the outcome says.
+- **Loading.** The document opens on the result last saved against the producing span (a draft), else on the payload's `result`. A draft reopens with the values the reviewer had confirmed. `documentId` defaults to `metadata.traceId`.
+- **Saving.** Submit and draft record the review against the producing span; report-as-exception records a rejection with the reason. `onSubmit`, `onSaveAsDraft` and `onReportException` receive the outcome as their second argument. `request.validatedData` is an `IXPExtraction` on submit, and an `IXPReviewedExtraction` — the same plus the reviewer's `confirmations` — on a draft.
+- **Record format.** A review is stored as the `ProcessedDocument` the widget was given, with its `result` replaced by the validated one and `metadata.hitl.draft` set — `true` for a draft, `false` for a submit. This is the shape the Angular Validation Station uses, so either reopens a review the other saved. A record in any other shape — including the `{ draft, extraction }` envelope both used before — is ignored on load, and the document opens on the payload's `result`.
+- **Completing the task is yours.** The downstream Flow node reads the validated document from the task completion. A submit's `result.processedDocument` is that document — the same one the record holds, a `ValidatedProcessedDocument` — so complete the task with it, verbatim, whatever `result.success` says: a failed record write must not block the review. `toValidatedProcessedDocument(processedDocument, validatedData, draft)` builds it when you persist yourself.
 - **Scope.** Only `ValidationStation` takes `processedDocument` or an IXP document; the [subcomponents](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/validation-station-subcomponents.md) take Document Understanding documents (`DuDocumentArtifacts`) only.
 - **OAuth scopes.** The `sdk`'s token needs `Traces.Api` (the run's spans, and the review record) and `OR.Buckets.Read` (the document, DOM and OCR text, via ECS). A coded action app completing the task also needs `OR.Tasks`. A missing scope surfaces as a 401/403 in the load or save error.
 - **Hosting.** The artifacts are downloaded in the browser from pre-signed ECS storage URLs, so the host's origin must be in the ECS storage account's CORS rules. Coded apps (`https://{org}.{env}.uipath.host`) are.
 
 The widget does this through exported functions, so a host that fetches up front runs exactly the same code:
 
-| Export                                                              | Use                                                                                  |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `fetchProcessedDocumentArtifacts(sdk, processedDocument)`           | Fetch the `IxpDocumentArtifacts` — what the widget fetches given `processedDocument` |
-| `submitProcessedDocument(sdk, processedDocument, request)`          | Record a submitted review                                                            |
-| `saveProcessedDocumentAsDraft(sdk, processedDocument, request)`     | Record a draft — the one the next load opens on                                      |
-| `reportProcessedDocumentException(sdk, processedDocument, request)` | Record a rejection with the reviewer's reason. Replaces a saved draft                |
+| Export                                                              | Use                                                                                             |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `fetchProcessedDocumentArtifacts(sdk, processedDocument)`           | Fetch the `IxpDocumentArtifacts` — what the widget fetches given `processedDocument`            |
+| `submitProcessedDocument(sdk, processedDocument, request)`          | Record a submitted review; its result carries the `processedDocument` to complete the task with |
+| `saveProcessedDocumentAsDraft(sdk, processedDocument, request)`     | Record a draft — the one the next load opens on                                                 |
+| `reportProcessedDocumentException(sdk, processedDocument, request)` | Record a rejection with the reviewer's reason. Replaces a saved draft                           |
 
 ```tsx
 const artifacts = await fetchProcessedDocumentArtifacts(sdk, processedDocument);
@@ -216,8 +219,13 @@ const artifacts = await fetchProcessedDocumentArtifacts(sdk, processedDocument);
 <ValidationStation
   artifacts={artifacts}
   onSubmit={async (request) => {
-    await submitProcessedDocument(sdk, processedDocument, request);
-    completeTask(request.validatedData);
+    const result = await submitProcessedDocument(
+      sdk,
+      processedDocument,
+      request,
+    );
+    // Undefined only for a payload the station could not have reviewed.
+    if (result.processedDocument) completeTask(result.processedDocument);
   }}
   onSaveAsDraft={(request) =>
     saveProcessedDocumentAsDraft(sdk, processedDocument, request)
@@ -229,24 +237,24 @@ The save functions are stateless: each one edits the span's newest review record
 
 ## Props
 
-| Prop                             | Type                                           | Required | Default   | Description                                                                                                                                                                                                                                                            |
-| -------------------------------- | ---------------------------------------------- | -------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sdk`                            | `UiPath`                                       | No\*     | —         | UiPath SDK instance for authentication and API calls. Required for self-fetching / persistence                                                                                                                                                                         |
-| `data`                           | `ContentValidationData`                        | No\*     | —         | Document data containing the bucket paths, document ID, and the folder they live in — `FolderId` or `FolderKey`, whichever the producing activity set. Required for self-fetching / persistence                                                                        |
-| `processedDocument`              | `ProcessedDocument`                            | No\*     | —         | A Flow IDP node's output. With `sdk`, the widget fetches its artifacts and records reviews through the producing run — see [IXP documents](#ixp-documents-processeddocument). Ignored when `data` is set                                                               |
-| `artifacts`                      | `DuDocumentArtifacts \| IxpDocumentArtifacts`  | No\*     | —         | Pre-fetched document artifacts. When supplied, no fetch is performed. \*Either `artifacts`, `sdk` + `data` or `sdk` + `processedDocument` must be provided                                                                                                             |
-| `documentId`                     | `string`                                       | No       | —         | Document ID forwarded to the web component. Falls back to `data.DocumentId`, else `processedDocument.metadata.traceId` — pass it in pre-fetched mode                                                                                                                   |
-| `theme`                          | `'light' \| 'dark' \| 'light-hc' \| 'dark-hc'` | No       | `'light'` | Visual theme                                                                                                                                                                                                                                                           |
-| `language`                       | `ValidationStationLanguage`                    | No       | `English` | UI language (see [the enum](#language-enum))                                                                                                                                                                                                                           |
-| `isReadonly`                     | `boolean`                                      | No       | `false`   | When `true`, renders in read-only mode                                                                                                                                                                                                                                 |
-| `persistent`                     | `boolean`                                      | No       | `false`   | Render the persistent element variant, which survives portal/DOM detachment (e.g. tab switches)                                                                                                                                                                        |
-| `options`                        | `IValidationStationOptions`                    | No       | —         | Fine-grained UI feature flags, passed through to the element as given                                                                                                                                                                                                  |
-| `save={{ validate: false }}`     | `{ validate: boolean }`                        | No       | —         | Trigger **save as draft**                                                                                                                                                                                                                                              |
-| `save={{ validate: true }}`      | `{ validate: boolean }`                        | No       | —         | Trigger **submit** — runs validation first, then saves                                                                                                                                                                                                                 |
-| `discardChanges`                 | `{ value: boolean }`                           | No       | —         | Trigger a discard-changes operation. Call `setDiscardChanges({ value: true })` (or `false` — the boolean is ignored) every time you want it to fire. Each call creates a brand-new object even if the content looks identical, and that is what the widget watches for |
-| `setFieldValueByPath`            | `SetFieldValueByPath`                          | No       | —         | Set a field value addressed by a path of `{ fieldName, valueIndex }` segments                                                                                                                                                                                          |
-| `selectAndFocusFieldValueByPath` | `SelectAndFocusFieldValueByPath`               | No       | —         | Select and focus a field value addressed by a path; focuses the document reference if any                                                                                                                                                                              |
-| `deleteFieldValueByPath`         | `DeleteFieldValueByPath`                       | No       | —         | Delete a field value addressed by a path                                                                                                                                                                                                                               |
+| Prop                             | Type                                          | Required | Default   | Description                                                                                                                                                                                                                                                            |
+| -------------------------------- | --------------------------------------------- | -------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sdk`                            | `UiPath`                                      | No\*     | —         | UiPath SDK instance for authentication and API calls. Required for self-fetching / persistence                                                                                                                                                                         |
+| `data`                           | `ContentValidationData`                       | No\*     | —         | Document data containing the bucket paths, document ID, and the folder they live in — `FolderId` or `FolderKey`, whichever the producing activity set. Required for self-fetching / persistence                                                                        |
+| `processedDocument`              | `ProcessedDocument`                           | No\*     | —         | A Flow IDP node's output. With `sdk`, the widget fetches its artifacts and records reviews through the producing run — see [IXP documents](#ixp-documents-processeddocument). Ignored when `data` is set                                                               |
+| `artifacts`                      | `DuDocumentArtifacts \| IxpDocumentArtifacts` | No\*     | —         | Pre-fetched document artifacts. When supplied, no fetch is performed. \*Either `artifacts`, `sdk` + `data` or `sdk` + `processedDocument` must be provided                                                                                                             |
+| `documentId`                     | `string`                                      | No       | —         | Document ID forwarded to the web component. Falls back to `data.DocumentId`, else `processedDocument.metadata.traceId` — pass it in pre-fetched mode                                                                                                                   |
+| `theme`                          | `DuTheme`                                     | No       | `'light'` | Visual theme: `'light'`, `'dark'`, `'light-hc'`, `'dark-hc'`, or the Apollo Modern `'future-light'` / `'future-dark'`                                                                                                                                                  |
+| `language`                       | `ValidationStationLanguage`                   | No       | `English` | UI language (see [the enum](#language-enum))                                                                                                                                                                                                                           |
+| `isReadonly`                     | `boolean`                                     | No       | `false`   | When `true`, renders in read-only mode                                                                                                                                                                                                                                 |
+| `persistent`                     | `boolean`                                     | No       | `false`   | Render the persistent element variant, which survives portal/DOM detachment (e.g. tab switches)                                                                                                                                                                        |
+| `options`                        | `IValidationStationOptions`                   | No       | —         | Fine-grained UI feature flags, passed through to the element as given                                                                                                                                                                                                  |
+| `save={{ validate: false }}`     | `{ validate: boolean }`                       | No       | —         | Trigger **save as draft**                                                                                                                                                                                                                                              |
+| `save={{ validate: true }}`      | `{ validate: boolean }`                       | No       | —         | Trigger **submit** — runs validation first, then saves                                                                                                                                                                                                                 |
+| `discardChanges`                 | `{ value: boolean }`                          | No       | —         | Trigger a discard-changes operation. Call `setDiscardChanges({ value: true })` (or `false` — the boolean is ignored) every time you want it to fire. Each call creates a brand-new object even if the content looks identical, and that is what the widget watches for |
+| `setFieldValueByPath`            | `SetFieldValueByPath`                         | No       | —         | Set a field value addressed by a path of `{ fieldName, valueIndex }` segments                                                                                                                                                                                          |
+| `selectAndFocusFieldValueByPath` | `SelectAndFocusFieldValueByPath`              | No       | —         | Select and focus a field value addressed by a path; focuses the document reference if any                                                                                                                                                                              |
+| `deleteFieldValueByPath`         | `DeleteFieldValueByPath`                      | No       | —         | Delete a field value addressed by a path                                                                                                                                                                                                                               |
 
 The three save callbacks (`onSubmit`, `onSaveAsDraft`, `onReportException`) are documented [below](#reacting-to-save-draft-and-exception-flows); the state callbacks in [Reading the document state](#reading-the-document-state).
 
@@ -317,23 +325,23 @@ function App({ sdk, data, task }) {
 
 These callbacks report the rest of the element's `IValidationStationStandaloneWcEventMap`; the three save flows are above.
 
-| Prop                                     | Fires when                                                                            |
-| ---------------------------------------- | ------------------------------------------------------------------------------------- |
-| `onExtractionResultChanged`              | Any change to the extraction result — needs `options={{ emitDtoStateChanges: true }}` |
-| `onLoaded`                               | The element finished loading                                                          |
-| `onDirtyChange`                          | Unsaved changes appear or are cleared                                                 |
-| `onIsValidChange`                        | Validity flips (`true` = no Must rule broken, no invalid values)                      |
-| `onDocumentTypeChanged`                  | The user picks another document type                                                  |
-| `onFieldValueSelected`                   | The user selects a field value                                                        |
-| `onFieldValueChanged`                    | The user edits a field value                                                          |
-| `onBusinessRulesEvaluated`               | Validation errors and business rules are re-evaluated                                 |
-| `onSaveResult`                           | A `save` command completes                                                            |
-| `onSetFieldValueByPathResult`            | A `setFieldValueByPath` command completes                                             |
-| `onSelectAndFocusFieldValueByPathResult` | A `selectAndFocusFieldValueByPath` command completes                                  |
-| `onDeleteFieldValueByPathResult`         | A `deleteFieldValueByPath` command completes                                          |
-| `onFieldsPanelWidthChanged`              | The fields panel is resized (width in px)                                             |
-| `onFieldsPanelSideChanged`               | The panel moves to the other side of the viewer                                       |
-| `onWcMessage`                            | The element publishes a message on its bus (`ui-du-vs-wc-message`) — see below        |
+| Prop                                     | Fires when                                                                                                                                                          |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `onExtractionResultChanged`              | Any change to the extraction result — needs `options={{ emitDtoStateChanges: true }}`. An IXP document reports an `IXPReviewedExtraction`, with its `confirmations` |
+| `onLoaded`                               | The element finished loading                                                                                                                                        |
+| `onDirtyChange`                          | Unsaved changes appear or are cleared                                                                                                                               |
+| `onIsValidChange`                        | Validity flips (`true` = no Must rule broken, no invalid values)                                                                                                    |
+| `onDocumentTypeChanged`                  | The user picks another document type                                                                                                                                |
+| `onFieldValueSelected`                   | The user selects a field value                                                                                                                                      |
+| `onFieldValueChanged`                    | The user edits a field value                                                                                                                                        |
+| `onBusinessRulesEvaluated`               | Validation errors and business rules are re-evaluated                                                                                                               |
+| `onSaveResult`                           | A `save` command completes                                                                                                                                          |
+| `onSetFieldValueByPathResult`            | A `setFieldValueByPath` command completes                                                                                                                           |
+| `onSelectAndFocusFieldValueByPathResult` | A `selectAndFocusFieldValueByPath` command completes                                                                                                                |
+| `onDeleteFieldValueByPathResult`         | A `deleteFieldValueByPath` command completes                                                                                                                        |
+| `onFieldsPanelWidthChanged`              | The fields panel is resized (width in px)                                                                                                                           |
+| `onFieldsPanelSideChanged`               | The panel moves to the other side of the viewer                                                                                                                     |
+| `onWcMessage`                            | The element publishes a message on its bus (`ui-du-vs-wc-message`) — see below                                                                                      |
 
 > **Attention: Commands need a loaded document**
 > `setFieldValueByPath`, `selectAndFocusFieldValueByPath` and `deleteFieldValueByPath` resolve their `path` against the taxonomy and the current extraction result, so one issued before those arrive fails to resolve. Gate on `onLoaded`, and wire the matching `*Result` callback — it carries the reason (`No field value found at path …`), which is otherwise invisible.
@@ -362,6 +370,23 @@ ui-du-validation-station-standalone-wc-element::part(indicator-overlay) {
 ```
 
 `message.instanceId` tells elements apart when several report to one handler. `CompactFieldsForm`, `CompactTableEditor` and `CompactBusinessRules` take `onWcMessage` too.
+
+### Opening a field in your taxonomy editor
+
+An annotation host — one that sets `options={{ intendedUse: "document-annotation" }}` — gets an _Edit instructions_ link on each prediction-diff warning. Clicking it publishes `taxonomy-field-focus-request` on the same bus, naming the field group or table (`fieldId`) and its `documentTypeId`:
+
+```tsx
+<ValidationStation
+  artifacts={artifacts}
+  options={{ intendedUse: "document-annotation" }}
+  onWcMessage={(message) => {
+    if (message.type === "taxonomy-field-focus-request")
+      openTaxonomyField(message.documentTypeId, message.fieldId);
+  }}
+/>
+```
+
+`ValidationStation` and `CompactFieldsForm` publish it; the table editor does not. Since `IVsWcMessage` gained this member, an exhaustive `switch` over `message.type` needs a new case.
 
 ## Language enum
 
@@ -408,8 +433,11 @@ import type {
   ValidationStationArtifacts,
   IXPTaxonomy,
   IXPExtraction,
+  IXPReviewedExtraction,
   ProcessedDocument,
-  IVsWcMessage,
+  ValidatedProcessedDocument,
+  DuTheme,
+  ValidationStationIntendedUse,
   IValidationStationOptions,
   FieldFilterOptions,
   DocumentViewerOptions,
@@ -417,6 +445,7 @@ import type {
   IFeatureCustomization,
   IVsWcMessage,
   IVsIndicatorOverlayContext,
+  IVsTaxonomyFieldFocusRequestMessage,
   IVsSaveValidatedDataRequest,
   IVsSaveValidatedDataAsDraftRequest,
   IVsSaveExceptionReportRequest,
@@ -602,7 +631,7 @@ What it does need is the package copied into `public/`, which Vite serves verbat
     "prebuild": "npm run stage-du-wc"
   },
   "devDependencies": {
-    "@uipath/du-validation-station-wc": "1.0.0-rc.3"
+    "@uipath/du-validation-station-wc": "1.0.0-rc.5"
   }
 }
 ```
@@ -636,11 +665,62 @@ so `includeFonts: true` against one of those links the Apollo fonts too.
 - **CSP.** Serving from your own origin needs no more than `script-src 'self'`. A separate origin must be added to `script-src` and `style-src`, and note that the loader offers no Subresource Integrity hook — self-hosting avoids that exposure entirely.
 - **Version skew.** The URL decides which web component version actually runs, and it is not checked against the installed `@uipath/du-validation-station-wc`. Keep the hosted copy in step with the version this package's types are built against.
 
-## Web component 1.0.0-rc.3
+## Web component 1.0.0-rc.5
 
-The widgets now render `@uipath/du-validation-station-wc` `1.0.0-rc.3`. Keep the
+The widgets now render `@uipath/du-validation-station-wc` `1.0.0-rc.5`. Keep the
 hosted copy in step (see _Version skew_ above). No prop of this package was
 removed or renamed, but the web component changes a few things you will see.
+
+> **Warning: The Flow review record and the task completion changed**
+> This release follows the Angular Validation Station in how a `ProcessedDocument` review is recorded and completed. A review is now stored as the validated `ProcessedDocument` (`metadata.hitl.draft` telling a draft from a submit) instead of `{ draft, extraction }`, and a draft saved in the old envelope no longer reopens — the document opens on the payload's `result`. Complete the task with a submit's `result.processedDocument` rather than `request.validatedData`. See [IXP (`ProcessedDocument`)](#ixp-processeddocument).
+
+From rc.5 — read the behaviour changes before upgrading:
+
+- **A value with a validation error can no longer be confirmed**, nor the row,
+  table or field group containing it. `setFieldValueByPath` follows suit:
+  `OperatorConfirmed: true` on such a value fails with `success: false` and
+  applies nothing, and without `OperatorConfirmed` an updated value is
+  confirmed only when valid.
+- **IXP documents keep their confirmations.** `extractionResult` takes an
+  `IXPReviewedExtraction` (`confirmations` are JSON Pointers of confirmed
+  values), `onExtractionResultChanged` now fires for IXP documents, and a
+  draft carries the confirmations, so a saved draft reopens with them. A bare
+  `IXPExtraction` still opens with nothing confirmed.
+- **IXP citations are rewritten on save.** `validatedData` cites every value
+  afresh with `references` in page units plus `pageWidth` / `pageHeight`;
+  `boundingBoxes` is deprecated and written for words only.
+- **`EnablePredictionDiff` inserts missing predicted values**, and changing
+  `predictedExtractionResult` alone resets the element — see
+  [Comparing against the prediction](#comparing-against-the-prediction).
+- **New compact UI, on by default:** a confirm-all checkbox on each field
+  group, clickable line numbers in the table editor, an autocomplete box for
+  set fields, and field filters that reach inside field groups. Field-group
+  rows are now called _instances_.
+- **The value-indicator popover's custom properties are renamed** from
+  `--du-vs-indicator-overlay-*` to `--ui-hover-popover-*` (`padding`,
+  `shadow`, `radius`, `background`). Old names are silently ignored.
+- **New options:** `options.intendedUse` (`'extraction-validation'` or
+  `'document-annotation'`), `documentViewerOptions.hideReferencedFieldsPopover`,
+  and the `FeatureCustomization` flags `DisableKeyboardShortcuts`,
+  `EnableFieldGroupTableView`, `EnableMarkReferenceAsMissing` and
+  `DistinguishUnconfirmedValues`.
+- **New message:** `taxonomy-field-focus-request` on `onWcMessage` — see
+  [Opening a field in your taxonomy editor](#opening-a-field-in-your-taxonomy-editor).
+- **New themes:** `theme` accepts the Apollo Modern `'future-light'` and
+  `'future-dark'`.
+- **`DocumentViewer` is deprecated**, following the web component's own
+  document-viewer element. For a viewer that does not need `instanceId`
+  linking, use [`@uipath/ui-widgets-document-viewer`](https://github.com/UiPath/uipath-ui-widgets/tree/develop/packages/document-viewer).
+
+From rc.4:
+
+- **IXP predictions.** `IxpDocumentArtifacts` takes an `IXPExtraction`
+  `predictedExtractionResult`, so an IXP document can show the prediction diff.
+- **Single-instance field groups** in IXP taxonomies (a nullable `object`)
+  render as one row; such a taxonomy failed to load before.
+- **New compact UI, on by default:** a _No taxonomy defined_ state (text via
+  `options.emptyTaxonomyMessage`), a _Duplicate row_ action and column freezing
+  in the table editor, and a **Shift+N** shortcut to the next flagged value.
 
 From rc.3:
 

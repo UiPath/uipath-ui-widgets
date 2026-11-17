@@ -7,14 +7,25 @@ import type {
 import { Tasks, TaskType } from "@uipath/uipath-typescript/tasks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+/** The Document Understanding task types these samples open. */
+export type DuTaskType =
+  | TaskType.DocumentValidation
+  | TaskType.DocumentClassification;
+
 /**
- * The document-validation task queue and the currently open task, shared by the
- * Validation Station sample pages.
+ * The task queue of one Document Understanding task type and the currently
+ * open task, shared by the Validation Station, Classification Station and
+ * document viewer sample pages. `Data` is the task's bucket descriptor: a
+ * `ContentValidationData` for document validation, a `CsContentValidationData`
+ * for document classification.
  *
  * `getAll()` rows carry no `data`, so the selected task is re-fetched with
- * `getById` to obtain its `ContentValidationData`.
+ * `getById` to obtain its descriptor.
  */
-export function useDocumentValidationTasks(uipathSdk: UiPath) {
+export function useDocumentValidationTasks<
+  Data extends { FolderId?: number; FolderKey?: string } =
+    DuFramework.ContentValidationData,
+>(uipathSdk: UiPath, taskType: DuTaskType = TaskType.DocumentValidation) {
   const [taskList, setTaskList] = useState<RawTaskGetResponse[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
@@ -37,9 +48,9 @@ export function useDocumentValidationTasks(uipathSdk: UiPath) {
       setTasksLoading(true);
       const tasksService = new Tasks(uipathSdk);
       // Filter server-side: the tenant may hold thousands of tasks of every
-      // type, and only document-validation ones open in this widget.
+      // type, and only one type opens in each widget.
       const result = await tasksService.getAll({
-        filter: `Type eq '${TaskType.DocumentValidation}'`,
+        filter: `Type eq '${taskType}'`,
         orderby: "CreationTime desc",
         pageSize: 100,
       });
@@ -49,7 +60,7 @@ export function useDocumentValidationTasks(uipathSdk: UiPath) {
     } finally {
       setTasksLoading(false);
     }
-  }, [uipathSdk]);
+  }, [uipathSdk, taskType]);
 
   useEffect(() => {
     fetchTasks();
@@ -77,7 +88,7 @@ export function useDocumentValidationTasks(uipathSdk: UiPath) {
         const tasksService = new Tasks(uipathSdk);
         const task = await tasksService.getById(
           selectedTaskId,
-          { taskType: TaskType.DocumentValidation },
+          { taskType },
           listTask.folderId,
         );
         if (!cancelled) setSelectedTask(task);
@@ -91,7 +102,7 @@ export function useDocumentValidationTasks(uipathSdk: UiPath) {
     return () => {
       cancelled = true;
     };
-  }, [uipathSdk, selectedTaskId]);
+  }, [uipathSdk, selectedTaskId, taskType]);
 
   // The widgets read the bucket folder off `ContentValidationData`. The
   // activity that produces the payload sets FolderId or FolderKey; these sample
@@ -100,9 +111,7 @@ export function useDocumentValidationTasks(uipathSdk: UiPath) {
   // widgets see a stable reference and do not refetch on every render.
   const contentValidationData = useMemo(() => {
     if (!selectedTask) return undefined;
-    const cvd = selectedTask.data as
-      | DuFramework.ContentValidationData
-      | undefined;
+    const cvd = selectedTask.data as Data | undefined;
     if (!cvd || cvd.FolderId || cvd.FolderKey) return cvd;
     return { ...cvd, FolderId: selectedTask.folderId };
   }, [selectedTask]);

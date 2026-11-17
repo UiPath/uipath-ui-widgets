@@ -235,7 +235,14 @@ function App() {
     theme: {
       description: "Visual theme for the validation station",
       control: "select",
-      options: ["light", "dark", "light-hc", "dark-hc"],
+      options: [
+        "light",
+        "dark",
+        "light-hc",
+        "dark-hc",
+        "future-light",
+        "future-dark",
+      ],
     },
     language: {
       description: "Language/locale for the validation station UI",

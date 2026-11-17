@@ -8,10 +8,18 @@ import { type DuFramework } from "@uipath/uipath-typescript/document-understandi
 import { OrchestratorDuModule } from "@uipath/uipath-typescript/orchestrator-du-module";
 import { strToU8, zipSync } from "fflate";
 import { isIXPExtraction } from "./ixpUtil.js";
+import type { ValidatedProcessedDocument } from "./processedDocument/review.js";
 
 export interface SaveValidatedDataResult {
   success: boolean;
   error?: string;
+  /**
+   * A `ProcessedDocument` submit only: the validated document — the payload
+   * with its `result` replaced by the validated one — to complete the Action
+   * Center task with, verbatim. Set even when `success` is `false`, since a
+   * failed record write must not stop the task from completing.
+   */
+  processedDocument?: ValidatedProcessedDocument;
 }
 
 /**

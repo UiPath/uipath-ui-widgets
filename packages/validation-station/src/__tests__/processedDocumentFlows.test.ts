@@ -135,7 +135,11 @@ describe("fetchProcessedDocumentArtifacts", () => {
       };
       client.findFeedback.mockResolvedValue({
         id: "fb-1",
-        metadata: JSON.stringify({ draft, extraction }),
+        metadata: JSON.stringify({
+          ...makeProcessedDocument(),
+          result: extraction,
+          metadata: { ...makeProcessedDocument().metadata, hitl: { draft } },
+        }),
       });
 
       const artifacts = await fetchProcessedDocumentArtifacts(
@@ -158,6 +162,26 @@ describe("fetchProcessedDocumentArtifacts", () => {
         metadata: JSON.stringify({ output: { Invoice: [] }, attribution: {} }),
       },
     ],
+    [
+      "the record is in the retired { draft, extraction } envelope",
+      {
+        id: "fb-1",
+        metadata: JSON.stringify({
+          draft: true,
+          extraction: { output: { Invoice: [] }, attribution: {} },
+        }),
+      },
+    ],
+    [
+      "the recorded document's result is not an IXP extraction",
+      {
+        id: "fb-1",
+        metadata: JSON.stringify({
+          ...makeProcessedDocument(),
+          result: { ResultsDocument: {} },
+        }),
+      },
+    ],
   ])("falls back to the payload's result when %s", async (_name, record) => {
     client.findFeedback.mockResolvedValue(record);
 
@@ -167,6 +191,46 @@ describe("fetchProcessedDocumentArtifacts", () => {
     );
 
     expect(artifacts.extractionResult).toBe(payloadResult);
+  });
+
+  it("reopens a draft with its confirmations", async () => {
+    const reviewed = { ...payloadResult, confirmations: ["/Invoice/0/Total"] };
+    client.findFeedback.mockResolvedValue({
+      id: "fb-1",
+      metadata: JSON.stringify({
+        ...makeProcessedDocument(),
+        result: reviewed,
+      }),
+    });
+
+    const artifacts = await fetchProcessedDocumentArtifacts(
+      sdk,
+      makeProcessedDocument(),
+    );
+
+    expect(artifacts.extractionResult).toEqual(reviewed);
+  });
+
+  it("opens with the payload's own confirmations when nothing was saved", async () => {
+    const result = { ...payloadResult, confirmations: ["/Invoice/0/Total"] };
+
+    const artifacts = await fetchProcessedDocumentArtifacts(
+      sdk,
+      makeProcessedDocument({ result }),
+    );
+
+    expect(artifacts.extractionResult).toEqual(result);
+  });
+
+  it("drops the payload's confirmations when they are not a list of pointers", async () => {
+    const artifacts = await fetchProcessedDocumentArtifacts(
+      sdk,
+      makeProcessedDocument({
+        result: { ...payloadResult, confirmations: "not-a-list" },
+      }),
+    );
+
+    expect(artifacts.extractionResult).toEqual(payloadResult);
   });
 
   it("fails the load when the lookup fails, rather than hiding a draft", async () => {
@@ -278,19 +342,34 @@ describe("fetchProcessedDocumentArtifacts", () => {
 
 const validated = { output: { Invoice: [{ Total: 3 }] }, attribution: {} };
 
-// Recorded as `{ draft, extraction }`, the shape the Angular Validation Station
-// writes, so either one reopens a review the other saved.
+/**
+ * The payload with its result replaced by the validated one and
+ * `metadata.hitl.draft` set: what the Angular Validation Station records, so
+ * either one reopens a review the other saved.
+ */
+const validatedDocument = (result: unknown, draft: boolean) => ({
+  ...makeProcessedDocument(),
+  result,
+  metadata: { ...makeProcessedDocument().metadata, hitl: { draft } },
+});
+
+// A submit hands the host the document to complete the task with; a draft does not.
+const outcome = (draft: boolean, extra: Record<string, unknown>) =>
+  draft
+    ? extra
+    : { ...extra, processedDocument: validatedDocument(validated, false) };
+
 describe.each([
   ["submitProcessedDocument", submitProcessedDocument, false],
   ["saveProcessedDocumentAsDraft", saveProcessedDocumentAsDraft, true],
 ] as const)("%s", (_name, save, draft) => {
   const request = { documentId: "trace-1", validatedData: validated } as any;
-  const metadata = JSON.stringify({ draft, extraction: validated });
+  const metadata = JSON.stringify(validatedDocument(validated, draft));
 
   it("creates the span's record when nobody has reviewed it yet", async () => {
     const result = await save(sdk, makeProcessedDocument(), request);
 
-    expect(result).toEqual({ success: true });
+    expect(result).toEqual(outcome(draft, { success: true }));
     expect(client.createFeedback).toHaveBeenCalledWith(anchor, {
       isPositive: true,
       metadata,
@@ -303,7 +382,7 @@ describe.each([
 
     const result = await save(sdk, makeProcessedDocument(), request);
 
-    expect(result).toEqual({ success: true });
+    expect(result).toEqual(outcome(draft, { success: true }));
     expect(client.editFeedback).toHaveBeenCalledWith(anchor, "fb-1", {
       isPositive: true,
       metadata,
@@ -331,6 +410,7 @@ describe.each([
       request,
     );
 
+    // Nothing to complete the task with: the payload was never reviewable.
     expect(result).toEqual({
       success: false,
       error:
@@ -345,7 +425,10 @@ describe.each([
 
     const result = await save(sdk, makeProcessedDocument(), request);
 
-    expect(result).toEqual({ success: false, error: "failed with status 500" });
+    // A submit still hands back the document: the task completes regardless.
+    expect(result).toEqual(
+      outcome(draft, { success: false, error: "failed with status 500" }),
+    );
   });
 
   // A save's result goes to the host, not telemetry, so it carries the
@@ -357,11 +440,34 @@ describe.each([
 
     const result = await save(sdk, makeProcessedDocument(), request);
 
-    expect(result).toEqual({
-      success: false,
-      error: "Creating the review failed with status 400: metadata is too long",
-    });
+    expect(result).toEqual(
+      outcome(draft, {
+        success: false,
+        error:
+          "Creating the review failed with status 400: metadata is too long",
+      }),
+    );
   });
+
+  it(
+    draft
+      ? "keeps the confirmations, so the draft reopens with them"
+      : "drops the confirmations: a submit confirms every value",
+    async () => {
+      const reviewed = { ...validated, confirmations: ["/Invoice/0/Total"] };
+
+      const result = await save(sdk, makeProcessedDocument(), {
+        documentId: "trace-1",
+        validatedData: reviewed,
+      } as any);
+
+      const written = JSON.parse(
+        client.createFeedback.mock.calls[0][1].metadata,
+      );
+      expect(written.result).toEqual(draft ? reviewed : validated);
+      if (!draft) expect(result.processedDocument).toEqual(written);
+    },
+  );
 });
 
 describe("concurrent saves", () => {
@@ -383,7 +489,7 @@ describe("concurrent saves", () => {
       saveProcessedDocumentAsDraft(sdk, makeProcessedDocument(), request),
     ]);
 
-    expect(results).toEqual([{ success: true }, { success: true }]);
+    expect(results.map((r) => r.success)).toEqual([true, true]);
     expect(client.createFeedback).toHaveBeenCalledTimes(1);
     expect(client.editFeedback).toHaveBeenCalledTimes(1);
   });
@@ -397,8 +503,8 @@ describe("concurrent saves", () => {
       submitProcessedDocument(sdk, makeProcessedDocument(), request),
     ]);
 
-    expect(first).toEqual({ success: false, error: "status 500" });
-    expect(second).toEqual({ success: true });
+    expect(first).toMatchObject({ success: false, error: "status 500" });
+    expect(second).toMatchObject({ success: true });
   });
 });
 

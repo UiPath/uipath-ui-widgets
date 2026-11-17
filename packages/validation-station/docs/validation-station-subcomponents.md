@@ -8,7 +8,9 @@ Package: [`@uipath/ui-widgets-validation-station`](https://www.npmjs.com/package
 
 - User wants a **custom-laid-out** document-review UI: e.g. viewer on the left, a separate fields form, a standalone business-rules panel, a doc-type selector, and a table editor — arranged in the host's own grid, side panels, tabs, or resizable splits.
 - User wants panels to **cross-link** (selecting a field highlights it in the viewer; a rule click focuses the offending field) without wiring that themselves.
-- User wants to embed **one or two** panels only (e.g. just the `DocumentViewer` as a read-only preview).
+- User wants to embed **one or two** panels only (e.g. a fields form next to the viewer).
+
+For a viewer on its own — a read-only preview with no fields form linked through `instanceId` — use `DocumentViewer` from [`@uipath/ui-widgets-document-viewer`](https://github.com/UiPath/uipath-ui-widgets/tree/develop/packages/document-viewer) instead.
 
 If the user just wants the standard, self-contained review screen, use the monolithic `ValidationStation` — do **not** hand-compose the subcomponents to reproduce it. And do **not** rebuild any of these panels (PDF viewer, field editor, table editor, rules) from scratch.
 
@@ -31,11 +33,13 @@ npm install @uipath/ui-widgets-validation-station
 
 | Component              | Purpose                                 | Editable?         | Owns save flow? | Key extra props                                                            |
 | ---------------------- | --------------------------------------- | ----------------- | --------------- | -------------------------------------------------------------------------- |
-| `DocumentViewer`       | PDF/text viewer with bounding boxes     | No (read-only)    | No              | `onTokensSelect`, `onCurrentPageChange`, `goToPage`                        |
+| `DocumentViewer` ⚠️    | PDF/text viewer with bounding boxes     | No (read-only)    | No              | `onTokensSelect`, `onCurrentPageChange`, `goToPage`                        |
 | `CompactFieldsForm`    | Extraction-fields editor + save actions | Yes (fields)      | **Yes**         | `sdk`, `data`, `options`, `onSubmit`, `onSaveAsDraft`, `onReportException` |
 | `CompactTableEditor`   | Line-items / table-field editor         | Yes (cells, rows) | No              | `onClosed`, `isTableSelectionEnabled`                                      |
 | `CompactBusinessRules` | Evaluated business-rules panel          | No (read-only)    | No              | `onBusinessRuleClick`, `onBusinessRulesToggle`                             |
 | `CompactDocTypeField`  | Document-type selector                  | Yes (doc-type)    | No              | `onDocumentTypeChanged`, `onPanelOpenChange`                               |
+
+> **Warning: `DocumentViewer` is deprecated.** `@uipath/du-validation-station-wc` `1.0.0-rc.5` deprecates the element it wraps in favour of `@uipath/du-document-viewer-wc`. Keep using it only to link the viewer to the other subcomponents through `instanceId`, which the new viewer cannot do yet. It will be removed when the web component drops the element.
 
 > **"Editable?" vs "Owns save flow?" — they are different questions.** _Editable_ means the panel lets the user change data in place (edit fields, edit table cells/rows, pick a document type). _Owns save flow_ means the panel writes back to Orchestrator — it takes `sdk` + `data` and exposes submit / save-as-draft / report-exception. Only `CompactFieldsForm` does the latter. Every panel sharing the same `instanceId` mutates **one shared store**, so edits made in `CompactTableEditor` (or `CompactDocTypeField`) are committed when the user saves **through `CompactFieldsForm`** — the table editor deliberately has no save button of its own. It signals its changes via `onDirtyChange` / `onFieldValueChanged` / `onExtractionResultChanged`.
 
@@ -46,7 +50,7 @@ npm install @uipath/ui-widgets-validation-station
 | `artifacts`           | Yes\*             | Pre-fetched `DuDocumentArtifacts` from `useDuDocumentArtifacts`. \*Omit only if you deliberately let this one panel self-fetch (then pass `sdk`+`data` instead). |
 | `documentId`          | No                | Falls back to `data.DocumentId`. Pass it in pre-fetched mode where there's no `data`.                                                                            |
 | `instanceId`          | Yes (for linking) | Same value across panels → shared store. Omit for an isolated panel.                                                                                             |
-| `theme`               | No                | `'light' \| 'dark' \| 'light-hc' \| 'dark-hc'`. Keep in sync with body class.                                                                                    |
+| `theme`               | No                | `DuTheme`: `'light' \| 'dark' \| 'light-hc' \| 'dark-hc' \| 'future-light' \| 'future-dark'`. Keep in sync with body class.                                      |
 | `language`            | No                | `ValidationStationLanguage` enum from the package.                                                                                                               |
 | `persistent`          | No                | Default `false`. Keep `false` for static grids (see Critical Rule 3).                                                                                            |
 | `isReadonly`          | No                | `true` for an audit/read-only view.                                                                                                                              |

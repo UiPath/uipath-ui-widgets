@@ -2,7 +2,10 @@
 import { describe, it, expect } from "vitest";
 import { parseDigitizedDocument } from "../processedDocument/dom";
 import { validateProcessedDocument } from "../processedDocument/payload";
-import { parseReview } from "../processedDocument/review";
+import {
+  parseReview,
+  toValidatedProcessedDocument,
+} from "../processedDocument/review";
 import { resolveDocumentArtifacts } from "../processedDocument/spans";
 
 const makeProcessedDocument = (overrides: Record<string, any> = {}) =>
@@ -231,31 +234,87 @@ describe("parseDigitizedDocument", () => {
 
 describe("parseReview", () => {
   const extraction = { output: { a: 1 }, attribution: {} };
+  const recordOf = (result: unknown, draft = true) =>
+    JSON.stringify({
+      ...makeProcessedDocument({ result }),
+      metadata: { ...makeProcessedDocument().metadata, hitl: { draft } },
+    });
 
   it.each([[true], [false]])(
-    "returns the extraction of a recorded review (draft: %s)",
+    "returns the result of a recorded ProcessedDocument (draft: %s)",
     (draft) => {
-      expect(parseReview(JSON.stringify({ draft, extraction }))).toEqual(
-        extraction,
-      );
+      expect(parseReview(recordOf(extraction, draft))).toEqual(extraction);
     },
   );
 
+  it("keeps a draft's confirmations, so the draft reopens with them", () => {
+    const reviewed = { ...extraction, confirmations: ["/a"] };
+    const record = toValidatedProcessedDocument(
+      makeProcessedDocument(),
+      reviewed,
+      true,
+    );
+    expect(parseReview(JSON.stringify(record))).toEqual(reviewed);
+  });
+
+  it("drops confirmations that are not a list of pointers", () => {
+    expect(
+      parseReview(recordOf({ ...extraction, confirmations: [1, "/a"] })),
+    ).toEqual(extraction);
+  });
+
   it.each([
     ["unparseable metadata", "{nope"],
-    ["a bare extraction, not a review", JSON.stringify(extraction)],
-    ["a review without a draft flag", JSON.stringify({ extraction })],
+    ["a bare extraction, not a document", JSON.stringify(extraction)],
     [
-      "a review whose draft flag is not a boolean",
-      JSON.stringify({ draft: "true", extraction }),
+      "the retired { draft, extraction } envelope",
+      JSON.stringify({ draft: true, extraction }),
     ],
-    ["a review without an extraction", JSON.stringify({ draft: true })],
     [
-      "a review holding a UiPath extraction result",
-      JSON.stringify({ draft: false, extraction: { ResultsDocument: {} } }),
+      "a document without metadata",
+      JSON.stringify({ result: extraction, taxonomy: {} }),
+    ],
+    [
+      "a document holding a UiPath extraction result",
+      recordOf({ ResultsDocument: {} }),
     ],
     ["a non-object", "42"],
   ])("returns null for %s", (_name, metadata) => {
     expect(parseReview(metadata)).toBeNull();
+  });
+});
+
+describe("toValidatedProcessedDocument", () => {
+  const result = { output: { Invoice: [] }, attribution: {} };
+
+  it("replaces the result and marks the review state, keeping the rest", () => {
+    const pd = makeProcessedDocument();
+    expect(toValidatedProcessedDocument(pd, result, true)).toEqual({
+      ...pd,
+      result,
+      metadata: { ...pd.metadata, hitl: { draft: true } },
+    });
+    // The payload itself is left alone.
+    expect(pd.metadata).not.toHaveProperty("hitl");
+  });
+
+  it("drops confirmations from a submit", () => {
+    const doc = toValidatedProcessedDocument(
+      makeProcessedDocument(),
+      { ...result, confirmations: ["/a"] },
+      false,
+    );
+    expect(doc.result).toEqual(result);
+    expect(doc.metadata.hitl).toEqual({ draft: false });
+  });
+
+  it("refuses a result that is not an IXP extraction", () => {
+    expect(() =>
+      toValidatedProcessedDocument(
+        makeProcessedDocument(),
+        { ResultsDocument: {} },
+        false,
+      ),
+    ).toThrow("not an IXP extraction");
   });
 });

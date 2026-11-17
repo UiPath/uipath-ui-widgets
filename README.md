@@ -71,6 +71,26 @@ A React wrapper for the UiPath Document Understanding Validation Station.
 - ⚙️ Handles web component loading and bucket artifact fetching
 - 🧩 Declarative props API for all Validation Station features
 
+### [@uipath/ui-widgets-classification-station](./packages/classification-station)
+
+A React wrapper for the UiPath Document Understanding Classification Station.
+
+**Features:**
+
+- 🗂️ Split and classify review UI as a React component
+- ⚙️ Handles web component loading, bucket artifact fetching and the validated-classification write-back
+- 🧩 Declarative props API for the station's inputs and outputs
+
+### [@uipath/ui-widgets-document-viewer](./packages/document-viewer)
+
+A React wrapper for the UiPath Document Understanding document viewer.
+
+**Features:**
+
+- 📄 The Validation and Classification Station document viewer, on its own
+- 🔗 Links to your own form through content references — highlight in, selection out
+- ⚙️ Handles web component loading and bucket artifact fetching
+
 ### [@uipath/ui-widgets-pdf-viewer](./packages/pdf-viewer)
 
 A PDF viewer widget for UiPath coded apps.
@@ -196,8 +216,10 @@ npm install @uipath/ui-widgets-pdf-viewer@dev      # dev
 ```
 uipath-ui-widgets/
 ├── packages/
+│   ├── classification-station/     # Document Understanding Classification Station wrapper
 │   ├── conversational-agent-chat/  # Conversational agent chat widget
 │   ├── datatable/                  # DataTable component
+│   ├── document-viewer/            # Document Understanding document viewer wrapper
 │   ├── external-auth/              # Provider-agnostic sign-in widget
 │   ├── multi-file-upload/          # Multi-file upload to storage buckets
 │   ├── pdf-viewer/                 # PDF viewer widget
