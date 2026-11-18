@@ -7,6 +7,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { StrictMode } from "react";
 import { getI18n } from "../i18n";
 import { ConversationalAgentChat } from "../ConversationalAgentChat";
 import { UiPath } from "@uipath/uipath-typescript/core";
@@ -128,6 +129,8 @@ const {
   mockDownloadCitationSource,
   mockExchangesGetAll,
   mockConversationGetById,
+  mockHistoryGetAll,
+  mockUploadAttachment,
   sessionControl,
 } = vi.hoisted(() => ({
   capturedAgentConstructorArgs: [] as any[][],
@@ -137,6 +140,8 @@ const {
   mockDownloadCitationSource: vi.fn(),
   mockExchangesGetAll: vi.fn(),
   mockConversationGetById: vi.fn(),
+  mockHistoryGetAll: vi.fn(),
+  mockUploadAttachment: vi.fn(),
   // When neverStarts is true, startSession returns a session that never fires
   // sessionStarted and keeps emits paused — exercises the start-timeout path.
   sessionControl: { neverStarts: false },
@@ -261,7 +266,7 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
       conversations = {
         create: mockCreate,
         updateById: mockUpdateById,
-        getAll: vi.fn().mockResolvedValue({
+        getAll: mockHistoryGetAll.mockResolvedValue({
           items: mockConversations,
           nextCursor: { value: "cursor-1" },
           hasNextPage: true,
@@ -271,14 +276,15 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => {
             getAll: mockExchangesGetAll,
           },
         }),
-        uploadAttachment: vi.fn().mockResolvedValue({
+        uploadAttachment: mockUploadAttachment.mockResolvedValue({
           uri: "file://test.txt",
           name: "test.txt",
           mimeType: "text/plain",
         }),
         deleteById: vi.fn().mockResolvedValue(undefined),
-        startSession: vi.fn().mockImplementation(() => {
+        startSession: vi.fn().mockImplementation((conversationId: string) => {
           const sessionHelper = {
+            conversationId,
             onSessionStarted: vi.fn((callback: any) => {
               if (!sessionControl.neverStarts) setTimeout(callback, 0);
               return () => {};
@@ -374,6 +380,8 @@ describe("ConversationalAgentChat", () => {
       lastActivityTime: "2024-01-03T10:00:00Z",
     });
     mockUpdateById.mockReset().mockResolvedValue(undefined);
+    mockHistoryGetAll.mockReset();
+    mockUploadAttachment.mockReset();
     // The widget owns a private instance; the shared default one is the host's
     // and is never initialized here.
     getI18n().changeLanguage("en");
@@ -822,7 +830,13 @@ describe("ConversationalAgentChat", () => {
 
     rerender(<ConversationalAgentChat {...defaultProps} agentId={2} />);
 
-    expect(screen.getByTestId("ap-chat")).toBeInTheDocument();
+    // The loader shows while the new agent initializes, then its chat.
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("ap-chat")).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
   });
 
   it("should create ConversationalAgent with provided SDK", async () => {
@@ -1431,6 +1445,1022 @@ describe("ConversationalAgentChat", () => {
       await waitFor(() =>
         expect(startedSession?.sendSessionEnd).toHaveBeenCalledTimes(1),
       );
+    });
+  });
+
+  describe("conversation creation timing", () => {
+    // Creating it starts the agent's job, so it must exist before the first send.
+    const conversation = (id: string) => ({
+      id,
+      label: "",
+      lastActivityTime: "2024-01-03T10:00:00Z",
+    });
+    const mockAgentWithCreate = (
+      create = vi.fn().mockResolvedValue(conversation("conv-123")),
+    ) => {
+      mockGetById.mockResolvedValue({
+        id: 12345,
+        name: "Test Agent",
+        folderId: 100,
+        conversations: { create },
+      });
+      return create;
+    };
+    const deferred = () => {
+      let resolve: (value: unknown) => void = () => {};
+      let reject: (reason: unknown) => void = () => {};
+      const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    };
+    const getHandler = (event: string) => {
+      const calls = mockChatService.on.mock.calls.filter(
+        (call: any) => call[0] === event,
+      );
+      return calls[calls.length - 1]?.[1];
+    };
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 50));
+
+    it("creates the conversation on load, before the chat is shown", async () => {
+      const pending = deferred();
+      const create = mockAgentWithCreate(
+        vi.fn().mockReturnValue(pending.promise),
+      );
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(() => expect(create).toHaveBeenCalledTimes(1), {
+        timeout: 3000,
+      });
+      expect(screen.queryByTestId("ap-chat")).not.toBeInTheDocument();
+
+      pending.resolve(conversation("conv-123"));
+      await waitFor(() =>
+        expect(screen.getByTestId("ap-chat")).toBeInTheDocument(),
+      );
+      expect(lastSessionHelper).toBeNull();
+    });
+
+    it("creates one conversation under React StrictMode", async () => {
+      // StrictMode mounts, unmounts and remounts in development; the unmount
+      // invalidates the first init, so only the second one creates.
+      const create = mockAgentWithCreate();
+      render(
+        <StrictMode>
+          <ConversationalAgentChat {...defaultProps} />
+        </StrictMode>,
+      );
+
+      await waitFor(
+        () => expect(screen.getByTestId("ap-chat")).toBeInTheDocument(),
+        { timeout: 3000 },
+      );
+      await flush();
+      expect(create).toHaveBeenCalledTimes(1);
+    });
+
+    it("sends the first message to the conversation created on load", async () => {
+      const create = mockAgentWithCreate();
+      render(<ConversationalAgentChat {...defaultProps} />);
+      await waitFor(() => expect(getHandler("request")).toBeTruthy(), {
+        timeout: 3000,
+      });
+
+      await getHandler("request")({ content: "Hi", attachments: [] });
+
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(lastSessionHelper?.conversationId).toBe("conv-123");
+    });
+
+    it("shows the error screen when the create on load fails", async () => {
+      mockAgentWithCreate(
+        vi.fn().mockRejectedValue(new Error("create failed")),
+      );
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      expect(await screen.findByText("create failed")).toBeInTheDocument();
+      expect(screen.queryByTestId("ap-chat")).not.toBeInTheDocument();
+    });
+
+    it("creates a new conversation when New Chat is clicked", async () => {
+      const create = mockAgentWithCreate();
+      render(<ConversationalAgentChat {...defaultProps} />);
+      await waitFor(() => expect(getHandler("newChat")).toBeTruthy(), {
+        timeout: 3000,
+      });
+
+      getHandler("newChat")();
+
+      await waitFor(() => expect(create).toHaveBeenCalledTimes(2));
+    });
+
+    it("sends a message typed during New Chat's create to the new conversation", async () => {
+      const newChatCreate = deferred();
+      const create = mockAgentWithCreate(
+        vi
+          .fn()
+          .mockResolvedValueOnce(conversation("conv-123"))
+          .mockReturnValueOnce(newChatCreate.promise),
+      );
+      render(<ConversationalAgentChat {...defaultProps} />);
+      await waitFor(() => expect(getHandler("newChat")).toBeTruthy(), {
+        timeout: 3000,
+      });
+
+      getHandler("newChat")();
+      const send = getHandler("request")({ content: "Hi", attachments: [] });
+      newChatCreate.resolve(conversation("conv-456"));
+      await send;
+
+      expect(create).toHaveBeenCalledTimes(2);
+      expect(lastSessionHelper?.conversationId).toBe("conv-456");
+    });
+
+    it("drops a send waiting on a create the user abandoned", async () => {
+      const abandoned = deferred();
+      mockAgentWithCreate(
+        vi
+          .fn()
+          .mockResolvedValueOnce(conversation("conv-123"))
+          .mockReturnValueOnce(abandoned.promise)
+          .mockResolvedValueOnce(conversation("conv-789")),
+      );
+      render(<ConversationalAgentChat {...defaultProps} />);
+      await waitFor(() => expect(getHandler("newChat")).toBeTruthy(), {
+        timeout: 3000,
+      });
+
+      // A send joins New Chat's create, then the user clicks New Chat again.
+      getHandler("newChat")();
+      const staleSend = getHandler("request")({
+        content: "Hi",
+        attachments: [],
+      });
+      getHandler("newChat")();
+      abandoned.resolve(conversation("conv-456"));
+      await staleSend;
+
+      expect(lastSessionHelper).toBeNull();
+      expect(mockChatService.setError).not.toHaveBeenCalled();
+
+      await getHandler("request")({ content: "Hello", attachments: [] });
+      expect(lastSessionHelper?.conversationId).toBe("conv-789");
+    });
+
+    it("drops the error of a create the user abandoned", async () => {
+      const abandoned = deferred();
+      mockAgentWithCreate(
+        vi
+          .fn()
+          .mockResolvedValueOnce(conversation("conv-123"))
+          .mockReturnValueOnce(abandoned.promise)
+          .mockResolvedValueOnce(conversation("conv-789")),
+      );
+      render(<ConversationalAgentChat {...defaultProps} />);
+      await waitFor(() => expect(getHandler("newChat")).toBeTruthy(), {
+        timeout: 3000,
+      });
+
+      getHandler("newChat")();
+      const staleSend = getHandler("request")({
+        content: "Hi",
+        attachments: [],
+      });
+      getHandler("newChat")();
+      abandoned.reject(new Error("create failed"));
+      await staleSend;
+
+      expect(mockChatService.setError).not.toHaveBeenCalled();
+    });
+
+    it("ignores a create that resolves after the chat unmounts", async () => {
+      const newChatCreate = deferred();
+      mockAgentWithCreate(
+        vi
+          .fn()
+          .mockResolvedValueOnce(conversation("conv-123"))
+          .mockReturnValueOnce(newChatCreate.promise),
+      );
+      const { unmount } = render(<ConversationalAgentChat {...defaultProps} />);
+      await waitFor(() => expect(getHandler("newChat")).toBeTruthy(), {
+        timeout: 3000,
+      });
+      getHandler("newChat")();
+      await flush();
+      const historyCalls = mockChatService.setHistory.mock.calls.length;
+
+      unmount();
+      newChatCreate.resolve(conversation("conv-456"));
+      await flush();
+
+      expect(mockChatService.setHistory).toHaveBeenCalledTimes(historyCalls);
+    });
+
+    it("does not create a conversation when opening an existing one", async () => {
+      const create = mockAgentWithCreate();
+      render(
+        <ConversationalAgentChat
+          {...defaultProps}
+          existingConversationId="conv-1"
+        />,
+      );
+      await waitFor(
+        () => expect(screen.getByTestId("ap-chat")).toBeInTheDocument(),
+        { timeout: 3000 },
+      );
+
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("does not create a conversation in read-only mode", async () => {
+      const create = mockAgentWithCreate();
+      render(<ConversationalAgentChat {...defaultProps} readOnly />);
+      await waitFor(
+        () => expect(screen.getByTestId("ap-chat")).toBeInTheDocument(),
+        { timeout: 3000 },
+      );
+
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("starts a fresh conversation when the agent changes", async () => {
+      const create = mockAgentWithCreate(
+        vi
+          .fn()
+          .mockResolvedValueOnce(conversation("conv-a"))
+          .mockResolvedValueOnce(conversation("conv-b")),
+      );
+      const { rerender } = render(
+        <ConversationalAgentChat {...defaultProps} />,
+      );
+      await waitFor(() => expect(create).toHaveBeenCalledTimes(1), {
+        timeout: 3000,
+      });
+
+      rerender(<ConversationalAgentChat {...defaultProps} agentId={67890} />);
+      await waitFor(() => expect(create).toHaveBeenCalledTimes(2), {
+        timeout: 3000,
+      });
+      await flush();
+
+      await getHandler("request")({ content: "Hi", attachments: [] });
+      expect(lastSessionHelper?.conversationId).toBe("conv-b");
+    });
+
+    it("creates the conversation as the new user when externalUserId changes", async () => {
+      // Each resolved agent's create is bound to the user its service was built for.
+      const createFor: Record<string, ReturnType<typeof vi.fn>> = {
+        "user-a": vi.fn().mockResolvedValue(conversation("conv-a")),
+        "user-b": vi.fn().mockResolvedValue(conversation("conv-b")),
+      };
+      mockGetById.mockImplementation(async () => {
+        const [, options] =
+          capturedAgentConstructorArgs[capturedAgentConstructorArgs.length - 1];
+        // Same id and folder as the props, so a cached release would match.
+        return {
+          id: defaultProps.agentId,
+          name: "Test Agent",
+          folderId: defaultProps.folderId,
+          conversations: { create: createFor[options?.externalUserId] },
+        };
+      });
+      const { rerender } = render(
+        <ConversationalAgentChat {...defaultProps} externalUserId="user-a" />,
+      );
+      await waitFor(
+        () => expect(createFor["user-a"]).toHaveBeenCalledTimes(1),
+        {
+          timeout: 3000,
+        },
+      );
+
+      rerender(
+        <ConversationalAgentChat {...defaultProps} externalUserId="user-b" />,
+      );
+
+      await waitFor(
+        () => expect(createFor["user-b"]).toHaveBeenCalledTimes(1),
+        {
+          timeout: 3000,
+        },
+      );
+      expect(createFor["user-a"]).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the new user's agent when an older user's lookup finishes last", async () => {
+      const createFor: Record<string, ReturnType<typeof vi.fn>> = {
+        "user-a": vi.fn().mockResolvedValue(conversation("conv-a")),
+        "user-b": vi.fn().mockResolvedValue(conversation("conv-b")),
+      };
+      const agentFor = (user: string) => ({
+        id: defaultProps.agentId,
+        name: "Test Agent",
+        folderId: defaultProps.folderId,
+        conversations: { create: createFor[user] },
+      });
+      const lookupA = deferred();
+      mockGetById.mockImplementation(() => {
+        const [, options] =
+          capturedAgentConstructorArgs[capturedAgentConstructorArgs.length - 1];
+        return options?.externalUserId === "user-a"
+          ? lookupA.promise
+          : Promise.resolve(agentFor(options?.externalUserId));
+      });
+
+      // User A's lookup is still pending when the host switches to user B.
+      const { rerender } = render(
+        <ConversationalAgentChat {...defaultProps} externalUserId="user-a" />,
+      );
+      await waitFor(() => expect(mockGetById).toHaveBeenCalledTimes(1));
+      rerender(
+        <ConversationalAgentChat {...defaultProps} externalUserId="user-b" />,
+      );
+      await waitFor(
+        () => expect(createFor["user-b"]).toHaveBeenCalledTimes(1),
+        {
+          timeout: 3000,
+        },
+      );
+
+      // A's lookup lands last; New Chat must still create as user B.
+      lookupA.resolve(agentFor("user-a"));
+      await flush();
+      getHandler("newChat")();
+
+      await waitFor(() => expect(createFor["user-b"]).toHaveBeenCalledTimes(2));
+      expect(createFor["user-a"]).not.toHaveBeenCalled();
+    });
+
+    it("loads a requested conversation instead of reusing the one created on load", async () => {
+      const create = mockAgentWithCreate();
+      const { rerender } = render(
+        <ConversationalAgentChat {...defaultProps} />,
+      );
+      await waitFor(() => expect(create).toHaveBeenCalledTimes(1), {
+        timeout: 3000,
+      });
+
+      mockConversationGetById.mockClear();
+      rerender(
+        <ConversationalAgentChat
+          {...defaultProps}
+          existingConversationId="conv-1"
+        />,
+      );
+
+      await waitFor(
+        () => expect(mockConversationGetById).toHaveBeenCalledWith("conv-1"),
+        { timeout: 3000 },
+      );
+      expect(mockConversationGetById).not.toHaveBeenCalledWith("conv-123");
+      expect(create).toHaveBeenCalledTimes(1);
+    });
+
+    describe("interrupted while loading", () => {
+      const exchangesPage = () => ({
+        exchanges: { getAll: mockExchangesGetAll },
+      });
+      const attachment = {
+        name: "test.txt",
+        type: "text/plain",
+        content: { text: null, binary: [116, 101, 115, 116], base64: null },
+      };
+      const renderReady = async (props = {}) => {
+        const utils = render(
+          <ConversationalAgentChat {...defaultProps} {...props} />,
+        );
+        await waitFor(() => expect(getHandler("newChat")).toBeTruthy(), {
+          timeout: 3000,
+        });
+        await waitFor(() =>
+          expect(mockChatService.setHistory).toHaveBeenCalled(),
+        );
+        return utils;
+      };
+
+      it("drops the create on load when the agent switches before it finishes", async () => {
+        const createA = deferred();
+        const createB = vi.fn().mockResolvedValue(conversation("conv-b"));
+        mockGetById
+          .mockResolvedValueOnce({
+            id: 1,
+            name: "Agent A",
+            folderId: 100,
+            conversations: { create: vi.fn().mockReturnValue(createA.promise) },
+          })
+          .mockResolvedValue({
+            id: 2,
+            name: "Agent B",
+            folderId: 100,
+            conversations: { create: createB },
+          });
+        const { rerender } = render(
+          <ConversationalAgentChat {...defaultProps} />,
+        );
+        await waitFor(() => expect(mockGetById).toHaveBeenCalledTimes(1));
+        await flush();
+
+        rerender(<ConversationalAgentChat {...defaultProps} agentId={2} />);
+        await waitFor(() => expect(createB).toHaveBeenCalledTimes(1), {
+          timeout: 3000,
+        });
+        createA.resolve(conversation("conv-a"));
+        await flush();
+
+        expect(screen.getByTestId("ap-chat")).toBeInTheDocument();
+        await getHandler("request")({ content: "Hi", attachments: [] });
+        expect(lastSessionHelper?.conversationId).toBe("conv-b");
+      });
+
+      it("retries the create on Reload after it failed on load", async () => {
+        const create = mockAgentWithCreate(
+          vi
+            .fn()
+            .mockRejectedValueOnce(new Error("create failed"))
+            .mockResolvedValueOnce(conversation("conv-123")),
+        );
+        render(<ConversationalAgentChat {...defaultProps} />);
+        fireEvent.click(await screen.findByRole("button", { name: /reload/i }));
+
+        await waitFor(() =>
+          expect(screen.getByTestId("ap-chat")).toBeInTheDocument(),
+        );
+        expect(create).toHaveBeenCalledTimes(2);
+      });
+
+      it("keeps a history conversation opened during New Chat's create", async () => {
+        const newChatCreate = deferred();
+        mockAgentWithCreate(
+          vi
+            .fn()
+            .mockResolvedValueOnce(conversation("conv-123"))
+            .mockReturnValueOnce(newChatCreate.promise),
+        );
+        await renderReady();
+
+        getHandler("newChat")();
+        await getHandler("openConversation")("conv-1");
+        newChatCreate.resolve(conversation("conv-456"));
+        await flush();
+
+        await getHandler("request")({ content: "Hi", attachments: [] });
+        expect(lastSessionHelper?.conversationId).toBe("conv-1");
+      });
+
+      it("ignores New Chat's create when the host switches agents", async () => {
+        const newChatCreate = deferred();
+        const createB = vi.fn().mockResolvedValue(conversation("conv-b"));
+        mockGetById
+          .mockResolvedValueOnce({
+            id: 1,
+            name: "Agent A",
+            folderId: 100,
+            conversations: {
+              create: vi
+                .fn()
+                .mockResolvedValueOnce(conversation("conv-123"))
+                .mockReturnValueOnce(newChatCreate.promise),
+            },
+          })
+          .mockResolvedValue({
+            id: 2,
+            name: "Agent B",
+            folderId: 100,
+            conversations: { create: createB },
+          });
+        const { rerender } = await renderReady();
+
+        getHandler("newChat")();
+        rerender(<ConversationalAgentChat {...defaultProps} agentId={2} />);
+        await waitFor(() => expect(createB).toHaveBeenCalledTimes(1), {
+          timeout: 3000,
+        });
+        newChatCreate.resolve(conversation("conv-a2"));
+        await flush();
+
+        await getHandler("request")({ content: "Hi", attachments: [] });
+        expect(lastSessionHelper?.conversationId).toBe("conv-b");
+      });
+
+      it("uploads an attachment added during New Chat's create to the new conversation", async () => {
+        const newChatCreate = deferred();
+        mockAgentWithCreate(
+          vi
+            .fn()
+            .mockResolvedValueOnce(conversation("conv-123"))
+            .mockReturnValueOnce(newChatCreate.promise),
+        );
+        mockUploadAttachment.mockResolvedValue({
+          uri: "file://test.txt",
+          name: "test.txt",
+          mimeType: "text/plain",
+        });
+        await renderReady();
+
+        getHandler("newChat")();
+        const upload = getHandler("setAttachments")({ added: [attachment] });
+        newChatCreate.resolve(conversation("conv-456"));
+        await upload;
+
+        expect(mockUploadAttachment).toHaveBeenCalledWith(
+          "conv-456",
+          expect.anything(),
+        );
+        expect(mockChatService.setError).not.toHaveBeenCalled();
+      });
+
+      it("doesn't report an upload abandoned by another New Chat", async () => {
+        const abandoned = deferred();
+        mockAgentWithCreate(
+          vi
+            .fn()
+            .mockResolvedValueOnce(conversation("conv-123"))
+            .mockReturnValueOnce(abandoned.promise)
+            .mockResolvedValueOnce(conversation("conv-789")),
+        );
+        await renderReady();
+
+        getHandler("newChat")();
+        const upload = getHandler("setAttachments")({ added: [attachment] });
+        getHandler("newChat")();
+        abandoned.resolve(conversation("conv-456"));
+        await upload;
+
+        expect(mockUploadAttachment).not.toHaveBeenCalled();
+        expect(mockChatService.setError).not.toHaveBeenCalled();
+      });
+
+      it("stops uploading the remaining files once New Chat abandons their conversation", async () => {
+        const abandoned = deferred();
+        mockAgentWithCreate(
+          vi
+            .fn()
+            .mockResolvedValueOnce(conversation("conv-123"))
+            .mockReturnValueOnce(abandoned.promise)
+            .mockResolvedValueOnce(conversation("conv-789")),
+        );
+        await renderReady();
+
+        // Four files: uploaded in a batch of three, then a batch of one.
+        const files = ["a", "b", "c", "d"].map((name) => ({
+          ...attachment,
+          name: `${name}.txt`,
+        }));
+        getHandler("newChat")();
+        const upload = getHandler("setAttachments")({ added: files });
+        getHandler("newChat")();
+        abandoned.resolve(conversation("conv-456"));
+        await upload;
+
+        expect(mockUploadAttachment).not.toHaveBeenCalled();
+      });
+
+      it("doesn't report an upload that fails after the user leaves the conversation", async () => {
+        mockAgentWithCreate();
+        const slowUpload = deferred();
+        mockUploadAttachment.mockReturnValueOnce(slowUpload.promise);
+        await renderReady();
+
+        const upload = getHandler("setAttachments")({ added: [attachment] });
+        await waitFor(() => expect(mockUploadAttachment).toHaveBeenCalled());
+        getHandler("newChat")();
+        slowUpload.reject(new Error("upload failed"));
+        await upload;
+
+        expect(mockChatService.setError).not.toHaveBeenCalled();
+      });
+
+      it("shows the InputsPage on New Chat for agents with required inputs, without creating", async () => {
+        const create = vi.fn().mockResolvedValue(conversation("conv-123"));
+        mockGetById.mockResolvedValue({
+          id: 1,
+          name: "Test Agent",
+          folderId: 100,
+          inputSchema: {
+            type: "object",
+            properties: { customerName: { type: "string" } },
+            required: ["customerName"],
+          },
+          conversations: { create },
+        });
+        render(<ConversationalAgentChat {...defaultProps} />);
+        fireEvent.change(await screen.findByPlaceholderText(/enter a value/i), {
+          target: { value: "Acme" },
+        });
+        fireEvent.click(
+          screen.getByRole("button", { name: /start conversation/i }),
+        );
+        await waitFor(() => expect(getHandler("newChat")).toBeTruthy(), {
+          timeout: 3000,
+        });
+        expect(create).toHaveBeenCalledTimes(1);
+
+        act(() => getHandler("newChat")());
+
+        expect(
+          await screen.findByRole("button", { name: /start conversation/i }),
+        ).toBeInTheDocument();
+        expect(create).toHaveBeenCalledTimes(1);
+      });
+
+      it("ignores an inputs-page create that finishes after the host switches agents", async () => {
+        const submitCreate = deferred();
+        const createB = vi.fn().mockResolvedValue(conversation("conv-b"));
+        mockGetById
+          .mockResolvedValueOnce({
+            id: 1,
+            name: "Agent A",
+            folderId: 100,
+            inputSchema: {
+              type: "object",
+              properties: { customerName: { type: "string" } },
+              required: ["customerName"],
+            },
+            conversations: {
+              create: vi.fn().mockReturnValue(submitCreate.promise),
+            },
+          })
+          .mockResolvedValue({
+            id: 2,
+            name: "Agent B",
+            folderId: 100,
+            conversations: { create: createB },
+          });
+        const { rerender } = render(
+          <ConversationalAgentChat {...defaultProps} />,
+        );
+        fireEvent.change(await screen.findByPlaceholderText(/enter a value/i), {
+          target: { value: "Acme" },
+        });
+        fireEvent.click(
+          screen.getByRole("button", { name: /start conversation/i }),
+        );
+
+        rerender(<ConversationalAgentChat {...defaultProps} agentId={2} />);
+        await waitFor(() => expect(createB).toHaveBeenCalledTimes(1), {
+          timeout: 3000,
+        });
+        submitCreate.resolve(conversation("conv-a"));
+        await flush();
+
+        await getHandler("request")({ content: "Hi", attachments: [] });
+        expect(lastSessionHelper?.conversationId).toBe("conv-b");
+      });
+
+      it("shows the loader instead of the previous agent's chat while re-initializing", async () => {
+        const createB = deferred();
+        mockGetById
+          .mockResolvedValueOnce({
+            id: 1,
+            name: "Agent A",
+            folderId: 100,
+            conversations: {
+              create: vi.fn().mockResolvedValue(conversation("conv-a")),
+            },
+          })
+          .mockResolvedValue({
+            id: 2,
+            name: "Agent B",
+            folderId: 100,
+            conversations: { create: vi.fn().mockReturnValue(createB.promise) },
+          });
+        const { rerender } = await renderReady();
+        expect(screen.getByTestId("ap-chat")).toBeInTheDocument();
+
+        rerender(<ConversationalAgentChat {...defaultProps} agentId={2} />);
+
+        await waitFor(() =>
+          expect(screen.queryByTestId("ap-chat")).not.toBeInTheDocument(),
+        );
+        createB.resolve(conversation("conv-b"));
+        await waitFor(() =>
+          expect(screen.getByTestId("ap-chat")).toBeInTheDocument(),
+        );
+        await getHandler("request")({ content: "Hi", attachments: [] });
+        expect(lastSessionHelper?.conversationId).toBe("conv-b");
+      });
+
+      it("forgets the previous conversation's paging cursor on re-initialization", async () => {
+        const create = mockAgentWithCreate();
+        mockConversationGetById.mockResolvedValue(exchangesPage());
+        const { rerender } = await renderReady();
+        await getHandler("openConversation")("conv-1");
+
+        rerender(<ConversationalAgentChat {...defaultProps} agentId={2} />);
+        await waitFor(() => expect(create).toHaveBeenCalledTimes(2), {
+          timeout: 3000,
+        });
+        await flush();
+        mockExchangesGetAll.mockClear();
+        await getHandler("conversationLoadMore")();
+
+        expect(mockExchangesGetAll).not.toHaveBeenCalled();
+        expect(mockChatService.prependOlderMessages).toHaveBeenLastCalledWith(
+          [],
+          true,
+        );
+      });
+
+      it("shows the chat after switching from an agent with required inputs to one without", async () => {
+        mockGetById
+          .mockResolvedValueOnce({
+            id: 1,
+            name: "Agent A",
+            folderId: 100,
+            inputSchema: {
+              type: "object",
+              properties: { customerName: { type: "string" } },
+              required: ["customerName"],
+            },
+            conversations: { create: vi.fn() },
+          })
+          .mockResolvedValue({
+            id: 2,
+            name: "Agent B",
+            folderId: 100,
+            conversations: {
+              create: vi.fn().mockResolvedValue(conversation("conv-b")),
+            },
+          });
+        const { rerender } = render(
+          <ConversationalAgentChat {...defaultProps} />,
+        );
+        await screen.findByRole("button", { name: /start conversation/i });
+
+        rerender(<ConversationalAgentChat {...defaultProps} agentId={2} />);
+
+        await waitFor(
+          () => expect(screen.getByTestId("ap-chat")).toBeInTheDocument(),
+          { timeout: 3000 },
+        );
+      });
+
+      it("recovers from a failed create on load when the host switches agents", async () => {
+        mockGetById
+          .mockResolvedValueOnce({
+            id: 1,
+            name: "Agent A",
+            folderId: 100,
+            conversations: {
+              create: vi.fn().mockRejectedValue(new Error("create failed")),
+            },
+          })
+          .mockResolvedValue({
+            id: 2,
+            name: "Agent B",
+            folderId: 100,
+            conversations: {
+              create: vi.fn().mockResolvedValue(conversation("conv-b")),
+            },
+          });
+        const { rerender } = render(
+          <ConversationalAgentChat {...defaultProps} />,
+        );
+        await screen.findByText("create failed");
+
+        rerender(<ConversationalAgentChat {...defaultProps} agentId={2} />);
+
+        await waitFor(
+          () => expect(screen.getByTestId("ap-chat")).toBeInTheDocument(),
+          { timeout: 3000 },
+        );
+        expect(screen.queryByText("create failed")).not.toBeInTheDocument();
+      });
+
+      it("ignores a history conversation's messages when another is opened first", async () => {
+        const slowLoad = deferred();
+        mockConversationGetById
+          .mockReturnValueOnce(slowLoad.promise)
+          .mockResolvedValue(exchangesPage());
+        await renderReady();
+
+        const openFirst = getHandler("openConversation")("conv-1");
+        await getHandler("openConversation")("conv-2");
+        const loadsBefore = mockChatService.setConversation.mock.calls.length;
+        slowLoad.resolve(exchangesPage());
+        await openFirst;
+
+        expect(mockChatService.setConversation).toHaveBeenCalledTimes(
+          loadsBefore,
+        );
+      });
+
+      it("ignores a history conversation's messages when New Chat is clicked while it loads", async () => {
+        const slowLoad = deferred();
+        mockConversationGetById.mockReturnValueOnce(slowLoad.promise);
+        await renderReady();
+
+        const open = getHandler("openConversation")("conv-1");
+        getHandler("newChat")();
+        const loadsBefore = mockChatService.setConversation.mock.calls.length;
+        slowLoad.resolve(exchangesPage());
+        await open;
+
+        expect(mockChatService.setConversation).toHaveBeenCalledTimes(
+          loadsBefore,
+        );
+        expect(mockChatService.setError).not.toHaveBeenCalled();
+      });
+
+      it("ignores older messages that load after switching conversations", async () => {
+        mockConversationGetById.mockResolvedValue(exchangesPage());
+        await renderReady();
+        await getHandler("openConversation")("conv-1");
+
+        const slowPage = deferred();
+        mockConversationGetById.mockReturnValueOnce(slowPage.promise);
+        const loadMore = getHandler("conversationLoadMore")();
+        getHandler("newChat")();
+        slowPage.resolve(exchangesPage());
+        await loadMore;
+
+        expect(mockChatService.prependOlderMessages).not.toHaveBeenCalled();
+      });
+
+      it("keeps the open conversation's paging cursor when an older load finishes late", async () => {
+        const slowLoad = deferred();
+        mockConversationGetById
+          .mockReturnValueOnce(slowLoad.promise)
+          .mockResolvedValue(exchangesPage());
+        await renderReady();
+
+        const openFirst = getHandler("openConversation")("conv-1");
+        await getHandler("openConversation")("conv-2");
+        slowLoad.resolve({
+          exchanges: {
+            getAll: vi.fn().mockResolvedValue({
+              items: [],
+              nextCursor: { value: "stale-cursor" },
+              hasNextPage: true,
+            }),
+          },
+        });
+        await openFirst;
+
+        mockExchangesGetAll.mockClear();
+        await getHandler("conversationLoadMore")();
+        expect(mockExchangesGetAll).toHaveBeenCalledWith(
+          expect.objectContaining({ cursor: { value: "exch-cursor-1" } }),
+        );
+      });
+
+      it("ignores a history load that fails after an agent switch", async () => {
+        const staleHistory = deferred();
+        mockHistoryGetAll.mockReturnValueOnce(staleHistory.promise);
+        const { rerender } = render(
+          <ConversationalAgentChat {...defaultProps} />,
+        );
+        await waitFor(
+          () => expect(mockHistoryGetAll).toHaveBeenCalledTimes(1),
+          {
+            timeout: 3000,
+          },
+        );
+
+        rerender(<ConversationalAgentChat {...defaultProps} agentId={2} />);
+        await waitFor(
+          () => expect(mockHistoryGetAll).toHaveBeenCalledTimes(2),
+          {
+            timeout: 3000,
+          },
+        );
+        staleHistory.reject(new Error("history failed"));
+        await flush();
+
+        expect(screen.queryByText("history failed")).not.toBeInTheDocument();
+        expect(screen.getByTestId("ap-chat")).toBeInTheDocument();
+      });
+
+      it("doesn't create a conversation when the chat unmounts while the agent loads", async () => {
+        const agentLookup = deferred();
+        const create = vi.fn().mockResolvedValue(conversation("conv-123"));
+        mockGetById.mockReturnValueOnce(agentLookup.promise);
+        const { unmount } = render(
+          <ConversationalAgentChat {...defaultProps} />,
+        );
+        await waitFor(() => expect(mockGetById).toHaveBeenCalledTimes(1));
+
+        unmount();
+        agentLookup.resolve({
+          id: 1,
+          name: "Test Agent",
+          folderId: 100,
+          conversations: { create },
+        });
+        await flush();
+
+        expect(create).not.toHaveBeenCalled();
+      });
+
+      it("ignores a history page that loads after the widget closes and reopens", async () => {
+        const staleHistory = deferred();
+        mockHistoryGetAll.mockReturnValueOnce(staleHistory.promise);
+        const first = render(<ConversationalAgentChat {...defaultProps} />);
+        await waitFor(
+          () => expect(mockHistoryGetAll).toHaveBeenCalledTimes(1),
+          {
+            timeout: 3000,
+          },
+        );
+
+        // Closed and reopened for the same agent; Apollo's service is reused.
+        first.unmount();
+        render(<ConversationalAgentChat {...defaultProps} />);
+        await waitFor(
+          () => expect(mockHistoryGetAll).toHaveBeenCalledTimes(2),
+          {
+            timeout: 3000,
+          },
+        );
+        staleHistory.resolve({
+          items: [conversation("closed-widget-conv")],
+          nextCursor: undefined,
+          hasNextPage: false,
+        });
+        await flush();
+
+        const ids = mockChatService.setHistory.mock.calls.flatMap((call: any) =>
+          call[0].map((item: any) => item.id),
+        );
+        expect(ids).not.toContain("closed-widget-conv");
+      });
+
+      it("ignores a history page from before an agent switch", async () => {
+        const staleHistory = deferred();
+        mockHistoryGetAll.mockReturnValueOnce(staleHistory.promise);
+        const { rerender } = render(
+          <ConversationalAgentChat {...defaultProps} />,
+        );
+        await waitFor(
+          () => expect(mockHistoryGetAll).toHaveBeenCalledTimes(1),
+          {
+            timeout: 3000,
+          },
+        );
+
+        rerender(<ConversationalAgentChat {...defaultProps} agentId={2} />);
+        await waitFor(
+          () => expect(mockHistoryGetAll).toHaveBeenCalledTimes(2),
+          {
+            timeout: 3000,
+          },
+        );
+        await waitFor(() =>
+          expect(mockChatService.setHistory).toHaveBeenCalled(),
+        );
+        staleHistory.resolve({
+          items: [conversation("agent-a-conv")],
+          nextCursor: undefined,
+          hasNextPage: false,
+        });
+        await flush();
+
+        const ids = mockChatService.setHistory.mock.calls.flatMap((call: any) =>
+          call[0].map((item: any) => item.id),
+        );
+        expect(ids).not.toContain("agent-a-conv");
+      });
+    });
+
+    it("ignores an agent that finishes resolving after the chat switched agents", async () => {
+      const createA = vi.fn().mockResolvedValue(conversation("conv-a"));
+      const createB = vi.fn().mockResolvedValue(conversation("conv-b"));
+      const agentA = deferred();
+      const agentB = deferred();
+      mockGetById
+        .mockReturnValueOnce(agentA.promise)
+        .mockReturnValueOnce(agentB.promise);
+
+      const { rerender } = render(
+        <ConversationalAgentChat {...defaultProps} />,
+      );
+      await waitFor(() => expect(mockGetById).toHaveBeenCalledTimes(1));
+      rerender(<ConversationalAgentChat {...defaultProps} agentId={67890} />);
+      await waitFor(() => expect(mockGetById).toHaveBeenCalledTimes(2));
+
+      // A resolves while B is still resolving; A's init must stop, not create.
+      agentA.resolve({
+        id: 12345,
+        name: "Agent A",
+        folderId: 100,
+        conversations: { create: createA },
+      });
+      await flush();
+      agentB.resolve({
+        id: 67890,
+        name: "Agent B",
+        folderId: 100,
+        conversations: { create: createB },
+      });
+      await waitFor(() => expect(createB).toHaveBeenCalledTimes(1), {
+        timeout: 3000,
+      });
+      expect(createA).not.toHaveBeenCalled();
+
+      await waitFor(() => expect(getHandler("request")).toBeTruthy());
+      await getHandler("request")({ content: "Hi", attachments: [] });
+      expect(lastSessionHelper?.conversationId).toBe("conv-b");
     });
   });
 
@@ -2828,13 +3858,15 @@ describe("ConversationalAgentChat", () => {
       expect(other?.name).toBe("Second Chat");
     });
 
-    const sendFirstMessage = async () => {
+    // New Chat creates a fresh conversation (id: "conv-123" per the create()
+    // mock), then the first message is sent in it.
+    const newChatThenSend = async () => {
       render(<ConversationalAgentChat {...defaultProps} />);
 
       await waitFor(
         () => {
           expect(mockChatService.on).toHaveBeenCalledWith(
-            "request",
+            "newChat",
             expect.any(Function),
           );
           expect(mockChatService.setHistory).toHaveBeenCalled();
@@ -2842,30 +3874,29 @@ describe("ConversationalAgentChat", () => {
         { timeout: 3000 },
       );
 
-      const requestCall = mockChatService.on.mock.calls.find(
-        (call: any) => call[0] === "request",
-      );
-      const onSendMessage = requestCall?.[1];
+      const findHandler = (event: string) =>
+        mockChatService.on.mock.calls.find(
+          (call: any) => call[0] === event,
+        )?.[1];
       mockChatService.setHistory.mockClear();
-      await onSendMessage?.({ content: "Hi", attachments: [] });
+      findHandler("newChat")?.();
+      await waitFor(() =>
+        expect(mockChatService.setHistory).toHaveBeenCalled(),
+      );
+      await findHandler("request")?.({ content: "Hi", attachments: [] });
     };
 
     it("should add brand-new conversations to the sidebar on create", async () => {
-      // Sending a message on first run creates a fresh conversation (id:
-      // "conv-123" per the create() mock). It must appear in the sidebar
-      // before the service auto-generates its label.
-      await sendFirstMessage();
+      // It must appear in the sidebar before the service generates its label.
+      await newChatThenSend();
 
-      await waitFor(() => {
-        expect(mockChatService.setHistory).toHaveBeenCalled();
-      });
       const afterCreate = mockChatService.setHistory.mock.calls[0][0];
       const newEntry = afterCreate.find((i: any) => i.id === "conv-123");
       expect(newEntry).toBeDefined();
     });
 
     it("should refresh the new conversation's label when the service generates one", async () => {
-      await sendFirstMessage();
+      await newChatThenSend();
 
       await waitFor(() => {
         expect(labelUpdatedHandler).toBeTruthy();
@@ -3786,7 +4817,9 @@ describe("ConversationalAgentChat", () => {
       requireConfirmation = false,
       isClientSideTool = false,
     } = {}) => {
-      const { unmount } = render(<ConversationalAgentChat {...defaultProps} />);
+      const { unmount, rerender } = render(
+        <ConversationalAgentChat {...defaultProps} />,
+      );
       await waitFor(
         () => {
           expect(mockChatService.on).toHaveBeenCalledWith(
@@ -3831,6 +4864,7 @@ describe("ConversationalAgentChat", () => {
       );
       return {
         unmount,
+        rerender,
         startExecuting: () => executingHandler?.(),
         endMessage: () => messageEndHandler?.(),
         endToolCall: (output: unknown) =>
@@ -3945,6 +4979,19 @@ describe("ConversationalAgentChat", () => {
       );
       // Same spans on the final fetch: nothing new is sent.
       expect(traceResponses()).toHaveLength(1);
+      clearIntervalSpy.mockRestore();
+    });
+
+    it("in FullTrace, stops polling the old trace when the chat re-initializes", async () => {
+      mockAgentWithDisplayMode("FullTrace");
+      mockTracesGetById.mockResolvedValue(traceSpans);
+      const { rerender } = await startToolCallMessage();
+      await waitFor(() => expect(mockTracesGetById).toHaveBeenCalled());
+      const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+
+      rerender(<ConversationalAgentChat {...defaultProps} agentId={2} />);
+
+      await waitFor(() => expect(clearIntervalSpy).toHaveBeenCalled());
       clearIntervalSpy.mockRestore();
     });
 

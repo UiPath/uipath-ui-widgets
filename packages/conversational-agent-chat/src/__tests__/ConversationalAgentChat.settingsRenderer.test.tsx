@@ -6,6 +6,10 @@ import type { UiPath } from "@uipath/uipath-typescript/core";
 
 vi.mock("@uipath/apollo-react/core/fonts/font.css", () => ({}));
 
+const { settingsProps } = vi.hoisted(() => ({
+  settingsProps: { current: null as any },
+}));
+
 vi.mock("@uipath/apollo-react/material/components", () => ({
   ApChat: () => <div data-testid="ap-chat" />,
   AutopilotChatMode: { Embedded: "embedded" },
@@ -42,6 +46,13 @@ vi.mock("@uipath/apollo-react/material/components", () => ({
       getLocale: vi.fn().mockReturnValue("en"),
       setAllowedAttachments: vi.fn(),
       toggleSettings: vi.fn(),
+      setPrompt: vi.fn(),
+      prependOlderMessages: vi.fn(),
+      injectMessageRenderer: vi.fn(),
+      setShowLoading: vi.fn(),
+      setWaiting: vi.fn(),
+      setCustomHeaderActions: vi.fn(),
+      getConversation: vi.fn(() => []),
     })),
   },
 }));
@@ -51,12 +62,23 @@ vi.mock("../utils/telemetryUtils", () => ({ trackTelemetry: vi.fn() }));
 // The panel body is irrelevant here — these tests cover the mount/unmount
 // plumbing between Apollo's container and the widget's React root.
 vi.mock("../components/SettingsDialog", () => ({
-  SettingsDialog: () => <div data-testid="settings-body">Settings</div>,
+  SettingsDialog: (props: any) => {
+    settingsProps.current = props;
+    return <div data-testid="settings-body">Settings</div>;
+  },
 }));
 
 vi.mock("@uipath/uipath-typescript/conversational-agent", () => ({
   ConversationalAgent: class {
     getById = vi.fn().mockResolvedValue({
+      id: 1,
+      folderId: 100,
+      conversations: {
+        create: vi.fn().mockResolvedValue({
+          id: "conv-1",
+          lastActivityTime: "2024-01-01T10:00:00Z",
+        }),
+      },
       name: "Test Agent",
       appearance: {
         welcomeTitle: "Welcome",
@@ -65,7 +87,10 @@ vi.mock("@uipath/uipath-typescript/conversational-agent", () => ({
       },
     });
     conversations = {
-      create: vi.fn().mockResolvedValue({ id: "conv-1" }),
+      create: vi.fn().mockResolvedValue({
+        id: "conv-1",
+        lastActivityTime: "2024-01-01T10:00:00Z",
+      }),
       getAll: vi.fn().mockResolvedValue({
         items: [],
         nextCursor: undefined,
@@ -170,6 +195,57 @@ describe("ConversationalAgentChat — Apollo settings renderer plumbing", () => 
     expect(
       container.querySelector("[data-testid='settings-body']"),
     ).not.toBeNull();
+  });
+
+  it("doesn't carry applied inputs over to a re-initialized chat", async () => {
+    const { AutopilotChatService } =
+      await import("@uipath/apollo-react/material/components");
+    const { rerender } = render(
+      <ConversationalAgentChat
+        sdk={mockSdk}
+        agentId={1}
+        folderId={100}
+        externalUserId="user-a"
+      />,
+    );
+    const settingsRenderer = await getSettingsRenderer();
+    // The chat shows once the conversation created on load exists.
+    await waitFor(() =>
+      expect(document.querySelector("[data-testid='ap-chat']")).not.toBeNull(),
+    );
+    await act(async () => {
+      apolloToggleSettings(container, settingsRenderer, true);
+    });
+    await act(async () => {
+      await settingsProps.current.onApplyInputs({ customerName: "Acme" });
+    });
+
+    // A different user re-initializes the chat with a fresh conversation.
+    const instantiations = (AutopilotChatService.Instantiate as any).mock.calls
+      .length;
+    rerender(
+      <ConversationalAgentChat
+        sdk={mockSdk}
+        agentId={1}
+        folderId={100}
+        externalUserId="user-b"
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        (AutopilotChatService.Instantiate as any).mock.calls.length,
+      ).toBeGreaterThan(instantiations),
+    );
+    const nextRenderer = await getSettingsRenderer();
+    // The re-initialized chat must actually be up, not on an error screen.
+    await waitFor(() =>
+      expect(document.querySelector("[data-testid='ap-chat']")).not.toBeNull(),
+    );
+    await act(async () => {
+      apolloToggleSettings(container, nextRenderer, true);
+    });
+
+    expect(settingsProps.current.initialInputs).toEqual({});
   });
 
   it("unmounts cleanly when the widget is torn down while settings are still open", async () => {
