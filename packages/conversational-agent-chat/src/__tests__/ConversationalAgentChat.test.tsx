@@ -1434,6 +1434,91 @@ describe("ConversationalAgentChat", () => {
     });
   });
 
+  describe("conversation created on open", () => {
+    // Creating the conversation starts the agent's job. A Flow only receives
+    // messages once it reaches Wait-for-Message, so the conversation must exist
+    // before the first send rather than being created by it.
+    const mockAgentWithCreate = () => {
+      const create = vi.fn().mockResolvedValue({
+        id: "conv-123",
+        label: "",
+        lastActivityTime: "2024-01-03T10:00:00Z",
+      });
+      mockGetById.mockResolvedValue({
+        id: 12345,
+        name: "Test Agent",
+        folderId: 100,
+        conversations: { create },
+      });
+      return create;
+    };
+
+    const getHandler = (event: string) =>
+      mockChatService.on.mock.calls.find((call: any) => call[0] === event)?.[1];
+
+    it("creates the conversation when the chat opens, before any message", async () => {
+      const create = mockAgentWithCreate();
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(() => expect(create).toHaveBeenCalledTimes(1), {
+        timeout: 3000,
+      });
+      expect(lastSessionHelper).toBeNull();
+    });
+
+    it("reuses the conversation created on open for the first send", async () => {
+      const create = mockAgentWithCreate();
+      render(<ConversationalAgentChat {...defaultProps} />);
+      await waitFor(() => expect(getHandler("request")).toBeTruthy(), {
+        timeout: 3000,
+      });
+
+      await getHandler("request")?.({ content: "Hi", attachments: [] });
+
+      expect(lastSessionHelper).not.toBeNull();
+      expect(create).toHaveBeenCalledTimes(1);
+    });
+
+    it("creates a new conversation when New Chat is clicked", async () => {
+      const create = mockAgentWithCreate();
+      render(<ConversationalAgentChat {...defaultProps} />);
+      await waitFor(() => expect(create).toHaveBeenCalledTimes(1), {
+        timeout: 3000,
+      });
+
+      getHandler("newChat")?.();
+
+      await waitFor(() => expect(create).toHaveBeenCalledTimes(2));
+    });
+
+    it("does not create a conversation when opening an existing one", async () => {
+      const create = mockAgentWithCreate();
+      render(
+        <ConversationalAgentChat
+          {...defaultProps}
+          existingConversationId="conv-1"
+        />,
+      );
+      await waitFor(
+        () => expect(screen.getByTestId("ap-chat")).toBeInTheDocument(),
+        { timeout: 3000 },
+      );
+
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("does not create a conversation in read-only mode", async () => {
+      const create = mockAgentWithCreate();
+      render(<ConversationalAgentChat {...defaultProps} readOnly />);
+      await waitFor(
+        () => expect(screen.getByTestId("ap-chat")).toBeInTheDocument(),
+        { timeout: 3000 },
+      );
+
+      expect(create).not.toHaveBeenCalled();
+    });
+  });
+
   describe("InputsPage agentInput flow", () => {
     const buildInputSchemaAgent = (
       createImpl: () => Promise<unknown> = () =>
@@ -2851,17 +2936,23 @@ describe("ConversationalAgentChat", () => {
     };
 
     it("should add brand-new conversations to the sidebar on create", async () => {
-      // Sending a message on first run creates a fresh conversation (id:
-      // "conv-123" per the create() mock). It must appear in the sidebar
-      // before the service auto-generates its label.
-      await sendFirstMessage();
+      // Opening the chat creates a fresh conversation (id: "conv-123" per the
+      // create() mock). It must appear in the sidebar, alongside the history
+      // page that doesn't list it yet, before the service generates its label.
+      render(<ConversationalAgentChat {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(mockChatService.setHistory).toHaveBeenCalled();
-      });
-      const afterCreate = mockChatService.setHistory.mock.calls[0][0];
-      const newEntry = afterCreate.find((i: any) => i.id === "conv-123");
-      expect(newEntry).toBeDefined();
+      await waitFor(
+        () => {
+          const lists = mockChatService.setHistory.mock.calls.map(
+            (call: any) => call[0],
+          );
+          const latest = lists[lists.length - 1] ?? [];
+          expect(latest.map((i: any) => i.id)).toEqual(
+            expect.arrayContaining(["conv-123", "conv-1"]),
+          );
+        },
+        { timeout: 3000 },
+      );
     });
 
     it("should refresh the new conversation's label when the service generates one", async () => {
