@@ -1836,6 +1836,17 @@ export const ConversationalAgentChat = ({
     chatService?.setRenderer(renderer);
   }, [chatService, renderer]);
 
+  // The widget translates these labels itself (Apollo's own strings follow
+  // `locale`), so re-send them when the locale or the host's labels change.
+  const footerDisclaimerLabel = overrideLabels?.footerDisclaimer;
+  const inputPlaceholderLabel = overrideLabels?.inputPlaceholder;
+  useEffect(() => {
+    chatService?.setOverrideLabels({
+      footerDisclaimer: footerDisclaimerLabel ?? t("disclaimer_message"),
+      inputPlaceholder: inputPlaceholderLabel ?? t("chat_input_placeholder"),
+    });
+  }, [chatService, footerDisclaimerLabel, inputPlaceholderLabel, t]);
+
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
