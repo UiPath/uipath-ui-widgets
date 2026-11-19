@@ -41,6 +41,7 @@ const createMockChatService = () => {
     setAttachmentsLoading: vi.fn(),
     setError: vi.fn(),
     setHistory: vi.fn(),
+    setOverrideLabels: vi.fn(),
     setConversation: vi.fn((messages: any[]) => {
       conversation.splice(0, conversation.length, ...messages);
     }),
@@ -4147,6 +4148,78 @@ describe("ConversationalAgentChat", () => {
 
     unmount();
     expect(sessionHelper.sendSessionEnd).toHaveBeenCalled();
+  });
+
+  describe("labels after a runtime locale change", () => {
+    // The widget translates these itself; Apollo's own strings follow `locale`.
+    const german = {
+      inputPlaceholder: "Sprechen Sie mit Ihrem Agent…",
+      footerDisclaimer:
+        "Agents können Fehler machen. Überprüfen Sie die Antworten sorgfältig.",
+    };
+    const renderReady = async (props = {}) => {
+      const utils = render(
+        <ConversationalAgentChat {...defaultProps} locale="en" {...props} />,
+      );
+      await waitFor(
+        () => expect(screen.getByTestId("ap-chat")).toBeInTheDocument(),
+        { timeout: 3000 },
+      );
+      mockChatService.setOverrideLabels.mockClear();
+      return utils;
+    };
+
+    it("re-translates the input placeholder and disclaimer", async () => {
+      const { rerender } = await renderReady();
+
+      rerender(<ConversationalAgentChat {...defaultProps} locale="de" />);
+
+      await waitFor(() =>
+        expect(mockChatService.setOverrideLabels).toHaveBeenLastCalledWith(
+          german,
+        ),
+      );
+    });
+
+    it("keeps labels the host provided", async () => {
+      const overrideLabels = { inputPlaceholder: "Ask me anything" };
+      const { rerender } = await renderReady({ overrideLabels });
+
+      rerender(
+        <ConversationalAgentChat
+          {...defaultProps}
+          locale="de"
+          overrideLabels={overrideLabels}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(mockChatService.setOverrideLabels).toHaveBeenLastCalledWith({
+          inputPlaceholder: "Ask me anything",
+          footerDisclaimer: german.footerDisclaimer,
+        }),
+      );
+    });
+
+    it("applies labels the host changes at runtime", async () => {
+      const { rerender } = await renderReady();
+
+      rerender(
+        <ConversationalAgentChat
+          {...defaultProps}
+          locale="en"
+          overrideLabels={{ footerDisclaimer: "Check with your admin." }}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(mockChatService.setOverrideLabels).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            footerDisclaimer: "Check with your admin.",
+          }),
+        ),
+      );
+    });
   });
 
   describe("stale singleton state reset", () => {
