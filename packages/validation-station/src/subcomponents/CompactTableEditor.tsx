@@ -60,7 +60,7 @@ export const CompactTableEditor: React.FC<CompactTableEditorProps> = ({
       style,
     },
   });
-  const ref = useWcRef<ICompactTableEditorStandaloneWcEventMap>(
+  const ref = useWcRef<ICompactTableEditorStandaloneWcEventMap<"du">>(
     {
       loaded: onLoaded,
       dirty: onDirtyChange,
