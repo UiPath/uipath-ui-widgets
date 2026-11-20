@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 500" width="960" height="500" role="img" aria-labelledby="title desc">
+  <title id="title">How documents get into the widgets</title>
+  <desc id="desc">A Document Understanding task produces ContentValidationData; a Flow IDP node produces ProcessedDocument (IXP). Either is sent as one payload (sdk plus data or processedDocument) or as the pieces you already hold (artifacts). Validation Station, its fields form, table editor and document viewer take both. Business rules, the document type field and the Classification Station take DU only. The standalone Document Viewer takes DU, or for IXP only the dom, text and original.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#5b6472"/>
+    </marker>
+  </defs>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; fill: #1f2328; }
+    .h { font-size: 15px; font-weight: 700; fill: #5b6472; letter-spacing: 0.02em; }
+    .t { font-size: 14px; font-weight: 600; }
+    .s { font-size: 12.5px; fill: #4b5563; }
+    .r { font-size: 13.5px; }
+    .c { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; fill: #1f2328; }
+    .box { fill: #f6f8fa; stroke: #d0d7de; stroke-width: 1; }
+    .chip-du { fill: #0969da; }
+    .chip-ixp { fill: #8250df; }
+    .chip-off { fill: none; stroke: #d0d7de; stroke-dasharray: 3 2; }
+    .chip-txt { font-size: 11px; font-weight: 700; fill: #ffffff; }
+    .chip-off-txt { font-size: 11px; fill: #8c959f; }
+  </style>
+
+  <rect x="0.5" y="0.5" width="959" height="499" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+
+  <!-- Column 1: your workflow -->
+  <text class="h" x="24" y="40">YOUR WORKFLOW</text>
+  <rect fill="#ddf4ff" stroke="#54aeff" stroke-width="1" x="24" y="60" width="240" height="118" rx="8"/>
+  <text class="t" x="40" y="88">Document Understanding task</text>
+  <text class="c" x="40" y="112">ContentValidationData</text>
+  <text class="s" x="40" y="140">IntelligentOCR,</text>
+  <text class="s" x="40" y="158">DocumentUnderstanding.Activities</text>
+  <rect fill="#fbefff" stroke="#c297ff" stroke-width="1" x="24" y="198" width="240" height="82" rx="8"/>
+  <text class="t" x="40" y="226">Flow IDP node (IXP)</text>
+  <text class="c" x="40" y="250">ProcessedDocument</text>
+
+  <line x1="272" y1="190" x2="318" y2="190" stroke="#5b6472" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Column 2: how you send it -->
+  <text class="h" x="330" y="40">HOW YOU SEND IT</text>
+  <rect class="box" x="330" y="60" width="270" height="118" rx="8"/>
+  <text class="t" x="346" y="88">① One payload</text>
+  <text class="c" x="346" y="112">sdk + data</text>
+  <text class="c" x="346" y="130">sdk + processedDocument</text>
+  <text class="s" x="346" y="158">The widget fetches the rest.</text>
+  <rect class="box" x="330" y="198" width="270" height="160" rx="8"/>
+  <text class="t" x="346" y="226">② The pieces you already hold</text>
+  <text class="c" x="346" y="250">artifacts={</text>
+  <text class="c" x="362" y="268">taxonomy, extractionResult,</text>
+  <text class="c" x="362" y="286">dom, text, original</text>
+  <text class="c" x="346" y="304">}</text>
+  <text class="s" x="346" y="334">No fetch: one copy can feed</text>
+  <text class="s" x="346" y="350">every linked subcomponent.</text>
+
+  <line x1="608" y1="210" x2="654" y2="210" stroke="#5b6472" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Column 3: where it goes -->
+  <text class="h" x="666" y="40">WHERE IT GOES</text>
+
+  <rect class="box" x="666" y="60" width="270" height="62" rx="8"/>
+  <text class="t" x="682" y="84">Validation Station, whole</text>
+  <text class="r" x="682" y="108">ValidationStation</text>
+  <rect class="chip-du" x="846" y="95" width="34" height="18" rx="9"/><text class="chip-txt" x="863" y="108" text-anchor="middle">DU</text>
+  <rect class="chip-ixp" x="886" y="95" width="34" height="18" rx="9"/><text class="chip-txt" x="903" y="108" text-anchor="middle">IXP</text>
+
+  <rect class="box" x="666" y="134" width="270" height="184" rx="8"/>
+  <text class="t" x="682" y="158">Or its subcomponents,</text>
+  <text class="s" x="682" y="176">linked by one instanceId</text>
+  <text class="r" x="682" y="202">Fields form</text>
+  <rect class="chip-du" x="846" y="189" width="34" height="18" rx="9"/><text class="chip-txt" x="863" y="202" text-anchor="middle">DU</text>
+  <rect class="chip-ixp" x="886" y="189" width="34" height="18" rx="9"/><text class="chip-txt" x="903" y="202" text-anchor="middle">IXP</text>
+  <text class="r" x="682" y="226">Table editor</text>
+  <rect class="chip-du" x="846" y="213" width="34" height="18" rx="9"/><text class="chip-txt" x="863" y="226" text-anchor="middle">DU</text>
+  <rect class="chip-ixp" x="886" y="213" width="34" height="18" rx="9"/><text class="chip-txt" x="903" y="226" text-anchor="middle">IXP</text>
+  <text class="r" x="682" y="250">Document viewer</text>
+  <rect class="chip-du" x="846" y="237" width="34" height="18" rx="9"/><text class="chip-txt" x="863" y="250" text-anchor="middle">DU</text>
+  <rect class="chip-ixp" x="886" y="237" width="34" height="18" rx="9"/><text class="chip-txt" x="903" y="250" text-anchor="middle">IXP</text>
+  <text class="r" x="682" y="274">Business rules</text>
+  <rect class="chip-du" x="846" y="261" width="34" height="18" rx="9"/><text class="chip-txt" x="863" y="274" text-anchor="middle">DU</text>
+  <rect class="chip-off" x="886.5" y="261.5" width="33" height="17" rx="8.5"/><text class="chip-off-txt" x="903" y="274" text-anchor="middle">—</text>
+  <text class="r" x="682" y="298">Document type field</text>
+  <rect class="chip-du" x="846" y="285" width="34" height="18" rx="9"/><text class="chip-txt" x="863" y="298" text-anchor="middle">DU</text>
+  <rect class="chip-off" x="886.5" y="285.5" width="33" height="17" rx="8.5"/><text class="chip-off-txt" x="903" y="298" text-anchor="middle">—</text>
+
+  <rect class="box" x="666" y="330" width="270" height="110" rx="8"/>
+  <text class="t" x="682" y="354">Other widgets</text>
+  <text class="r" x="682" y="380">Document Viewer</text>
+  <text class="s" x="682" y="396">standalone package</text>
+  <rect class="chip-du" x="846" y="367" width="34" height="18" rx="9"/><text class="chip-txt" x="863" y="380" text-anchor="middle">DU</text>
+  <rect class="chip-ixp" x="886" y="367" width="34" height="18" rx="9"/><text class="chip-txt" x="903" y="380" text-anchor="middle">IXP*</text>
+  <text class="r" x="682" y="422">Classification Station</text>
+  <rect class="chip-du" x="846" y="409" width="34" height="18" rx="9"/><text class="chip-txt" x="863" y="422" text-anchor="middle">DU</text>
+  <rect class="chip-off" x="886.5" y="409.5" width="33" height="17" rx="8.5"/><text class="chip-off-txt" x="903" y="422" text-anchor="middle">—</text>
+
+  <!-- Legend -->
+  <rect class="chip-du" x="24" y="459" width="34" height="18" rx="9"/><text class="chip-txt" x="41" y="472" text-anchor="middle">DU</text>
+  <text class="s" x="64" y="472">takes ContentValidationData</text>
+  <rect class="chip-ixp" x="244" y="459" width="34" height="18" rx="9"/><text class="chip-txt" x="261" y="472" text-anchor="middle">IXP</text>
+  <text class="s" x="284" y="472">takes ProcessedDocument</text>
+  <text class="s" x="470" y="472">IXP* no contract: pass only dom, text and original (②)</text>
+</svg>
