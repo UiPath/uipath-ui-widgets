@@ -3,7 +3,7 @@ import { describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 import type { ProcessedDocument } from "../processedDocument/types";
-import type { DuDocumentArtifacts, ValidationStationArtifacts } from "../types";
+import type { DuDocumentArtifacts, IxpDocumentArtifacts } from "../types";
 import { useResolvedArtifacts } from "../useResolvedArtifacts";
 
 const mockFetchBucketArtifacts = vi.fn();
@@ -173,7 +173,7 @@ describe("useResolvedArtifacts result type", () => {
     ).toEqualTypeOf<DuDocumentArtifacts | null>();
   });
 
-  it("is either representation for a processedDocument source", () => {
+  it("is the IXP representation for a processedDocument source", () => {
     const { result } = renderHook(() =>
       useResolvedArtifacts({
         sdk,
@@ -183,6 +183,21 @@ describe("useResolvedArtifacts result type", () => {
 
     expectTypeOf(
       result.current.artifacts,
-    ).toEqualTypeOf<ValidationStationArtifacts | null>();
+    ).toEqualTypeOf<IxpDocumentArtifacts | null>();
+  });
+
+  it("is the Document Understanding representation when data rides along with a processedDocument", () => {
+    // A variable escapes excess-property checks, and `data` wins at runtime,
+    // so this must not resolve to the Flow-only overload.
+    const source = {
+      sdk,
+      processedDocument: processedDocument as ProcessedDocument,
+      data: data as DuFramework.ContentValidationData,
+    };
+    const { result } = renderHook(() => useResolvedArtifacts(source));
+
+    expectTypeOf(
+      result.current.artifacts,
+    ).toEqualTypeOf<DuDocumentArtifacts | null>();
   });
 });

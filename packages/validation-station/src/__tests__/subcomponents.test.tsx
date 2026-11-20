@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 import type { UiPath } from "@uipath/uipath-typescript/core";
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
@@ -38,6 +38,27 @@ vi.mock("../saveValidatedDataUtil", () => ({
     mockSaveValidatedDataAsDraft(...args),
 }));
 
+const mockSubmitProcessedDocument = vi.fn();
+const mockSaveProcessedDocumentAsDraft = vi.fn();
+const mockReportProcessedDocumentException = vi.fn();
+vi.mock("../processedDocument/save", () => ({
+  submitProcessedDocument: (...args: any[]) =>
+    mockSubmitProcessedDocument(...args),
+  saveProcessedDocumentAsDraft: (...args: any[]) =>
+    mockSaveProcessedDocumentAsDraft(...args),
+  reportProcessedDocumentException: (...args: any[]) =>
+    mockReportProcessedDocumentException(...args),
+}));
+
+import type { ProcessedDocument } from "../processedDocument/types";
+import type { IxpDocumentArtifacts } from "../types";
+import type {
+  CompactBusinessRulesProps,
+  CompactDocTypeFieldProps,
+  CompactFieldsFormProps,
+  CompactTableEditorProps,
+  DocumentViewerProps,
+} from "../subcomponents/types";
 import { CompactBusinessRules } from "../subcomponents/CompactBusinessRules";
 import { CompactDocTypeField } from "../subcomponents/CompactDocTypeField";
 import { CompactFieldsForm } from "../subcomponents/CompactFieldsForm";
@@ -52,6 +73,50 @@ const mockArtifacts = {
   customizationInfo: undefined,
   original: undefined,
 };
+
+// React assigns an object prop as a property only when the element already
+// declares one (otherwise it stringifies it into an attribute), so stand in for
+// the real elements' artifact inputs on the three IXP-capable tags. Defined
+// once, for the whole file: every test on these tags renders onto these stubs.
+for (const base of [
+  "ui-du-compact-fields-form-standalone-wc-element",
+  "ui-du-compact-table-editor-standalone-wc-element",
+  "ui-du-document-viewer-standalone-wc-element",
+]) {
+  for (const t of [base, base.replace(/-element$/, "-persistent-element")]) {
+    if (!customElements.get(t)) {
+      customElements.define(
+        t,
+        class extends HTMLElement {
+          taxonomy: unknown = undefined;
+          extractionResult: unknown = undefined;
+          predictedExtractionResult: unknown = undefined;
+          dom: unknown = undefined;
+          document: unknown = undefined;
+        },
+      );
+    }
+  }
+}
+
+/** An IXP document's artifacts, as a Flow run or a host fetch hands them. */
+const ixpArtifacts = {
+  taxonomy: {
+    type: "object",
+    properties: { Invoice: { type: "object", properties: {} } },
+  },
+  extractionResult: { output: {}, attribution: {}, confirmations: [] },
+  predictedExtractionResult: { output: {}, attribution: {} },
+  dom: { pages: [] },
+  text: "invoice text",
+  customizationInfo: undefined,
+  original: "data:application/pdf;base64,AAAA",
+} as unknown as IxpDocumentArtifacts;
+
+const processedDocument = {
+  type: "Extraction",
+  metadata: { traceId: "trace-1", spanId: "span-1", folderKey: "f-1" },
+} as unknown as ProcessedDocument;
 
 function readyState(overrides: Record<string, any> = {}) {
   return {
@@ -347,21 +412,6 @@ describe.each(
     ["CompactFieldsForm", "CompactTableEditor"].includes(name),
   ),
 )("$name prediction", ({ Component, tag }) => {
-  // React assigns an object prop as a property only when the element already
-  // declares one (otherwise it stringifies it into an attribute), so stand in
-  // for the real element's input.
-  const persistentTag = tag.replace(/-element$/, "-persistent-element");
-  for (const t of [tag, persistentTag]) {
-    if (!customElements.get(t)) {
-      customElements.define(
-        t,
-        class extends HTMLElement {
-          predictedExtractionResult: unknown = undefined;
-        },
-      );
-    }
-  }
-
   it("hands the element the artifacts' predictedExtractionResult", () => {
     const predictedExtractionResult = { predicted: true };
     mockUseSubcomponentArtifacts.mockReturnValue(
@@ -374,5 +424,162 @@ describe.each(
     expect(
       (container.querySelector(tag) as any).predictedExtractionResult,
     ).toBe(predictedExtractionResult);
+  });
+});
+
+const ixpCases = cases.filter(({ name }) =>
+  ["CompactFieldsForm", "CompactTableEditor", "DocumentViewer"].includes(name),
+);
+
+describe.each(ixpCases)("$name with an IXP document", ({ Component, tag }) => {
+  it("hands the IXP artifacts to the element unchanged", () => {
+    mockUseSubcomponentArtifacts.mockReturnValue(
+      readyState({ artifacts: ixpArtifacts }),
+    );
+    const { container } = render(<Component artifacts={ixpArtifacts} />);
+    const el = container.querySelector(tag) as any;
+
+    expect(el.taxonomy).toBe(ixpArtifacts.taxonomy);
+    expect(el.extractionResult).toBe(ixpArtifacts.extractionResult);
+  });
+
+  it("hands the processedDocument to artifact resolution", () => {
+    const sdk = { id: "sdk" } as any;
+    render(<Component sdk={sdk} processedDocument={processedDocument} />);
+
+    expect(mockUseSubcomponentArtifacts).toHaveBeenCalledWith(
+      expect.objectContaining({ sdk, processedDocument }),
+    );
+  });
+});
+
+describe.each(ixpCases.filter(({ name }) => name !== "DocumentViewer"))(
+  "$name IXP prediction and events",
+  ({ Component, tag }) => {
+    it("hands the element the IXP prediction", () => {
+      mockUseSubcomponentArtifacts.mockReturnValue(
+        readyState({ artifacts: ixpArtifacts }),
+      );
+      const { container } = render(<Component artifacts={ixpArtifacts} />);
+
+      expect(
+        (container.querySelector(tag) as any).predictedExtractionResult,
+      ).toBe(ixpArtifacts.predictedExtractionResult);
+    });
+
+    it("reports an IXP extractionResultChanged as given", () => {
+      const onExtractionResultChanged = vi.fn();
+      const { container } = render(
+        <Component
+          artifacts={ixpArtifacts}
+          onExtractionResultChanged={onExtractionResultChanged}
+        />,
+      );
+      const changed = { output: { total: 1 }, attribution: {} };
+      container
+        .querySelector(tag)!
+        .dispatchEvent(
+          new CustomEvent("extractionResultChanged", { detail: changed }),
+        );
+
+      expect(onExtractionResultChanged).toHaveBeenCalledExactlyOnceWith(
+        changed,
+      );
+    });
+  },
+);
+
+describe("DocumentViewer IXP document inputs", () => {
+  it("hands the element the document's pages, text and file", () => {
+    mockUseSubcomponentArtifacts.mockReturnValue(
+      readyState({ artifacts: ixpArtifacts }),
+    );
+    const { container } = render(<DocumentViewer artifacts={ixpArtifacts} />);
+    const el = container.querySelector(
+      "ui-du-document-viewer-standalone-wc-element",
+    ) as any;
+
+    expect(el.dom).toBe(ixpArtifacts.dom);
+    expect(el.document).toBe(ixpArtifacts.original);
+    expect(el.getAttribute("text")).toBe(ixpArtifacts.text);
+  });
+});
+
+describe("CompactFieldsForm save wiring for a Flow document", () => {
+  const sdk = { id: "sdk" } as any;
+
+  it.each([
+    ["saveValidatedDataRequest", "onSubmit", () => mockSubmitProcessedDocument],
+    [
+      "saveValidatedDataAsDraftRequest",
+      "onSaveAsDraft",
+      () => mockSaveProcessedDocumentAsDraft,
+    ],
+    [
+      "saveExceptionReportRequest",
+      "onReportException",
+      () => mockReportProcessedDocumentException,
+    ],
+  ])(
+    "persists `%s` through the run and emits the outcome",
+    async (event, prop, getMock) => {
+      const outcome = { success: false, error: "status 500" };
+      getMock().mockResolvedValue(outcome);
+      const callback = vi.fn();
+      const { container } = render(
+        <CompactFieldsForm
+          sdk={sdk}
+          processedDocument={processedDocument}
+          {...{ [prop]: callback }}
+        />,
+      );
+      const detail = { documentId: "trace-1", validatedData: { output: {} } };
+      container
+        .querySelector("ui-du-compact-fields-form-standalone-wc-element")!
+        .dispatchEvent(new CustomEvent(event, { detail }));
+
+      await waitFor(() =>
+        expect(callback).toHaveBeenCalledWith(detail, outcome),
+      );
+      expect(getMock()).toHaveBeenCalledExactlyOnceWith(
+        sdk,
+        processedDocument,
+        detail,
+      );
+      expect(mockSubmitValidatedData).not.toHaveBeenCalled();
+      expect(mockSaveValidatedDataAsDraft).not.toHaveBeenCalled();
+    },
+  );
+
+  it("persists through ContentValidationData when both payloads are set", async () => {
+    mockSubmitValidatedData.mockResolvedValue({ success: true });
+    const data = { DocumentId: "doc-123", FolderId: 42 } as any;
+    const { container } = render(
+      <CompactFieldsForm
+        sdk={sdk}
+        data={data}
+        processedDocument={processedDocument}
+      />,
+    );
+    const detail = { documentId: "doc-123", validatedData: {} };
+    container
+      .querySelector("ui-du-compact-fields-form-standalone-wc-element")!
+      .dispatchEvent(new CustomEvent("saveValidatedDataRequest", { detail }));
+
+    await waitFor(() =>
+      expect(mockSubmitValidatedData).toHaveBeenCalledWith(sdk, data, detail),
+    );
+    expect(mockSubmitProcessedDocument).not.toHaveBeenCalled();
+  });
+});
+
+describe("artifact representation per wrapper (types)", () => {
+  it("lets only the IXP-capable wrappers take IXP artifacts", () => {
+    const ixp = { artifacts: ixpArtifacts };
+    expectTypeOf(ixp).toExtend<CompactFieldsFormProps>();
+    expectTypeOf(ixp).toExtend<CompactTableEditorProps>();
+    expectTypeOf(ixp).toExtend<DocumentViewerProps>();
+    expectTypeOf(ixp).not.toExtend<CompactBusinessRulesProps>();
+    expectTypeOf(ixp).not.toExtend<CompactDocTypeFieldProps>();
   });
 });

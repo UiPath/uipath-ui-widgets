@@ -153,8 +153,9 @@ export interface DuDocumentArtifacts {
 
 /**
  * {@link DuDocumentArtifacts} with the taxonomy and the extraction result in
- * the IXP (JSON Schema) representation. Only `ValidationStation` takes it; the
- * subcomponents take the Document Understanding representation.
+ * the IXP (JSON Schema) representation. `ValidationStation`, `CompactFieldsForm`,
+ * `CompactTableEditor` and `DocumentViewer` take it; `CompactBusinessRules` and
+ * `CompactDocTypeField` take the Document Understanding representation only.
  *
  * `fetchProcessedDocumentArtifacts` produces one of these from a Flow
  * `ProcessedDocument`.
@@ -179,7 +180,10 @@ export interface IxpDocumentArtifacts extends Omit<
   predictedExtractionResult?: IXPExtraction | null;
 }
 
-/** The artifacts `ValidationStation` takes: either representation. */
+/**
+ * The artifacts `ValidationStation`, `CompactFieldsForm`, `CompactTableEditor`
+ * and `DocumentViewer` take: either representation.
+ */
 export type ValidationStationArtifacts =
   | DuDocumentArtifacts
   | IxpDocumentArtifacts;
@@ -195,8 +199,7 @@ export interface DuSaveCallbacks {
    * carries the request the web component produced.
    *
    * `result` is present only when the widget persisted the data itself, i.e.
-   * when it has `sdk` + `data` naming a folder, or (`ValidationStation` only)
-   * `sdk` + `processedDocument`.
+   * when it has `sdk` + `data` naming a folder, or `sdk` + `processedDocument`.
    * Otherwise the write-back is yours — the exported `submitValidatedData`
    * (bucket-backed document) and `submitProcessedDocument` (Flow document) do
    * what the widget would have done.
@@ -223,8 +226,7 @@ export interface DuSaveCallbacks {
    * The user reported the document as an exception. The reason lives at
    * `request.exceptionReport.Reason`.
    *
-   * Given `sdk` + `processedDocument` (`ValidationStation` only), the widget
-   * records the rejection and
+   * Given `sdk` + `processedDocument`, the widget records the rejection and
    * passes the outcome as `result` (host-side: `reportProcessedDocumentException`).
    * Otherwise there is no `result` and the host owns it, typically via
    * `OrchestratorDuModule.submitExceptionReport(...)`.
@@ -311,12 +313,14 @@ export interface VsSaveResultEventProps {
 }
 
 /**
- * The output surface unique to the full `ValidationStation` element: overall
- * validity plus the document-viewer panel layout. Mirrors the web component's
- * `IVsWcSharedEventMap`.
+ * {@link VsStateEventProps} for the widgets that take a document in either
+ * representation — `ValidationStation`, `CompactFieldsForm` and
+ * `CompactTableEditor` — whose extraction result arrives in the representation
+ * the document was supplied in. `CompactBusinessRules` takes Document
+ * Understanding documents only, so it keeps the narrower
+ * {@link VsStateEventProps}.
  */
-export interface ValidationStationEventProps
-  extends VsStateEventProps, VsSaveResultEventProps {
+export interface VsAnyRepresentationStateEventProps extends VsStateEventProps {
   /**
    * Every change to the extraction result, in the representation the document
    * was supplied in: an `ExtractionResult` for a Document Understanding
@@ -330,6 +334,15 @@ export interface ValidationStationEventProps
   onExtractionResultChanged?: (
     result: DuFramework.ExtractionResult | IXPReviewedExtraction,
   ) => void;
+}
+
+/**
+ * The output surface unique to the full `ValidationStation` element: overall
+ * validity plus the document-viewer panel layout. Mirrors the web component's
+ * `IVsWcSharedEventMap`.
+ */
+export interface ValidationStationEventProps
+  extends VsAnyRepresentationStateEventProps, VsSaveResultEventProps {
   /**
    * Validity changed. `true` when no critical (Must) business rule is broken and
    * no field value fails validation — the element weighs both, and counts every

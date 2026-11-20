@@ -8,6 +8,7 @@ import { fetchProcessedDocumentArtifacts } from "./processedDocument/artifacts.j
 import type { ProcessedDocument } from "./processedDocument/types.js";
 import {
   type DuDocumentArtifacts,
+  type IxpDocumentArtifacts,
   TelemetryEvent,
   TelemetryStatus,
   type ValidationStationArtifacts,
@@ -41,8 +42,10 @@ export interface DuArtifactsSource {
 }
 
 /**
- * `ValidationStation`'s data source: {@link DuArtifactsSource}, whose
- * `artifacts` may also be in the IXP representation, plus a third mode:
+ * The data source of the widgets that take either representation —
+ * `ValidationStation`, `CompactFieldsForm`, `CompactTableEditor` and
+ * `DocumentViewer`: {@link DuArtifactsSource}, whose `artifacts` may also be in
+ * the IXP representation, plus a third mode:
  *
  * 3. **Self-fetching, IXP** — pass `sdk` + `processedDocument`. The hook
  *    fetches the document's artifacts through its producing run, as
@@ -78,6 +81,17 @@ export interface ResolvedArtifacts<
 export function useResolvedArtifacts(
   source: DuArtifactsSource,
 ): ResolvedArtifacts<DuDocumentArtifacts>;
+/**
+ * A Flow document only: what it fetches is always the IXP representation. The
+ * `undefined` members keep a source that also carries `data` (which wins) or
+ * pre-fetched `artifacts` on the general overload.
+ */
+export function useResolvedArtifacts(source: {
+  sdk: UiPath | undefined;
+  processedDocument: ProcessedDocument;
+  data?: undefined;
+  artifacts?: undefined;
+}): ResolvedArtifacts<IxpDocumentArtifacts>;
 export function useResolvedArtifacts(
   source: ValidationStationArtifactsSource,
 ): ResolvedArtifacts;

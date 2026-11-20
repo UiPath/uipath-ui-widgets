@@ -13,13 +13,17 @@ import { useWcElement } from "./useWcElement.js";
  * React wrapper for `<ui-du-compact-fields-form-standalone-wc-element>` — the
  * extraction-fields panel without a document viewer. The only save-capable
  * subcomponent: given `sdk` + `data` it persists the submit and draft flows
- * itself, exactly as `ValidationStation` does, and reports through the same
- * callbacks either way.
+ * itself, and given `sdk` + `processedDocument` the exception flow too, exactly
+ * as `ValidationStation` does, and reports through the same callbacks either
+ * way.
+ *
+ * Takes a Document Understanding or an IXP document, like `ValidationStation`.
  */
 export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
   sdk,
   data,
   artifacts: providedArtifacts,
+  processedDocument,
   documentId: documentIdProp,
   instanceId,
   theme,
@@ -57,6 +61,7 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
       sdk,
       data,
       artifacts: providedArtifacts,
+      processedDocument,
       documentId: documentIdProp,
     },
     common: {
@@ -72,13 +77,12 @@ export const CompactFieldsForm: React.FC<CompactFieldsFormProps> = ({
 
   const { handleSubmit, handleSaveAsDraft, handleException } =
     createSaveHandlers(
-      { sdk, data },
+      { sdk, data, processedDocument },
       { onSubmit, onSaveAsDraft, onReportException },
     );
 
-  // Its artifacts are always the Document Understanding representation, so its
-  // events carry that one only.
-  const ref = useWcRef<ICompactFieldsFormStandaloneWcEventMap<"du">>(
+  // The document may be in either representation, and so may its events.
+  const ref = useWcRef<ICompactFieldsFormStandaloneWcEventMap>(
     {
       loaded: onLoaded,
       dirty: onDirtyChange,

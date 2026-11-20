@@ -4,11 +4,13 @@ import {
   useResolvedArtifacts,
   type ResolvedArtifacts,
   type DuArtifactsSource,
+  type ValidationStationArtifactsSource,
 } from "../useResolvedArtifacts.js";
 import {
   ValidationStationLanguage,
   type DuDocumentArtifacts,
   type DuTheme,
+  type ValidationStationArtifacts,
 } from "../types.js";
 import { useWcReady } from "../useWcReady.js";
 import { wcStyle } from "./shared.js";
@@ -35,7 +37,9 @@ interface WcCommonProps {
   isReadonly: boolean;
 }
 
-export interface WcElementState extends ResolvedArtifacts<DuDocumentArtifacts> {
+export interface WcElementState<
+  A extends ValidationStationArtifacts = ValidationStationArtifacts,
+> extends ResolvedArtifacts<A> {
   wcReady: boolean;
   /** Tag actually rendered — the base tag, or its persistent variant. */
   tag: string;
@@ -48,10 +52,23 @@ export interface WcElementState extends ResolvedArtifacts<DuDocumentArtifacts> {
  * (base vs persistent variant) to upgrade, and assembles the common JSX prop
  * block with defaults applied once. Each wrapper supplies only its event map
  * (via {@link useWcRef}) and element-specific props.
+ *
+ * A Document Understanding-only data source resolves to DU artifacts, so the
+ * wrappers whose element takes nothing else need no narrowing.
  */
 export function useWcElement(params: {
   baseTag: string;
   dataSource: DuArtifactsSource;
+  common: WcElementCommon;
+}): WcElementState<DuDocumentArtifacts>;
+export function useWcElement(params: {
+  baseTag: string;
+  dataSource: ValidationStationArtifactsSource;
+  common: WcElementCommon;
+}): WcElementState;
+export function useWcElement(params: {
+  baseTag: string;
+  dataSource: ValidationStationArtifactsSource;
   common: WcElementCommon;
 }): WcElementState {
   const { baseTag, dataSource, common } = params;

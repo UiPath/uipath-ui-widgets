@@ -37,6 +37,7 @@ export type {
   ValidationStationIntendedUse,
   ValidationStationArtifacts,
   ValidationStationProps,
+  VsAnyRepresentationStateEventProps,
   VsSaveResultEventProps,
   VsStateEventProps,
 } from "./types.js";
@@ -52,6 +53,7 @@ export {
 
 // ─── IXP documents (ProcessedDocument) ────────────────────────────────────────
 export { fetchProcessedDocumentArtifacts } from "./processedDocument/artifacts.js";
+export { useProcessedDocumentArtifacts } from "./useProcessedDocumentArtifacts.js";
 export {
   reportProcessedDocumentException,
   saveProcessedDocumentAsDraft,
@@ -87,6 +89,7 @@ export type {
   CompactFieldsFormProps,
   CompactTableEditorProps,
   DocumentViewerProps,
+  IxpCapableSubcomponentCommonProps,
   SubcomponentCommandProps,
   SubcomponentCommonProps,
 } from "./subcomponents/types.js";

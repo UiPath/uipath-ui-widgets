@@ -15,6 +15,9 @@ import { useWcElement } from "./useWcElement.js";
  * renders a table only while a table field is selected in the store — select
  * one via `selectAndFocusFieldValueByPath` (use `valueIndex: -1` to target the
  * table itself) or from a sibling element sharing the same `instanceId`.
+ *
+ * Takes a Document Understanding or an IXP document; `onExtractionResultChanged`
+ * reports in the representation it was given.
  */
 export const CompactTableEditor: React.FC<CompactTableEditorProps> = ({
   instanceId,

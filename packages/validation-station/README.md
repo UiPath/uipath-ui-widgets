@@ -105,7 +105,7 @@ Every bucket call is scoped to the folder `data` names — `FolderId`, or `Folde
 The two modes can be mixed: pass `artifacts` **and** `sdk` + `data` to skip the fetch while keeping the built-in write-back — `onSubmit` then receives the outcome as well.
 
 > **Info: `DuDocumentArtifacts`**
-> `{ taxonomy, extractionResult, predictedExtractionResult?, dom, text, customizationInfo, original }` — `original` is the base64-encoded document the viewer renders. In `DuDocumentArtifacts`, `taxonomy` and `extractionResult` are UiPath DU contracts. `ValidationStation` also takes `IxpDocumentArtifacts`, the same shape with all three in the IXP representation (an `IXPTaxonomy` JSON Schema, an `IXPReviewedExtraction` — an `IXPExtraction` plus optional `confirmations` — and an optional `IXPExtraction` prediction); the subcomponents take `DuDocumentArtifacts` only.
+> `{ taxonomy, extractionResult, predictedExtractionResult?, dom, text, customizationInfo, original }` — `original` is the base64-encoded document the viewer renders. In `DuDocumentArtifacts`, `taxonomy` and `extractionResult` are UiPath DU contracts. `ValidationStation` also takes `IxpDocumentArtifacts`, the same shape with all three in the IXP representation (an `IXPTaxonomy` JSON Schema, an `IXPReviewedExtraction` — an `IXPExtraction` plus optional `confirmations` — and an optional `IXPExtraction` prediction). So do the `CompactFieldsForm`, `CompactTableEditor` and `DocumentViewer` subcomponents; `CompactBusinessRules` and `CompactDocTypeField` take `DuDocumentArtifacts` only.
 
 ### Comparing against the prediction
 
@@ -200,7 +200,7 @@ A Flow IDP node emits a `ProcessedDocument` rather than a `ContentValidationData
 - **Saving.** Submit and draft record the review against the producing span; report-as-exception records a rejection with the reason. `onSubmit`, `onSaveAsDraft` and `onReportException` receive the outcome as their second argument. `request.validatedData` is an `IXPExtraction` on submit, and an `IXPReviewedExtraction` — the same plus the reviewer's `confirmations` — on a draft.
 - **Record format.** A review is stored as the `ProcessedDocument` the widget was given, with its `result` replaced by the validated one and `metadata.hitl.draft` set — `true` for a draft, `false` for a submit. This is the shape the Angular Validation Station uses, so either reopens a review the other saved. A record in any other shape — including the `{ draft, extraction }` envelope both used before — is ignored on load, and the document opens on the payload's `result`.
 - **Completing the task is yours.** The downstream Flow node reads the validated document from the task completion. A submit's `result.processedDocument` is that document — the same one the record holds, a `ValidatedProcessedDocument` — so complete the task with it, verbatim, whatever `result.success` says: a failed record write must not block the review. `toValidatedProcessedDocument(processedDocument, validatedData, draft)` builds it when you persist yourself.
-- **Scope.** Only `ValidationStation` takes `processedDocument` or an IXP document; the [subcomponents](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/validation-station-subcomponents.md) take Document Understanding documents (`DuDocumentArtifacts`) only.
+- **Subcomponents.** `CompactFieldsForm`, `CompactTableEditor` and `DocumentViewer` take `processedDocument` or `IxpDocumentArtifacts` too, and `CompactFieldsForm` saves a Flow document as `ValidationStation` does. `CompactBusinessRules` and `CompactDocTypeField` are Document Understanding-only. See the [subcomponents guide](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/validation-station-subcomponents.md#ixp-documents).
 - **OAuth scopes.** The `sdk`'s token needs `Traces.Api` (the run's spans, and the review record) and `OR.Buckets.Read` (the document, DOM and OCR text, via ECS). A coded action app completing the task also needs `OR.Tasks`. A missing scope surfaces as a 401/403 in the load or save error.
 - **Hosting.** The artifacts are downloaded in the browser from pre-signed ECS storage URLs, so the host's origin must be in the ECS storage account's CORS rules. Coded apps (`https://{org}.{env}.uipath.host`) are.
 
@@ -209,6 +209,7 @@ The widget does this through exported functions, so a host that fetches up front
 | Export                                                              | Use                                                                                             |
 | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `fetchProcessedDocumentArtifacts(sdk, processedDocument)`           | Fetch the `IxpDocumentArtifacts` — what the widget fetches given `processedDocument`            |
+| `useProcessedDocumentArtifacts(sdk, processedDocument)`             | The same fetch as a hook, for when the fetch belongs to a component's lifecycle                 |
 | `submitProcessedDocument(sdk, processedDocument, request)`          | Record a submitted review; its result carries the `processedDocument` to complete the task with |
 | `saveProcessedDocumentAsDraft(sdk, processedDocument, request)`     | Record a draft — the one the next load opens on                                                 |
 | `reportProcessedDocumentException(sdk, processedDocument, request)` | Record a rejection with the reviewer's reason. Replaces a saved draft                           |
@@ -455,6 +456,7 @@ import type {
   DeleteFieldValueByPath,
   ValidationStationEventProps,
   VsStateEventProps,
+  VsAnyRepresentationStateEventProps,
   VsSaveResultEventProps,
   IFieldValueDetailsDto,
   EvaluatedBusinessRulesForFieldValueDto,
@@ -631,7 +633,7 @@ What it does need is the package copied into `public/`, which Vite serves verbat
     "prebuild": "npm run stage-du-wc"
   },
   "devDependencies": {
-    "@uipath/du-validation-station-wc": "1.0.0-rc.5"
+    "@uipath/du-validation-station-wc": "1.0.0-rc.6"
   }
 }
 ```
@@ -665,16 +667,37 @@ so `includeFonts: true` against one of those links the Apollo fonts too.
 - **CSP.** Serving from your own origin needs no more than `script-src 'self'`. A separate origin must be added to `script-src` and `style-src`, and note that the loader offers no Subresource Integrity hook — self-hosting avoids that exposure entirely.
 - **Version skew.** The URL decides which web component version actually runs, and it is not checked against the installed `@uipath/du-validation-station-wc`. Keep the hosted copy in step with the version this package's types are built against.
 
-## Web component 1.0.0-rc.5
+## Web component 1.0.0-rc.6
 
-The widgets now render `@uipath/du-validation-station-wc` `1.0.0-rc.5`. Keep the
+The widgets now render `@uipath/du-validation-station-wc` `1.0.0-rc.6`. Keep the
 hosted copy in step (see _Version skew_ above). No prop of this package was
 removed or renamed, but the web component changes a few things you will see.
 
+From rc.6 — read the behaviour changes before upgrading:
+
+- **IXP documents in the subcomponents.** `CompactFieldsForm`,
+  `CompactTableEditor` and `DocumentViewer` take `processedDocument` or
+  `IxpDocumentArtifacts` — see the
+  [subcomponents guide](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/validation-station-subcomponents.md#ixp-documents).
+  `onExtractionResultChanged` on `CompactFieldsForm` and `CompactTableEditor` is
+  typed for either representation, so a handler typed for `ExtractionResult`
+  alone no longer compiles on either one.
+- **The compact fields form and table editor reject `boundingBoxes`-only IXP
+  citations.** An IXP extraction whose sources cite by `boundingBoxes` alone
+  (no `references`) does not load on these elements, and such a prediction
+  shows no predicted values. Either cites fine in `ValidationStation` and
+  `DocumentViewer`, which have the document.
+- **New compact UI, on by default:** the field filter bar counts
+  confirmed fields, and a filled field or table cell shows a _Replace value_
+  button.
+- **New options:** `options.hideDiscardButton`, and
+  `documentViewerOptions.floatingButtonsOptions.showDownloadButton`.
+- **`fieldValueChanged` now fires for IXP documents.**
+
+From rc.5:
+
 > **Warning: The Flow review record and the task completion changed**
 > This release follows the Angular Validation Station in how a `ProcessedDocument` review is recorded and completed. A review is now stored as the validated `ProcessedDocument` (`metadata.hitl.draft` telling a draft from a submit) instead of `{ draft, extraction }`, and a draft saved in the old envelope no longer reopens — the document opens on the payload's `result`. Complete the task with a submit's `result.processedDocument` rather than `request.validatedData`. See [IXP (`ProcessedDocument`)](#ixp-processeddocument).
-
-From rc.5 — read the behaviour changes before upgrading:
 
 - **A value with a validation error can no longer be confirmed**, nor the row,
   table or field group containing it. `setFieldValueByPath` follows suit:
