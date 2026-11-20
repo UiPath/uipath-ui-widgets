@@ -131,10 +131,11 @@ el.original          = await fetchOriginalAsBase64DataUrl();
 // Optional: the model's prediction — the extraction output nobody edited — as opposed to
 // extractionResult, the result the user reviews and edits. It enables features that compare
 // against the predicted extractions; set to null to clear it.
+// Change it together with extractionResult: a prediction change on its own resets the element to the last extractionResult it was fed.
 el.predictedExtractionResult = await fetchPredictedExtractionResult();
 
 // Optional configuration.
-el.theme    = 'light';
+el.theme    = 'light';  // any WcTheme: 'light', 'dark', 'light-hc', 'dark-hc', 'future-light', 'future-dark'
 el.language = 'en';
 el.options  = { hideReportAsExceptionButton: true };
 
@@ -162,21 +163,52 @@ them to resolve to anything other than `any`.
 
 ### Supplying an IXP extraction
 
-The validation-station and compact fields-form elements also accept a document
-in the IXP representation: `taxonomy` as an `IXPTaxonomy` (the output JSON
-Schema) and `extractionResult` as an `IXPExtraction` (the extracted `output`
-plus an `attribution` map keyed by JSON Pointer). Supply both in the same
-representation.
+The validation-station, compact fields-form, table-editor and document-viewer
+elements also accept a document in the IXP representation: `taxonomy` as an
+`IXPTaxonomy` (the output JSON Schema) and `extractionResult` as an `IXPReviewedExtraction` (the extracted
+`output`, an `attribution` map keyed by JSON Pointer, and optional
+`confirmations` — the pointers of the values already confirmed). Supply both in
+the same representation. A row's pointer (`/Items/2`) in `confirmations`
+confirms every value in that row, and a group's pointer (`/Items`) confirms a
+group with no rows as empty.
 
 ```ts
 el.taxonomy         = await fetchIxpOutputSchema();
 el.extractionResult = await fetchIxpExtraction();
 ```
 
+Each `attribution` entry's `sources` say where a value sits in the document.
+Cite it with `references`: one per word (`kind: 'word'`) or drawn region
+(`kind: 'area'`), with its `box` as `[top, left, width, height]` in page units,
+plus the page's `pageWidth` and `pageHeight`. When any source carries
+`references`, the values load without waiting for the document. A source with
+only the deprecated `boundingBoxes`, on a 0–1000 grid, is located against
+`dom` instead, so it waits for it.
+
 Such a document saves back in the representation it arrived in:
-`saveValidatedDataRequest`'s `validatedData` is then an `IXPExtraction`
-rather than an `ExtractionResult`. Tell the two apart by the `output`
-property, which an `ExtractionResult` never has.
+`saveValidatedDataRequest`'s `validatedData` is then an `IXPExtraction` — no
+`confirmations`, since a submit confirms every value — rather than an
+`ExtractionResult`. `extractionResultChanged` and a draft save carry the
+current `confirmations`, one pointer per confirmed value. Tell the two apart by the `output`
+property, which an `ExtractionResult` never has — or declare the
+representation on the element's type, which narrows every input and emitted
+payload and rejects a mixed taxonomy/extraction:
+
+```ts
+const el = document.querySelector('ui-du-validation-station-standalone-wc-element') as
+    IValidationStationStandaloneWcElement<'ixp'>;
+el.addEventListener('extractionResultChanged', (e) => saveDraft(e.detail)); // IXPReviewedExtraction
+```
+
+The table-editor element has no save: its `extractionResultChanged` carries
+the IXP extraction with the current `confirmations`. The document-viewer
+element only displays the document: it takes the same two inputs and emits no
+extraction.
+
+The compact fields-form and table-editor elements have no document, so they
+do not support an IXP extraction whose sources cite by `boundingBoxes` alone:
+those boxes can only be located in the document, and such an extraction does
+not load. An extraction whose sources carry `references` loads without one.
 
 ### Updating the data inputs after mount
 
@@ -188,12 +220,20 @@ object** for an update to be picked up.
 > already loaded.** The fields panel keeps the values it built from the
 > previous taxonomy, so a new taxonomy on its own can leave it showing
 > fields from the old one. Assign a new `extractionResult` in the same
-> update, and the values are re-mapped against the new taxonomy.
+> update, and the values are re-mapped against the new taxonomy. While a
+> prediction is paired, a taxonomy-only change instead resets the element
+> to the last `extractionResult` you fed in, re-mapped against the new
+> taxonomy, and unsaved edits are dropped.
 
 **Re-feeding `extractionResult` is destructive.** The loaded values are
 replaced wholesale, which discards any edits the reviewer has not saved
 and resets the current selection. Persist pending edits before you
 re-feed.
+
+**So is changing `predictedExtractionResult` on its own.** Once the element has
+paired a prediction with the loaded values, a different prediction (or `null`)
+reloads the last `extractionResult` you fed in before pairing the new one, which
+drops unsaved edits the same way. Re-feed both inputs together.
 
 Because of that, recreating the element is often the clearer option, and it
 costs no more: call `forceDestroy()` if your variant has it, `remove()` the
@@ -220,6 +260,7 @@ its `FeatureCustomization` member, typed `IFeatureCustomization`. A supplied
 |---|---|---|---|
 | `DisableLanguageSelection` | When `true`, hides the document viewer's OCR language dropdown and leaves only the selected language on display. | both | validation-station, document-viewer |
 | `DisableReportException` | When `true`, hides the "Report as exception" action from the fields form (`options.hideReportAsExceptionButton` hides it independently). | both | validation-station, fields-form |
+| `DisableKeyboardShortcuts` | When `true`, turns the keyboard shortcuts off for every user, overriding the setting a user picks in the keyboard-shortcuts dialog: no shortcut responds, no shortcut hint is shown next to fields, cells and actions, and the document viewer menu drops its "Show available keyboard shortcuts" entry. The document viewer's own zoom, rotate and search keys still work. Omitted or `false`, each user's own setting applies. | both | validation-station, fields-form, table-editor, document-viewer |
 | `DefaultSelectionMode` | Sets the document viewer's initial selection tool — `'Tokens'` for word selection, `'Area'` for free-form boxes, `'UserChoice'` to decide per selection — which the user can still switch afterwards. | both | validation-station, document-viewer |
 | `DisableFieldCrops` | Has no effect in the current version. | n/a | none |
 | `HideConfidence` | Deprecated alias of `IgnoreConfidence`; either flag on its own takes confidence out of the experience. | both | validation-station, fields-form, table-editor |
@@ -230,9 +271,12 @@ its `FeatureCustomization` member, typed `IFeatureCustomization`. A supplied
 | `DisplayMode` | Chooses which shell the validation-station element renders. Only that element reads it — every other element always renders compact. Omitted, it keeps the compact default; `'classic'` selects the classic shell. | selects the mode | validation-station |
 | `TextOnlyMode` | When `true`, the document viewer skips the page image and runs text-only, with no token creation on the canvas; the document-viewer element ignores the flag and derives text-only mode from the content inputs it was given. | both | validation-station |
 | `HideConfirmationCheckboxes` | When `true`, hides the per-value, per-row and per-cell confirmation checkboxes. Purely visual — the confirmation state and the submit flow are unchanged. | compact | validation-station, fields-form, table-editor |
-| `HideHighlightRow` | When `true`, hides the "Highlight row" action from the menu of each field group row in the fields list; in read-only mode, where that leaves the menu empty, the menu button is hidden too. The table editors keep their own "Highlight row" action. | compact | validation-station, fields-form |
+| `HideHighlightRow` | When `true`, hides the "Highlight instance" action from the menu of each field group row in the fields list. In read-only mode a row shows no menu either way. The table editors keep their own "Highlight row" action. | compact | validation-station, fields-form |
+| `EnableFieldGroupTableView` | When `true`, a field group whose fields are all simple fields gets a table toggle on its header. Switched on, the group behaves as a table field: its line shows the table summary, and selecting it opens the table editor (a table-editor element sharing the same `instance-id` edits it too). The taxonomy can open a group as a table from the start, and the user can still switch it back: `Metadata: [{ Key: 'DisplayAsTable', Value: 'true' }]` on a UiPath taxonomy's field group, or `"x-uipath-display-settings": { "tableView": true }` on an IXP taxonomy's group property. Without this flag, both are ignored. | compact | validation-station, fields-form |
 | `HideReadonlyModeIndicator` | When `true`, hides the READ-ONLY indicator shown at the bottom of the fields list while the element is read-only. | both | validation-station, fields-form |
-| `EnablePredictionDiff` | When `true`, shows the predicted value where it differs from the current values, with a button that takes it over. Needs `predictedExtractionResult`. | compact | validation-station, fields-form, table-editor |
+| `EnablePredictionDiff` | When `true`, the prediction is the annotation baseline: predicted rows and values the result lacks are inserted as unconfirmed values, and where the prediction differs from a current value the element shows the predicted value with a button that takes it over, a corner marker on every value that departs from the prediction, and a warning on field groups, rows and tables containing one. Needs `predictedExtractionResult`. | compact | validation-station, fields-form, table-editor |
+| `EnableMarkReferenceAsMissing` | When `true`, adds a "Mark reference as missing" action to the value and table-cell action menus. It removes only the value's reference to the document and keeps the extracted value, as an edit that Revert and Discard undo. The action is enabled only on a value that has a reference, in a field whose taxonomy doesn't require one. When `false`, the action is removed even where the platform enables it. Omitted, the action appears only where the platform enables it. | both | validation-station, fields-form, table-editor |
+| `DistinguishUnconfirmedValues` | When `true`, the document viewer draws the words of a value that is not yet confirmed with a faint tint of the field color and an underline, and keeps the filled highlight for confirmed values, so the document shows what still needs review. Off, every extracted value is filled. | both | validation-station, document-viewer |
 
 <div align="right">
 
@@ -242,12 +286,14 @@ its `FeatureCustomization` member, typed `IFeatureCustomization`. A supplied
 
 ## Element options
 
-`options` (typed `IValidationStationOptions`) configures the host-facing
-chrome of the validation-station element. Every member is optional.
+`options` (typed `IValidationStationOptions`) configures the validation-station
+element: what the host uses it for, and its host-facing chrome. Every member is
+optional.
 
 | Option | Effect |
 |---|---|
-| `hideSubmitButton`, `hideReportAsExceptionButton`, `hideDocumentTypeField`, `hideFields`, `hideBusinessRules` | Hide the matching part of the fields panel. |
+| `intendedUse` | `'extraction-validation'` (default) when a reviewer checks extracted data before automation acts on it, `'document-annotation'` when an annotator produces the reference data a model learns from. Tunes the wording and the in-feature actions of features that are already on; never turns a feature on or off. Unknown values behave as the default. |
+| `hideSubmitButton`, `hideDiscardButton`, `hideReportAsExceptionButton`, `hideDocumentTypeField`, `hideFields`, `hideBusinessRules` | Hide the matching part of the fields panel. |
 | `emptyTaxonomyMessage` | Text shown under the "No taxonomy defined" title when the selected document type has no fields (compact mode). Rendered verbatim, so pass it already localized; when unset, a default about there being no fields to validate is shown. |
 | `fieldsSectionPosition` | `'left'` (default) or `'right'` — which side the fields panel sits on. |
 | `fieldFilterOptions` | Trims the compact field-filter toolbar: `hideBar` removes it entirely; `hideConfirmed`, `hideNotExtracted` and `hideNoFlaggedIssues` each drop one entry of the *Hide fields* menu, and the menu button disappears once all three are hidden. A hidden filter also stops filtering. |
@@ -277,6 +323,12 @@ el.options = {
 (also disables its keyboard shortcut) and `hideLanguageSelect` (removes the
 dropdown, where the `DisableLanguageSelection` customization only disables
 it). `defaultInteractionType` picks the selection mode the viewer starts in.
+`showDownloadButton` is the one switch that adds a control: a "Download
+document" menu entry that saves the original file the viewer was given. It is
+off unless the host sets it, and stays hidden for a text-only document.
+
+The top-level `hideReferencedFieldsPopover` hides the popover that lists the
+fields referencing a word.
 
 <div align="right">
 
@@ -310,9 +362,18 @@ el.addEventListener('ui-du-vs-wc-message', (e: CustomEvent<IVsWcMessage>) => {
         case 'indicator-overlay-hide':
             hidePopover();
             break;
+        case 'taxonomy-field-focus-request':
+            // The "Edit instructions" link on a prediction-diff warning:
+            // focus this field in your taxonomy definition view.
+            focusTaxonomyField(e.detail.documentTypeId, e.detail.fieldId);
+            break;
     }
 });
 ```
+
+`taxonomy-field-focus-request` is published by the validation-station and
+compact fields-form elements, not by the table editor, and only when
+`options.intendedUse` is `'document-annotation'`.
 
 `detail.instanceId` tells instances apart when several elements share a
 listener.

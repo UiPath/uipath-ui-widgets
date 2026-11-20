@@ -1,0 +1,1 @@
+import"./chunk-eWXhx1GK.js";var n=`Falkland Islands`;var l=[{regionCode:`00`,regionName:``,city:`Stanley`,aliases:``}];var o={countryName:n,records:l};export{n as countryName,o as default,l as records};

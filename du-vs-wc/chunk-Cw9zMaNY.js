@@ -1,0 +1,1 @@
+import"./chunk-eWXhx1GK.js";var o=`Tokelau`;var i=[{regionCode:`F`,regionName:`Fakaofo`,city:`Fale old settlement`,aliases:``},{regionCode:`N`,regionName:`Nukunonu`,city:`Nukunonu`,aliases:``},{regionCode:`A`,regionName:`Atafu`,city:`Atafu Village`,aliases:``}];var n={countryName:o,records:i};export{o as countryName,n as default,i as records};

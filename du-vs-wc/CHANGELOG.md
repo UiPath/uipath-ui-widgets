@@ -7,6 +7,302 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0-rc.6] - 2026-11-17
+
+Sixth release candidate for `1.0.0`. No element tag, input, event or
+command method from `1.0.0-rc.5` is renamed or removed, and the new options
+are opt-in. Some compact- and modern-mode UI appears by default: the
+field filter bar's confirmed counter and the *Replace value* button. A
+document supplied through `processedDocument` now opens in the modern
+display mode, and the standalone table editor's types take the
+representation parameter: read **Changed** before upgrading.
+
+> 🚀 This is a **release candidate**. Please report any issues before the
+> stable release.
+
+### Added
+
+- In compact and modern display modes, the field filter bar shows how many
+  fields are confirmed, as "3 of 10 confirmed". A field confirmed as missing
+  counts, and each instance of a value counts separately.
+- In compact and modern display modes, a filled field and a filled table cell
+  show a *Replace value* button, which replaces the value with the words
+  selected in the document, as the actions menu's entry and its keyboard
+  shortcut do. It is disabled while nothing usable is selected, and the
+  document type field does not show it.
+- `documentViewerOptions.floatingButtonsOptions.showDownloadButton` adds a
+  "Download document" entry to the document viewer's menu, which saves the
+  original file the viewer was given. Off by default; hidden for a text-only
+  document.
+- `options.hideDiscardButton` hides the *Discard* button in the fields panel
+  footer and turns off its keyboard shortcut, for hosts that keep edits as a
+  draft and offer their own discard. Off by default.
+- The document-viewer element accepts an IXP document: `taxonomy` as an
+  `IXPTaxonomy` and `extractionResult` as an `IXPReviewedExtraction` (a bare
+  `IXPExtraction` works, with nothing confirmed). Its element types take the
+  representation parameter — `IDocumentViewerStandaloneWcElement<'ixp'>` — and
+  default to both representations, so existing code compiles unchanged.
+- The table-editor element accepts an IXP document the same way, including
+  `predictedExtractionResult` as an `IXPExtraction`, and its
+  `extractionResultChanged` then carries an `IXPReviewedExtraction`.
+
+### Changed
+
+- A document supplied through `processedDocument` opens in the modern display
+  mode. It carries no customizations, so it previously opened in compact.
+- `ICompactTableEditorStandaloneWcElement` and its event map take the
+  representation parameter. The event map previously fixed it to `'du'`, so a
+  listener that types `extractionResultChanged`'s detail as `ExtractionResult`
+  now needs `ICompactTableEditorStandaloneWcElement<'du'>`.
+- The compact fields-form and table-editor elements no longer supply an empty
+  document for an IXP extraction. One whose sources carry `references`, or
+  that cites nothing, loads without a document. One whose sources cite by
+  `boundingBoxes` alone is not supported on these elements: locating those
+  boxes needs the document, which neither element has, so such an
+  `extractionResult` does not load and such a `predictedExtractionResult`
+  provides no predicted values.
+- In compact and modern display modes, the popover listing the fields a
+  document word belongs to now shows each field's group path, instance number
+  and type icon, lists every field instead of the first three, and highlights
+  the row under the pointer.
+- In modern display mode, each field group instance header reads
+  "1 of 2 (values)", as in compact, instead of showing the instance number in
+  a box.
+
+### Fixed
+
+- The prediction diff and the popover that lists the fields referencing a
+  word compare reference boxes with a small tolerance, so boxes drawn slightly
+  differently around the same words no longer count as a different reference.
+- `fieldValueChanged` is emitted when a value of an IXP document is edited, on
+  every element that has the output. It was emitted only for UiPath
+  extractions.
+- In modern display mode, fields inside a field group no longer keep an empty
+  chevron-wide gap on their left; fields next to a field group keep it, so
+  their names stay aligned with the group's chevron.
+
+## [1.0.0-rc.5] - 2026-11-11
+
+Fifth release candidate for `1.0.0`. No element tag, input, event or
+command method from `1.0.0-rc.4` is renamed or removed; the document-viewer
+element is deprecated in favour of `@uipath/du-document-viewer-wc`. The new
+flags and options are opt-in, but some compact-mode UI appears by default:
+the field group's confirm-all checkbox, the table editor's clickable line
+numbers, set-field autocomplete and field filters inside field groups. A few
+changes can also affect an existing integration — values with a validation
+error can no longer be confirmed, `setFieldValueByPath` confirms
+differently, an IXP document saves new citations, and the value-indicator
+popover's custom properties are renamed: read **Changed** before upgrading.
+
+> 🚀 This is a **release candidate**. Please report any issues before the
+> stable release.
+
+### Deprecated
+
+- `<ui-du-document-viewer-standalone-wc-element>` and its persistent variant.
+  The same viewer now ships on its own as `<ui-du-document-viewer-wc-element>`
+  in [`@uipath/du-document-viewer-wc`](https://www.npmjs.com/package/@uipath/du-document-viewer-wc);
+  move to it. It takes no taxonomy or extraction result: link it to a fields
+  form yourself, by assigning the selected value's `Reference` to its
+  `highlightReference`. Stay on the deprecated element only while you need it
+  linked to another element of this package through `instance-id`, which the
+  new element cannot do yet. It will be removed in a later release.
+
+### Added
+
+- `x-uipath-suggested-currencies` on a monetary (`format: "monetary"`) `$defs`
+  entry of an IXP taxonomy. In compact mode the currency box suggests these
+  currencies while editing and still accepts any other.
+- With `EnablePredictionDiff` on, the compact form marks each value that
+  differs from the prediction, and flags the field groups, rows and tables
+  that contain one.
+- A `taxonomy-field-focus-request` message on `ui-du-vs-wc-message`, sent when
+  an annotator clicks *Edit instructions* on one of those flags. The link shows
+  only with `options.intendedUse: 'document-annotation'`, so an annotation host
+  must set it; otherwise the flags use the validation wording. Handle the
+  message to open that field in your taxonomy editor. `IVsWcMessage` gains this member,
+  so an exhaustive `switch` over its `type` needs a new case.
+- `EnableMarkReferenceAsMissing` on `FeatureCustomization`. When `true`, the
+  value and table-cell action menus of the validation-station, fields-form
+  and table-editor elements get a "Mark reference as missing" action. It
+  removes only the value's reference to the document and keeps the extracted
+  value, as an edit that Revert and Discard undo. It's enabled only on a value
+  that has a reference, in a field whose taxonomy doesn't require one. When
+  `false`, the action is removed even where the platform enables it.
+- The validation-station and compact fields-form element types take a
+  representation parameter — `IValidationStationStandaloneWcElement<'ixp'>`,
+  `ICompactFieldsFormStandaloneWcElement<'du'>` — that narrows `taxonomy`,
+  `extractionResult`, `predictedExtractionResult`, `extractionResultChanged`
+  and the save-request payloads to one representation, and rejects mixing a
+  UiPath taxonomy with an IXP extraction. New exports: `VsRepresentation`,
+  `ExtractionOf`, `ReviewedExtractionOf`, `TaxonomyOf`. The parameter defaults to both
+  representations, so existing code compiles unchanged.
+- `options.intendedUse` tells the station what the host uses it for:
+  `'extraction-validation'` (the default) when a reviewer checks extracted data
+  before automation acts on it, or `'document-annotation'` when an annotator
+  produces the reference data a model learns from. It tunes the wording and the
+  in-feature actions of features that are already on, and never turns a feature
+  on or off.
+- `IXPReviewedExtraction`: an `IXPExtraction` plus the reviewer's
+  `confirmations`, JSON Pointers of the confirmed values. The
+  validation-station and compact fields-form elements take it as an IXP
+  document's `extractionResult` and open with those values confirmed; a row's
+  or group's pointer confirms every value under it, or a group with no rows
+  as empty. A bare `IXPExtraction`
+  still works, with nothing confirmed. `predictedExtractionResult` stays an
+  `IXPExtraction`.
+- `DistinguishUnconfirmedValues` on `FeatureCustomization`. When `true`, the
+  document viewer of the validation-station and document-viewer elements
+  draws the words of values that are not yet confirmed with a faint tint of
+  the field color and an underline, and keeps the filled highlight for
+  confirmed values. Off by default.
+- Hovering a word in the document outlines every word of the value it belongs
+  to in the field colour and, after a moment, lists the values containing it so
+  one can be selected. Available in the validation-station and document-viewer
+  elements. In compact mode, hovering a value, field, row or table in the list
+  outlines its words in the document, and hovering a word highlights the values
+  containing it in the list, along with a group or row around them only while
+  it is collapsed. The fields-form and table-editor elements
+  highlight hovers only within themselves.
+- Clicking a field, group or table name selects it (validation-station and
+  fields-form elements); in the validation-station element a table name also
+  opens the table editor.
+- `hideReferencedFieldsPopover` on `DocumentViewerOptions`. When `true`, the
+  document viewer stops showing the popover that lists the fields referencing
+  a word; selecting words still works. Applies to the document-viewer element
+  and, through `options.documentViewerOptions`, to the validation-station
+  elements.
+- `DisableKeyboardShortcuts` on `FeatureCustomization`. When `true`, the
+  validation-station, fields-form, table-editor and document-viewer elements
+  turn their keyboard shortcuts off for every user, overriding the
+  setting a user picks in the keyboard-shortcuts dialog: no shortcut responds,
+  no shortcut hint is shown next to fields, cells and actions, and the
+  document viewer menu drops its "Show available keyboard shortcuts" entry.
+  The document viewer's own zoom, rotate and search keys still work.
+- `EnableFieldGroupTableView` on `FeatureCustomization` (validation-station
+  and fields-form elements, compact mode only) — a field group whose fields
+  are all simple fields gets a table toggle on its header.
+  Switched on, the group behaves as a table field: its line shows the table
+  summary, and selecting it opens the table editor (a table-editor element
+  sharing the same `instance-id` edits it too). The taxonomy can open a group
+  as a table from the start, and the user can still switch it back: a UiPath
+  taxonomy with `Metadata: [{ Key: 'DisplayAsTable', Value: 'true' }]` on the
+  field group, an IXP taxonomy with
+  `"x-uipath-display-settings": { "tableView": true }` on the group's
+  property. Without the flag, both are ignored.
+- A checkbox on a field group's line confirms or unconfirms all its
+  instances ("Confirm all instances in this field group"), and shows as
+  indeterminate while only some are confirmed (validation-station and
+  fields-form elements, compact mode). `HideConfirmationCheckboxes` hides it.
+- In the compact table editor (validation-station and table-editor
+  elements), each row's line number is a button, "Select row N", and a Tab
+  stop. Clicking it, or pressing Enter or Space, selects the row's first cell
+  and highlights the row in the document, in read-only mode too.
+- An IXP attribution source can cite its place on the page in page units:
+  `references`, each with a `kind` (`'word'` or `'area'`), a `box`
+  (`[top, left, width, height]`) and an optional `ocrConfidence`, plus the
+  page's `pageWidth` and `pageHeight`. When any source carries `references`,
+  the values load from them without waiting for the document, so they load
+  even when the document fails to. A source without them is still located
+  from `boundingBoxes` against `dom`; `boundingBoxes` is deprecated. A
+  reference of an unknown kind or with a malformed box, and a source on no
+  valid page, are dropped.
+- `theme` accepts the Apollo Modern themes, `'future-light'` and
+  `'future-dark'`. The accepted ids are exported as `WcTheme`.
+
+### Fixed
+
+- The validation-station element renders its fields panel and compact table
+  editor as soon as their data is ready. They waited for the browser to go
+  idle, so on a busy page they could stay blank.
+- Selecting a value, stepping through search matches and moving between
+  words no longer scroll the host page, or shift the page image inside the
+  viewer (validation-station and document-viewer elements).
+- An empty field inside a field-group row shows its broken business-rule
+  indicator. It showed none, although the rule still blocked submitting.
+- An IXP document no longer opens with *Discard* enabled and `dirty` `true`:
+  both wait for the reviewer's first change.
+- Picking a table cell from the list of fields that reference a word opens
+  the table editor with that cell selected, also after that table's editor
+  was closed. It selected the cell but left the editor closed.
+- While the list of fields that reference a word is open and focused, the
+  fields' assignment keys and F + A work. They were ignored until it closed.
+- With keyboard shortcuts off, a field's colour button no longer shows the
+  "No key was assigned to this field" tooltip.
+- `saveValidatedDataAsDraftRequest`'s `validatedData` is typed
+  `ExtractionResult | IXPReviewedExtraction`; it was typed `ExtractionResult`
+  although an IXP document's draft carries an IXP extraction.
+- `extractionResultChanged` on the compact table-editor and business-rules
+  elements is typed `ExtractionResult`, the only representation they emit.
+
+### Changed
+
+- `extractionResultChanged` now fires for a document supplied as an
+  `IXPExtraction` on the validation-station and compact fields-form elements,
+  carrying an `IXPReviewedExtraction` — the same representation a draft save
+  emits as `validatedData`. It previously never fired for such a document. It is still
+  gated on `options.emitDtoStateChanges`, and an `ExtractionResult` document
+  still emits an `ExtractionResult`. Feed the emitted object back as
+  `extractionResult` to reopen a draft with its confirmations.
+- `EnablePredictionDiff` now also inserts the predicted rows and values the
+  extraction result lacks, as unconfirmed values the user confirms or deletes.
+  The flag means the prediction is the annotation baseline. Rows whose content
+  matches several predicted rows equally well are paired with the one cited at
+  the same place in the document; only rows that neither content nor place
+  tells apart stay unpaired, and their predictions are inserted.
+- The inline predicted-value line appears only when the predicted value differs;
+  a reference that differs alone is labelled in the crop popover footer only.
+- Changing `predictedExtractionResult` on its own, after the element has paired
+  the previous prediction, resets the element to the last `extractionResult` it
+  was fed before pairing the new one; so does changing `taxonomy` alone while a
+  prediction is paired. Re-feed the inputs together.
+- A value with a validation error can no longer be confirmed, and neither can
+  the row, table or field group containing it. Validation errors are a
+  required value left empty or blank, a value outside its set's options, an
+  anchor error and, in compact mode, an unparseable date, number or amount
+  part; broken business rules don't block confirming. The checkbox is
+  disabled, with a tooltip such as "Fix the validation error before
+  confirming this value", the confirm shortcuts skip the value, and editing a
+  value into an error unconfirms it. The `setFieldValueByPath` command
+  follows suit: `OperatorConfirmed: true` on such a value, or on a row, table
+  or group containing one, fails with `success: false` and applies nothing;
+  `OperatorConfirmed: false` keeps a valid value unconfirmed; without
+  `OperatorConfirmed`, an updated value is confirmed when valid and left
+  unconfirmed when not.
+- In compact mode a set field or cell is a text box with an autocomplete list
+  instead of a dropdown. Typing filters the options; Enter or leaving the box
+  commits the text only when it matches an option, ignoring case, and
+  otherwise keeps the previous value. Escape restores the value.
+- F + C on a selected empty field extracts its value, as the field's "+"
+  button does, and F + A only adds a value to a multi-value field that
+  already has one. F + A used to create an empty field's value, and F + C did
+  nothing there. In classic mode, T + C creates an empty table header cell's
+  value.
+- Field-group rows are called instances (compact mode): the add button reads
+  "Add instance", where it read "Add value", with the tooltip "Add an
+  additional instance", and a row's "Highlight row" action reads "Highlight
+  instance". In read-only mode a row no longer shows its actions menu;
+  clicking the row still highlights it.
+- The compact field filters reach inside field groups (validation-station and
+  fields-form elements). The field-search picker lists a group's fields under
+  it, and picking the group picks them all. The *Hide fields* filters apply to
+  a group's fields too: a row whose fields are all hidden is hidden, and so is
+  a group whose rows all are, and the group line and its rows show how many
+  fields they hide. A row the reviewer just added stays visible until the
+  filters change. Table columns and rows are still not filtered.
+- An IXP document's `validatedData`, on submit and on a draft save, and its
+  `extractionResultChanged` cite every value afresh: each source carries
+  `references`, `pageWidth` and `pageHeight` (`null` when unknown), and
+  `boundingBoxes` for words only, so a value the reviewer didn't touch no
+  longer echoes its incoming `sources`. A `null` value whose attribution cites
+  words loads as an empty value that keeps its reference, and a value emptied
+  in place saves as `null` with its citation.
+- The value-indicator popover's styling custom properties are renamed from
+  `--du-vs-indicator-overlay-padding`, `-shadow`, `-radius` and `-background`
+  to `--ui-hover-popover-padding`, `-shadow`, `-radius` and `-background`. A
+  host that sets the old names silently loses that styling. The
+  `::part(indicator-overlay)` parts are unchanged.
+
 ## [1.0.0-rc.4] - 2026-10-09
 
 Fourth release candidate for `1.0.0`. No element tag, input, event or

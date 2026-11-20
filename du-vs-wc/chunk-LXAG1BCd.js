@@ -1,0 +1,1 @@
+import"./chunk-eWXhx1GK.js";var o=`Cocos Islands`;var a=[{regionCode:``,regionName:``,city:`West Island`,aliases:``}];var n={countryName:o,records:a};export{o as countryName,n as default,a as records};

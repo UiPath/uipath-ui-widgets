@@ -1,1 +1,0 @@
-import"./chunk-D4-ktzGU.js";var i=`Gibraltar`;var e=[{regionCode:`00`,regionName:``,city:`Gibraltar`,aliases:`Gibraltaro;Gibraltaras`}];var o={countryName:i,records:e};export{i as countryName,o as default,e as records};

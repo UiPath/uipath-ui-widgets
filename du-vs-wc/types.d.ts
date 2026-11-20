@@ -15,7 +15,8 @@
  *     <ui-du-compact-table-editor-standalone-wc-element>
  *     <ui-du-compact-table-editor-standalone-wc-persistent-element>
  *
- *   Document viewer (viewer only, no fields form):
+ *   Document viewer (viewer only, no fields form) — deprecated, see
+ *   `@uipath/du-document-viewer-wc`:
  *     <ui-du-document-viewer-standalone-wc-element>
  *     <ui-du-document-viewer-standalone-wc-persistent-element>
  *
@@ -122,11 +123,16 @@ export type SelectionModeCustomization = 'Tokens' | 'Area' | 'UserChoice';
 
 export type DisplayMode = 'classic' | 'compact';
 
+/** Theme id accepted by the `theme` input. `future-light` and `future-dark` are the Apollo Modern themes. */
+export type WcTheme = 'light' | 'dark' | 'light-hc' | 'dark-hc' | 'future-light' | 'future-dark';
+
 export interface IFeatureCustomization {
     /** Hides the document viewer's OCR language dropdown, leaving the selected language on display (both modes). */
     DisableLanguageSelection?: boolean;
     /** Hides the "Report as exception" action from the fields form (both modes). */
     DisableReportException?: boolean;
+    /** Turns the keyboard shortcuts off for every user, overriding the user's own setting: no shortcut responds, no shortcut hint is shown, and the document viewer menu drops its "Show available keyboard shortcuts" entry; the viewer's own zoom, rotate and search keys still work (both modes). */
+    DisableKeyboardShortcuts?: boolean;
     /** The document viewer's initial selection tool; the user can still switch tools afterwards (both modes). */
     DefaultSelectionMode?: SelectionModeCustomization;
     /** Has no effect in the current version. */
@@ -147,12 +153,23 @@ export interface IFeatureCustomization {
     TextOnlyMode?: boolean;
     /** Hides the per-value, per-row and per-cell confirmation checkboxes; purely visual, the submit flow is unchanged (compact mode only). */
     HideConfirmationCheckboxes?: boolean;
-    /** Hides the "Highlight row" action from a field group row's menu in the fields list (compact mode only). */
+    /** Hides the "Highlight instance" action from a field group row's menu in the fields list (compact mode only). */
     HideHighlightRow?: boolean;
+    /**
+     * Lets a field group of simple fields be shown as a table and edited in the table editor (compact mode only).
+     * A group opens as a table when its taxonomy says so — `Metadata: [{ Key: 'DisplayAsTable', Value: 'true' }]` on a
+     * UiPath field group, `"x-uipath-display-settings": { "tableView": true }` on an IXP group property — and the user
+     * can still switch it back. Without this flag those taxonomy settings are ignored.
+     */
+    EnableFieldGroupTableView?: boolean;
     /** Hides the READ-ONLY indicator at the bottom of the fields list while the component is in readonly mode (both modes). */
     HideReadonlyModeIndicator?: boolean;
-    /** Shows the prediction diff (compact mode only). Needs `predictedExtractionResult`. */
+    /** Shows the prediction diff (compact mode only): the predicted value under each value that differs, a corner marker on every value that departs from the prediction, and a warning on field groups, rows and tables containing one. Needs `predictedExtractionResult`. */
     EnablePredictionDiff?: boolean;
+    /** Adds (`true`) or removes (`false`) "Mark reference as missing" in the value and table-cell action menus, whatever the platform enables (both modes). */
+    EnableMarkReferenceAsMissing?: boolean;
+    /** Draws the words of a not-yet-confirmed value with a faint tint of the field color and an underline instead of the filled highlight; confirmed values keep the fill (both modes). */
+    DistinguishUnconfirmedValues?: boolean;
 }
 
 export interface IHelpCustomizationDTO {
@@ -200,8 +217,34 @@ export interface FieldFilterOptions {
     hideNoFlaggedIssues?: boolean;
 }
 
+/**
+ * What a host uses the station for. See {@link IValidationStationOptions.intendedUse}.
+ */
+export type ValidationStationIntendedUse =
+    | 'extraction-validation'
+    | 'document-annotation';
+
 export interface IValidationStationOptions {
+    /**
+     * What the host uses the station for: `'extraction-validation'` when a reviewer checks
+     * extracted data before automation acts on it, `'document-annotation'` when an annotator
+     * produces the reference data a model learns from.
+     *
+     * Tunes the wording and the in-feature actions of features that are already on. It never
+     * turns a feature on or off; the other options and the customization flags do that.
+     * Unknown values behave as the default.
+     *
+     * @default 'extraction-validation'
+     * @example
+     * element.options = { intendedUse: 'document-annotation' };
+     */
+    intendedUse?: ValidationStationIntendedUse;
     hideSubmitButton?: boolean;
+    /**
+     * Hides the Discard button in the fields panel footer and turns off its keyboard shortcut.
+     * A host that triggers discard itself is unaffected.
+     */
+    hideDiscardButton?: boolean;
     hideReportAsExceptionButton?: boolean;
     /** Hides the document type field. Defaults to `true` for an IXP taxonomy, `false` otherwise. */
     hideDocumentTypeField?: boolean;
@@ -298,6 +341,11 @@ export interface DocumentViewerFloatingButtonsOptions {
      * customization, which leaves the dropdown visible but disabled.
      */
     hideLanguageSelect?: boolean;
+    /**
+     * Show a "Download document" entry in the viewer's burger menu, which saves the original file
+     * the viewer was given. Hidden for a text-only document. @default false
+     */
+    showDownloadButton?: boolean;
 }
 
 /** Fine-grained configuration for the document-viewer element. */
@@ -315,6 +363,11 @@ export interface DocumentViewerOptions {
      * Also hides the interaction-type button, which only switches selection modes.
      */
     disableSelection?: boolean;
+    /**
+     * Set to true to hide the popover listing the fields that reference a word
+     * in the document. Selecting words is unaffected.
+     */
+    hideReferencedFieldsPopover?: boolean;
 }
 
 // ─── Path-based inputs ────────────────────────────────────────────────────────
@@ -417,10 +470,67 @@ export interface IXPExtraction {
             attachmentId?: string;
             /** 1-based. */
             pageNumber?: number;
+            /**
+             * The citation on the 0–1000 grid of each page axis.
+             * @deprecated Read only from a source without `references`, located against the document's `dom`; written for
+             * words only, for consumers that still read it.
+             */
             boundingBoxes?: { xMin: number; xMax: number; yMin: number; yMax: number }[];
+            /** The page's size in page units; `null` when it is unknown. */
+            pageWidth?: number | null;
+            pageHeight?: number | null;
+            /**
+             * The citation in page units: one entry per cited word, or per drawn area. When any source of an extraction
+             * carries them, its values load without waiting for the document. Written on every save.
+             */
+            references?: {
+                kind: 'word' | 'area';
+                /** `[top, left, width, height]`, in page units. */
+                box: [number, number, number, number];
+                /** A word's OCR confidence; `null` when the OCR gave none, absent on an area. */
+                ocrConfidence?: number | null;
+            }[];
         }[];
     }>;
 }
+
+/**
+ * An {@link IXPExtraction} together with the reviewer's state — what an IXP document's
+ * `extractionResult` is supplied as and what `extractionResultChanged` emits. A bare
+ * `IXPExtraction` is one with nothing confirmed.
+ */
+export interface IXPReviewedExtraction extends IXPExtraction {
+    /**
+     * RFC 6901 JSON Pointers, in the `attribution` key space, of the values the reviewer confirmed.
+     * Supplied, a leaf's pointer confirms that value and a row's pointer (`/Items/2`) or a group's
+     * confirms every value under it, or the group itself when it has no rows; pointers naming
+     * nothing are ignored. Emitted, the list holds one leaf pointer per confirmed value, including
+     * confirmed empty ones, plus the pointer of each confirmed group with no rows.
+     */
+    confirmations?: string[];
+}
+
+/**
+ * The representation a standalone element's document is supplied in, and so emitted back in:
+ * `'du'` for the UiPath SDK contracts, `'ixp'` for {@link IXPTaxonomy} + {@link IXPExtraction}.
+ *
+ * The element, event-map and save-payload types take it as a type parameter, defaulting to
+ * both. Declare it on the element's type to narrow every input and emitted payload together:
+ *
+ * @example
+ * const ref = useRef<IValidationStationStandaloneWcElement<'ixp'>>(null);
+ * ref.current?.addEventListener('extractionResultChanged', (e) => save(e.detail.output));
+ */
+export type VsRepresentation = 'du' | 'ixp';
+
+/** The extraction result type of representation `R`. */
+export type ExtractionOf<R extends VsRepresentation> = R extends 'ixp' ? IXPExtraction : ExtractionResult;
+
+/** The extraction result type of representation `R`, with the reviewer's state where the representation carries it. */
+export type ReviewedExtractionOf<R extends VsRepresentation> = R extends 'ixp' ? IXPReviewedExtraction : ExtractionResult;
+
+/** The taxonomy type of representation `R`. */
+export type TaxonomyOf<R extends VsRepresentation> = R extends 'ixp' ? IXPTaxonomy : DocumentTaxonomy;
 
 /**
  * Payload of the `saveValidatedDataRequest` event.
@@ -429,23 +539,25 @@ export interface IXPExtraction {
  * from `@uipath/uipath-typescript`, and so does `validatedData` unless the document was supplied
  * in the IXP representation.
  */
-export interface IVsSaveValidatedDataRequest {
+export interface IVsSaveValidatedDataRequest<R extends VsRepresentation = VsRepresentation> {
     documentId: string;
     /**
      * The extraction result after user edits — an {@link IXPExtraction} when the document was
      * supplied in the IXP representation, which saves back in the representation it arrived in.
+     * It carries no `confirmations`: a submit confirms every value.
      */
-    validatedData: ExtractionResult | IXPExtraction;
-    /** The automatic (pre-edit) extraction result. */
-    automaticExtractionResult: ExtractionResult | null;
-    /** The taxonomy for this document. */
-    taxonomy: DocumentTaxonomy | null;
+    validatedData: ExtractionOf<R>;
+    /** The automatic (pre-edit) extraction result. Always `null` for an IXP document. */
+    automaticExtractionResult: (R extends 'ixp' ? never : ExtractionResult) | null;
+    /** The taxonomy for this document. Always `null` for an IXP document. */
+    taxonomy: (R extends 'ixp' ? never : DocumentTaxonomy) | null;
 }
 
 /** Payload of the `saveValidatedDataAsDraftRequest` event. */
-export interface IVsSaveValidatedDataAsDraftRequest {
+export interface IVsSaveValidatedDataAsDraftRequest<R extends VsRepresentation = VsRepresentation> {
     documentId: string;
-    validatedData: ExtractionResult;
+    /** The extraction result after user edits, in the representation the document was supplied in. */
+    validatedData: ReviewedExtractionOf<R>;
 }
 
 /**
@@ -503,8 +615,24 @@ export interface IVsIndicatorOverlayHideMessage extends IVsWcBaseMessage {
     type: 'indicator-overlay-hide';
 }
 
+/**
+ * Asks the host to focus this field in its taxonomy definition view. Published by the "Edit
+ * instructions" link on a prediction-diff warning (field group, row or table), which shows only
+ * when `options.intendedUse` is `'document-annotation'`.
+ */
+export interface IVsTaxonomyFieldFocusRequestMessage extends IVsWcBaseMessage {
+    type: 'taxonomy-field-focus-request';
+    /** Document type the field belongs to. */
+    documentTypeId: string;
+    /** The field group or table's `FieldId` — the IXP `x-uipath-field-group-id` for an IXP taxonomy. */
+    fieldId: string;
+}
+
 /** Union of every message published on the VS WC message bus. */
-export type IVsWcMessage = IVsIndicatorOverlayShowMessage | IVsIndicatorOverlayHideMessage;
+export type IVsWcMessage =
+    | IVsIndicatorOverlayShowMessage
+    | IVsIndicatorOverlayHideMessage
+    | IVsTaxonomyFieldFocusRequestMessage;
 
 /**
  * Edit/state events common to every standalone VS-family web component — the full
@@ -513,15 +641,19 @@ export type IVsWcMessage = IVsIndicatorOverlayShowMessage | IVsIndicatorOverlayH
  * elements that expose a `save` command emit it (see `IVsWcCommonEventMap`); the
  * edit-only table editor does not.
  */
-export interface IVsWcCommonStateEventMap {
+export interface IVsWcCommonStateEventMap<R extends VsRepresentation = VsRepresentation> {
     /** Fires once when the component has finished loading. */
     loaded: boolean;
     /** Fires when the user has unsaved changes (true) or the state is clean (false). */
     dirty: boolean;
     /** Fires when the user changes the document type. Detail is the new document type ID. */
     documentTypeChanged: string;
-    /** Fires on every extraction result change when `IValidationStationOptions.emitDtoStateChanges` is true. */
-    extractionResultChanged: ExtractionResult;
+    /**
+     * Fires on every extraction result change when `IValidationStationOptions.emitDtoStateChanges` is true.
+     * Carries the result in the representation the document was supplied in: an
+     * {@link IXPReviewedExtraction} for an IXP document, an `ExtractionResult` for a DU one.
+     */
+    extractionResultChanged: ReviewedExtractionOf<R>;
     /** Fires when the user selects a field value. */
     fieldValueSelected: IFieldValueDetailsDto;
     /** Fires when the user edits a field value. */
@@ -551,7 +683,7 @@ export interface IVsWcCommonStateEventMap {
  * validation-station element and the compact fields-form element. Adds the
  * `save`-command result to the shared edit/state events.
  */
-export interface IVsWcCommonEventMap extends IVsWcCommonStateEventMap {
+export interface IVsWcCommonEventMap<R extends VsRepresentation = VsRepresentation> extends IVsWcCommonStateEventMap<R> {
     /** Result of a `save` command. */
     saveResult: ISaveResult;
 }
@@ -563,7 +695,7 @@ export interface IVsWcCommonEventMap extends IVsWcCommonStateEventMap {
  * Extends the common map with the document-viewer panel layout events that
  * only the full validation-station element (which renders a PDF viewer) emits.
  */
-export interface IVsWcSharedEventMap extends IVsWcCommonEventMap {
+export interface IVsWcSharedEventMap<R extends VsRepresentation = VsRepresentation> extends IVsWcCommonEventMap<R> {
     /**
      * Fires when the component's validity changes. `true` when no `Must` rule set is broken and no
      * value-level validation error exists
@@ -576,11 +708,11 @@ export interface IVsWcSharedEventMap extends IVsWcCommonEventMap {
 }
 
 /** The standalone save-request events shared by every standalone VS-family element. */
-export interface IVsWcSaveRequestEventMap {
+export interface IVsWcSaveRequestEventMap<R extends VsRepresentation = VsRepresentation> {
     /** Emitted when the user saves. Handle this to call the ProcessExtractedData API. */
-    saveValidatedDataRequest: IVsSaveValidatedDataRequest;
+    saveValidatedDataRequest: IVsSaveValidatedDataRequest<R>;
     /** Emitted when the user saves as draft. */
-    saveValidatedDataAsDraftRequest: IVsSaveValidatedDataAsDraftRequest;
+    saveValidatedDataAsDraftRequest: IVsSaveValidatedDataAsDraftRequest<R>;
     /** Emitted when the user reports an exception. */
     saveExceptionReportRequest: IVsSaveExceptionReportRequest;
 }
@@ -591,7 +723,7 @@ export interface IVsWcSaveRequestEventMap {
  *
  * The standalone variant emits API command events instead of making HTTP calls.
  */
-export interface IValidationStationStandaloneWcEventMap extends IVsWcSharedEventMap, IVsWcSaveRequestEventMap {}
+export interface IValidationStationStandaloneWcEventMap<R extends VsRepresentation = VsRepresentation> extends IVsWcSharedEventMap<R>, IVsWcSaveRequestEventMap<R> {}
 
 /**
  * Maps every custom-event name emitted by the standalone compact fields-form
@@ -601,7 +733,7 @@ export interface IValidationStationStandaloneWcEventMap extends IVsWcSharedEvent
  * panel layout events (`fieldsPanelWidthChanged` / `fieldsPanelSideChanged`):
  * the compact form renders fields only, with no PDF viewer or resizable panel.
  */
-export interface ICompactFieldsFormStandaloneWcEventMap extends IVsWcCommonEventMap, IVsWcSaveRequestEventMap {}
+export interface ICompactFieldsFormStandaloneWcEventMap<R extends VsRepresentation = VsRepresentation> extends IVsWcCommonEventMap<R>, IVsWcSaveRequestEventMap<R> {}
 
 /**
  * Maps every custom-event name emitted by the standalone compact table-editor
@@ -612,7 +744,8 @@ export interface ICompactFieldsFormStandaloneWcEventMap extends IVsWcCommonEvent
  * `IVsWcCommonEventMap`. Adds `tableSelectionEvent` for the PDF table-selection
  * round-trip.
  */
-export interface ICompactTableEditorStandaloneWcEventMap extends IVsWcCommonStateEventMap {
+export interface ICompactTableEditorStandaloneWcEventMap<R extends VsRepresentation = VsRepresentation>
+    extends IVsWcCommonStateEventMap<R> {
     /**
      * Fires when the user starts/stops a PDF table selection from the editor's
      * extract controls; null when the selection is cancelled.
@@ -635,7 +768,7 @@ export interface ICompactTableEditorStandaloneWcEventMap extends IVsWcCommonStat
  * extends `IVsWcCommonStateEventMap`, not `IVsWcCommonEventMap`. Adds the two
  * panel-specific outputs.
  */
-export interface ICompactBusinessRulesStandaloneWcEventMap extends IVsWcCommonStateEventMap {
+export interface ICompactBusinessRulesStandaloneWcEventMap extends IVsWcCommonStateEventMap<'du'> {
     /** Fires when the user expands (true) or collapses (false) the rules panel. */
     businessRulesToggle: boolean;
     /** Fires when the user clicks an evaluated rule. */
@@ -652,6 +785,10 @@ export interface ICompactBusinessRulesStandaloneWcEventMap extends IVsWcCommonSt
  *
  * `tokensSelect` carries an internal PDF-viewer shape (`IPDFToken[]`) that is
  * not part of the public WC type surface; it is exposed opaquely as `unknown[]`.
+ *
+ * @deprecated Use `<ui-du-document-viewer-wc-element>` from `@uipath/du-document-viewer-wc`. Keep this
+ * element only while it must link to a VS element through `instance-id`, which the new element
+ * cannot do yet. It will be removed in a later release.
  */
 export interface IDocumentViewerStandaloneWcEventMap {
     /** Fires when the inner document viewer is ready. */
@@ -702,7 +839,7 @@ export interface IVsWcBaseElement<TEventMap> extends HTMLElement {
     // ── Configuration inputs ──────────────────────────────────────────────────
 
     /** Visual theme applied to the component. @default 'light' */
-    theme: 'light' | 'dark' | 'light-hc' | 'dark-hc';
+    theme: WcTheme;
     /** BCP-47 language code for the UI. @default 'en' */
     language: string;
     /** When true, the component renders in read-only mode. @default false */
@@ -764,7 +901,8 @@ export interface IVsWcBaseElement<TEventMap> extends HTMLElement {
  * to `saveValidatedDataRequest` / `saveValidatedDataAsDraftRequest` /
  * `saveExceptionReportRequest`.
  */
-export interface IValidationStationStandaloneWcElement extends IVsWcBaseElement<IValidationStationStandaloneWcEventMap> {
+export interface IValidationStationStandaloneWcElement<R extends VsRepresentation = VsRepresentation>
+    extends IVsWcBaseElement<IValidationStationStandaloneWcEventMap<R>> {
     // ── Setup inputs ──────────────────────────────────────────────────────────
 
     /** Document identifier. Required before any data inputs are set. */
@@ -779,20 +917,20 @@ export interface IValidationStationStandaloneWcElement extends IVsWcBaseElement<
      * Taxonomy for this document: a UiPath `DocumentTaxonomy`, or an {@link IXPTaxonomy}
      * (the IXP output JSON Schema).
      */
-    taxonomy?: DocumentTaxonomy | IXPTaxonomy;
+    taxonomy?: TaxonomyOf<R>;
     /**
-     * Initial extraction results: a UiPath `ExtractionResult`, or an {@link IXPExtraction}
+     * Initial extraction results: a UiPath `ExtractionResult`, or an {@link IXPReviewedExtraction}
      * matching an `IXPTaxonomy`. An IXP document saves back in the same representation — the
      * `saveValidatedDataRequest` event's `validatedData` is then an `IXPExtraction`.
      */
-    extractionResult?: ExtractionResult | IXPExtraction;
+    extractionResult?: ReviewedExtractionOf<R>;
     /**
      * Predicted extraction result — the model output before any human edit, as opposed to
      * `extractionResult`, the result the user reviews and edits. In the same representation
      * as `extractionResult`. Optional; it enables features that compare against
      * the predicted extractions. Set `null` to clear it.
      */
-    predictedExtractionResult?: ExtractionResult | IXPExtraction | null;
+    predictedExtractionResult?: ExtractionOf<R> | null;
     /** Document object model (digitized document). */
     dom: DocumentEntity;
     /** Plain text content of the document. */
@@ -811,7 +949,8 @@ export interface IValidationStationStandaloneWcElement extends IVsWcBaseElement<
  * element is being permanently removed (`ngOnDestroy` / `useEffect`
  * cleanup / `componentWillUnmount`).
  */
-export interface IPersistentValidationStationStandaloneWcElement extends IValidationStationStandaloneWcElement {
+export interface IPersistentValidationStationStandaloneWcElement<R extends VsRepresentation = VsRepresentation>
+    extends IValidationStationStandaloneWcElement<R> {
     /**
      * Explicitly tears down the inner Angular component.
      * Must be called when the element is being permanently removed.
@@ -832,7 +971,8 @@ export interface IPersistentValidationStationStandaloneWcElement extends IValida
  * document-viewer data inputs (`dom`, `text`, `original`) and the panel
  * layout events (`fieldsPanelWidthChanged` / `fieldsPanelSideChanged`).
  */
-export interface ICompactFieldsFormStandaloneWcElement extends IVsWcBaseElement<ICompactFieldsFormStandaloneWcEventMap> {
+export interface ICompactFieldsFormStandaloneWcElement<R extends VsRepresentation = VsRepresentation>
+    extends IVsWcBaseElement<ICompactFieldsFormStandaloneWcEventMap<R>> {
     // ── Setup inputs ──────────────────────────────────────────────────────────
 
     /** Document identifier. Required before any data inputs are set. */
@@ -856,20 +996,20 @@ export interface ICompactFieldsFormStandaloneWcElement extends IVsWcBaseElement<
      * Taxonomy for this document: a UiPath `DocumentTaxonomy`, or an {@link IXPTaxonomy}
      * (the IXP output JSON Schema).
      */
-    taxonomy: DocumentTaxonomy | IXPTaxonomy;
+    taxonomy: TaxonomyOf<R>;
     /**
-     * Initial extraction results: a UiPath `ExtractionResult`, or an {@link IXPExtraction}
+     * Initial extraction results: a UiPath `ExtractionResult`, or an {@link IXPReviewedExtraction}
      * matching an `IXPTaxonomy`. An IXP document saves back in the same representation — the
      * `saveValidatedDataRequest` event's `validatedData` is then an `IXPExtraction`.
      */
-    extractionResult: ExtractionResult | IXPExtraction;
+    extractionResult: ReviewedExtractionOf<R>;
     /**
      * Predicted extraction result — the model output before any human edit, as opposed to
      * `extractionResult`, the result the user reviews and edits. In the same representation
      * as `extractionResult`. Optional; it enables features that compare against
      * the predicted extractions. Set `null` to clear it.
      */
-    predictedExtractionResult?: ExtractionResult | IXPExtraction | null;
+    predictedExtractionResult?: ExtractionOf<R> | null;
     /** Customization configuration. Type: the exported ICustomizationInfoDTO. */
     customizationInfo: unknown;
 }
@@ -882,7 +1022,8 @@ export interface ICompactFieldsFormStandaloneWcElement extends IVsWcBaseElement<
  * element is being permanently removed (`ngOnDestroy` / `useEffect`
  * cleanup / `componentWillUnmount`).
  */
-export interface IPersistentCompactFieldsFormStandaloneWcElement extends ICompactFieldsFormStandaloneWcElement {
+export interface IPersistentCompactFieldsFormStandaloneWcElement<R extends VsRepresentation = VsRepresentation>
+    extends ICompactFieldsFormStandaloneWcElement<R> {
     /**
      * Explicitly tears down the inner Angular component.
      * Must be called when the element is being permanently removed.
@@ -904,7 +1045,7 @@ export interface IPersistentCompactFieldsFormStandaloneWcElement extends ICompac
  * Edit-only: there is no `save` command and no save-request events. Persist edits
  * by listening to `fieldValueChanged` / `extractionResultChanged` / `dirty`.
  */
-export interface ICompactTableEditorStandaloneWcElement extends HTMLElement {
+export interface ICompactTableEditorStandaloneWcElement<R extends VsRepresentation = VsRepresentation> extends HTMLElement {
     // ── Setup inputs ──────────────────────────────────────────────────────────
 
     /** Document identifier. Required before any data inputs are set. */
@@ -922,25 +1063,35 @@ export interface ICompactTableEditorStandaloneWcElement extends HTMLElement {
     instanceId: string | undefined;
 
     // ── Data inputs (replace the HTTP fetches of the non-standalone variant) ──
+    //
+    // `taxonomy` + `extractionResult` are EITHER the UiPath SDK contracts OR the IXP
+    // (JSON-Schema) representation — supply both in the same representation.
 
-    /** Taxonomy for this document. */
-    taxonomy: DocumentTaxonomy;
-    /** Initial extraction results. */
-    extractionResult: ExtractionResult;
+    /**
+     * Taxonomy for this document: a UiPath `DocumentTaxonomy`, or an {@link IXPTaxonomy}
+     * (the IXP output JSON Schema).
+     */
+    taxonomy: TaxonomyOf<R>;
+    /**
+     * Initial extraction results: a UiPath `ExtractionResult`, or an {@link IXPReviewedExtraction}
+     * matching an `IXPTaxonomy`. An IXP document's `extractionResultChanged` carries an
+     * `IXPReviewedExtraction` with the current `confirmations`.
+     */
+    extractionResult: ReviewedExtractionOf<R>;
     /**
      * Predicted extraction result — the model output before any human edit, as opposed to
-     * `extractionResult`, the result the user reviews and edits. Same `ExtractionResult`
-     * shape as `extractionResult`. Optional; it enables features that compare against
+     * `extractionResult`, the result the user reviews and edits. In the same representation
+     * as `extractionResult`. Optional; it enables features that compare against
      * the predicted extractions. Set `null` to clear it.
      */
-    predictedExtractionResult?: ExtractionResult | null;
+    predictedExtractionResult?: ExtractionOf<R> | null;
     /** Customization configuration. Type: the exported ICustomizationInfoDTO. */
     customizationInfo: unknown;
 
     // ── Configuration inputs ──────────────────────────────────────────────────
 
     /** Visual theme applied to the component. @default 'light' */
-    theme: 'light' | 'dark' | 'light-hc' | 'dark-hc';
+    theme: WcTheme;
     /** BCP-47 language code for the UI. @default 'en' */
     language: string;
     /** When true, the table renders in read-only mode. @default false */
@@ -977,9 +1128,9 @@ export interface ICompactTableEditorStandaloneWcElement extends HTMLElement {
 
     // ── Typed event listeners ─────────────────────────────────────────────────
 
-    addEventListener<K extends keyof ICompactTableEditorStandaloneWcEventMap>(
+    addEventListener<K extends keyof ICompactTableEditorStandaloneWcEventMap<R>>(
         type: K,
-        listener: (event: CustomEvent<ICompactTableEditorStandaloneWcEventMap[K]>) => void,
+        listener: (event: CustomEvent<ICompactTableEditorStandaloneWcEventMap<R>[K]>) => void,
         options?: boolean | AddEventListenerOptions,
     ): void;
     addEventListener(
@@ -988,9 +1139,9 @@ export interface ICompactTableEditorStandaloneWcElement extends HTMLElement {
         options?: boolean | AddEventListenerOptions,
     ): void;
 
-    removeEventListener<K extends keyof ICompactTableEditorStandaloneWcEventMap>(
+    removeEventListener<K extends keyof ICompactTableEditorStandaloneWcEventMap<R>>(
         type: K,
-        listener: (event: CustomEvent<ICompactTableEditorStandaloneWcEventMap[K]>) => void,
+        listener: (event: CustomEvent<ICompactTableEditorStandaloneWcEventMap<R>[K]>) => void,
         options?: boolean | EventListenerOptions,
     ): void;
     removeEventListener(
@@ -1008,7 +1159,8 @@ export interface ICompactTableEditorStandaloneWcElement extends HTMLElement {
  * element is being permanently removed (`ngOnDestroy` / `useEffect`
  * cleanup / `componentWillUnmount`).
  */
-export interface IPersistentCompactTableEditorStandaloneWcElement extends ICompactTableEditorStandaloneWcElement {
+export interface IPersistentCompactTableEditorStandaloneWcElement<R extends VsRepresentation = VsRepresentation>
+    extends ICompactTableEditorStandaloneWcElement<R> {
     /**
      * Explicitly tears down the inner Angular component.
      * Must be called when the element is being permanently removed.
@@ -1058,7 +1210,7 @@ export interface ICompactBusinessRulesStandaloneWcElement extends HTMLElement {
     // ── Configuration inputs ──────────────────────────────────────────────────
 
     /** Visual theme applied to the component. @default 'light' */
-    theme: 'light' | 'dark' | 'light-hc' | 'dark-hc';
+    theme: WcTheme;
     /** BCP-47 language code for the UI. @default 'en' */
     language: string;
     /** When true, the component renders in read-only mode. @default false */
@@ -1138,8 +1290,12 @@ export interface IPersistentCompactBusinessRulesStandaloneWcElement extends ICom
  * variants: it carries no save/discard/field-mutation commands, only the
  * configuration inputs, content inputs, optional VS data, and the
  * `selectAndFocusFieldValueByPath` command.
+ *
+ * @deprecated Use `<ui-du-document-viewer-wc-element>` from `@uipath/du-document-viewer-wc`. Keep this
+ * element only while it must link to a VS element through `instance-id`, which the new element
+ * cannot do yet. It will be removed in a later release.
  */
-export interface IDocumentViewerStandaloneWcElement extends HTMLElement {
+export interface IDocumentViewerStandaloneWcElement<R extends VsRepresentation = VsRepresentation> extends HTMLElement {
     // ── Setup inputs ──────────────────────────────────────────────────────────
 
     /** Document identifier. Required before any data inputs are set. */
@@ -1158,7 +1314,7 @@ export interface IDocumentViewerStandaloneWcElement extends HTMLElement {
     // ── Configuration inputs ──────────────────────────────────────────────────
 
     /** Visual theme applied to the component. @default 'light' */
-    theme: 'light' | 'dark' | 'light-hc' | 'dark-hc';
+    theme: WcTheme;
     /** BCP-47 language code for the UI. @default 'en' */
     language: string;
     /** When true, the component renders in read-only mode. @default false */
@@ -1182,11 +1338,21 @@ export interface IDocumentViewerStandaloneWcElement extends HTMLElement {
     // ── Optional VS data (enables field-aware highlighting & anchors) ─────────
     // Optional at the type level (the component accepts them as undefined); supply
     // them to enable field-aware highlighting/anchors.
+    //
+    // `taxonomy` + `extractionResult` are EITHER the UiPath SDK contracts OR the IXP
+    // (JSON-Schema) representation — supply both in the same representation.
 
-    /** Taxonomy for this document. */
-    taxonomy?: DocumentTaxonomy;
-    /** Initial extraction results. */
-    extractionResult?: ExtractionResult;
+    /**
+     * Taxonomy for this document: a UiPath `DocumentTaxonomy`, or an {@link IXPTaxonomy}
+     * (the IXP output JSON Schema).
+     */
+    taxonomy?: TaxonomyOf<R>;
+    /**
+     * Extraction results to highlight: a UiPath `ExtractionResult`, or an {@link IXPReviewedExtraction}
+     * matching an `IXPTaxonomy`. Its optional `confirmations` mark the confirmed values, which
+     * `DistinguishUnconfirmedValues` sets apart; a bare `IXPExtraction` has nothing confirmed.
+     */
+    extractionResult?: ReviewedExtractionOf<R>;
     /** Customization configuration. Type: the exported ICustomizationInfoDTO. */
     customizationInfo?: unknown;
 
@@ -1244,8 +1410,13 @@ export interface IDocumentViewerStandaloneWcElement extends HTMLElement {
  * portal detachments (e.g. tab switches). Call `forceDestroy()` when the
  * element is being permanently removed (`ngOnDestroy` / `useEffect`
  * cleanup / `componentWillUnmount`).
+ *
+ * @deprecated Use `<ui-du-document-viewer-wc-element>` from `@uipath/du-document-viewer-wc`. Keep this
+ * element only while it must link to a VS element through `instance-id`, which the new element
+ * cannot do yet. It will be removed in a later release.
  */
-export interface IPersistentDocumentViewerStandaloneWcElement extends IDocumentViewerStandaloneWcElement {
+export interface IPersistentDocumentViewerStandaloneWcElement<R extends VsRepresentation = VsRepresentation>
+    extends IDocumentViewerStandaloneWcElement<R> {
     /**
      * Explicitly tears down the inner Angular component.
      * Must be called when the element is being permanently removed.
@@ -1291,7 +1462,7 @@ export interface ICompactDocTypeFieldStandaloneWcElement extends HTMLElement {
     // ── Configuration inputs ──────────────────────────────────────────────────
 
     /** Visual theme applied to the component. @default 'light' */
-    theme: 'light' | 'dark' | 'light-hc' | 'dark-hc';
+    theme: WcTheme;
     /** BCP-47 language code for the UI. @default 'en' */
     language: string;
     /** When true, the component renders in read-only mode. @default false */
@@ -1372,7 +1543,7 @@ export interface IVsWcCommonHtmlJsxProps {
  */
 export interface IVsWcSharedJsxProps extends IVsWcCommonHtmlJsxProps {
     // ── Scalar configuration inputs ───────────────────────────────────────────
-    theme?: 'light' | 'dark' | 'light-hc' | 'dark-hc';
+    theme?: WcTheme;
     language?: string;
     /** JS property form. */
     isReadonly?: boolean;
@@ -1407,7 +1578,7 @@ export interface IValidationStationStandaloneWcJsxProps extends IVsWcSharedJsxPr
     text?: string;
     original?: string;
     taxonomy?: DocumentTaxonomy | IXPTaxonomy;
-    extractionResult?: ExtractionResult | IXPExtraction;
+    extractionResult?: ExtractionResult | IXPReviewedExtraction;
     predictedExtractionResult?: ExtractionResult | IXPExtraction | null;
     dom?: DocumentEntity;
     customizationInfo?: unknown;
@@ -1432,7 +1603,7 @@ export interface ICompactFieldsFormStandaloneWcJsxProps extends IVsWcSharedJsxPr
     /** Link id — set as the `instance-id` attribute before connect. See {@link ICompactFieldsFormStandaloneWcElement.instanceId}. */
     'instance-id'?: string;
     taxonomy?: DocumentTaxonomy | IXPTaxonomy;
-    extractionResult?: ExtractionResult | IXPExtraction;
+    extractionResult?: ExtractionResult | IXPReviewedExtraction;
     predictedExtractionResult?: ExtractionResult | IXPExtraction | null;
     customizationInfo?: unknown;
 }
@@ -1454,7 +1625,7 @@ export type IPersistentCompactFieldsFormStandaloneWcJsxProps = ICompactFieldsFor
  */
 export interface ICompactTableEditorStandaloneWcJsxProps extends IVsWcCommonHtmlJsxProps {
     // ── Scalar configuration inputs ───────────────────────────────────────────
-    theme?: 'light' | 'dark' | 'light-hc' | 'dark-hc';
+    theme?: WcTheme;
     language?: string;
     /** JS property form. */
     isReadonly?: boolean;
@@ -1480,9 +1651,9 @@ export interface ICompactTableEditorStandaloneWcJsxProps extends IVsWcCommonHtml
     documentId?: string;
     /** Link id — set as the `instance-id` attribute before connect. See {@link ICompactTableEditorStandaloneWcElement.instanceId}. */
     'instance-id'?: string;
-    taxonomy?: DocumentTaxonomy;
-    extractionResult?: ExtractionResult;
-    predictedExtractionResult?: ExtractionResult | null;
+    taxonomy?: DocumentTaxonomy | IXPTaxonomy;
+    extractionResult?: ExtractionResult | IXPReviewedExtraction;
+    predictedExtractionResult?: ExtractionResult | IXPExtraction | null;
     customizationInfo?: unknown;
 }
 
@@ -1502,7 +1673,7 @@ export type IPersistentCompactTableEditorStandaloneWcJsxProps = ICompactTableEdi
  */
 export interface ICompactBusinessRulesStandaloneWcJsxProps extends IVsWcCommonHtmlJsxProps {
     // ── Scalar configuration inputs ───────────────────────────────────────────
-    theme?: 'light' | 'dark' | 'light-hc' | 'dark-hc';
+    theme?: WcTheme;
     language?: string;
     /** JS property form. */
     isReadonly?: boolean;
@@ -1537,10 +1708,14 @@ export type IPersistentCompactBusinessRulesStandaloneWcJsxProps = ICompactBusine
  *
  * A viewer-only element: it omits the save/discard/field-mutation commands and
  * exposes content inputs (`text` / `document` / `dom`) that drive the view mode.
+ *
+ * @deprecated Use `<ui-du-document-viewer-wc-element>` from `@uipath/du-document-viewer-wc`. Keep this
+ * element only while it must link to a VS element through `instance-id`, which the new element
+ * cannot do yet. It will be removed in a later release.
  */
 export interface IDocumentViewerStandaloneWcJsxProps {
     // ── Scalar configuration inputs ───────────────────────────────────────────
-    theme?: 'light' | 'dark' | 'light-hc' | 'dark-hc';
+    theme?: WcTheme;
     language?: string;
     /** JS property form. */
     isReadonly?: boolean;
@@ -1554,8 +1729,8 @@ export interface IDocumentViewerStandaloneWcJsxProps {
     text?: string;
     document?: string;
     dom?: DocumentEntity;
-    taxonomy?: DocumentTaxonomy;
-    extractionResult?: ExtractionResult;
+    taxonomy?: DocumentTaxonomy | IXPTaxonomy;
+    extractionResult?: ExtractionResult | IXPReviewedExtraction;
     customizationInfo?: unknown;
     // ── Command inputs ────────────────────────────────────────────────────────
     selectAndFocusFieldValueByPath?: SelectAndFocusFieldValueByPath;
@@ -1577,7 +1752,13 @@ export interface IDocumentViewerStandaloneWcJsxProps {
     [ariaAttr: `aria-${string}`]: string | number | boolean | null | undefined;
 }
 
-/** Props for `<ui-du-document-viewer-standalone-wc-persistent-element>` in React JSX. */
+/**
+ * Props for `<ui-du-document-viewer-standalone-wc-persistent-element>` in React JSX.
+ *
+ * @deprecated Use `<ui-du-document-viewer-wc-element>` from `@uipath/du-document-viewer-wc`. Keep this
+ * element only while it must link to a VS element through `instance-id`, which the new element
+ * cannot do yet. It will be removed in a later release.
+ */
 export type IPersistentDocumentViewerStandaloneWcJsxProps = IDocumentViewerStandaloneWcJsxProps;
 
 /**
@@ -1593,7 +1774,7 @@ export type IPersistentDocumentViewerStandaloneWcJsxProps = IDocumentViewerStand
  */
 export interface ICompactDocTypeFieldStandaloneWcJsxProps extends IVsWcCommonHtmlJsxProps {
     // ── Scalar configuration inputs ───────────────────────────────────────────
-    theme?: 'light' | 'dark' | 'light-hc' | 'dark-hc';
+    theme?: WcTheme;
     language?: string;
     /** JS property form. */
     isReadonly?: boolean;

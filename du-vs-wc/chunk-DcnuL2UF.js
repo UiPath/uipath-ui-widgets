@@ -1,0 +1,1 @@
+import"./chunk-eWXhx1GK.js";var i=`Pitcairn`;var o=[{regionCode:``,regionName:``,city:`Adamstown`,aliases:``}];var r={countryName:i,records:o};export{i as countryName,r as default,o as records};

@@ -1,1 +1,0 @@
-import"./chunk-D4-ktzGU.js";var n=`Norfolk Island`;var r=[{regionCode:`00`,regionName:``,city:`Kingston`,aliases:``}];var a={countryName:n,records:r};export{n as countryName,a as default,r as records};

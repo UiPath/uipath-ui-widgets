@@ -1,0 +1,44 @@
+{
+    "name": "@uipath/du-classification-station-wc",
+    "version": "1.0.0-rc.2",
+    "description": "Classification Station as a web component for UiPath Document Understanding.",
+    "keywords": [
+        "uipath",
+        "document-understanding",
+        "classification-station",
+        "document-splitting",
+        "web-component",
+        "wc",
+        "angular"
+    ],
+    "homepage": "https://docs.uipath.com/activities/other/latest/document-understanding/present-classification-station",
+    "license": "MIT",
+    "type": "module",
+    "main": "./main.js",
+    "types": "./types.d.ts",
+    "exports": {
+        ".": {
+            "types": "./types.d.ts",
+            "default": "./main.js"
+        },
+        "./main": "./main.js",
+        "./polyfills": "./polyfills.js",
+        "./styles": {
+            "types": "./styles.d.ts",
+            "default": "./styles.js"
+        },
+        "./styles.css": "./styles.css",
+        "./fonts.css": "./fonts.css",
+        "./package.json": "./package.json"
+    },
+    "peerDependencies": {
+        "@uipath/uipath-typescript": "^1.5.1"
+    },
+    "dependencies": {},
+    "sideEffects": true,
+    "publishConfig": {
+        "registry": "https://registry.npmjs.org/",
+        "access": "public",
+        "provenance": false
+    }
+}

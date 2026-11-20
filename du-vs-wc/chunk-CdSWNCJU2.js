@@ -1,1 +1,0 @@
-import"./chunk-D4-ktzGU.js";var i=`Vatican`;var c=[{regionCode:``,regionName:``,city:`Vatican City`,aliases:``}];var n={countryName:i,records:c};export{i as countryName,n as default,c as records};
