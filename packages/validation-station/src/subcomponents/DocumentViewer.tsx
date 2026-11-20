@@ -11,7 +11,8 @@ import { useWcElement } from "./useWcElement.js";
 /**
  * React wrapper for `<ui-du-document-viewer-standalone-wc-element>` — the
  * document/text viewer with no fields form or save flow. Share its store with a
- * fields-form / table-editor by passing the same `instanceId`.
+ * fields-form / table-editor by passing the same `instanceId`. Takes a
+ * Document Understanding or an IXP document.
  *
  * @deprecated The web component deprecates this element in favour of
  * `<ui-du-document-viewer-wc-element>`, wrapped by `DocumentViewer` from

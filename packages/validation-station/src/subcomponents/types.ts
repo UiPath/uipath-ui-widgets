@@ -10,20 +10,20 @@ import type {
   SetFieldValueByPath,
 } from "@uipath/du-validation-station-wc";
 import type { CSSProperties } from "react";
-import type { DuArtifactsSource } from "../useResolvedArtifacts.js";
+import type {
+  DuArtifactsSource,
+  ValidationStationArtifactsSource,
+} from "../useResolvedArtifacts.js";
 import type {
   DuCommonProps,
   DuSaveCallbacks,
+  VsAnyRepresentationStateEventProps,
   VsSaveResultEventProps,
   VsStateEventProps,
 } from "../types.js";
 
-/**
- * Props common to every subcomponent wrapper: a data source (see
- * {@link DuArtifactsSource}), shared-store linking, and presentation.
- */
-export interface SubcomponentCommonProps
-  extends DuArtifactsSource, DuCommonProps {
+/** Shared-store linking and presentation, common to every subcomponent wrapper. */
+interface SubcomponentPresentationProps extends DuCommonProps {
   /**
    * Links this element's store to sibling standalone elements. Elements sharing
    * the same `instanceId` mirror each other's edits, selection, and document
@@ -37,6 +37,29 @@ export interface SubcomponentCommonProps
   style?: CSSProperties;
 }
 
+/**
+ * Props common to the subcomponent wrappers that take Document Understanding
+ * documents only — `CompactBusinessRules` and `CompactDocTypeField`: a data
+ * source (see {@link DuArtifactsSource}), shared-store linking, and
+ * presentation.
+ */
+export interface SubcomponentCommonProps
+  extends DuArtifactsSource, SubcomponentPresentationProps {}
+
+/**
+ * Props common to the subcomponent wrappers that take a document in either
+ * representation — `CompactFieldsForm`, `CompactTableEditor` and
+ * `DocumentViewer`: a data source that may be an IXP document (pre-fetched
+ * `IxpDocumentArtifacts`, or `sdk` + `processedDocument` — see
+ * {@link ValidationStationArtifactsSource}), shared-store linking, and
+ * presentation.
+ *
+ * Elements linked through one `instanceId` must all be given the same
+ * representation.
+ */
+export interface IxpCapableSubcomponentCommonProps
+  extends ValidationStationArtifactsSource, SubcomponentPresentationProps {}
+
 /** Command inputs shared by the editable subcomponents. */
 export interface SubcomponentCommandProps {
   setFieldValueByPath?: SetFieldValueByPath;
@@ -49,9 +72,9 @@ export interface SubcomponentCommandProps {
 
 export interface CompactFieldsFormProps
   extends
-    SubcomponentCommonProps,
+    IxpCapableSubcomponentCommonProps,
     SubcomponentCommandProps,
-    VsStateEventProps,
+    VsAnyRepresentationStateEventProps,
     VsSaveResultEventProps,
     DuSaveCallbacks {
   options?: IValidationStationOptions;
@@ -62,7 +85,10 @@ export interface CompactFieldsFormProps
 // ─── Compact table editor ─────────────────────────────────────────────────────
 
 export interface CompactTableEditorProps
-  extends SubcomponentCommonProps, SubcomponentCommandProps, VsStateEventProps {
+  extends
+    IxpCapableSubcomponentCommonProps,
+    SubcomponentCommandProps,
+    VsAnyRepresentationStateEventProps {
   options?: IValidationStationOptions;
   /** Enable the PDF table-selection round-trip controls. */
   isTableSelectionEnabled?: boolean;
@@ -88,7 +114,7 @@ export interface CompactBusinessRulesProps
 
 // ─── Document viewer ──────────────────────────────────────────────────────────
 
-export interface DocumentViewerProps extends SubcomponentCommonProps {
+export interface DocumentViewerProps extends IxpCapableSubcomponentCommonProps {
   options?: DocumentViewerOptions;
   /** Select a field by path and focus its document reference in the viewer. */
   selectAndFocusFieldValueByPath?: SelectAndFocusFieldValueByPath;

@@ -16,10 +16,10 @@ If the user just wants the standard, self-contained review screen, use the monol
 
 ## Critical Rules
 
-1. **Fetch artifacts once, in the parent — never per subcomponent.** Call `useDuDocumentArtifacts(sdk, data)` once and pass the resulting `artifacts` to every panel. Each subcomponent _can_ self-fetch if given `sdk` + `data`, but composing N self-fetching panels hits the bucket N times for the same document. Pre-fetch, then hand down `artifacts`. The monolithic `ValidationStation` takes the same `artifacts` / `documentId` pair, so a host that already holds the artifacts (or keeps them somewhere other than a bucket) can feed the all-in-one widget directly — see the package README's _Data sources_ section.
+1. **Fetch artifacts once, in the parent — never per subcomponent.** Call `useDuDocumentArtifacts(sdk, data)` — or `useProcessedDocumentArtifacts(sdk, processedDocument)` for a Flow document — once and pass the resulting `artifacts` to every panel. Each subcomponent _can_ self-fetch if given `sdk` + `data` (or `sdk` + `processedDocument`), but composing N self-fetching panels fetches the same document N times. Pre-fetch, then hand down `artifacts`. The monolithic `ValidationStation` takes the same `artifacts` / `documentId` pair, so a host that already holds the artifacts (or keeps them somewhere other than a bucket) can feed the all-in-one widget directly — see the package README's _Data sources_ section.
 2. **Give every subcomponent the same `instanceId`.** That is what makes them share one store and mirror each other's selection/edits/document-type. Different (or missing) `instanceId` → isolated stores → no cross-linking. It is immutable once mounted — set it before render, don't change it.
 3. **Set `persistent={false}` for a static layout.** The panels live in a fixed grid and are never re-parented, so they don't need the portal-survival path. Leaving `persistent` on makes React StrictMode's throwaway unmount call `forceDestroy()`, tearing down the Angular element so it never re-renders (blank panel). Only set `persistent={true}` if a panel is genuinely moved across the DOM (e.g. into a portal / tab that unmounts).
-4. **Only `CompactFieldsForm` persists.** Other panels may still be _editable_ — `CompactTableEditor` edits cells/rows, `CompactDocTypeField` changes the type — but none write to Orchestrator. Those edits land in the shared store and are committed when the user saves through the form. Submit / save-as-draft / report-exception all flow through `CompactFieldsForm` — it is the only panel that takes `sdk` + `data`.
+4. **Only `CompactFieldsForm` persists.** Other panels may still be _editable_ — `CompactTableEditor` edits cells/rows, `CompactDocTypeField` changes the type — but none write to Orchestrator. Those edits land in the shared store and are committed when the user saves through the form. Submit / save-as-draft / report-exception all flow through `CompactFieldsForm` — it is the only panel that saves with `sdk` + `data` (or `sdk` + `processedDocument`).
 5. **Avoid duplicate surfaces.** If you render standalone `CompactBusinessRules` and/or `CompactDocTypeField` panels, tell the form to drop its built-in ones via `options={{ hideBusinessRules: true, hideDocumentTypeField: true }}` — otherwise the field appears twice.
 6. **Save-as-draft needs a flag.** Set `options={{ emitDtoStateChanges: true }}` on `CompactFieldsForm` or the save-as-draft flow (and `onSaveAsDraft`) never fires.
 
@@ -43,18 +43,18 @@ npm install @uipath/ui-widgets-validation-station
 
 > **"Editable?" vs "Owns save flow?" — they are different questions.** _Editable_ means the panel lets the user change data in place (edit fields, edit table cells/rows, pick a document type). _Owns save flow_ means the panel writes back to Orchestrator — it takes `sdk` + `data` and exposes submit / save-as-draft / report-exception. Only `CompactFieldsForm` does the latter. Every panel sharing the same `instanceId` mutates **one shared store**, so edits made in `CompactTableEditor` (or `CompactDocTypeField`) are committed when the user saves **through `CompactFieldsForm`** — the table editor deliberately has no save button of its own. It signals its changes via `onDirtyChange` / `onFieldValueChanged` / `onExtractionResultChanged`.
 
-**Shared props** (every subcomponent — `SubcomponentCommonProps`):
+**Shared props** (every subcomponent — `IxpCapableSubcomponentCommonProps` on `CompactFieldsForm`, `CompactTableEditor` and `DocumentViewer`; `SubcomponentCommonProps` on the Document Understanding-only `CompactBusinessRules` and `CompactDocTypeField`):
 
-| Prop                  | Required          | Notes                                                                                                                                                            |
-| --------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `artifacts`           | Yes\*             | Pre-fetched `DuDocumentArtifacts` from `useDuDocumentArtifacts`. \*Omit only if you deliberately let this one panel self-fetch (then pass `sdk`+`data` instead). |
-| `documentId`          | No                | Falls back to `data.DocumentId`. Pass it in pre-fetched mode where there's no `data`.                                                                            |
-| `instanceId`          | Yes (for linking) | Same value across panels → shared store. Omit for an isolated panel.                                                                                             |
-| `theme`               | No                | `DuTheme`: `'light' \| 'dark' \| 'light-hc' \| 'dark-hc' \| 'future-light' \| 'future-dark'`. Keep in sync with body class.                                      |
-| `language`            | No                | `ValidationStationLanguage` enum from the package.                                                                                                               |
-| `persistent`          | No                | Default `false`. Keep `false` for static grids (see Critical Rule 3).                                                                                            |
-| `isReadonly`          | No                | `true` for an audit/read-only view.                                                                                                                              |
-| `style` / `className` | No                | The viewer usually wants `style={{ height: '100%' }}`.                                                                                                           |
+| Prop                  | Required          | Notes                                                                                                                                                                                                                                                                                   |
+| --------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `artifacts`           | Yes\*             | Pre-fetched `DuDocumentArtifacts` from `useDuDocumentArtifacts`, or `IxpDocumentArtifacts` from `useProcessedDocumentArtifacts` (IXP-capable panels only). \*Omit only if you deliberately let this one panel self-fetch (then pass `sdk`+`data` or `sdk`+`processedDocument` instead). |
+| `documentId`          | No                | Falls back to `data.DocumentId`, else `processedDocument.metadata.traceId`. Pass it in pre-fetched mode where there's neither.                                                                                                                                                          |
+| `instanceId`          | Yes (for linking) | Same value across panels → shared store. Omit for an isolated panel.                                                                                                                                                                                                                    |
+| `theme`               | No                | `DuTheme`: `'light' \| 'dark' \| 'light-hc' \| 'dark-hc' \| 'future-light' \| 'future-dark'`. Keep in sync with body class.                                                                                                                                                             |
+| `language`            | No                | `ValidationStationLanguage` enum from the package.                                                                                                                                                                                                                                      |
+| `persistent`          | No                | Default `false`. Keep `false` for static grids (see Critical Rule 3).                                                                                                                                                                                                                   |
+| `isReadonly`          | No                | `true` for an audit/read-only view.                                                                                                                                                                                                                                                     |
+| `style` / `className` | No                | The viewer usually wants `style={{ height: '100%' }}`.                                                                                                                                                                                                                                  |
 
 ## Composition Pattern (worked example)
 
@@ -278,6 +278,67 @@ return (
 );
 ```
 
+## IXP documents
+
+`CompactFieldsForm`, `CompactTableEditor` and `DocumentViewer` take an IXP document — a Flow `processedDocument`, or `IxpDocumentArtifacts` — exactly as `ValidationStation` does. `CompactBusinessRules` and `CompactDocTypeField` do not: the web component evaluates business rules and document types for Document Understanding only, and their props reject `IxpDocumentArtifacts` at compile time.
+
+```tsx
+import {
+  CompactFieldsForm,
+  CompactTableEditor,
+  DocumentViewer,
+  useProcessedDocumentArtifacts,
+  type ProcessedDocument,
+  type ValidatedProcessedDocument,
+} from "@uipath/ui-widgets-validation-station";
+import type { UiPath } from "@uipath/uipath-typescript/core";
+
+function FlowReview({
+  sdk,
+  processedDocument,
+  completeTask,
+}: {
+  sdk: UiPath;
+  processedDocument: ProcessedDocument;
+  completeTask: (document?: ValidatedProcessedDocument) => void;
+}) {
+  // FETCH ONCE, through the Flow run that produced the document.
+  const { artifacts, error } = useProcessedDocumentArtifacts(
+    sdk,
+    processedDocument,
+  );
+  if (error) return <div>Failed to load document: {error}</div>;
+  if (!artifacts) return <div>Loading document…</div>;
+
+  const shared = {
+    artifacts,
+    documentId: processedDocument.metadata.traceId,
+    instanceId: `review-${processedDocument.metadata.traceId}-${processedDocument.metadata.spanId}`,
+    persistent: false,
+  };
+
+  return (
+    <>
+      <DocumentViewer {...shared} style={{ height: "100%" }} />
+      {/* sdk + processedDocument: the form records the review on the run */}
+      <CompactFieldsForm
+        {...shared}
+        sdk={sdk}
+        processedDocument={processedDocument}
+        options={{ emitDtoStateChanges: true }}
+        onSubmit={(request, result) => completeTask(result?.processedDocument)}
+      />
+      <CompactTableEditor {...shared} />
+    </>
+  );
+}
+```
+
+- **Saving.** Given `sdk` + `processedDocument`, `CompactFieldsForm` records submit, draft and report-as-exception against the producing run, and passes the outcome as the callback's second argument — the same flows as `ValidationStation`; see the package README's _IXP (`ProcessedDocument`)_ section. Completing the task is still yours. With both `data` and `processedDocument`, `data` wins.
+- **One representation per `instanceId`.** Panels sharing a store must all get the same document, so do not link a DU panel to an IXP one.
+- **Cite with `references`.** The compact fields form and table editor have no document to locate `boundingBoxes` in, so an IXP extraction whose sources cite by `boundingBoxes` alone does not load on them, and such a prediction shows no predicted values. Extractions from current IXP models cite with `references` and load fine.
+- **Events report in the document's representation.** `onExtractionResultChanged` hands back an `IXPReviewedExtraction` for an IXP document, so both panels type it as `ExtractionResult | IXPReviewedExtraction`.
+
 ## Cross-linking (free, via shared `instanceId`)
 
 With one shared store, selection and edits propagate automatically — no host wiring:
@@ -291,11 +352,11 @@ The `on*` callbacks (`onFieldValueSelected`, `onBusinessRuleClick`, `onDocumentT
 
 ## Anti-patterns
 
-- **Do not self-fetch in each panel.** Passing `sdk`+`data` to all five triggers five bucket fetches for one document. Pre-fetch once with `useDuDocumentArtifacts`, pass `artifacts` down.
+- **Do not self-fetch in each panel.** Passing `sdk`+`data` to all five triggers five bucket fetches for one document. Pre-fetch once with `useDuDocumentArtifacts` (or `useProcessedDocumentArtifacts`), pass `artifacts` down.
 - **Do not give panels different `instanceId`s** (or omit it) and then expect cross-linking. Same document → same `instanceId`.
 - **Do not leave `persistent` at `true` in a static grid.** StrictMode's dev double-mount calls `forceDestroy()` and blanks the panel. Use `persistent={false}` unless the panel is truly re-parented.
 - **Do not render duplicate surfaces.** Standalone `CompactBusinessRules`/`CompactDocTypeField` + a form that still shows its own = the field twice. Set `hideBusinessRules`/`hideDocumentTypeField`.
 - **Do not compose the subcomponents to rebuild the standard station.** If the layout is just "the normal Validation Station," use `ValidationStation`.
 - **Do not pass a `tasks.getAll()` row into the workspace.** Its `data` is undefined — hydrate with `tasks.getById(id, { taskType: TaskType.DocumentValidation }, folderId)` first.
-- **Do not assume any panel shows an error on failure.** Submit/draft return `{ success: false, error }` with no UI; report-exception persists nothing. The host owns all feedback and the exception API call (`OrchestratorDuModule.submitExceptionReport`).
+- **Do not assume any panel shows an error on failure.** Submit/draft return `{ success: false, error }` with no UI; report-exception persists nothing outside a Flow document. The host owns all feedback and the exception API call (`OrchestratorDuModule.submitExceptionReport`).
 - **Do not construct a second `UiPath` SDK** for the widgets. Reuse the app's authenticated instance.
