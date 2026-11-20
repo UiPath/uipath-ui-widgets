@@ -77,14 +77,13 @@ export interface ResolvedArtifacts<
  * Resolves the artifacts a widget needs — `ValidationStation` and every
  * subcomponent alike — transparently handling both the pre-fetched and
  * self-fetching modes described on {@link ValidationStationArtifactsSource}.
- */
-export function useResolvedArtifacts(
-  source: DuArtifactsSource,
-): ResolvedArtifacts<DuDocumentArtifacts>;
-/**
- * A Flow document only: what it fetches is always the IXP representation. The
- * `undefined` members keep a source that also carries `data` (which wins) or
- * pre-fetched `artifacts` on the general overload.
+ *
+ * This overload is a Flow document only: what it fetches is always the IXP
+ * representation. The `undefined` members send a source that also carries
+ * `data` (which wins) or pre-fetched `artifacts` on to the overloads below.
+ * It must come first: every member of `DuArtifactsSource` is optional, so a
+ * Flow source held in a variable (no excess-property check) would otherwise
+ * match that overload and be typed as DU.
  */
 export function useResolvedArtifacts(source: {
   sdk: UiPath | undefined;
@@ -92,6 +91,9 @@ export function useResolvedArtifacts(source: {
   data?: undefined;
   artifacts?: undefined;
 }): ResolvedArtifacts<IxpDocumentArtifacts>;
+export function useResolvedArtifacts(
+  source: DuArtifactsSource,
+): ResolvedArtifacts<DuDocumentArtifacts>;
 export function useResolvedArtifacts(
   source: ValidationStationArtifactsSource,
 ): ResolvedArtifacts;

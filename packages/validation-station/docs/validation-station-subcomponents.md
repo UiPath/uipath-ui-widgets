@@ -313,7 +313,7 @@ function FlowReview({
   const shared = {
     artifacts,
     documentId: processedDocument.metadata.traceId,
-    instanceId: `review-${processedDocument.metadata.traceId}`,
+    instanceId: `review-${processedDocument.metadata.traceId}-${processedDocument.metadata.spanId}`,
     persistent: false,
   };
 

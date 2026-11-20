@@ -186,6 +186,20 @@ describe("useResolvedArtifacts result type", () => {
     ).toEqualTypeOf<IxpDocumentArtifacts | null>();
   });
 
+  it("is the IXP representation for a processedDocument source held in a variable", () => {
+    // A variable escapes excess-property checks, so this would match the
+    // all-optional DU overload if the Flow-only one did not come first.
+    const source = {
+      sdk,
+      processedDocument: processedDocument as ProcessedDocument,
+    };
+    const { result } = renderHook(() => useResolvedArtifacts(source));
+
+    expectTypeOf(
+      result.current.artifacts,
+    ).toEqualTypeOf<IxpDocumentArtifacts | null>();
+  });
+
   it("is the Document Understanding representation when data rides along with a processedDocument", () => {
     // A variable escapes excess-property checks, and `data` wins at runtime,
     // so this must not resolve to the Flow-only overload.
