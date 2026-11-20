@@ -63,7 +63,7 @@
   },
   "dependencies": {
     "@uipath/du-classification-station-wc": "1.0.0-rc.2",
-    "@uipath/du-utils": "1.0.0-rc.3",
+    "@uipath/du-utils": "1.0.0-rc.4",
     "fflate": "^0.8.2"
   }
 }

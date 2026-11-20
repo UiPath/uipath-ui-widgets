@@ -2,7 +2,10 @@ import type {
   IXPExtraction,
   IXPReviewedExtraction,
 } from "@uipath/du-validation-station-wc";
-import { isProcessedDocument } from "@uipath/du-utils";
+import {
+  isProcessedDocument,
+  type ProcessedDocumentHitl,
+} from "@uipath/du-utils";
 import { isIXPExtraction } from "../ixpUtil.js";
 import type { ProcessedDocument, ProcessedDocumentMetadata } from "./types.js";
 
@@ -20,7 +23,7 @@ export interface ValidatedProcessedDocument extends ProcessedDocument {
   result: IXPReviewedExtraction;
   metadata: ProcessedDocumentMetadata & {
     /** Human-in-the-loop state, absent on a producer's output. */
-    hitl: { draft: boolean };
+    hitl: ProcessedDocumentHitl;
   };
 }
 
