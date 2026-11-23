@@ -11,6 +11,7 @@ import { getI18n } from "../i18n";
 import { ConversationalAgentChat } from "../ConversationalAgentChat";
 import { UiPath } from "@uipath/uipath-typescript/core";
 import { toast } from "@uipath/apollo-wind";
+import { FontVariantToken } from "@uipath/apollo-core";
 
 // Mock @uipath/apollo-react
 vi.mock("@uipath/apollo-react/core/fonts/font.css", () => ({}));
@@ -54,6 +55,7 @@ const createMockChatService = () => {
     setTheme: vi.fn(),
     setChatMode: vi.fn(),
     setRenderer: vi.fn(),
+    setSpacing: vi.fn(),
     getLocale: vi.fn().mockReturnValue("en"),
     injectMessageRenderer: vi.fn(),
     sendOutputStreamEvent: vi.fn(),
@@ -4148,6 +4150,69 @@ describe("ConversationalAgentChat", () => {
 
     unmount();
     expect(sessionHelper.sendSessionEnd).toHaveBeenCalled();
+  });
+
+  describe("compact mode", () => {
+    const instantiatedSpacing = async () => {
+      const { AutopilotChatService } =
+        await import("@uipath/apollo-react/material/components");
+      await waitFor(
+        () => expect(AutopilotChatService.Instantiate).toHaveBeenCalled(),
+        { timeout: 3000 },
+      );
+      return vi.mocked(AutopilotChatService.Instantiate).mock.lastCall?.[0]
+        ?.config?.spacing;
+    };
+    const renderReady = async (props = {}) => {
+      const utils = render(
+        <ConversationalAgentChat {...defaultProps} {...props} />,
+      );
+      await waitFor(
+        () => expect(screen.getByTestId("ap-chat")).toBeInTheDocument(),
+        { timeout: 3000 },
+      );
+      return utils;
+    };
+
+    it("uses the larger 16px text by default", async () => {
+      render(<ConversationalAgentChat {...defaultProps} />);
+
+      const spacing = await instantiatedSpacing();
+      expect(spacing).toEqual(
+        expect.objectContaining({
+          primaryFontToken: FontVariantToken.fontSizeL,
+        }),
+      );
+      expect(spacing).not.toHaveProperty("compactMode");
+    });
+
+    it("passes Apollo's compact mode without the 16px overrides", async () => {
+      render(<ConversationalAgentChat {...defaultProps} compactMode />);
+
+      expect(await instantiatedSpacing()).toEqual({ compactMode: true });
+    });
+
+    it("switches compact mode at runtime", async () => {
+      const { rerender } = await renderReady();
+
+      rerender(<ConversationalAgentChat {...defaultProps} compactMode />);
+
+      await waitFor(() =>
+        expect(mockChatService.setSpacing).toHaveBeenLastCalledWith({
+          compactMode: true,
+        }),
+      );
+
+      rerender(<ConversationalAgentChat {...defaultProps} />);
+
+      await waitFor(() =>
+        expect(mockChatService.setSpacing).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            primaryFontToken: FontVariantToken.fontSizeL,
+          }),
+        ),
+      );
+    });
   });
 
   describe("labels after a runtime locale change", () => {

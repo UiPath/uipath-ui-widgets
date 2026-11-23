@@ -131,6 +131,29 @@ function toApolloSupportedLocale(widgetLocale: Locale): SupportedLocale {
   return widgetLocale === "keys" ? "en" : (widgetLocale as SupportedLocale);
 }
 
+// Apollo's ApChat defaults message text to fontSizeM (14px); the deprecated
+// portal-shell chat used a larger size, so bump primary text and markdown body
+// tokens to fontSizeL (16px) to match. Compact mode keeps Apollo's own smaller
+// compact tokens instead.
+const getChatSpacing = (compactMode: boolean) =>
+  compactMode
+    ? { compactMode: true }
+    : {
+        primaryFontToken: FontVariantToken.fontSizeL,
+        primaryBoldFontToken: FontVariantToken.fontSizeLBold,
+        suggestionFontToken: FontVariantToken.fontSizeL,
+        markdownTokens: {
+          p: FontVariantToken.fontSizeL,
+          li: FontVariantToken.fontSizeL,
+          th: FontVariantToken.fontSizeL,
+          td: FontVariantToken.fontSizeL,
+          em: FontVariantToken.fontSizeL,
+          del: FontVariantToken.fontSizeL,
+          strong: FontVariantToken.fontSizeLBold,
+          link: FontVariantToken.fontSizeL,
+        },
+      };
+
 export const ConversationalAgentChat = ({
   sdk,
   agentId,
@@ -142,6 +165,7 @@ export const ConversationalAgentChat = ({
   theme: themeProp,
   mode = AutopilotChatMode.Embedded,
   renderer = "material",
+  compactMode = false,
   readOnly = false,
   overrideLabels,
   firstRunExperience,
@@ -185,6 +209,7 @@ export const ConversationalAgentChat = ({
   const themeRef = useRef(theme);
   const modeRef = useRef(mode);
   const rendererRef = useRef(renderer);
+  const compactModeRef = useRef(compactMode);
   const overrideLabelsRef = useRef(overrideLabels);
   const disabledFeaturesRef = useRef(disabledFeatures);
   const firstRunExperienceRef = useRef(firstRunExperience);
@@ -212,6 +237,7 @@ export const ConversationalAgentChat = ({
     themeRef.current = theme;
     modeRef.current = mode;
     rendererRef.current = renderer;
+    compactModeRef.current = compactMode;
     overrideLabelsRef.current = overrideLabels;
     disabledFeaturesRef.current = disabledFeatures;
     firstRunExperienceRef.current = firstRunExperience;
@@ -229,6 +255,7 @@ export const ConversationalAgentChat = ({
     theme,
     mode,
     renderer,
+    compactMode,
     overrideLabels,
     disabledFeatures,
     firstRunExperience,
@@ -1622,24 +1649,7 @@ export const ConversationalAgentChat = ({
               return false;
             },
           },
-          // Apollo's ApChat defaults message text to fontSizeM (14px); the
-          // deprecated portal-shell chat used a larger size, so bump primary
-          // text and markdown body tokens to fontSizeL (16px) to match.
-          spacing: {
-            primaryFontToken: FontVariantToken.fontSizeL,
-            primaryBoldFontToken: FontVariantToken.fontSizeLBold,
-            suggestionFontToken: FontVariantToken.fontSizeL,
-            markdownTokens: {
-              p: FontVariantToken.fontSizeL,
-              li: FontVariantToken.fontSizeL,
-              th: FontVariantToken.fontSizeL,
-              td: FontVariantToken.fontSizeL,
-              em: FontVariantToken.fontSizeL,
-              del: FontVariantToken.fontSizeL,
-              strong: FontVariantToken.fontSizeLBold,
-              link: FontVariantToken.fontSizeL,
-            },
-          },
+          spacing: getChatSpacing(compactModeRef.current),
           disabledFeatures: {
             fullScreen: true,
             preview: true,
@@ -1835,6 +1845,10 @@ export const ConversationalAgentChat = ({
   useEffect(() => {
     chatService?.setRenderer(renderer);
   }, [chatService, renderer]);
+
+  useEffect(() => {
+    chatService?.setSpacing(getChatSpacing(compactMode));
+  }, [chatService, compactMode]);
 
   // The widget translates these labels itself (Apollo's own strings follow
   // `locale`), so re-send them when the locale or the host's labels change.
