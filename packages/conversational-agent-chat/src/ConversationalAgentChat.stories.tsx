@@ -244,6 +244,10 @@ function App() {
       control: "inline-radio",
       options: ["material", "wind"],
     },
+    compactMode: {
+      description: "Denser layout for narrow panels such as debug chats",
+      control: "boolean",
+    },
     readOnly: {
       description: "When true, disables user input",
       control: "boolean",
@@ -285,6 +289,7 @@ function App() {
     theme: "light",
     mode: AutopilotChatMode.Embedded,
     renderer: "material",
+    compactMode: false,
     readOnly: false,
     overrideLabels: undefined,
     existingConversationId: undefined,

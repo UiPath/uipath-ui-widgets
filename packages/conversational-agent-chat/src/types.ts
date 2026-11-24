@@ -94,6 +94,11 @@ export interface ConversationalAgentChatProps {
    * @internal
    */
   renderer?: AutopilotChatRenderer;
+  /**
+   * Denser layout for narrow host panels (e.g. debug chats): smaller text,
+   * tighter message spacing and a shorter input. Defaults to false.
+   */
+  compactMode?: boolean;
   readOnly?: boolean;
   overrideLabels?: OverrideLabels;
   /**
