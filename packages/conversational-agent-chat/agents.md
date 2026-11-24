@@ -31,19 +31,19 @@ ConversationalAgentChat
 
 ## Streaming Architecture
 
-1. **Session Lifecycle** - One effect keyed on the active conversation starts its `SessionStream` (`{ echo: false }`) as soon as the conversation is active, and ends it when the conversation changes or the widget unmounts. Ended and read-only conversations get no session. Sends await the session through a gate that is rejected (and dropped silently) if the user moves to another conversation first.
+1. **Session Lifecycle** - An effect starts the active conversation's `SessionStream` (`{ echo: false }`) as soon as it's active, and ends it when the conversation changes or the widget unmounts. Ended and read-only conversations get no session. A send waits for the session, and is dropped if the user switches conversation first.
 2. **Exchange Flow** - Each message triggers `startExchange()` with handlers attached via `setupExchangeHandlers()`.
 3. **Chunk Streaming** - Text chunks are sent to the UI immediately with `stream: true`, final complete response with `stream: false, done: true`.
 4. **Tool Calls** - Displayed using `MessageWidget.ApolloAgentsToolCall` with input parameters, status, and results.
 
 ## Conversation Management
 
-- **Create** - Created up front by `startConversation()` on load and on New Chat, behind the mounted chat (not in debug or read-only mode, or when the agent has required inputs; the inputs form creates on submit with `agentInput`). Sends, attachments and the settings panel join the in-flight create. A failed or timed-out (30s) create shows a banner, and the next send retries.
+- **Create** - `startConversation()` creates it on load and on New Chat, except in debug or read-only mode, or when the agent has required inputs (the inputs form creates it on submit). Sends, attachments and settings wait for a create in flight. A failed or timed-out (30s) create shows a banner, and the next send tries again.
 - **History** - Loaded paginated (20 per page, descending by `lastActivityTime`) with cursor-based pagination.
 - **Switch** - Past conversations loaded by fetching all exchanges and mapping to chat messages.
 - **Delete** - Removed via API, clears current conversation if active.
 - **Rename** - Inline rename from the history list (on by default; opt out with `disabledFeatures.renameChat: true`). A pre-hook rejects blank names and names over 100 characters, then `agentService.conversations.updateById(id, { label, autogenerateLabel: false })` persists it so later exchanges don't overwrite it.
-- **New Chat** - Leaves the active conversation (ending its session and abandoning any create in flight), then creates the next one as on load.
+- **New Chat** - Leaves the active conversation (ending its session and dropping any create in flight), then creates the next one as on load.
 
 ## File Attachments
 

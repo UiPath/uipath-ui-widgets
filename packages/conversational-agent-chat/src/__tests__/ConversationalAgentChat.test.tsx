@@ -2885,9 +2885,7 @@ describe("ConversationalAgentChat", () => {
     };
 
     it("should add brand-new conversations to the sidebar on create", async () => {
-      // The conversation created on load (id "conv-123" per the create()
-      // mock) must appear in the sidebar before the service auto-generates
-      // its label.
+      // The conversation created on load shows in the sidebar before it has a label.
       render(<ConversationalAgentChat {...defaultProps} />);
 
       await waitFor(
@@ -3351,7 +3349,7 @@ describe("ConversationalAgentChat", () => {
         sessionControl.neverStarts = true;
         render(<ConversationalAgentChat {...defaultProps} />);
 
-        // The session starts on load, with emits paused (never resumed here).
+        // The session starts on load but never confirms.
         await vi.waitFor(() =>
           expect(lastSessionHelper?.pauseEmits).toHaveBeenCalled(),
         );
@@ -3366,8 +3364,7 @@ describe("ConversationalAgentChat", () => {
           "Timed out starting a session for the conversation. Please try again.",
         );
 
-        // A subsequent send ends the permanently-paused session and starts a
-        // fresh one rather than reusing it.
+        // The next send ends it and starts a new one.
         sessionControl.neverStarts = false;
         const onSendMessage = mockChatService.on.mock.calls.findLast(
           (call: any) => call[0] === "request",
@@ -4828,8 +4825,8 @@ describe("ConversationalAgentChat", () => {
         lastExchange = null;
         mockChatService.setError.mockClear();
 
-        // The create finishes, but the session effect hasn't run yet, so the
-        // send is now waiting on the session rather than the create.
+        // The create is done but the session hasn't started, so the send now
+        // waits on the session.
         second.resolve(conversation("conv-b"));
         for (let i = 0; i < 10; i++) await Promise.resolve();
         expect(mockChatService.setHistory.mock.calls.at(-1)?.[0][0].id).toBe(

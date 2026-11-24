@@ -120,8 +120,7 @@ const EXCHANGES_PAGE_SIZE = 15;
 // `sessionStarted`, so if it never arrives, surface an error instead of
 // leaving the send silently pending.
 const SESSION_START_TIMEOUT_MS = 30_000;
-// Bounds a conversation create so a hung request surfaces a banner instead of
-// leaving a send waiting forever.
+// How long a conversation create can take before we show an error.
 const CONVERSATION_CREATE_TIMEOUT_MS = 30_000;
 // Backend limit on ConversationSchema.label.
 const CONVERSATION_LABEL_MAX_LENGTH = 100;
@@ -129,8 +128,8 @@ type ConversationCreateOptionsArg = Parameters<
   ConversationalAgent["conversations"]["create"]
 >[2];
 
-// Rejects work waiting on a conversation the user or host has since moved away
-// from (New Chat, a switch, re-init, unmount); the waiter drops it silently.
+// Thrown to anything still waiting on a conversation the user has left (New
+// Chat, a switch, re-init, unmount). Callers ignore it.
 class ConversationReplacedError extends Error {}
 
 type Deferred<T> = {
@@ -146,7 +145,7 @@ function createDeferred<T>(): Deferred<T> {
     resolve = res;
     reject = rej;
   });
-  // A gate is rejected when replaced, whether or not anything awaited it.
+  // Gates are rejected when replaced, even if nothing awaited them.
   promise.catch(() => {});
   return { promise, resolve, reject };
 }
@@ -208,25 +207,20 @@ export const ConversationalAgentChat = ({
       surfaceVersion,
     }),
   );
-  // The active conversation. The state drives the session effect; the ref is
-  // written alongside it (see activateConversation) so Apollo's imperative
-  // handlers, registered once, always read the current value. Each activation
-  // is a new object, so reopening the same conversation restarts its session.
+  // The active conversation. The state drives the session effect, and the ref
+  // is for Apollo's handlers, which are registered once. Each activation is a
+  // new object, so reopening a conversation restarts its session.
   const [activation, setActivation] = useState<{
     conversation: ConversationCreateResponse | null;
   }>({ conversation: null });
   const activeConversationRef = useRef<ConversationCreateResponse | null>(null);
-  // Bumped whenever the active conversation changes, so a create started for
-  // an earlier one never becomes active.
-  const conversationGeneration = useRef(0);
-  // The in-flight create, shared by everything waiting on a conversation.
+  // The create in flight, shared by everything waiting on a conversation.
   const pendingCreate = useRef<Promise<ConversationCreateResponse> | null>(
     null,
   );
-  // Conversations this widget created, so the first history page (which can
-  // land after the create) doesn't drop the active one from the sidebar.
-  const createdConversationIds = useRef(new Set<string>());
-  // Bumped per init run (and on unmount) so a superseded run stops at its next await.
+  // Whether this widget created the active conversation (see fetchFirstHistoryPage).
+  const activeCreatedHere = useRef(false);
+  // Bumped on each init and on unmount, so an outdated init stops at its next await.
   const initRun = useRef(0);
   const initializedFor = useRef<string | null>(null);
   const themeRef = useRef(theme);
@@ -238,8 +232,8 @@ export const ConversationalAgentChat = ({
   const initialConversationConsumed = useRef(false);
   const resolvedAgent = useRef<AgentGetByIdResponse | null>(null);
   const folderIdRef = useRef<number | undefined>(folderId);
-  // An object prop, so read through a ref: a dependency on it would re-run
-  // everything downstream on each host render.
+  // Read through a ref so a new object from the host doesn't re-run everything
+  // that depends on it.
   const jobStartOverridesRef = useRef(jobStartOverrides);
   const toolConfirmationLabelsRef = useRef<ToolConfirmationLabels | null>(null);
   // Per-instance so unmounting one widget doesn't tear down another's React roots.
@@ -306,11 +300,10 @@ export const ConversationalAgentChat = ({
     );
   }, [sdk, externalUserId]);
   const session = useRef<SessionStream | null>(null);
-  // Resolves with the active conversation's session once the session effect
-  // starts it. Replaced (and the old one rejected) whenever the active
-  // conversation changes, so a send never lands in a conversation the user left.
+  // Resolves with the active conversation's session once it starts. Replaced
+  // when the conversation changes, so a send never goes to one the user left.
   const sessionReady = useRef(createDeferred<SessionStream>());
-  // Set when the active session failed to start; the next send restarts it.
+  // Set when the session failed to start; the next send tries again.
   const sessionNeedsRestart = useRef(false);
   const [sessionAttempt, setSessionAttempt] = useState(0);
   const pastConversations = useRef<ConversationCreateResponse[]>([]);
@@ -816,13 +809,12 @@ export const ConversationalAgentChat = ({
     [chatService, startTracePolling, stopTracePolling, t],
   );
 
-  // Makes `conversation` the active one (null for none). Rejects anything still
-  // waiting on the previous conversation's create or session, and arms a fresh
-  // session gate that the session effect resolves.
+  // Makes `conversation` the active one (or none). Anything still waiting on
+  // the previous one is rejected.
   const activateConversation = useCallback(
     (conversation: ConversationCreateResponse | null) => {
-      conversationGeneration.current += 1;
       pendingCreate.current = null;
+      activeCreatedHere.current = false;
       sessionReady.current.reject(new ConversationReplacedError());
       sessionReady.current = createDeferred();
       sessionNeedsRestart.current = false;
@@ -835,8 +827,7 @@ export const ConversationalAgentChat = ({
   const resolveAgent = useCallback(async (): Promise<
     AgentGetByIdResponse | undefined
   > => {
-    // Only the init run that started this lookup may write the cache, so a
-    // superseded run can't leave another agent's release behind.
+    // Only the init run that started this lookup may cache the result.
     const run = initRun.current;
     let effectiveAgentId = agentId;
     let effectiveFolderId = folderIdRef.current;
@@ -890,8 +881,7 @@ export const ConversationalAgentChat = ({
   const setConversationHistory = useCallback(
     (next: ConversationCreateResponse[], allLoaded?: boolean) => {
       pastConversations.current = next;
-      // Through the ref: a create started during init finishes before the
-      // `chatService` state is set, and must still reach the sidebar.
+      // Through the ref: a create during init can finish before `chatService` is set.
       chatServiceRef.current?.setHistory(
         getConversationHistoryDisplayItems(next, t("new_chat")),
         allLoaded,
@@ -900,13 +890,20 @@ export const ConversationalAgentChat = ({
     [t],
   );
 
-  // The only way a conversation is created. Everything that needs one (load,
-  // New Chat, the inputs form, a send, an attachment, the settings panel)
-  // joins the one in-flight create rather than starting a second.
+  // The only place a conversation is created. Callers share the create in flight.
   const startConversation = useCallback(
     (agentInput?: JSONObject): Promise<ConversationCreateResponse> => {
-      if (pendingCreate.current) return pendingCreate.current;
-      const generation = conversationGeneration.current;
+      const inFlight = pendingCreate.current;
+      if (inFlight) {
+        if (!agentInput) return inFlight;
+        // A create without inputs is already running: attach these to it.
+        return inFlight.then(async (conversation) => {
+          await agentService.current.conversations.updateById(conversation.id, {
+            agentInput: { inline: agentInput },
+          });
+          return conversation;
+        });
+      }
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timeout = new Promise<never>((_, reject) => {
         timer = setTimeout(
@@ -936,13 +933,13 @@ export const ConversationalAgentChat = ({
       ])
         .then(
           (conversation) => {
-            if (conversationGeneration.current !== generation) {
+            if (pendingCreate.current !== pending) {
               throw new ConversationReplacedError();
             }
-            createdConversationIds.current.add(conversation.id);
             activateConversation(conversation);
-            // Show it in the sidebar right away so the label the service
-            // generates after the first exchange refreshes it in place.
+            activeCreatedHere.current = true;
+            // Add it to the sidebar now, so the label generated after the
+            // first reply updates it in place.
             setConversationHistory([
               conversation,
               ...pastConversations.current,
@@ -950,7 +947,7 @@ export const ConversationalAgentChat = ({
             return conversation;
           },
           (err: unknown) => {
-            if (conversationGeneration.current !== generation) {
+            if (pendingCreate.current !== pending) {
               throw new ConversationReplacedError();
             }
             throw err;
@@ -971,8 +968,8 @@ export const ConversationalAgentChat = ({
       return activeConversationRef.current ?? startConversation();
     }, [startConversation]);
 
-  // For the creates nothing awaits (load, New Chat): a failure becomes a
-  // banner, and the next send retries.
+  // For creates nobody awaits (load, New Chat): a failure shows a banner, and
+  // the next send tries again.
   const startConversationInBackground = useCallback(() => {
     startConversation().catch((err: unknown) => {
       if (err instanceof ConversationReplacedError) return;
@@ -980,7 +977,7 @@ export const ConversationalAgentChat = ({
     });
   }, [startConversation, t]);
 
-  // Load and New Chat create the conversation up front under the same rule.
+  // Whether load and New Chat create the conversation right away.
   const shouldCreateUpfront = useCallback(
     (agent: AgentGetByIdResponse | null | undefined, requiredInputs: boolean) =>
       !!agent && !requiredInputs && !readOnly && !isDebugMode,
@@ -1019,8 +1016,8 @@ export const ConversationalAgentChat = ({
     chatServiceRef.current?.clearError();
   }, []);
 
-  // Read by the session's handlers, so a new `t` (locale change) or callback
-  // identity doesn't restart the session.
+  // Read by the session handlers, so a locale change or a new callback doesn't
+  // restart the session.
   const sessionCallbacksRef = useRef({
     applyEndedState,
     setConversationHistory,
@@ -1034,17 +1031,13 @@ export const ConversationalAgentChat = ({
     };
   }, [applyEndedState, setConversationHistory, t]);
 
-  // Owns the session: starts one for the active conversation as soon as the
-  // chat is up, and ends it when the conversation changes or the widget
-  // unmounts. React runs the cleanup before the next start, so a switch always
-  // ends the old session first. Ended and read-only conversations take no
-  // input, so they get no session. The in-flight exchange is left running on
-  // a switch (ending it is reserved for onStopResponse), so reopening a busy
-  // conversation resumes its turn.
+  // Starts a session for the active conversation once the chat is up, and ends
+  // it when the conversation changes or the widget unmounts. Ended and
+  // read-only conversations get no session. A reply in progress keeps running
+  // if the user switches away.
   useEffect(() => {
     const conversation = activation.conversation;
-    // A live end is recorded on the ref only (see onConversationEnd), so check
-    // it too before restarting this conversation's session.
+    // A conversation that ended while open is only marked on the ref, so check it too.
     const latest = activeConversationRef.current;
     const ended =
       !!conversation?.endedTime ||
@@ -1054,18 +1047,17 @@ export const ConversationalAgentChat = ({
     }
     const conversationId = conversation.id;
     const ready = sessionReady.current;
-    // A fresh session replaces any failed one, so the next send needn't restart it.
+    // A new session replaces a failed one.
     sessionNeedsRestart.current = false;
     const sessionHelper = agentService.current.conversations.startSession(
       conversationId,
       { echo: false },
     );
-    // Mark active before registering handlers so a synchronous sessionStarted
-    // can't lose the `session.current === sessionHelper` guard race below.
+    // Set before registering handlers, which check it.
     session.current = sessionHelper;
-    // Refresh the sidebar label when the service auto-generates one (or the
-    // label is updated via the API). Bound to this session's conversation id
-    // so a stale event from an ended session can't mislabel the active one.
+    // Refresh the sidebar label when the service generates or updates it.
+    // Uses this session's conversation id so an old session can't relabel
+    // the active one.
     sessionHelper.onLabelUpdated(({ label }) => {
       sessionCallbacksRef.current.setConversationHistory(
         pastConversations.current.map((c) =>
@@ -1084,13 +1076,13 @@ export const ConversationalAgentChat = ({
       );
       const active = activeConversationRef.current;
       if (active?.id !== conversationId) return;
-      // Only the ref: the session stays open until the user leaves, so the
-      // turn in flight still finishes. The ended state blocks further sends.
+      // Only update the ref: the session stays open so the current reply can
+      // finish. The ended state blocks new sends.
       activeConversationRef.current = { ...active, endedTime, endReason };
       sessionCallbacksRef.current.applyEndedState(endReason);
     });
-    // A failed start surfaces an error and re-arms the gate; the next send
-    // restarts the session rather than reusing this one.
+    // On a failed start, show the error and reset the gate. The next send starts
+    // a new session.
     const failSession = (message: string) => {
       if (session.current !== sessionHelper) return;
       session.current = null;
@@ -1098,8 +1090,7 @@ export const ConversationalAgentChat = ({
       sessionNeedsRestart.current = true;
       chatService.setError(message);
     };
-    // Buffer outgoing events until the server confirms the session is started,
-    // then flush, so a send never blocks on the sessionStarted round-trip.
+    // Buffer outgoing events until the session has started, then send them.
     sessionHelper.pauseEmits();
     const startTimeout = setTimeout(() => {
       if (sessionHelper.isEmitPaused) {
@@ -1126,9 +1117,8 @@ export const ConversationalAgentChat = ({
         /* session already closed */
       }
       if (session.current === sessionHelper) session.current = null;
-      // Re-arm the gate if nothing else did (activation and failSession do),
-      // so a restart for the same conversation, e.g. readOnly turned on and
-      // back off, doesn't leave sends on this ended session.
+      // Reset the gate if nothing else did, so restarting the same conversation
+      // (e.g. readOnly toggled) doesn't send on this ended session.
       if (sessionReady.current === ready) {
         sessionReady.current = createDeferred();
       }
@@ -1183,8 +1173,8 @@ export const ConversationalAgentChat = ({
       });
   }, []);
 
-  // Leaves the active conversation (the session effect ends its session),
-  // abandoning any create still in flight. Shared by New Chat and init.
+  // Leaves the active conversation and drops any create in flight. Used by
+  // New Chat and init.
   const resetConversation = useCallback(() => {
     clearEndedState();
     activateConversation(null);
@@ -1204,9 +1194,8 @@ export const ConversationalAgentChat = ({
   const onNewChat = useCallback(() => {
     resetConversation();
     if (hasRequiredInputs(inputSchemaState)) {
-      // Re-show the InputsPage with a cleared form; it creates on submit.
-      // Bumping the counter forces an unmount/remount via the key on
-      // <InputsPage>, which resets internal form state.
+      // Show the inputs form again, cleared (the key change remounts it). The
+      // conversation is created on submit.
       setInputsInstance((n) => n + 1);
       setShowInputPage(true);
     } else if (shouldCreateUpfront(resolvedAgent.current, false)) {
@@ -1244,13 +1233,12 @@ export const ConversationalAgentChat = ({
       ...buildHistoryFilterOptions(),
     });
     conversationsCursor.current = result.nextCursor;
-    // A conversation created while this page loaded may not be in it yet;
-    // keep it at the top unless a search is filtering the list. Take the
-    // sidebar's copy, which carries any label update since the create.
+    // A conversation we just created may not be on this page yet. Keep it at
+    // the top (unless searching), using the sidebar's copy so its label is current.
     const active = activeConversationRef.current;
     const kept =
       active &&
-      createdConversationIds.current.has(active.id) &&
+      activeCreatedHere.current &&
       !searchTextRef.current &&
       !result.items.some((c) => c.id === active.id)
         ? (pastConversations.current.find((c) => c.id === active.id) ?? active)
@@ -1347,8 +1335,7 @@ export const ConversationalAgentChat = ({
         chatService?.clearError();
         setHasMessages(true);
         setConnectionReadiness(null);
-        // Joins a create already in flight, or creates one (debug mode, or
-        // after a failed create).
+        // Uses the create in flight, or starts one (debug mode, or after a failed create).
         await ensureConversation();
         if (sessionNeedsRestart.current) {
           sessionNeedsRestart.current = false;
@@ -1546,8 +1533,8 @@ export const ConversationalAgentChat = ({
         resetTraceState();
         activateConversation(selectedConversation);
         exchangesCursor.current = undefined;
-        // Set now, not after the transcript loads: an ended conversation gets
-        // no session, so a send in between must be blocked rather than wait.
+        // Set before the transcript loads: an ended conversation has no session,
+        // so a send in the meantime must be blocked.
         endReasonRef.current = selectedConversation.endedTime
           ? (selectedConversation.endReason ?? ConversationEndReason.Completed)
           : null;
@@ -1632,9 +1619,7 @@ export const ConversationalAgentChat = ({
   const initChat = useCallback(async () => {
     const run = ++initRun.current;
     const initKey = `${agentId}-${folderId}-${existingConversationId ?? ""}-${externalUserId ?? ""}`;
-    // A re-init (the host changed agent, user or conversation) starts over:
-    // leave the previous conversation, drop the cached agent, and show the
-    // loader until this run finishes.
+    // A re-init (new agent, user or conversation) starts over.
     resetConversation();
     initialConversationConsumed.current = false;
     resolvedAgent.current = null;
@@ -1712,8 +1697,7 @@ export const ConversationalAgentChat = ({
       const handleApplySettingsInputs = async (
         inputs: Record<string, unknown>,
       ) => {
-        // Waits for a create still in flight (or starts one) rather than
-        // failing before the first message.
+        // Waits for the create in flight, or starts one.
         const conversation = await ensureConversation();
         await agentService.current.conversations.updateById(conversation.id, {
           agentInput: { inline: inputs as JSONObject },
@@ -1936,8 +1920,7 @@ export const ConversationalAgentChat = ({
       }
 
       setChatService(chatServiceInstance);
-      // Created behind the mounted chat, never behind the loader; a send in
-      // the meantime joins it.
+      // Created after the chat is shown; a send in the meantime waits for it.
       if (
         !existingConversationId &&
         shouldCreateUpfront(agentRelease, requiredInputs)
@@ -2108,15 +2091,12 @@ export const ConversationalAgentChat = ({
     };
   }, []);
 
-  // On unmount, supersede any init run or create still in flight so neither
-  // touches the unmounted widget (the session effect ends the session), and
-  // stop trace polling. Clearing initializedFor lets StrictMode's simulated
-  // remount initialize again.
+  // On unmount, stop any init or create still running and stop trace polling.
+  // Clearing initializedFor lets StrictMode's remount initialize again.
   useEffect(() => {
     return () => {
       initRun.current += 1;
       initializedFor.current = null;
-      conversationGeneration.current += 1;
       pendingCreate.current = null;
       if (tracePollIntervalRef.current) {
         clearInterval(tracePollIntervalRef.current);
@@ -2361,8 +2341,7 @@ export const ConversationalAgentChat = ({
                     { agentInput: { inline: inputs as JSONObject } },
                   );
                 } else {
-                  // Awaited so a failure shows on the form and the user keeps
-                  // the inputs this conversation requires.
+                  // Awaited so a failure shows on the form and the inputs aren't lost.
                   await startConversation(inputs as JSONObject);
                 }
                 storedAgentInputs.current = inputs;
