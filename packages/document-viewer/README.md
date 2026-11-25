@@ -57,6 +57,18 @@ function Preview({ sdk, task }) {
 | `fetchDvDocumentArtifacts(sdk, data)` | Fetch `DvDocumentArtifacts` imperatively — outside render, ahead of time |
 | `useDvDocumentArtifacts(sdk, data)`   | The same fetch as a hook                                                 |
 
+### Supported formats
+
+The page view renders `original`, and picks a renderer from its data URL's MIME type:
+
+| Format                    | MIME type                               | Page view                                                    |
+| ------------------------- | --------------------------------------- | ------------------------------------------------------------ |
+| PDF                       | `application/pdf`                       | All pages                                                    |
+| JPEG, PNG, WebP           | `image/jpeg`, `image/png`, `image/webp` | Single-page images                                           |
+| TIFF, BMP, GIF and others | —                                       | Not rendered: the viewer reports the format as not supported |
+
+The text view does not depend on the original's format. To show a document whose original is not supported, leave `original` out and pass `text` (in self-fetching mode, leave `EncodedDocumentPath` unset): the viewer opens in text view.
+
 ## Linking it to a form
 
 The viewer is linked through content references, in and out:
