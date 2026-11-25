@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" width="960" height="420" role="img" aria-labelledby="title desc">
   <title id="title">How documents get into the widgets</title>
-  <desc id="desc">A Document Understanding workflow produces ContentValidationData; a Flow IDP extract node produces ProcessedDocument (IXP). Either is sent as one payload (sdk plus data or processedDocument) or as the individual inputs you already hold (artifacts). Validation Station, its fields form, table editor and document viewer take both. Business rules and the document type field take DU only.</desc>
+  <desc id="desc">A Document Understanding workflow produces ContentValidationData through its Create Document Validation Artifacts activity; a Flow IDP extract node produces ProcessedDocument (IXP). Either is sent as one payload (sdk plus data or processedDocument) or as the individual inputs you already hold (artifacts). Validation Station, its fields form, table editor and document viewer take both. Business rules and the document type field take DU only.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0 0L10 5L0 10z" fill="#5b6472"/>
@@ -28,8 +28,7 @@
   <rect fill="#ddf4ff" stroke="#54aeff" stroke-width="1" x="24" y="60" width="262" height="118" rx="8"/>
   <text class="t" x="40" y="88">Document Understanding workflow</text>
   <text class="c" x="40" y="112">ContentValidationData</text>
-  <text class="s" x="40" y="140">IntelligentOCR,</text>
-  <text class="s" x="40" y="158">DocumentUnderstanding.Activities</text>
+  <text class="s" x="40" y="140">Create Document Validation Artifacts</text>
   <rect fill="#fbefff" stroke="#c297ff" stroke-width="1" x="24" y="198" width="262" height="82" rx="8"/>
   <text class="t" x="40" y="226">Flow IDP extract node (IXP)</text>
   <text class="c" x="40" y="250">ProcessedDocument</text>

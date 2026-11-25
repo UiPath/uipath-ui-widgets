@@ -19,9 +19,8 @@ From rc.6 — read the behaviour changes before upgrading:
   alone no longer compiles on either one.
 - **The compact fields form and table editor reject `boundingBoxes`-only IXP
   citations.** An IXP extraction whose sources cite by `boundingBoxes` alone
-  (no `references`) does not load on these elements, and such a prediction
-  shows no predicted values. Either cites fine in `ValidationStation` and
-  `DocumentViewer`, which have the document.
+  (no `references`) does not load on these elements. Either cites fine in
+  `ValidationStation` and `DocumentViewer`, which have the document.
 - **New compact UI, on by default:** the field filter bar counts
   confirmed fields, and a filled field or table cell shows a _Replace value_
   button.
@@ -47,9 +46,6 @@ From rc.5:
 - **IXP citations are rewritten on save.** `validatedData` cites every value
   afresh with `references` in page units plus `pageWidth` / `pageHeight`;
   `boundingBoxes` is deprecated and written for words only.
-- **`EnablePredictionDiff` inserts missing predicted values**, and changing
-  `predictedExtractionResult` alone resets the element — see
-  [Comparing against the prediction](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/data-sources.md#comparing-against-the-prediction).
 - **New compact UI, on by default:** a confirm-all checkbox on each field
   group, clickable line numbers in the table editor, an autocomplete box for
   set fields, and field filters that reach inside field groups. Field-group
@@ -72,8 +68,6 @@ From rc.5:
 
 From rc.4:
 
-- **IXP predictions.** `IxpDocumentArtifacts` takes an `IXPExtraction`
-  `predictedExtractionResult`, so an IXP document can show the prediction diff.
 - **Single-instance field groups** in IXP taxonomies (a nullable `object`)
   render as one row; such a taxonomy failed to load before.
 - **New compact UI, on by default:** a _No taxonomy defined_ state (text via
@@ -104,10 +98,8 @@ From rc.2:
 - **New options:** `fieldFilterOptions`, `defaultFieldsAreaPercentage` /
   `defaultFieldsAreaWidth`, and `documentViewerOptions` for the embedded viewer
   (with the new `hideExtractedTokensToggle` / `hideLanguageSelect` flags).
-- **New outputs and inputs on this package:** `onWcMessage` (see
-  [Rendering your own value-indicator overlay](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/events-and-commands.md#rendering-your-own-value-indicator-overlay))
-  and `predictedExtractionResult` (see
-  [Comparing against the prediction](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/data-sources.md#comparing-against-the-prediction)).
+- **New output on this package:** `onWcMessage` — see
+  [Rendering your own value-indicator overlay](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/events-and-commands.md#rendering-your-own-value-indicator-overlay).
 - **`@uipath/uipath-typescript` `>= 1.5.1`** is now required — the web component
   declares it as a peer dependency.
 

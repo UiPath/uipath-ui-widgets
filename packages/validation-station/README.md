@@ -8,7 +8,7 @@ React component for the UiPath Document Understanding **Validation Station**, th
 
 Your workflow decides the contract:
 
-- **A Document Understanding workflow** (IntelligentOCR, DocumentUnderstanding.Activities) hands over a `ContentValidationData`. Pass it as `data`.
+- **A Document Understanding workflow** hands over the `ContentValidationData` that its _Create Document Validation Artifacts_ activity outputs (IntelligentOCR, DocumentUnderstanding.Activities). Pass it as `data`.
 - **A Flow IDP extract node** hands over a `ProcessedDocument` (IXP). Pass it as `processedDocument`.
 
 Send it as **① one payload**, with `sdk` + `data` or `sdk` + `processedDocument`, and the widget fetches the rest and saves the review. Or send **② the individual inputs** you already hold as `artifacts`, and save the review yourself. The quick start below takes ①.
@@ -227,7 +227,7 @@ Every other prop, the state callbacks (`onLoaded`, `onDirtyChange`, `onFieldValu
 
 ## Going further
 
-- [Data sources and the round trip](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/data-sources.md): pre-fetched artifacts, loading and saving from your own code, the prediction diff, and IXP documents in full.
+- [Data sources and the round trip](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/data-sources.md): pre-fetched artifacts, loading and saving from your own code, and IXP documents in full.
 - [Props, events and commands](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/events-and-commands.md): every prop and callback, setting and focusing values by path, a custom confidence popover, the language list.
 - [Hosting in depth](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/hosting.md): the served folder's layout, `deploymentUrl`, fonts, CSP and version skew.
 - [Subcomponents](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/validation-station-subcomponents.md): build your own layout from the fields form, table editor, document viewer, business rules and document type panels.

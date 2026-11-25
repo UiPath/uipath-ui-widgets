@@ -17,7 +17,7 @@ If both `data` and `processedDocument` are set, `data` wins.
 
 **The outputs do not change with the mode.** `onSubmit`, `onSaveAsDraft` and `onReportException` fire for every user action either way, and always carry the request the web component produced. The only difference is a second argument: when the widget persisted the data itself, it passes the outcome too.
 
-Pre-fetched mode is what you want when the document does not live in a storage bucket, when the artifacts are already in memory (e.g. fetched once and shared with the [subcomponents](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/validation-station-subcomponents.md)), or when persistence goes somewhere other than `ValidatedExtractionResultsPath`.
+Pre-fetched mode is what you want when the document does not live in a storage bucket, when the artifacts are already in memory (e.g. fetched once and shared with the [subcomponents](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/validation-station-subcomponents.md)), when persistence goes somewhere other than `ValidatedExtractionResultsPath`, or when you want to change the taxonomy or the extraction before handing them to the component. For the last, fetch them with `fetchDuDocumentArtifacts` (or `fetchProcessedDocumentArtifacts` for IXP), edit them, and pass the result as `artifacts`.
 
 ```tsx
 import {
@@ -38,38 +38,8 @@ function App({ artifacts }: { artifacts: DuDocumentArtifacts }) {
 
 Every bucket call is scoped to the folder `data` names — `FolderId`, or `FolderKey` when both are present. The activity that produces the `ContentValidationData` sets one of them; if neither is there, the widget renders an error instead of fetching.
 
-The two modes can be mixed: pass `artifacts` **and** `sdk` + `data` to skip the fetch while keeping the built-in write-back — `onSubmit` then receives the outcome as well.
-
 > **Info: `DuDocumentArtifacts`**
-> `{ taxonomy, extractionResult, predictedExtractionResult?, dom, text, customizationInfo, original }` — `original` is the base64-encoded document the viewer renders. In `DuDocumentArtifacts`, `taxonomy` and `extractionResult` are UiPath DU contracts. `ValidationStation` also takes `IxpDocumentArtifacts`, the same shape with all three in the IXP representation (an `IXPTaxonomy` JSON Schema, an `IXPReviewedExtraction` — an `IXPExtraction` plus optional `confirmations` — and an optional `IXPExtraction` prediction). So do the `CompactFieldsForm`, `CompactTableEditor` and `DocumentViewer` subcomponents; `CompactBusinessRules` and `CompactDocTypeField` take `DuDocumentArtifacts` only.
-
-## Comparing against the prediction
-
-`predictedExtractionResult` is the model's prediction — the extraction output nobody edited — as opposed to `extractionResult`, the result the user reviews. Self-fetching fills it from `AutomaticExtractionResultsPath`; in pre-fetched mode it is optional, and a hand-built `DuDocumentArtifacts` without it is still valid. Supply it in the same representation as `extractionResult`: an `IXPExtraction` on `IxpDocumentArtifacts`. A Flow `ProcessedDocument` carries no prediction, so self-fetching one leaves it unset.
-
-> **Warning: Change it together with `extractionResult`**
-> Once the element has paired a prediction with the loaded values, assigning a different `predictedExtractionResult` (or `null`) on its own reloads the last `extractionResult` it was fed and drops unsaved edits. With `EnablePredictionDiff` on, the element also inserts predicted rows and values the result lacks, as unconfirmed values the user confirms or deletes.
-
-By itself it changes nothing visible. It drives the `EnablePredictionDiff` customization flag (compact mode, on `ValidationStation`, `CompactFieldsForm` and `CompactTableEditor`): where the prediction differs from the current values, the element shows the predicted value with a button that takes it over. Like every customization flag, it lives under `FeatureCustomization` in `customizationInfo` — typed by the exported `ICustomizationInfoDTO` / `IFeatureCustomization`:
-
-```ts
-import type { ICustomizationInfoDTO } from "@uipath/ui-widgets-validation-station";
-
-// Merge over what the bucket supplied rather than replacing it.
-const fetched = artifacts.customizationInfo as
-  | ICustomizationInfoDTO
-  | undefined;
-const withDiff = {
-  ...artifacts,
-  customizationInfo: {
-    ...fetched,
-    FeatureCustomization: {
-      ...fetched?.FeatureCustomization,
-      EnablePredictionDiff: true,
-    },
-  } satisfies ICustomizationInfoDTO,
-};
-```
+> `{ taxonomy, extractionResult, dom, text, customizationInfo, original }` — `original` is the base64-encoded document the viewer renders. In `DuDocumentArtifacts`, `taxonomy` and `extractionResult` are UiPath DU contracts. `ValidationStation` also takes `IxpDocumentArtifacts`, the same shape with both in the IXP representation (an `IXPTaxonomy` JSON Schema, and an `IXPReviewedExtraction` — an `IXPExtraction` plus optional `confirmations`). So do the `CompactFieldsForm`, `CompactTableEditor` and `DocumentViewer` subcomponents; `CompactBusinessRules` and `CompactDocTypeField` take `DuDocumentArtifacts` only.
 
 ## Owning the round-trip
 
@@ -116,7 +86,7 @@ function HostOwnedReview({ sdk, data }) {
 ```
 
 > **Warning: Handle both callbacks**
-> The widget always offers **Save as draft**, so leaving `onSaveAsDraft` unwired means a draft click persists nothing.
+> If you persist yourself, handle `onSaveAsDraft` as well as `onSubmit`.
 
 The request payloads are exported too — `IVsSaveValidatedDataRequest`, `IVsSaveValidatedDataAsDraftRequest` and `IVsSaveExceptionReportRequest` — so handlers declared outside JSX can name their parameter.
 
