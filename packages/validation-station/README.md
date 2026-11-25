@@ -1,27 +1,23 @@
 # @uipath/ui-widgets-validation-station
 
-A React wrapper for the UiPath Document Understanding **Validation Station**: a reviewer checks and corrects the values extracted from one document, next to the document itself. Drop it into your React app, usually a [Coded Action App](https://uipath.github.io/uipath-typescript/coded-action-apps/getting-started/) that opens from an Action Center task. The widget loads the document, and saves the review back.
+React component for the UiPath Document Understanding **Validation Station**, the screen where a reviewer checks and corrects the values extracted from a document, side by side with the document itself. Give it the output of an extraction and it fetches the document, shows it for review, and saves the reviewer's changes. It runs in any React app, typically a [Coded Action App](https://uipath.github.io/uipath-typescript/coded-action-apps/getting-started/) whose task includes a review step; completing that task stays with your app.
 
 ## Pick your path
 
-![How documents get into the widgets: a Document Understanding task produces ContentValidationData, a Flow IDP node produces ProcessedDocument; either is sent as one payload or as pieces, to Validation Station, its subcomponents, or the other widgets](https://raw.githubusercontent.com/UiPath/uipath-ui-widgets/develop/packages/validation-station/docs/assets/how-documents-get-in.svg)
+![How documents get into the widgets: a Document Understanding workflow produces ContentValidationData, a Flow IDP extract node produces ProcessedDocument; either is sent as one payload or as individual inputs, to Validation Station or its subcomponents](https://raw.githubusercontent.com/UiPath/uipath-ui-widgets/develop/packages/validation-station/docs/assets/how-documents-get-in.svg)
 
 Your workflow decides the contract:
 
-- **A Document Understanding task** (IntelligentOCR, DocumentUnderstanding.Activities) hands over a `ContentValidationData`. Pass it as `data`.
-- **A Flow IDP node** hands over a `ProcessedDocument` (IXP). Pass it as `processedDocument`.
+- **A Document Understanding workflow** (IntelligentOCR, DocumentUnderstanding.Activities) hands over a `ContentValidationData`. Pass it as `data`.
+- **A Flow IDP extract node** hands over a `ProcessedDocument` (IXP). Pass it as `processedDocument`.
 
-Send it as **① one payload**, with `sdk` + `data` or `sdk` + `processedDocument`, and the widget fetches the rest and saves the review. Or send **② the pieces** you already hold as `artifacts`, and save them yourself. The quick start below takes ①.
+Send it as **① one payload**, with `sdk` + `data` or `sdk` + `processedDocument`, and the widget fetches the rest and saves the review. Or send **② the individual inputs** you already hold as `artifacts`, and save the review yourself. The quick start below takes ①.
 
-| Widget                                                                                                                   | DU ① | DU ② | IXP ① | IXP ② |
-| ------------------------------------------------------------------------------------------------------------------------ | :--: | :--: | :---: | :---: |
-| `ValidationStation`, the whole screen                                                                                    |  ✓   |  ✓   |   ✓   |   ✓   |
-| `CompactFieldsForm`, `CompactTableEditor`, `DocumentViewer`, its [subcomponents](#going-further)                         |  ✓   |  ✓   |   ✓   |   ✓   |
-| `CompactBusinessRules`, `CompactDocTypeField`, its subcomponents                                                         |  ✓   |  ✓   |   —   |   —   |
-| [Document Viewer](https://github.com/UiPath/uipath-ui-widgets/tree/develop/packages/document-viewer), standalone package |  ✓   |  ✓   |   —   |  ✓\*  |
-| [Classification Station](https://github.com/UiPath/uipath-ui-widgets/tree/develop/packages/classification-station)       |  ✓   |  ✓   |   —   |   —   |
-
-\* It takes no taxonomy or extraction, so for IXP pass only `dom`, `text` and `original`.
+| Widget                                                                                                                                                                                                     | DU ① | DU ② | IXP ① | IXP ② |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--: | :--: | :---: | :---: |
+| `ValidationStation`, the whole screen                                                                                                                                                                      |  ✓   |  ✓   |   ✓   |   ✓   |
+| [Subcomponents](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/validation-station-subcomponents.md) `CompactFieldsForm`, `CompactTableEditor`, `DocumentViewer` |  ✓   |  ✓   |   ✓   |   ✓   |
+| [Subcomponents](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/validation-station-subcomponents.md) `CompactBusinessRules`, `CompactDocTypeField`               |  ✓   |  ✓   |   —   |   —   |
 
 Start with `ValidationStation`. Reach for the subcomponents only when the standard screen does not fit your layout.
 
@@ -161,7 +157,7 @@ export function Validation() {
 > **Note: Theming**
 > Add a `light` or `dark` class to `<body>`; the widget's stylesheets key off it. `theme` and `language` default to `"light"` and English. The sample maps Action Center's theme onto both.
 
-### From a Flow IDP node (IXP)
+### From a Flow IDP extract node (IXP)
 
 Pass the `ProcessedDocument` instead of `data`, and complete the task with the validated document the widget hands back:
 
@@ -203,9 +199,9 @@ With ② (`artifacts`, no `sdk`), every callback carries only the request and th
 | Prop                                             | Type                                          | Description                                                                                                       |
 | ------------------------------------------------ | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `sdk`                                            | `UiPath`                                      | The SDK instance. Needed whenever the widget fetches or saves (①)                                                 |
-| `data`                                           | `ContentValidationData`                       | A Document Understanding task's payload. Wins over `processedDocument` when both are set                          |
-| `processedDocument`                              | `ProcessedDocument`                           | A Flow IDP node's output                                                                                          |
-| `artifacts`                                      | `DuDocumentArtifacts \| IxpDocumentArtifacts` | The pieces you already hold (②). No fetch happens. Pass `documentId` with them                                    |
+| `data`                                           | `ContentValidationData`                       | A Document Understanding workflow's output. Wins over `processedDocument` when both are set                       |
+| `processedDocument`                              | `ProcessedDocument`                           | A Flow IDP extract node's output                                                                                  |
+| `artifacts`                                      | `DuDocumentArtifacts \| IxpDocumentArtifacts` | The individual inputs you already hold (②). No fetch happens. Pass `documentId` with them                         |
 | `theme`                                          | `DuTheme`                                     | `'light'` (default), `'dark'`, `'light-hc'`, `'dark-hc'`, `'future-light'`, `'future-dark'`                       |
 | `language`                                       | `ValidationStationLanguage`                   | Defaults to `ValidationStationLanguage.English`                                                                   |
 | `isReadonly`                                     | `boolean`                                     | Read-only review. Pass the task's `isReadOnly`                                                                    |

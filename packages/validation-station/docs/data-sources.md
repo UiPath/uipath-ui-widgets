@@ -122,7 +122,7 @@ The request payloads are exported too — `IVsSaveValidatedDataRequest`, `IVsSav
 
 ## IXP (`ProcessedDocument`)
 
-A Flow IDP node emits a `ProcessedDocument` rather than a `ContentValidationData`. It carries the taxonomy (an `IXPTaxonomy`) and the result (an `IXPExtraction`) inline, plus `metadata` naming the run that produced it — `traceId`, `spanId` and `folderKey`. The document, its DOM and its OCR text are read through that run's trace.
+A Flow IDP extract node emits a `ProcessedDocument` rather than a `ContentValidationData`. It carries the taxonomy (an `IXPTaxonomy`) and the result (an `IXPExtraction`) inline, plus `metadata` naming the run that produced it — `traceId`, `spanId` and `folderKey`. The document, its DOM and its OCR text are read through that run's trace.
 
 ```tsx
 <ValidationStation
