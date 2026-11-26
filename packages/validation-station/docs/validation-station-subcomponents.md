@@ -1,166 +1,43 @@
-# Validation Station Subcomponents (Composition)
+# Building with the Validation Station subcomponents
 
-The **compact subcomponents** are the individual panels of the Document Understanding Validation Station, exposed as separate React elements you lay out yourself: `DocumentViewer`, `CompactFieldsForm`, `CompactTableEditor`, `CompactBusinessRules`, `CompactDocTypeField`. Use them to build a **custom document-review layout** instead of the single all-in-one `ValidationStation`.
+The subcomponents are the panels of the Validation Station as separate React elements you lay out yourself: `DocumentViewer`, `CompactFieldsForm`, `CompactTableEditor`, `CompactBusinessRules` and `CompactDocTypeField`. They render the same web component as `ValidationStation`, so the install, hosting and auth in the [package README](https://github.com/UiPath/uipath-ui-widgets/tree/develop/packages/validation-station) apply unchanged. This page covers only what composing them adds.
 
-Package: [`@uipath/ui-widgets-validation-station`](https://www.npmjs.com/package/@uipath/ui-widgets-validation-station). They render the **same** underlying web component as the monolith (`@uipath/du-validation-station-wc`) — so all install/build/auth plumbing is identical; only the composition responsibilities are new. Full prop surface lives in the package README — this file covers the composition steps that are easy to get wrong.
+## When you need this
 
-## When to Use
+- **Your own layout:** the viewer in one place, the fields in a drawer, the line items in a sheet, the rules in a side panel.
+- **One or two panels only,** for example a fields form next to the viewer.
+- **Panels that link to each other** (select a field and the viewer highlights it, click a rule and its field focuses) without wiring that yourself.
 
-- User wants a **custom-laid-out** document-review UI: e.g. viewer on the left, a separate fields form, a standalone business-rules panel, a doc-type selector, and a table editor — arranged in the host's own grid, side panels, tabs, or resizable splits.
-- User wants panels to **cross-link** (selecting a field highlights it in the viewer; a rule click focuses the offending field) without wiring that themselves.
-- User wants to embed **one or two** panels only (e.g. a fields form next to the viewer).
+For the standard review screen, use `ValidationStation`; don't recompose it from the panels. For a viewer on its own, with no form linked to it, use [`@uipath/ui-widgets-document-viewer`](https://github.com/UiPath/uipath-ui-widgets/tree/develop/packages/document-viewer).
 
-For a viewer on its own — a read-only preview with no fields form linked through `instanceId` — use `DocumentViewer` from [`@uipath/ui-widgets-document-viewer`](https://github.com/UiPath/uipath-ui-widgets/tree/develop/packages/document-viewer) instead.
+## Five things to get right
 
-If the user just wants the standard, self-contained review screen, use the monolithic `ValidationStation` — do **not** hand-compose the subcomponents to reproduce it. And do **not** rebuild any of these panels (PDF viewer, field editor, table editor, rules) from scratch.
+1. **Fetch once, in the parent.** Call `useDuDocumentArtifacts(sdk, data)` (or `useProcessedDocumentArtifacts(sdk, processedDocument)` for a Flow document) once, and pass the same `artifacts` to every panel. A panel given `sdk` + `data` fetches for itself, so five of them download the same document five times.
+2. **One `instanceId` per document, and per contract.** Panels with the same `instanceId` share one store, and that is all the linking needs. Use a different one for each document on screen, and never let a DU and an IXP rendering of a document share one: panels fed the wrong representation show every field as "Is missing". It cannot change once mounted.
+3. **`persistent={false}` in a fixed layout.** With `persistent` on, React StrictMode's throwaway unmount destroys the element, and the panel renders blank. Turn it on only for a panel that really moves across the DOM, such as into a portal.
+4. **Only `CompactFieldsForm` saves, and it needs `emitDtoStateChanges`.** The table editor and the document type field edit the shared store, and those edits are saved when the reviewer saves through the form. Give `sdk` + `data` to the form only, with `options={{ emitDtoStateChanges: true }}`, or **Save as draft** never fires.
+5. **Hide the form's own copies.** When you render `CompactBusinessRules` or `CompactDocTypeField` as panels, pass `hideBusinessRules: true` and `hideDocumentTypeField: true` in the form's `options`, or they appear twice.
 
-## Critical Rules
+## The subcomponents
 
-1. **Fetch artifacts once, in the parent — never per subcomponent.** Call `useDuDocumentArtifacts(sdk, data)` — or `useProcessedDocumentArtifacts(sdk, processedDocument)` for a Flow document — once and pass the resulting `artifacts` to every panel. Each subcomponent _can_ self-fetch if given `sdk` + `data` (or `sdk` + `processedDocument`), but composing N self-fetching panels fetches the same document N times. Pre-fetch, then hand down `artifacts`. The monolithic `ValidationStation` takes the same `artifacts` / `documentId` pair, so a host that already holds the artifacts (or keeps them somewhere other than a bucket) can feed the all-in-one widget directly — see the package README's _Data sources_ section.
-2. **Give every subcomponent the same `instanceId`.** That is what makes them share one store and mirror each other's selection/edits/document-type. Different (or missing) `instanceId` → isolated stores → no cross-linking. It is immutable once mounted — set it before render, don't change it.
-3. **Set `persistent={false}` for a static layout.** The panels live in a fixed grid and are never re-parented, so they don't need the portal-survival path. Leaving `persistent` on makes React StrictMode's throwaway unmount call `forceDestroy()`, tearing down the Angular element so it never re-renders (blank panel). Only set `persistent={true}` if a panel is genuinely moved across the DOM (e.g. into a portal / tab that unmounts).
-4. **Only `CompactFieldsForm` persists.** Other panels may still be _editable_ — `CompactTableEditor` edits cells/rows, `CompactDocTypeField` changes the type — but none write to Orchestrator. Those edits land in the shared store and are committed when the user saves through the form. Submit / save-as-draft / report-exception all flow through `CompactFieldsForm` — it is the only panel that saves with `sdk` + `data` (or `sdk` + `processedDocument`).
-5. **Avoid duplicate surfaces.** If you render standalone `CompactBusinessRules` and/or `CompactDocTypeField` panels, tell the form to drop its built-in ones via `options={{ hideBusinessRules: true, hideDocumentTypeField: true }}` — otherwise the field appears twice.
-6. **Save-as-draft needs a flag.** Set `options={{ emitDtoStateChanges: true }}` on `CompactFieldsForm` or the save-as-draft flow (and `onSaveAsDraft`) never fires.
+| Component              | What it is                                 | Edits             | Saves   | Extra props worth knowing                                                  |
+| ---------------------- | ------------------------------------------ | ----------------- | ------- | -------------------------------------------------------------------------- |
+| `DocumentViewer` ⚠️    | The page and text viewer, with highlights  | —                 | —       | `onTokensSelect`, `onCurrentPageChange`, `goToPage`                        |
+| `CompactFieldsForm`    | The extracted fields, and the save buttons | Fields            | **Yes** | `sdk`, `data`, `options`, `onSubmit`, `onSaveAsDraft`, `onReportException` |
+| `CompactTableEditor`   | The editor for one table field             | Cells, rows       | —       | `onClosed`, `isTableSelectionEnabled`                                      |
+| `CompactBusinessRules` | The evaluated business rules               | —                 | —       | `onBusinessRuleClick`, `onBusinessRulesToggle`                             |
+| `CompactDocTypeField`  | The document type selector                 | The document type | —       | `onDocumentTypeChanged`, `onPanelOpenChange`                               |
 
-## Install
+> **Warning: `DocumentViewer` is deprecated**
+> Web component `1.0.0-rc.5` deprecates the element it wraps in favour of `@uipath/du-document-viewer-wc`. Keep using it only to link the viewer to the other panels through `instanceId`, which the standalone viewer cannot do yet.
 
-```bash
-npm install @uipath/ui-widgets-validation-station
-```
+Every panel also takes `artifacts`, `documentId` (falls back to `data.DocumentId`, then `processedDocument.metadata.traceId`), `instanceId`, `theme`, `language`, `persistent`, `isReadonly`, `className` and `style`. The viewer usually wants `style={{ height: "100%" }}`.
 
-## The Subcomponents
+## Worked example: a Coded Action App
 
-| Component              | Purpose                                 | Editable?         | Owns save flow? | Key extra props                                                            |
-| ---------------------- | --------------------------------------- | ----------------- | --------------- | -------------------------------------------------------------------------- |
-| `DocumentViewer` ⚠️    | PDF/text viewer with bounding boxes     | No (read-only)    | No              | `onTokensSelect`, `onCurrentPageChange`, `goToPage`                        |
-| `CompactFieldsForm`    | Extraction-fields editor + save actions | Yes (fields)      | **Yes**         | `sdk`, `data`, `options`, `onSubmit`, `onSaveAsDraft`, `onReportException` |
-| `CompactTableEditor`   | Line-items / table-field editor         | Yes (cells, rows) | No              | `onClosed`, `isTableSelectionEnabled`                                      |
-| `CompactBusinessRules` | Evaluated business-rules panel          | No (read-only)    | No              | `onBusinessRuleClick`, `onBusinessRulesToggle`                             |
-| `CompactDocTypeField`  | Document-type selector                  | Yes (doc-type)    | No              | `onDocumentTypeChanged`, `onPanelOpenChange`                               |
+A cut-down version of the [`action-app-with-document-validation-subcomponents`](https://github.com/UiPath/uipath-typescript/tree/main/samples/coded-action-apps/action-app-with-document-validation-subcomponents) sample: the task's `contentValidationData` reviewed in a five-panel grid. `sdk` and `codedActionApp` come from `src/uipath.ts`, as in the package README's [quick start](https://github.com/UiPath/uipath-ui-widgets/tree/develop/packages/validation-station#quick-start-a-coded-action-app), which also shows reading the task.
 
-> **Warning: `DocumentViewer` is deprecated.** `@uipath/du-validation-station-wc` `1.0.0-rc.5` deprecates the element it wraps in favour of `@uipath/du-document-viewer-wc`. Keep using it only to link the viewer to the other subcomponents through `instanceId`, which the new viewer cannot do yet. It will be removed when the web component drops the element.
-
-> **"Editable?" vs "Owns save flow?" — they are different questions.** _Editable_ means the panel lets the user change data in place (edit fields, edit table cells/rows, pick a document type). _Owns save flow_ means the panel writes back to Orchestrator — it takes `sdk` + `data` and exposes submit / save-as-draft / report-exception. Only `CompactFieldsForm` does the latter. Every panel sharing the same `instanceId` mutates **one shared store**, so edits made in `CompactTableEditor` (or `CompactDocTypeField`) are committed when the user saves **through `CompactFieldsForm`** — the table editor deliberately has no save button of its own. It signals its changes via `onDirtyChange` / `onFieldValueChanged` / `onExtractionResultChanged`.
-
-**Shared props** (every subcomponent — `IxpCapableSubcomponentCommonProps` on `CompactFieldsForm`, `CompactTableEditor` and `DocumentViewer`; `SubcomponentCommonProps` on the Document Understanding-only `CompactBusinessRules` and `CompactDocTypeField`):
-
-| Prop                  | Required          | Notes                                                                                                                                                                                                                                                                                   |
-| --------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `artifacts`           | Yes\*             | Pre-fetched `DuDocumentArtifacts` from `useDuDocumentArtifacts`, or `IxpDocumentArtifacts` from `useProcessedDocumentArtifacts` (IXP-capable panels only). \*Omit only if you deliberately let this one panel self-fetch (then pass `sdk`+`data` or `sdk`+`processedDocument` instead). |
-| `documentId`          | No                | Falls back to `data.DocumentId`, else `processedDocument.metadata.traceId`. Pass it in pre-fetched mode where there's neither.                                                                                                                                                          |
-| `instanceId`          | Yes (for linking) | Same value across panels → shared store. Omit for an isolated panel.                                                                                                                                                                                                                    |
-| `theme`               | No                | `DuTheme`: `'light' \| 'dark' \| 'light-hc' \| 'dark-hc' \| 'future-light' \| 'future-dark'`. Keep in sync with body class.                                                                                                                                                             |
-| `language`            | No                | `ValidationStationLanguage` enum from the package.                                                                                                                                                                                                                                      |
-| `persistent`          | No                | Default `false`. Keep `false` for static grids (see Critical Rule 3).                                                                                                                                                                                                                   |
-| `isReadonly`          | No                | `true` for an audit/read-only view.                                                                                                                                                                                                                                                     |
-| `style` / `className` | No                | The viewer usually wants `style={{ height: '100%' }}`.                                                                                                                                                                                                                                  |
-
-## Composition Pattern (worked example)
-
-A web app that lists DU validation tasks and opens each one in a custom five-panel review workspace. Two layers: a **task hook** (list → hydrate → mutations) and a **workspace** (pre-fetch once → lay out the panels sharing one `instanceId`).
-
-### 1. Task hook — list, hydrate, mutate
-
-```tsx
-// useReviewTasks.ts
-import { useCallback, useEffect, useState } from "react";
-import type {
-  CompactFieldsFormProps,
-  SaveValidatedDataResult,
-} from "@uipath/ui-widgets-validation-station";
-import type { UiPath } from "@uipath/uipath-typescript/core";
-import { OrchestratorDuModule } from "@uipath/uipath-typescript/orchestrator-du-module";
-import { Tasks, TaskType } from "@uipath/uipath-typescript/tasks";
-import type { TaskGetResponse } from "@uipath/uipath-typescript/tasks";
-
-export function useReviewTasks(sdk: UiPath) {
-  const [selectedTask, setSelectedTask] = useState<TaskGetResponse | null>(
-    null,
-  );
-  const [notification, setNotification] = useState<{
-    message: string;
-    severity: "success" | "error";
-  } | null>(null);
-
-  // getAll() rows omit `data` — always hydrate the full task before rendering the panels.
-  const openTask = useCallback(
-    async (taskId: number, folderId: number) => {
-      const task = await new Tasks(sdk).getById(
-        taskId,
-        { taskType: TaskType.DocumentValidation },
-        folderId,
-      );
-      setSelectedTask(task);
-    },
-    [sdk],
-  );
-
-  // Submit succeeded → complete the task. The widget renders NO error UI — surface it here.
-  const handleSubmit: CompactFieldsFormProps["onSubmit"] = useCallback(
-    async (_request, result?: SaveValidatedDataResult) => {
-      if (!result?.success)
-        return setNotification({ message: "Submit failed", severity: "error" });
-      if (!selectedTask) return;
-      await selectedTask.complete({
-        type: TaskType.DocumentValidation,
-        action: "Completed",
-      });
-      setSelectedTask(null);
-      setNotification({ message: "Document submitted", severity: "success" });
-    },
-    [selectedTask],
-  );
-
-  // Save-as-draft persists edits WITHOUT completing the task — leave the selection in place.
-  const handleSaveAsDraft: CompactFieldsFormProps["onSaveAsDraft"] =
-    useCallback((_request, result?: SaveValidatedDataResult) => {
-      setNotification(
-        result?.success
-          ? { message: "Draft saved", severity: "success" }
-          : { message: "Failed to save draft", severity: "error" },
-      );
-    }, []);
-
-  // Report-as-exception makes NO API call in the widget — the host must persist it.
-  const handleReportException: CompactFieldsFormProps["onReportException"] =
-    useCallback(
-      async (request) => {
-        if (!selectedTask) return;
-        const documentId = request.documentId;
-        const reason = request.exceptionReport?.Reason ?? "";
-        const res = await new OrchestratorDuModule(sdk).submitExceptionReport(
-          selectedTask.id,
-          documentId,
-          reason || "Reported via review workspace",
-          { folderId: selectedTask.folderId },
-        );
-        if (!res.IsSuccessful)
-          return setNotification({
-            message: "Failed to report exception",
-            severity: "error",
-          });
-        setSelectedTask(null);
-        setNotification({ message: "Exception reported", severity: "success" });
-      },
-      [sdk, selectedTask],
-    );
-
-  return {
-    selectedTask,
-    openTask,
-    notification,
-    handleSubmit,
-    handleSaveAsDraft,
-    handleReportException,
-  };
-}
-```
-
-### 2. Workspace — pre-fetch once, share one `instanceId`
-
-```tsx
-// ReviewWorkspace.tsx
+```tsx title="src/Workspace.tsx"
 import {
   CompactBusinessRules,
   CompactDocTypeField,
@@ -168,84 +45,81 @@ import {
   CompactTableEditor,
   DocumentViewer,
   useDuDocumentArtifacts,
-  ValidationStationLanguage,
-  type CompactFieldsFormProps,
+  type IValidationStationOptions,
 } from "@uipath/ui-widgets-validation-station";
-import type { UiPath } from "@uipath/uipath-typescript/core";
 import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
-import type { TaskGetResponse } from "@uipath/uipath-typescript/tasks";
+import { MessageSeverity } from "@uipath/coded-action-app";
+import { codedActionApp, sdk } from "./uipath";
 
-export function ReviewWorkspace({
-  sdk,
-  task,
-  onSubmit,
-  onSaveAsDraft,
-  onReportException,
+const FIELDS_FORM_OPTIONS: IValidationStationOptions = {
+  hideBusinessRules: true, // rendered as their own panels below
+  hideDocumentTypeField: true,
+  emitDtoStateChanges: true, // makes "Save as draft" work
+  hideReportAsExceptionButton: true, // an app task cannot record an exception report
+};
+
+export function Workspace({
+  taskData,
+  data,
+  isReadonly,
 }: {
-  sdk: UiPath;
-  task: TaskGetResponse;
-  onSubmit: CompactFieldsFormProps["onSubmit"];
-  onSaveAsDraft: CompactFieldsFormProps["onSaveAsDraft"];
-  onReportException: (documentId: string, reason: string) => void;
+  taskData: { contentValidationData?: DuFramework.ContentValidationData };
+  data: DuFramework.ContentValidationData; // with FolderId filled in from the task
+  isReadonly: boolean;
 }) {
-  // The payload names the bucket folder (FolderId / FolderKey) it lives in.
-  const data = task.data as DuFramework.ContentValidationData;
-
-  // FETCH ONCE. All five panels below share this result.
+  // Fetched once, here, and shared by all five panels.
   const { artifacts, error } = useDuDocumentArtifacts(sdk, data);
-  if (error) return <div>Failed to load document: {error}</div>;
-  if (!artifacts) return <div>Loading document…</div>;
+  if (error) return <p>Failed to load the document: {error}</p>;
+  if (!artifacts) return <p>Loading the document…</p>;
 
-  // Props every panel shares — SAME instanceId ties them into one store.
   const shared = {
     artifacts,
     documentId: data.DocumentId,
-    instanceId: `review-${data.DocumentId ?? task.id}`,
-    theme: "light" as const,
-    language: ValidationStationLanguage.English,
-    persistent: false, // static grid — see Critical Rule 3
+    instanceId: `action-review-${data.DocumentId}`, // one store for this document
+    isReadonly,
+    persistent: false, // a fixed grid
   };
 
   return (
-    <div
-      style={{
-        display: "grid",
-        height: "100%",
-        gap: 8,
-        gridTemplateColumns: "1.3fr 1fr",
-        gridTemplateRows: "auto 1fr auto",
-        gridTemplateAreas: '"viewer doctype" "viewer form" "table rules"',
-      }}
-    >
+    // Each panel sits in its own grid cell: a panel's loading state is a plain <div>.
+    <div className="workspace">
       <div style={{ gridArea: "viewer" }}>
         <DocumentViewer {...shared} style={{ height: "100%" }} />
       </div>
-
       <div style={{ gridArea: "doctype" }}>
         <CompactDocTypeField {...shared} />
       </div>
-
       <div style={{ gridArea: "form" }}>
-        {/* hide the surfaces owned by the standalone panels below */}
+        {/* The only panel that saves, so the only one given sdk + data. */}
         <CompactFieldsForm
           {...shared}
           sdk={sdk}
           data={data}
-          options={{
-            hideBusinessRules: true,
-            hideDocumentTypeField: true,
-            emitDtoStateChanges: true,
+          options={FIELDS_FORM_OPTIONS}
+          onSubmit={async (_request, result) => {
+            if (!result?.success) {
+              codedActionApp.showMessage(
+                result?.error ?? "Failed to submit.",
+                MessageSeverity.Error,
+              );
+              return;
+            }
+            // completeTask replaces the task's data: pass all of it back.
+            await codedActionApp.completeTask("Submit", taskData);
           }}
-          onSubmit={onSubmit}
-          onSaveAsDraft={onSaveAsDraft}
-          onReportException={onReportException}
+          onSaveAsDraft={(_request, result) =>
+            codedActionApp.showMessage(
+              result?.success
+                ? "Draft saved."
+                : (result?.error ?? "Failed to save the draft."),
+              result?.success ? MessageSeverity.Success : MessageSeverity.Error,
+            )
+          }
         />
       </div>
-
       <div style={{ gridArea: "table" }}>
         <CompactTableEditor {...shared} />
       </div>
-
       <div style={{ gridArea: "rules" }}>
         <CompactBusinessRules {...shared} />
       </div>
@@ -254,109 +128,62 @@ export function ReviewWorkspace({
 }
 ```
 
-### 3. Wire it up
+For a standalone web app that lists validation tasks and opens each in a custom workspace, see the [`document-validation-subcomponents-app`](https://github.com/UiPath/uipath-typescript/tree/main/samples/document-validation-subcomponents-app) sample.
+
+> **Note: Hide a panel, don't unmount it**
+> To show a panel on demand (a fields drawer, a line-items sheet), keep it mounted and hide it with CSS, plus `inert` so it takes no focus. Unmounting destroys its element: a hidden fields form stops validating and tracking edits, and a table editor mounted late misses the table field the reviewer just picked.
+
+## IXP documents
+
+`CompactFieldsForm`, `CompactTableEditor` and `DocumentViewer` take a Flow `processedDocument`, or `IxpDocumentArtifacts`, as `ValidationStation` does. `CompactBusinessRules` and `CompactDocTypeField` don't: the web component evaluates rules and document types for Document Understanding only, and their props reject IXP artifacts at compile time.
 
 ```tsx
-// App.tsx (sdk from useAuth() — the app's single initialized instance)
-const { sdk } = useAuth();
-const t = useReviewTasks(sdk);
+const { artifacts, error } = useProcessedDocumentArtifacts(
+  sdk,
+  processedDocument,
+);
+// …error and loading states as above…
+const { traceId, spanId } = processedDocument.metadata;
+const shared = {
+  artifacts,
+  documentId: traceId,
+  instanceId: `review-${traceId}-${spanId}`, // unique per Flow document
+  persistent: false,
+};
 
 return (
   <>
-    {/* …task list that calls t.openTask(taskId, folderId)… */}
-    {t.selectedTask && (
-      <ReviewWorkspace
-        sdk={sdk}
-        task={t.selectedTask}
-        onSubmit={t.handleSubmit}
-        onSaveAsDraft={t.handleSaveAsDraft}
-        onReportException={t.handleReportException}
-      />
-    )}
-    {/* render t.notification in your toast/snackbar */}
+    <DocumentViewer {...shared} style={{ height: "100%" }} />
+    <CompactFieldsForm
+      {...shared}
+      sdk={sdk}
+      processedDocument={processedDocument}
+      options={{ emitDtoStateChanges: true }}
+      // Complete the task with the validated document, verbatim: the next node reads it.
+      onSubmit={(_request, result) => completeTask(result?.processedDocument)}
+    />
+    <CompactTableEditor {...shared} />
   </>
 );
 ```
 
-## IXP documents
+- **Saving** works as for `ValidationStation`: see [IXP (`ProcessedDocument`)](https://github.com/UiPath/uipath-ui-widgets/blob/develop/packages/validation-station/docs/data-sources.md#ixp-processeddocument). Completing the task is still yours. With both `data` and `processedDocument`, `data` wins.
+- **Cite with `references`.** The fields form and the table editor have no document to place `boundingBoxes` in, so an extraction whose sources cite by `boundingBoxes` alone shows no predicted values. Current IXP models cite with `references`.
+- **Events report in the document's representation.** `onExtractionResultChanged` hands back an `IXPReviewedExtraction` for an IXP document.
 
-`CompactFieldsForm`, `CompactTableEditor` and `DocumentViewer` take an IXP document — a Flow `processedDocument`, or `IxpDocumentArtifacts` — exactly as `ValidationStation` does. `CompactBusinessRules` and `CompactDocTypeField` do not: the web component evaluates business rules and document types for Document Understanding only, and their props reject `IxpDocumentArtifacts` at compile time.
+## What links for free
 
-```tsx
-import {
-  CompactFieldsForm,
-  CompactTableEditor,
-  DocumentViewer,
-  useProcessedDocumentArtifacts,
-  type ProcessedDocument,
-  type ValidatedProcessedDocument,
-} from "@uipath/ui-widgets-validation-station";
-import type { UiPath } from "@uipath/uipath-typescript/core";
+With one shared `instanceId`, these need no wiring:
 
-function FlowReview({
-  sdk,
-  processedDocument,
-  completeTask,
-}: {
-  sdk: UiPath;
-  processedDocument: ProcessedDocument;
-  completeTask: (document?: ValidatedProcessedDocument) => void;
-}) {
-  // FETCH ONCE, through the Flow run that produced the document.
-  const { artifacts, error } = useProcessedDocumentArtifacts(
-    sdk,
-    processedDocument,
-  );
-  if (error) return <div>Failed to load document: {error}</div>;
-  if (!artifacts) return <div>Loading document…</div>;
+- Select a field in the form, and the viewer highlights it.
+- Click a rule, and its field focuses.
+- Select a table field, and the table editor opens on it.
+- Change the document type, and the form switches to the new type's fields.
 
-  const shared = {
-    artifacts,
-    documentId: processedDocument.metadata.traceId,
-    instanceId: `review-${processedDocument.metadata.traceId}-${processedDocument.metadata.spanId}`,
-    persistent: false,
-  };
+The `on*` callbacks (`onFieldValueSelected`, `onBusinessRuleClick`, `onDocumentTypeChanged`, `onTokensSelect`, …) are for your own reactions, such as a status bar or analytics. The panels don't need them to link.
 
-  return (
-    <>
-      <DocumentViewer {...shared} style={{ height: "100%" }} />
-      {/* sdk + processedDocument: the form records the review on the run */}
-      <CompactFieldsForm
-        {...shared}
-        sdk={sdk}
-        processedDocument={processedDocument}
-        options={{ emitDtoStateChanges: true }}
-        onSubmit={(request, result) => completeTask(result?.processedDocument)}
-      />
-      <CompactTableEditor {...shared} />
-    </>
-  );
-}
-```
+## Also avoid
 
-- **Saving.** Given `sdk` + `processedDocument`, `CompactFieldsForm` records submit, draft and report-as-exception against the producing run, and passes the outcome as the callback's second argument — the same flows as `ValidationStation`; see the package README's _IXP (`ProcessedDocument`)_ section. Completing the task is still yours. With both `data` and `processedDocument`, `data` wins.
-- **One representation per `instanceId`.** Panels sharing a store must all get the same document, so do not link a DU panel to an IXP one.
-- **Cite with `references`.** The compact fields form and table editor have no document to locate `boundingBoxes` in, so an IXP extraction whose sources cite by `boundingBoxes` alone does not load on them, and such a prediction shows no predicted values. Extractions from current IXP models cite with `references` and load fine.
-- **Events report in the document's representation.** `onExtractionResultChanged` hands back an `IXPReviewedExtraction` for an IXP document, so both panels type it as `ExtractionResult | IXPReviewedExtraction`.
-
-## Cross-linking (free, via shared `instanceId`)
-
-With one shared store, selection and edits propagate automatically — no host wiring:
-
-- Select a field in `CompactFieldsForm` → it highlights in `DocumentViewer`.
-- Click a rule in `CompactBusinessRules` → the offending field focuses in the form/viewer.
-- Select a table field → `CompactTableEditor` opens on it.
-- Change the type in `CompactDocTypeField` → the form re-extracts for the new type.
-
-The `on*` callbacks (`onFieldValueSelected`, `onBusinessRuleClick`, `onDocumentTypeChanged`, `onTokensSelect`, …) are for the **host** to react (status bars, analytics) — they are not needed to link the panels to each other.
-
-## Anti-patterns
-
-- **Do not self-fetch in each panel.** Passing `sdk`+`data` to all five triggers five bucket fetches for one document. Pre-fetch once with `useDuDocumentArtifacts` (or `useProcessedDocumentArtifacts`), pass `artifacts` down.
-- **Do not give panels different `instanceId`s** (or omit it) and then expect cross-linking. Same document → same `instanceId`.
-- **Do not leave `persistent` at `true` in a static grid.** StrictMode's dev double-mount calls `forceDestroy()` and blanks the panel. Use `persistent={false}` unless the panel is truly re-parented.
-- **Do not render duplicate surfaces.** Standalone `CompactBusinessRules`/`CompactDocTypeField` + a form that still shows its own = the field twice. Set `hideBusinessRules`/`hideDocumentTypeField`.
-- **Do not compose the subcomponents to rebuild the standard station.** If the layout is just "the normal Validation Station," use `ValidationStation`.
-- **Do not pass a `tasks.getAll()` row into the workspace.** Its `data` is undefined — hydrate with `tasks.getById(id, { taskType: TaskType.DocumentValidation }, folderId)` first.
-- **Do not assume any panel shows an error on failure.** Submit/draft return `{ success: false, error }` with no UI; report-exception persists nothing outside a Flow document. The host owns all feedback and the exception API call (`OrchestratorDuModule.submitExceptionReport`).
-- **Do not construct a second `UiPath` SDK** for the widgets. Reuse the app's authenticated instance.
+- **Passing a `tasks.getAll()` row** to the panels in a standalone app. Its `data` is undefined; load the task with `tasks.getById(id, { taskType: TaskType.DocumentValidation }, folderId)` first.
+- **Expecting a panel to show an error.** A failed submit or draft returns `{ success: false, error }` and shows nothing. Report-as-exception persists nothing outside a Flow document: record it yourself (`OrchestratorDuModule.submitExceptionReport` for a Document Understanding validation task), or hide the button.
+- **Creating a second `UiPath` instance** for the panels. Reuse the app's.
