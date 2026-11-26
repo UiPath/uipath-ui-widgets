@@ -1,14 +1,15 @@
 import { createElement, type CSSProperties, type ReactElement } from "react";
 import type { WcRefCallback } from "./bindWcEvents.js";
+import { WcHost } from "./WcHost.js";
 
 /**
  * Renders a custom element by tag name with the given (typed) JSX props and
- * ref callback.
+ * ref callback, on React 18 or 19 (see {@link WcHost}).
  *
  * Rendering by string tag (rather than a computed JSX component) keeps the
  * element out of React's component identity, so its inner Angular component is
- * not torn down and recreated on every parent render. React 19 assigns the
- * props as element properties, in the order of `props`' keys.
+ * not torn down and recreated on every parent render. `WcHost` is a single
+ * module-level component, so it does not change that.
  *
  * Unset (`undefined`) props are left out rather than assigned, so an input the
  * host did not pass keeps the element's own default (`enableTokenFeatures`
@@ -22,7 +23,7 @@ export function renderWcElement<Props extends object>(
   const defined = Object.fromEntries(
     Object.entries(props).filter(([, value]) => value !== undefined),
   );
-  return createElement(tag, { ...defined, ref });
+  return createElement(WcHost, { tag, props: defined, elementRef: ref });
 }
 
 /**

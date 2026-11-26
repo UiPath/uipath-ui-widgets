@@ -23,8 +23,10 @@ npm install @uipath/ui-widgets-datatable
 ### Peer dependencies
 
 ```bash
-npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript@^1.7.1
+npm install react react-dom @uipath/uipath-typescript@^1.7.1
 ```
+
+Works with React 18.3 and React 19.
 
 ## Usage
 
