@@ -36,7 +36,8 @@
     "prepare": "husky",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "changeset publish"
+    "release": "changeset publish",
+    "test:react18": "npm ci --prefix test/react18 --no-audit --no-fund && REACT18=1 npm run test -w packages/document-viewer -w packages/validation-station -w packages/classification-station"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

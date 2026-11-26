@@ -1,14 +1,16 @@
 import { createElement, type CSSProperties, type ReactElement } from "react";
 import type { WcRefCallback } from "../bindWcEvents.js";
+import { WcHost } from "../WcHost.js";
 import type { ValidationStationArtifacts } from "../types.js";
 
 /**
  * Renders a standalone DU custom element by tag name with the given (typed)
- * JSX props and ref callback.
+ * JSX props and ref callback, on React 18 or 19 (see {@link WcHost}).
  *
  * Rendering by string tag (rather than a computed JSX component) keeps the
  * element out of React's component identity, so its inner Angular component is
- * not torn down and recreated on every parent render. `Props` is the web
+ * not torn down and recreated on every parent render. `WcHost` is a single
+ * module-level component, so it does not change that. `Props` is the web
  * component's JSX prop interface, so the caller's props object is fully
  * type-checked at construction.
  */
@@ -17,7 +19,11 @@ export function renderWcElement<Props extends object>(
   props: Props,
   ref: WcRefCallback,
 ): ReactElement {
-  return createElement(tag, { ...props, ref });
+  return createElement(WcHost, {
+    tag,
+    props: props as Record<string, unknown>,
+    elementRef: ref,
+  });
 }
 
 /**

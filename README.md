@@ -246,7 +246,7 @@ Key testing principles:
 
 ## 🛠️ Tech Stack
 
-- **React 19** - UI library
+- **React 18.3 or 19** - UI library
 - **TypeScript** - Type safety
 - **Vite** - Build tool
 - **ag-Grid** - Data grid component

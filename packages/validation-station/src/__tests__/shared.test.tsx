@@ -21,13 +21,13 @@ describe("wcStyle", () => {
 });
 
 describe("renderWcElement", () => {
-  it("creates an element of the given tag with props and ref", () => {
+  it("returns a React element carrying the tag, props and ref", () => {
     const ref = vi.fn();
     const el = renderWcElement("my-tag", { theme: "dark" } as any, ref);
     expect(isValidElement(el)).toBe(true);
-    expect(el.type).toBe("my-tag");
-    expect((el.props as any).theme).toBe("dark");
-    expect((el.props as any).ref).toBe(ref);
+    expect((el.props as any).tag).toBe("my-tag");
+    expect((el.props as any).props).toEqual({ theme: "dark" });
+    expect((el.props as any).elementRef).toBe(ref);
   });
 
   it("renders into the DOM as the requested tag, forwarding props and ref", () => {
@@ -41,9 +41,11 @@ describe("renderWcElement", () => {
     );
     const el = container.querySelector("my-tag");
     expect(el).toBeInTheDocument();
-    // Props must actually land on the element, not just the tag be present.
+    // Dashed names stay attributes on every React version.
     expect(el!.getAttribute("instance-id")).toBe("i1");
-    expect(el!.getAttribute("theme")).toBe("dark");
+    // The undefined element does not declare `theme`, so React 19 sets it as
+    // an attribute; React 18 (through `WcHost`) assigns it as a property.
+    expect((el as any).theme ?? el!.getAttribute("theme")).toBe("dark");
     // The ref callback receives the real element (this is how event binding attaches).
     expect(ref).toHaveBeenCalledWith(el);
   });

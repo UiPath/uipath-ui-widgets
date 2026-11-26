@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 export type WcElement = HTMLElement & { forceDestroy?: () => void };
 
 /** React ref-callback shape for a standalone DU element. */
-export type WcRefCallback = (el: WcElement | null) => void | (() => void);
+export type WcRefCallback = (el: WcElement | null) => void;
 
 type WcHandlers<EventMap> = {
   [K in keyof EventMap]?: (detail: EventMap[K]) => void;
@@ -50,6 +50,10 @@ function bindWcEvents<EventMap>(
  * and, on detach, removes them and — when `persistent` — calls `forceDestroy()`
  * to tear down the inner Angular component.
  *
+ * Detach is handled on the `null` call rather than through a returned cleanup:
+ * React 18 ignores a ref callback's return value, and React 19 still calls a
+ * ref callback with `null` when it returns nothing, so this works on both.
+ *
  * The callback identity changes only when `persistent` changes, so React does
  * not detach/re-attach — and never force-destroys a persistent element — on an
  * ordinary re-render. (A fresh callback each render, as a plain factory would
@@ -67,11 +71,16 @@ export function useWcRef<EventMap>(
     handlersRef.current = handlers;
   });
 
+  // The teardown for the element currently attached, run on the next call.
+  const detachRef = useRef<(() => void) | null>(null);
+
   return useCallback<WcRefCallback>(
     (el) => {
+      detachRef.current?.();
+      detachRef.current = null;
       if (!el) return;
       const unbind = bindWcEvents<EventMap>(el, () => handlersRef.current);
-      return () => {
+      detachRef.current = () => {
         unbind();
         if (persistent) el.forceDestroy?.();
       };

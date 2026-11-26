@@ -25,8 +25,10 @@ npm install @uipath/ui-widgets-external-auth
 ### Peer dependencies
 
 ```bash
-npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript@^1.4.1
+npm install react react-dom @uipath/uipath-typescript@^1.4.1
 ```
+
+Works with React 18.3 and React 19.
 
 The package declares the SDK as a peer dependency for consistency with the other widgets, even though this one makes no UiPath calls of its own.
 

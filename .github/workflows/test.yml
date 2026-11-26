@@ -48,6 +48,10 @@ jobs:
       - name: Run tests with coverage
         run: npm run test:coverage
 
+      - name: Run the DU widget tests on React 18
+        # The DU widgets support React 18 hosts (Flow); see test/vitest.react18.ts.
+        run: npm run test:react18
+
       - name: Post Coverage Report to PR
         if: github.event_name == 'pull_request'
         env:

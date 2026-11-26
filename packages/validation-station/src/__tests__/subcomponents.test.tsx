@@ -74,6 +74,18 @@ const mockArtifacts = {
   original: undefined,
 };
 
+/**
+ * Reads an input the wrapper handed the element. React 18 (through `WcHost`)
+ * assigns every input as a property; React 19 assigns it as a property only
+ * when the element declares it, else as a lower-cased attribute. These stubs
+ * declare only the object inputs, so a string input lands either way.
+ */
+function readInput(el: Element, key: string): unknown {
+  return key in el
+    ? (el as unknown as Record<string, unknown>)[key]
+    : el.getAttribute(key.toLowerCase());
+}
+
 // React assigns an object prop as a property only when the element already
 // declares one (otherwise it stringifies it into an attribute), so stand in for
 // the real elements' artifact inputs on the three IXP-capable tags. Defined
@@ -176,8 +188,8 @@ describe.each(cases)("$name", ({ Component, tag }) => {
     // instanceId → kebab attribute; theme passes through; documentId comes from
     // the resolved artifacts state, not the caller — proves the wiring end to end.
     expect(el.getAttribute("instance-id")).toBe("i1");
-    expect(el.getAttribute("theme")).toBe("dark");
-    expect(el.getAttribute("documentid")).toBe("doc-123");
+    expect(readInput(el, "theme")).toBe("dark");
+    expect(readInput(el, "documentId")).toBe("doc-123");
   });
 
   it("renders the persistent variant when persistent is set", () => {
@@ -501,7 +513,7 @@ describe("DocumentViewer IXP document inputs", () => {
 
     expect(el.dom).toBe(ixpArtifacts.dom);
     expect(el.document).toBe(ixpArtifacts.original);
-    expect(el.getAttribute("text")).toBe(ixpArtifacts.text);
+    expect(readInput(el, "text")).toBe(ixpArtifacts.text);
   });
 });
 
