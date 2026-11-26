@@ -16,13 +16,21 @@ import type { WcElement, WcRefCallback } from "./bindWcEvents.js";
 const REACT_SETS_PROPERTIES = Number.parseInt(version, 10) >= 19;
 
 /**
- * Props that stay on the rendered tag under every React version: `className`
- * and `style` (React 18 maps both correctly on custom elements) and dashed
- * names, which are attributes by design (`instance-id`).
+ * Props that stay on the rendered tag under every React version: `className`,
+ * `style`, and dashed names, which are attributes by design (`instance-id`).
+ * React 18 maps `style` on custom elements but not `className`, which it
+ * would write as a `classname` attribute, so it is passed as `class` there.
  */
 function isAttributeProp(key: string): boolean {
   return key === "className" || key === "style" || key.includes("-");
 }
+
+/**
+ * The inputs last assigned to each element, keyed by the element itself, so a
+ * ref that detaches and re-attaches to the same element (a new `elementRef`)
+ * does not re-assign unchanged inputs.
+ */
+const assignedInputs = new WeakMap<Element, Record<string, unknown>>();
 
 export interface WcHostProps {
   tag: string;
@@ -42,16 +50,11 @@ export interface WcHostProps {
  * host stops passing goes back to `undefined`, as React 19 does.
  */
 export function WcHost({ tag, props, elementRef }: WcHostProps): ReactElement {
-  const elementState = useRef<{
-    el: WcElement | null;
-    assigned: Record<string, unknown>;
-  }>({ el: null, assigned: {} });
+  const elementState = useRef<WcElement | null>(null);
 
   const ref = useCallback(
     (el: WcElement | null) => {
-      if (elementState.current.el !== el) {
-        elementState.current = { el, assigned: {} };
-      }
+      elementState.current = el;
       elementRef(el);
     },
     [elementRef],
@@ -59,8 +62,13 @@ export function WcHost({ tag, props, elementRef }: WcHostProps): ReactElement {
 
   useLayoutEffect(() => {
     if (REACT_SETS_PROPERTIES) return;
-    const { el, assigned } = elementState.current;
+    const el = elementState.current;
     if (!el) return;
+    let assigned = assignedInputs.get(el);
+    if (!assigned) {
+      assigned = {};
+      assignedInputs.set(el, assigned);
+    }
     const target = el as unknown as Record<string, unknown>;
     for (const [key, value] of Object.entries(props)) {
       if (isAttributeProp(key) || assigned[key] === value) continue;
@@ -79,7 +87,9 @@ export function WcHost({ tag, props, elementRef }: WcHostProps): ReactElement {
   const Tag = tag as unknown as ElementType;
   if (REACT_SETS_PROPERTIES) return <Tag {...props} ref={ref} />;
   const attributes = Object.fromEntries(
-    Object.entries(props).filter(([key]) => isAttributeProp(key)),
+    Object.entries(props)
+      .filter(([key]) => isAttributeProp(key))
+      .map(([key, value]) => [key === "className" ? "class" : key, value]),
   );
   return <Tag {...attributes} ref={ref} />;
 }
