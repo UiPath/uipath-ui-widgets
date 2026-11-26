@@ -76,8 +76,25 @@ describe("WcHost on React 18", () => {
     rerender(host(TAG, { dom, options }));
 
     expect(el.assigned).toEqual([
-      ["options", options],
       ["theme", undefined],
+      ["options", options],
+    ]);
+  });
+
+  it("clears a dropped input before assigning the next document's id", () => {
+    const { container, rerender } = render(
+      host(TAG, { dom: { Pages: [1] }, options: { a: 1 }, documentId: "d1" }),
+    );
+    const el = container.querySelector(TAG) as Recorder;
+    el.assigned = [];
+
+    const nextDom = { Pages: [2] };
+    rerender(host(TAG, { dom: nextDom, documentId: "d2" }));
+
+    expect(el.assigned).toEqual([
+      ["options", undefined],
+      ["dom", nextDom],
+      ["documentId", "d2"],
     ]);
   });
 

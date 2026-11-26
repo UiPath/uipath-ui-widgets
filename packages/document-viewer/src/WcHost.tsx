@@ -47,7 +47,8 @@ export interface WcHostProps {
  * tag; the rest are assigned as properties in a layout effect, in the order of
  * `props`' keys, after the element connects and before the browser paints.
  * Only values that changed since the last commit are assigned, and a prop the
- * host stops passing goes back to `undefined`, as React 19 does.
+ * host stops passing goes back to `undefined` before the others are assigned,
+ * as React 19 does.
  */
 export function WcHost({ tag, props, elementRef }: WcHostProps): ReactElement {
   const elementState = useRef<WcElement | null>(null);
@@ -70,16 +71,18 @@ export function WcHost({ tag, props, elementRef }: WcHostProps): ReactElement {
       assignedInputs.set(el, assigned);
     }
     const target = el as unknown as Record<string, unknown>;
-    for (const [key, value] of Object.entries(props)) {
-      if (isAttributeProp(key) || assigned[key] === value) continue;
-      target[key] = value;
-      assigned[key] = value;
-    }
+    // Clear removed inputs first, as React 19 does, so the last input in
+    // `props` (Classification Station's `documentId`) still arrives last.
     for (const key of Object.keys(assigned)) {
       if (!(key in props)) {
         target[key] = undefined;
         delete assigned[key];
       }
+    }
+    for (const [key, value] of Object.entries(props)) {
+      if (isAttributeProp(key) || assigned[key] === value) continue;
+      target[key] = value;
+      assigned[key] = value;
     }
   });
 
