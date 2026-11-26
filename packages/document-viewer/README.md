@@ -18,28 +18,48 @@ npm install react@^19.2.0 react-dom@^19.2.0 @uipath/uipath-typescript@^1.5.1
 
 ## Quick start
 
-> **Note: Theming**
-> Add either a `light` or `dark` class to your HTML `<body>` element to enable proper theming.
+The viewer is a web component that this package loads at runtime, so it needs two things before it renders: its files hosted next to your app, and one call to `configureDocumentViewerWc`.
+
+**1. Host the web component's files.** For Vite, copy them into `public/` before `dev` and `build`, and keep the copy out of git:
+
+```jsonc
+// package.json
+"scripts": {
+  "stage-dv-wc": "rm -rf public/du-dv-wc && cp -R node_modules/@uipath/du-document-viewer-wc public/du-dv-wc",
+  "predev": "npm run stage-dv-wc",
+  "prebuild": "npm run stage-dv-wc"
+}
+```
+
+```gitignore
+public/du-dv-wc
+```
+
+**2. Load it once, at app startup.** `includeFonts: true` loads the Material Icons the viewer's buttons use; leave it out only if your app already loads them. The returned promise is the only place a load failure surfaces.
 
 ```tsx
-import {
-  configureDocumentViewerWc,
-  DocumentViewer,
-} from "@uipath/ui-widgets-document-viewer";
+import { configureDocumentViewerWc } from "@uipath/ui-widgets-document-viewer";
 
-// Once, at app startup — loads the web component from `du-dv-wc`, next to
-// your app's own root by default. See "Hosting the web component" below.
-configureDocumentViewerWc();
+configureDocumentViewerWc({ includeFonts: true }).catch((error) =>
+  console.error("Document viewer failed to load", error),
+);
+```
+
+**3. Render it** with an SDK instance and a Validation Station or Classification Station task's data:
+
+```tsx
+import { DocumentViewer } from "@uipath/ui-widgets-document-viewer";
 
 function Preview({ sdk, task }) {
-  // A Validation Station or Classification Station task's data — the viewer
-  // reads its DOM, original and text paths.
+  // task.data is the task's ContentValidationData (or CsContentValidationData).
   return <DocumentViewer sdk={sdk} data={task.data} />;
 }
 ```
 
-> **Warning: Call `configureDocumentViewerWc` first**
-> You must call it once before rendering `DocumentViewer`, and host the web component's files where it expects them. See [Hosting the web component](#hosting-the-web-component).
+> **Note: Theming**
+> Add either a `light` or `dark` class to your HTML `<body>` element to enable proper theming.
+
+The default `deploymentUrl` is `du-dv-wc` under your app's base path, so the same setup works in a local Vite app and in a deployed UiPath Coded App. To serve the files elsewhere, see [Hosting the web component](#hosting-the-web-component).
 
 ## Data sources
 
@@ -48,16 +68,33 @@ function Preview({ sdk, task }) {
 | **Self-fetching** | `sdk` + `data` | The widget: `DocumentObjectModelPath`, plus `EncodedDocumentPath` and `TextPath` when set |
 | **Pre-fetched**   | `artifacts`    | You — hand it `{ dom, original, text }`                                                   |
 
-`data` is any object with the bucket fields the viewer reads (`DocumentViewerContentData`): a Validation Station task's `ContentValidationData` and a Classification Station task's `CsContentValidationData` both qualify. Every bucket call is scoped to its folder — `FolderKey`, or `FolderId` when there is no key.
+`data` is any object with the bucket fields the viewer reads (`DocumentViewerContentData`): a Validation Station task's `ContentValidationData` and a Classification Station task's `CsContentValidationData` both qualify, as they are.
 
-`artifacts` takes the `dom`, `original` and `text` members of the Validation Station's `DuDocumentArtifacts` or the Classification Station's `CsDocumentArtifacts`, so artifacts you already fetched for a station can be passed as they are. `original` (a base64 data URL) enables the page view, `text` the text view; with both, the user can switch.
+| Field                     | Required    | Read for                                         |
+| ------------------------- | ----------- | ------------------------------------------------ |
+| `BucketId`                | Yes         | Every bucket read                                |
+| `FolderKey` or `FolderId` | One of them | The folder scope; `FolderKey` wins when both set |
+| `DocumentObjectModelPath` | Yes         | The DOM. Nothing renders without it              |
+| `EncodedDocumentPath`     | No          | `original`, for the page view                    |
+| `TextPath`                | No          | `text`, for the text view                        |
+| `DocumentId`              | No          | Telling documents apart while a new one loads    |
 
-| Export                                | Use                                                                      |
-| ------------------------------------- | ------------------------------------------------------------------------ |
-| `fetchDvDocumentArtifacts(sdk, data)` | Fetch `DvDocumentArtifacts` imperatively — outside render, ahead of time |
-| `useDvDocumentArtifacts(sdk, data)`   | The same fetch as a hook                                                 |
+A missing required field renders an error instead of fetching. Every new `data` object triggers a new fetch, so pass a stable reference — React state or a memoized value, never an object literal built during render.
 
-### Supported formats
+`artifacts` takes the `dom`, `original` and `text` members of the Validation Station's `DuDocumentArtifacts` or the Classification Station's `CsDocumentArtifacts`, so artifacts you already fetched for a station can be passed as they are. `original` (a base64 data URL, not a Blob or an http URL) enables the page view, `text` the text view; with both, the user can switch.
+
+| Export                                | Use                                                                                                                                                 |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fetchDvDocumentArtifacts(sdk, data)` | Fetch `DvDocumentArtifacts` imperatively — outside render, ahead of time                                                                            |
+| `useDvDocumentArtifacts(sdk, data)`   | The same fetch as a hook. Returns `{ artifacts, error }`; `artifacts` is `null` until the fetch finishes, and `error` is a message string or `null` |
+
+### Loading and errors
+
+Until the artifacts are fetched and the web component is loaded, the viewer renders a plain `Loading...` element; a failed fetch renders `Failed to load document artifacts: <message>` in its place. Neither is styled or replaceable — to show your own states, fetch with `useDvDocumentArtifacts` and render `DocumentViewer` with `artifacts` once they are ready.
+
+If the web component itself fails to load, the viewer stays on `Loading...`: the error surfaces only on the promise `configureDocumentViewerWc` returns, so handle it there.
+
+## Supported formats
 
 The page view renders `original`, and picks a renderer from its data URL's MIME type:
 
@@ -65,46 +102,82 @@ The page view renders `original`, and picks a renderer from its data URL's MIME 
 | ------------------------- | --------------------------------------- | ------------------------------------------------------------ |
 | PDF                       | `application/pdf`                       | All pages                                                    |
 | JPEG, PNG, WebP           | `image/jpeg`, `image/png`, `image/webp` | Single-page images                                           |
-| TIFF, BMP, GIF and others | —                                       | Not rendered: the viewer reports the format as not supported |
+| TIFF, BMP, GIF and others | —                                       | Not rendered: the page stays blank and `onReady` never fires |
 
-The text view does not depend on the original's format. To show a document whose original is not supported, leave `original` out and pass `text` (in self-fetching mode, leave `EncodedDocumentPath` unset): the viewer opens in text view.
+There is no automatic fallback to the text view, which does not depend on the original's format. To show a document whose original is not supported, check the MIME type and leave `original` out:
+
+```tsx
+const PAGE_VIEW_TYPES = /^data:(application\/pdf|image\/(jpeg|png|webp))[;,]/i;
+
+const { artifacts } = useDvDocumentArtifacts(sdk, data);
+const viewable = artifacts && {
+  ...artifacts,
+  original: PAGE_VIEW_TYPES.test(artifacts.original ?? "")
+    ? artifacts.original
+    : undefined,
+};
+
+return viewable ? <DocumentViewer artifacts={viewable} /> : <Spinner />;
+```
+
+With `original` left out and `text` set, the viewer opens in text view.
 
 ## Linking it to a form
 
-The viewer is linked through content references, in and out:
+The viewer is linked through content references, in and out. A reference is a `DuFramework.ResultsContentReference` — the `Reference` of each value in an extraction result's `ResultsDocument.Fields`. This package holds no extraction result, so the fields come from your own source:
 
 ```tsx
+import { useMemo, useState } from "react";
 import { DocumentViewer } from "@uipath/ui-widgets-document-viewer";
-import { CompactFieldsForm } from "@uipath/ui-widgets-validation-station";
+import type { UiPath } from "@uipath/uipath-typescript/core";
+import type { DuFramework } from "@uipath/uipath-typescript/document-understanding";
 
-function Review({ artifacts }) {
-  const [selected, setSelected] = useState(null);
+function Review({
+  sdk,
+  data,
+  fields,
+}: {
+  sdk: UiPath;
+  data: DuFramework.ContentValidationData;
+  fields: DuFramework.ResultsDataPoint[];
+}) {
+  const [selected, setSelected] =
+    useState<DuFramework.ResultsContentReference | null>(null);
+  // Memoized: a new array redraws every passive highlight.
   const references = useMemo(
     () =>
-      artifacts.extractionResult.ResultsDocument.Fields.flatMap((field) =>
-        field.Values.map((value) => value.Reference),
-      ),
-    [artifacts],
+      fields.flatMap((f) => (f.Values ?? []).flatMap((v) => v.Reference ?? [])),
+    [fields],
   );
 
   return (
     <>
       <DocumentViewer
-        artifacts={artifacts}
+        sdk={sdk}
+        data={data}
         highlightReference={selected}
         passiveReferences={references}
-        onReferenceSelect={({ text, reference }) => fill(text, reference)}
-      />
-      <CompactFieldsForm
-        artifacts={artifacts}
-        onFieldValueSelected={(e) =>
-          setSelected(e.FieldValue?.Reference ?? null)
+        // The user's selection; empty `reference.Tokens` means it was cleared.
+        onReferenceSelect={({ text, reference }) =>
+          console.log(text, reference.Tokens)
         }
       />
+      <ul>
+        {fields.map((f) => (
+          <li
+            key={f.FieldId}
+            onClick={() => setSelected(f.Values?.[0]?.Reference ?? null)}
+          >
+            {f.FieldName}: {f.Values?.[0]?.Value}
+          </li>
+        ))}
+      </ul>
     </>
   );
 }
 ```
+
+With the Validation Station package, its artifacts carry the extraction result (`artifacts.extractionResult.ResultsDocument.Fields`), and its `CompactFieldsForm` reports the clicked value through `onFieldValueSelected` — pass `e.FieldValue?.Reference` to `highlightReference`.
 
 > **Note: Linking through `instanceId`**
 > This viewer cannot share a store with the Validation Station subcomponents through `instanceId` yet. When you need that — selecting a field highlights it, a rule click focuses its value, with nothing wired by hand — keep the Validation Station's own (deprecated) `DocumentViewer` subcomponent.
