@@ -61,6 +61,7 @@ const spans = (withText = true) => [
     id: "span-d",
     spanType: "idpDigitization",
     attributes: JSON.stringify({
+      pipelineRunId: "run-1",
       digitizationArtifacts: [
         {
           documentId: "doc-1",
@@ -305,16 +306,19 @@ describe("fetchProcessedDocumentArtifacts", () => {
       expect(client.getSpans).toHaveBeenCalledTimes(2);
     });
 
-    it("does not share a load between different payloads or SDKs", async () => {
+    it("shares only the trace read between payloads on one SDK", async () => {
       const pd = makeProcessedDocument();
 
-      await Promise.all([
+      const [first, second] = await Promise.all([
         fetchProcessedDocumentArtifacts(sdk, pd),
         fetchProcessedDocumentArtifacts(sdk, makeProcessedDocument()),
         fetchProcessedDocumentArtifacts({ id: "other-sdk" } as any, pd),
       ]);
 
-      expect(client.getSpans).toHaveBeenCalledTimes(3);
+      expect(second).not.toBe(first);
+      expect(client.findFeedback).toHaveBeenCalledTimes(3);
+      // The two payloads on one SDK still share their trace's read.
+      expect(client.getSpans).toHaveBeenCalledTimes(2);
     });
 
     it("does not reuse a failed load", async () => {
@@ -328,6 +332,103 @@ describe("fetchProcessedDocumentArtifacts", () => {
         fetchProcessedDocumentArtifacts(sdk, pd),
       ).resolves.toBeDefined();
       expect(client.getSpans).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // A Flow run that extracts several documents puts them all on one trace, and
+  // a host may show them side by side.
+  describe("trace reads in flight", () => {
+    const secondRun = {
+      id: "span-d-2",
+      spanType: "idpDigitization",
+      attributes: JSON.stringify({
+        pipelineRunId: "run-2",
+        digitizationArtifacts: [
+          {
+            normalizedPdfAttachmentId: "doc-2.pdf",
+            domAttachmentId: "dom-2.json.gz",
+          },
+        ],
+      }),
+      attachments: [
+        { id: "b-pdf-2", fileName: "doc-2.pdf" },
+        { id: "b-dom-2", fileName: "dom-2.json.gz" },
+      ],
+    };
+    const ofRun = (pipelineRunId: string) =>
+      makeProcessedDocument({ metadata: { pipelineRunId, ...anchor } });
+
+    const secondRunContent: Record<string, ArrayBuffer> = {
+      "uri:doc-2.pdf": toBuffer(strToU8("%PDF-2")),
+      "uri:dom-2.json.gz": toBuffer(
+        gzipSync(
+          strToU8(
+            JSON.stringify({ pages: [{ ...dom.pages[0], size: [2, 2] }] }),
+          ),
+        ),
+      ),
+    };
+
+    beforeEach(() => {
+      client.getSpans.mockResolvedValue([...spans(), secondRun]);
+      client.readBytes.mockImplementation(
+        async (uri: string) => secondRunContent[uri] ?? contentByUri[uri],
+      );
+    });
+
+    it("reads a trace once for the documents of its run loading together", async () => {
+      const [first, second] = await Promise.all([
+        fetchProcessedDocumentArtifacts(sdk, ofRun("run-1")),
+        fetchProcessedDocumentArtifacts(sdk, ofRun("run-2")),
+      ]);
+
+      expect(client.getSpans).toHaveBeenCalledTimes(1);
+      expect(first.original).toBe(
+        `data:application/pdf;base64,${btoa("%PDF")}`,
+      );
+      expect(first.dom.Pages?.[0]?.Size).toEqual([1, 1]);
+      expect(second.original).toBe(
+        `data:application/pdf;base64,${btoa("%PDF-2")}`,
+      );
+      expect(second.dom.Pages?.[0]?.Size).toEqual([2, 2]);
+    });
+
+    it("matches the run whatever the case of its id", async () => {
+      const artifacts = await fetchProcessedDocumentArtifacts(
+        sdk,
+        ofRun("RUN-2"),
+      );
+
+      expect(artifacts.dom.Pages?.[0]?.Size).toEqual([2, 2]);
+    });
+
+    it("reads the trace again once the earlier read has finished", async () => {
+      const first = await fetchProcessedDocumentArtifacts(sdk, ofRun("run-1"));
+      const second = await fetchProcessedDocumentArtifacts(sdk, ofRun("run-2"));
+
+      expect(client.getSpans).toHaveBeenCalledTimes(2);
+      expect(first.dom.Pages?.[0]?.Size).toEqual([1, 1]);
+      expect(second.dom.Pages?.[0]?.Size).toEqual([2, 2]);
+    });
+
+    it("does not reuse a failed read", async () => {
+      client.getSpans.mockRejectedValueOnce(new Error("503"));
+
+      await expect(
+        fetchProcessedDocumentArtifacts(sdk, ofRun("run-1")),
+      ).rejects.toThrow("503");
+      await expect(
+        fetchProcessedDocumentArtifacts(sdk, ofRun("run-2")),
+      ).resolves.toBeDefined();
+      expect(client.getSpans).toHaveBeenCalledTimes(2);
+    });
+
+    it("refuses a document whose run did not digitize on the trace", async () => {
+      await expect(
+        fetchProcessedDocumentArtifacts(sdk, ofRun("run-3")),
+      ).rejects.toThrow(
+        "the trace carries no idpDigitization span for pipeline run run-3",
+      );
     });
   });
 

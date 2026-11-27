@@ -105,13 +105,18 @@ export function useResolvedArtifacts(
     source.data,
     source.processedDocument,
   );
+  // A Flow document's id is its pipeline run: one per extraction, where the
+  // trace id is shared by every IDP node a Flow run executes.
   const resolvedDocumentId =
-    documentId ?? data?.DocumentId ?? processedDocument?.metadata?.traceId;
+    documentId ??
+    data?.DocumentId ??
+    processedDocument?.metadata?.pipelineRunId;
   // The outcome is tagged with the document it belongs to, so another
   // document shows the loading state instead of the previous one while its
   // fetch is in flight. By content rather than payload identity: a caller
   // passing an inline payload would otherwise never see its own fetch land.
-  // A Flow run's documents share a trace id, so theirs adds the span id.
+  // A Flow document's key also carries its span id, so two payloads given the
+  // same explicit `documentId` still load apart.
   const outcomeKey = processedDocument
     ? `${resolvedDocumentId}|${processedDocument.metadata?.spanId}`
     : resolvedDocumentId;

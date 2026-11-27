@@ -31,7 +31,7 @@ For the standard review screen, use `ValidationStation`; don't recompose it from
 > **Warning: `DocumentViewer` is deprecated**
 > Web component `1.0.0-rc.5` deprecates the element it wraps in favour of `@uipath/du-document-viewer-wc`. Keep using it only to link the viewer to the other panels through `instanceId`, which the standalone viewer cannot do yet.
 
-Every panel also takes `artifacts`, `documentId` (falls back to `data.DocumentId`, then `processedDocument.metadata.traceId`), `instanceId`, `theme`, `language`, `persistent`, `isReadonly`, `className` and `style`. The viewer usually wants `style={{ height: "100%" }}`.
+Every panel also takes `artifacts`, `documentId` (falls back to `data.DocumentId`, then `processedDocument.metadata.pipelineRunId`), `instanceId`, `theme`, `language`, `persistent`, `isReadonly`, `className` and `style`. The viewer usually wants `style={{ height: "100%" }}`.
 
 ## Worked example: a Coded Action App
 
@@ -143,11 +143,11 @@ const { artifacts, error } = useProcessedDocumentArtifacts(
   processedDocument,
 );
 // …error and loading states as above…
-const { traceId, spanId } = processedDocument.metadata;
+const { pipelineRunId } = processedDocument.metadata;
 const shared = {
   artifacts,
-  documentId: traceId,
-  instanceId: `review-${traceId}-${spanId}`, // unique per Flow document
+  documentId: pipelineRunId,
+  instanceId: `review-${pipelineRunId}`, // unique per Flow document
   persistent: false,
 };
 

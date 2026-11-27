@@ -2,6 +2,14 @@
 
 What changed in the web component releases this package renders, and how to move off `1.0.x`. For setup, start with the [README](https://github.com/UiPath/uipath-ui-widgets/tree/develop/packages/validation-station#readme).
 
+## Unreleased: Flow documents are matched by their pipeline run
+
+For a `ProcessedDocument`:
+
+- **`documentId` defaults to `metadata.pipelineRunId`**, not `metadata.traceId`. Every extraction of one Flow run shares its trace id, so the old default gave them all the same id. Host state keyed on `request.documentId` now sees the pipeline-run GUID.
+- **`metadata.pipelineRunId` is required.** A payload without it is refused on load and save. A cloud Flow run always sets it.
+- **The documents of one Flow run load side by side.** Each reads the digitization of its own pipeline run, where before every one failed with "the trace carries 2 idpDigitization spans".
+
 ## Web component 1.0.0-rc.6
 
 The widgets now render `@uipath/du-validation-station-wc` `1.0.0-rc.6`. Keep the

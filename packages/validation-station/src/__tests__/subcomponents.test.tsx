@@ -115,7 +115,12 @@ const ixpArtifacts = {
 
 const processedDocument = {
   type: "Extraction",
-  metadata: { traceId: "trace-1", spanId: "span-1", folderKey: "f-1" },
+  metadata: {
+    pipelineRunId: "run-1",
+    traceId: "trace-1",
+    spanId: "span-1",
+    folderKey: "f-1",
+  },
 } as unknown as ProcessedDocument;
 
 function readyState(overrides: Record<string, any> = {}) {
@@ -533,7 +538,7 @@ describe("CompactFieldsForm save wiring for a Flow document", () => {
           {...{ [prop]: callback }}
         />,
       );
-      const detail = { documentId: "trace-1", validatedData: { output: {} } };
+      const detail = { documentId: "run-1", validatedData: { output: {} } };
       container
         .querySelector("ui-du-compact-fields-form-standalone-wc-element")!
         .dispatchEvent(new CustomEvent(event, { detail }));

@@ -42,28 +42,43 @@ const toArtifactRef = (
   return attachment ? { bucketId: attachment.id, fileName } : null;
 };
 
-/** The document and its DOM are required to render; the OCR text is not. */
+// The payload's id comes from Flow and the span's from the service that
+// digitized, so neither promises the other a GUID's letter case.
+const isSameRun = (spanRunId: unknown, pipelineRunId: string): boolean =>
+  typeof spanRunId === "string" &&
+  spanRunId.toLowerCase() === pipelineRunId.toLowerCase();
+
+/**
+ * The artifacts of the document digitized for the pipeline run
+ * `pipelineRunId`. The document and its DOM are required to render; the OCR
+ * text is not.
+ */
 export function resolveDocumentArtifacts(
   spans: TraceSpan[],
+  pipelineRunId: string,
 ): DocumentArtifactRefs {
-  // Nothing on a span ties it to the extraction it fed, so with more than one
-  // the document could belong to another extraction: refuse rather than guess.
-  const digitizations = spans.filter(
-    (s) => s.spanType === DIGITIZATION_SPAN_TYPE,
-  );
-  if (digitizations.length > 1) {
+  // A Flow run's trace holds every extraction it ran, and each run stamps its
+  // digitization span with its own id: pick by that, never by position.
+  const ofRun = spans.flatMap((span) => {
+    if (span.spanType !== DIGITIZATION_SPAN_TYPE) return [];
+    const attributes = parseAttributes(span.attributes);
+    if (!attributes || !isSameRun(attributes["pipelineRunId"], pipelineRunId)) {
+      return [];
+    }
+    return [{ span, attributes }];
+  });
+  if (ofRun.length > 1) {
     refuse(
-      `the trace carries ${digitizations.length} ${DIGITIZATION_SPAN_TYPE} spans, so the document cannot be matched to this extraction`,
+      `the trace carries ${ofRun.length} ${DIGITIZATION_SPAN_TYPE} spans for pipeline run ${pipelineRunId}`,
     );
   }
-  const span = digitizations[0];
-  if (!span) {
-    refuse(`the trace carries no ${DIGITIZATION_SPAN_TYPE} span`);
+  const match = ofRun[0];
+  if (!match) {
+    refuse(
+      `the trace carries no ${DIGITIZATION_SPAN_TYPE} span for pipeline run ${pipelineRunId}`,
+    );
   }
-  const attributes = parseAttributes(span.attributes);
-  if (!attributes) {
-    refuse(`the ${DIGITIZATION_SPAN_TYPE} span carries no readable attributes`);
-  }
+  const { span, attributes } = match;
   const artifacts = attributes["digitizationArtifacts"];
   if (!Array.isArray(artifacts) || artifacts.length === 0) {
     refuse(
@@ -72,7 +87,7 @@ export function resolveDocumentArtifacts(
   }
   if (artifacts.length > 1) {
     refuse(
-      `the run digitized ${artifacts.length} documents, and only one can be validated`,
+      `the pipeline run digitized ${artifacts.length} documents, and only one can be validated`,
     );
   }
   const artifact = artifacts[0] as DigitizationArtifacts | null;
@@ -83,10 +98,10 @@ export function resolveDocumentArtifacts(
   );
   const dom = toArtifactRef(attachments, artifact?.domAttachmentId);
   if (!document) {
-    refuse("the run produced no document artifact");
+    refuse("the pipeline run produced no document artifact");
   }
   if (!dom) {
-    refuse("the run produced no dom artifact");
+    refuse("the pipeline run produced no dom artifact");
   }
 
   return {

@@ -24,13 +24,14 @@ const makeProcessedDocument = (overrides: Record<string, any> = {}) =>
   }) as any;
 
 describe("validateProcessedDocument", () => {
-  it("unwraps an extraction into its taxonomy, result and span anchor", () => {
+  it("unwraps an extraction into its taxonomy, result, span anchor and run", () => {
     const pd = makeProcessedDocument();
 
     expect(validateProcessedDocument(pd)).toEqual({
       taxonomy: pd.taxonomy,
       extraction: pd.result,
       anchor: { traceId: "trace-1", spanId: "span-1", folderKey: "folder-1" },
+      pipelineRunId: "run-1",
     });
   });
 
@@ -54,6 +55,21 @@ describe("validateProcessedDocument", () => {
       { metadata: { traceId: "t", spanId: "s", folderKey: "" } },
       "metadata.folderKey is empty",
     ],
+    [
+      {
+        metadata: {
+          traceId: "t",
+          spanId: "s",
+          folderKey: "f",
+          pipelineRunId: "",
+        },
+      },
+      "metadata.pipelineRunId is empty",
+    ],
+    [
+      { metadata: { traceId: "t", spanId: "s", folderKey: "f" } },
+      "metadata.pipelineRunId is empty",
+    ],
   ])("refuses %j, naming the missing piece", (overrides, reason) => {
     expect(() =>
       validateProcessedDocument(makeProcessedDocument(overrides)),
@@ -68,10 +84,14 @@ const digitizationSpan = (
     { id: "bucket-dom", fileName: "doc-1/dom.json.gz" },
     { id: "bucket-text", fileName: "doc-1/text.txt.gz" },
   ],
+  pipelineRunId = "run-1",
 ) => ({
-  id: "span-d",
+  id: `span-d-${pipelineRunId}`,
   spanType: "idpDigitization",
-  attributes: JSON.stringify({ digitizationArtifacts: artifacts }),
+  attributes: JSON.stringify({
+    pipelineRunId,
+    digitizationArtifacts: artifacts,
+  }),
   attachments: attachments,
 });
 
@@ -83,21 +103,52 @@ const fullArtifact = {
 };
 
 describe("resolveDocumentArtifacts", () => {
+  // The run's other spans carry its id too, so the span type must decide.
   it("pairs each artifact path with the bucket its attachment names", () => {
     const spans = [
       {
         id: "span-e",
         spanType: "idpExtraction",
-        attributes: null,
+        attributes: JSON.stringify({ pipelineRunId: "run-1" }),
         attachments: [],
       },
       digitizationSpan([fullArtifact]),
     ] as any;
 
-    expect(resolveDocumentArtifacts(spans)).toEqual({
+    expect(resolveDocumentArtifacts(spans, "run-1")).toEqual({
       document: { bucketId: "bucket-pdf", fileName: "doc-1/normalized.pdf" },
       dom: { bucketId: "bucket-dom", fileName: "doc-1/dom.json.gz" },
       text: { bucketId: "bucket-text", fileName: "doc-1/text.txt.gz" },
+    });
+  });
+
+  // A Flow run that extracts several documents puts every extraction's
+  // digitization on the one trace.
+  it("picks the digitization of its own pipeline run from a shared trace", () => {
+    const secondArtifact = {
+      normalizedPdfAttachmentId: "doc-2/normalized.pdf",
+      domAttachmentId: "doc-2/dom.json.gz",
+    };
+    const spans = [
+      digitizationSpan([fullArtifact]),
+      digitizationSpan(
+        [secondArtifact],
+        [
+          { id: "bucket-pdf-2", fileName: "doc-2/normalized.pdf" },
+          { id: "bucket-dom-2", fileName: "doc-2/dom.json.gz" },
+        ],
+        "run-2",
+      ),
+    ] as any;
+
+    expect(resolveDocumentArtifacts(spans, "run-1").dom).toEqual({
+      bucketId: "bucket-dom",
+      fileName: "doc-1/dom.json.gz",
+    });
+    expect(resolveDocumentArtifacts(spans, "run-2")).toEqual({
+      document: { bucketId: "bucket-pdf-2", fileName: "doc-2/normalized.pdf" },
+      dom: { bucketId: "bucket-dom-2", fileName: "doc-2/dom.json.gz" },
+      text: null,
     });
   });
 
@@ -106,7 +157,7 @@ describe("resolveDocumentArtifacts", () => {
       digitizationSpan([{ ...fullArtifact, documentId: undefined }]),
     ] as any;
 
-    expect(resolveDocumentArtifacts(spans).dom).toEqual({
+    expect(resolveDocumentArtifacts(spans, "run-1").dom).toEqual({
       bucketId: "bucket-dom",
       fileName: "doc-1/dom.json.gz",
     });
@@ -117,28 +168,53 @@ describe("resolveDocumentArtifacts", () => {
       digitizationSpan([{ ...fullArtifact, textAttachmentId: undefined }]),
     ] as any;
 
-    expect(resolveDocumentArtifacts(spans).text).toBeNull();
+    expect(resolveDocumentArtifacts(spans, "run-1").text).toBeNull();
   });
 
   // The service sends a JSON string, but the SDK types attributes as an object.
   it("reads attributes that arrive as an object as well as a string", () => {
     const span = digitizationSpan([fullArtifact]);
     const spans = [
-      { ...span, attributes: { digitizationArtifacts: [fullArtifact] } },
+      {
+        ...span,
+        attributes: {
+          pipelineRunId: "run-1",
+          digitizationArtifacts: [fullArtifact],
+        },
+      },
     ] as any;
 
-    expect(resolveDocumentArtifacts(spans).dom).toEqual({
+    expect(resolveDocumentArtifacts(spans, "run-1").dom).toEqual({
       bucketId: "bucket-dom",
       fileName: "doc-1/dom.json.gz",
     });
   });
 
   it.each([
-    ["no digitization span", [], "the trace carries no idpDigitization span"],
+    [
+      "no digitization span",
+      [],
+      "the trace carries no idpDigitization span for pipeline run run-1",
+    ],
+    [
+      "only another run's digitization",
+      [digitizationSpan([fullArtifact], undefined, "run-2")],
+      "the trace carries no idpDigitization span for pipeline run run-1",
+    ],
+    [
+      "a digitization stamped with no run",
+      [
+        {
+          ...digitizationSpan([fullArtifact]),
+          attributes: JSON.stringify({ digitizationArtifacts: [fullArtifact] }),
+        },
+      ],
+      "the trace carries no idpDigitization span for pipeline run run-1",
+    ],
     [
       "unreadable attributes",
       [{ ...digitizationSpan([]), attributes: "{not json" }],
-      "the idpDigitization span carries no readable attributes",
+      "the trace carries no idpDigitization span for pipeline run run-1",
     ],
     [
       "no artifacts",
@@ -146,14 +222,14 @@ describe("resolveDocumentArtifacts", () => {
       "the idpDigitization span declares no digitizationArtifacts",
     ],
     [
-      "several digitization spans",
+      "several digitization spans for its run",
       [digitizationSpan([fullArtifact]), digitizationSpan([fullArtifact])],
-      "the trace carries 2 idpDigitization spans, so the document cannot be matched to this extraction",
+      "the trace carries 2 idpDigitization spans for pipeline run run-1",
     ],
     [
       "several documents",
       [digitizationSpan([fullArtifact, fullArtifact])],
-      "the run digitized 2 documents, and only one can be validated",
+      "the pipeline run digitized 2 documents, and only one can be validated",
     ],
     [
       "no PDF attachment",
@@ -163,7 +239,7 @@ describe("resolveDocumentArtifacts", () => {
           [{ id: "b", fileName: "doc-1/dom.json.gz" }],
         ),
       ],
-      "the run produced no document artifact",
+      "the pipeline run produced no document artifact",
     ],
     [
       "no DOM attachment",
@@ -173,10 +249,12 @@ describe("resolveDocumentArtifacts", () => {
           [{ id: "b", fileName: "doc-1/normalized.pdf" }],
         ),
       ],
-      "the run produced no dom artifact",
+      "the pipeline run produced no dom artifact",
     ],
   ])("refuses a trace with %s", (_name, spans, reason) => {
-    expect(() => resolveDocumentArtifacts(spans as any)).toThrow(reason);
+    expect(() => resolveDocumentArtifacts(spans as any, "run-1")).toThrow(
+      reason,
+    );
   });
 });
 

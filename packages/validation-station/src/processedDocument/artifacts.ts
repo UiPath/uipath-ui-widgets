@@ -14,6 +14,7 @@ import type {
   ArtifactRef,
   FeedbackAnchor,
   ProcessedDocument,
+  TraceSpan,
 } from "./types.js";
 
 // The viewer takes a data URI, which the `ContentValidationData` artifact
@@ -63,6 +64,63 @@ const loadsInFlight = new WeakMap<
   WeakMap<ProcessedDocument, Promise<IxpDocumentArtifacts>>
 >();
 
+// Trace reads under way, by SDK and trace. The extractions of one Flow run
+// share a trace, and a host showing several of them at once would otherwise
+// read the whole trace once per document. Dropped once settled, like
+// `loadsInFlight`.
+const spansInFlight = new WeakMap<UiPath, Map<string, Promise<TraceSpan[]>>>();
+
+function spansOf(
+  sdk: UiPath,
+  client: PlatformClient,
+  traceId: string,
+): Promise<TraceSpan[]> {
+  return shareWhilePending(
+    ofSdk(spansInFlight, sdk, () => new Map()),
+    traceId,
+    () => client.getSpans(traceId),
+  );
+}
+
+interface PendingWork<K, V> {
+  get(key: K): Promise<V> | undefined;
+  set(key: K, work: Promise<V>): unknown;
+  delete(key: K): boolean;
+}
+
+// Hands a caller the work already under way for `key`, else starts it. The
+// entry is dropped once settled, so a later call starts afresh and a failure is
+// never reused.
+function shareWhilePending<K, V>(
+  pending: PendingWork<K, V>,
+  key: K,
+  start: () => Promise<V>,
+): Promise<V> {
+  const inFlight = pending.get(key);
+  if (inFlight) return inFlight;
+
+  const work = start();
+  pending.set(key, work);
+  const settle = () => {
+    if (pending.get(key) === work) pending.delete(key);
+  };
+  work.then(settle, settle);
+  return work;
+}
+
+function ofSdk<M extends object>(
+  bySdk: WeakMap<UiPath, M>,
+  sdk: UiPath,
+  create: () => M,
+): M {
+  let forSdk = bySdk.get(sdk);
+  if (!forSdk) {
+    forSdk = create();
+    bySdk.set(sdk, forSdk);
+  }
+  return forSdk;
+}
+
 /**
  * Fetches a {@link ProcessedDocument}'s artifacts, ready to pass as the
  * `artifacts` prop — the same fetch the widgets run when given `sdk` +
@@ -71,38 +129,31 @@ const loadsInFlight = new WeakMap<
  * loading the same `processedDocument` shares that load.
  *
  * @throws if the payload is not a renderable extraction, or its run's trace
- * does not describe exactly one digitized document.
+ * does not describe exactly one digitized document for its pipeline run.
  */
 export function fetchProcessedDocumentArtifacts(
   sdk: UiPath,
   processedDocument: ProcessedDocument,
 ): Promise<IxpDocumentArtifacts> {
-  let bySdk = loadsInFlight.get(sdk);
-  if (!bySdk) {
-    bySdk = new WeakMap();
-    loadsInFlight.set(sdk, bySdk);
-  }
-  const inFlight = bySdk.get(processedDocument);
-  if (inFlight) return inFlight;
-
-  const load = loadArtifacts(sdk, processedDocument);
-  bySdk.set(processedDocument, load);
-  const settle = () => {
-    if (bySdk.get(processedDocument) === load) bySdk.delete(processedDocument);
-  };
-  load.then(settle, settle);
-  return load;
+  return shareWhilePending(
+    ofSdk(loadsInFlight, sdk, () => new WeakMap()),
+    processedDocument,
+    () => loadArtifacts(sdk, processedDocument),
+  );
 }
 
 async function loadArtifacts(
   sdk: UiPath,
   processedDocument: ProcessedDocument,
 ): Promise<IxpDocumentArtifacts> {
-  const { taxonomy, extraction, anchor } =
+  const { taxonomy, extraction, anchor, pipelineRunId } =
     validateProcessedDocument(processedDocument);
   const client = createPlatformClient(sdk);
 
-  const refs = resolveDocumentArtifacts(await client.getSpans(anchor.traceId));
+  const refs = resolveDocumentArtifacts(
+    await spansOf(sdk, client, anchor.traceId),
+    pipelineRunId,
+  );
   const read = async (ref: ArtifactRef) =>
     client.readBytes(await client.getEcsReadUri(ref, anchor));
 

@@ -25,7 +25,12 @@ vi.mock("@uipath/uipath-typescript/buckets", () => ({
 const sdk = { id: "sdk" } as any;
 const processedDocument = {
   type: "Extraction",
-  metadata: { traceId: "trace-1", spanId: "span-1", folderKey: "folder-1" },
+  metadata: {
+    pipelineRunId: "run-1",
+    traceId: "trace-1",
+    spanId: "span-1",
+    folderKey: "folder-1",
+  },
 } as any;
 const data = { DocumentId: "doc-1", BucketId: 100, FolderId: 42 } as any;
 const ixpArtifacts = {
@@ -40,7 +45,7 @@ beforeEach(() => {
 });
 
 describe("useResolvedArtifacts with a processedDocument", () => {
-  it("fetches through fetchProcessedDocumentArtifacts, keyed by the trace id", async () => {
+  it("fetches through fetchProcessedDocumentArtifacts, keyed by the pipeline run", async () => {
     const { result } = renderHook(() =>
       useResolvedArtifacts({ sdk, processedDocument }),
     );
@@ -50,24 +55,35 @@ describe("useResolvedArtifacts with a processedDocument", () => {
       sdk,
       processedDocument,
     );
-    expect(result.current.documentId).toBe("trace-1");
+    expect(result.current.documentId).toBe("run-1");
     expect(result.current.error).toBeNull();
   });
 
-  // A Flow run's documents share a trace id and differ by span.
+  // A Flow run's extractions share a trace id; each has its own pipeline run.
+  // A host passing its own documentId is told documents apart by span.
   it.each([
-    ["another run", { traceId: "trace-2" }],
-    ["the same run", { spanId: "span-2" }],
+    [
+      "another Flow run",
+      { pipelineRunId: "run-2", traceId: "trace-2", spanId: "span-2" },
+      undefined,
+    ],
+    [
+      "the same Flow run",
+      { pipelineRunId: "run-2", spanId: "span-2" },
+      undefined,
+    ],
+    ["a host's fixed documentId", { spanId: "span-2" }, "mine"],
   ])(
     "shows the loading state, not the previous document, while the next one from %s loads",
-    async (_, change) => {
+    async (_, change, documentId) => {
       const next = {
         ...processedDocument,
         metadata: { ...processedDocument.metadata, ...change },
       };
       let resolveNext!: (artifacts: unknown) => void;
       const { result, rerender } = renderHook(
-        ({ pd }) => useResolvedArtifacts({ sdk, processedDocument: pd }),
+        ({ pd }) =>
+          useResolvedArtifacts({ sdk, processedDocument: pd, documentId }),
         { initialProps: { pd: processedDocument } },
       );
       await waitFor(() => expect(result.current.artifacts).toBe(ixpArtifacts));
@@ -77,7 +93,7 @@ describe("useResolvedArtifacts with a processedDocument", () => {
       );
       rerender({ pd: next });
 
-      expect(result.current.documentId).toBe(next.metadata.traceId);
+      expect(result.current.documentId).toBe(documentId ?? "run-2");
       expect(result.current.artifacts).toBeNull();
 
       const nextArtifacts = { ...ixpArtifacts };

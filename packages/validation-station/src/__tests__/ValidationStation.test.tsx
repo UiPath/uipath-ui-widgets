@@ -243,7 +243,12 @@ describe("ValidationStation", () => {
   describe("processedDocument source (sdk + processedDocument)", () => {
     const processedDocument = {
       type: "Extraction",
-      metadata: { traceId: "trace-1", spanId: "span-1", folderKey: "f-1" },
+      metadata: {
+        pipelineRunId: "run-1",
+        traceId: "trace-1",
+        spanId: "span-1",
+        folderKey: "f-1",
+      },
     };
     const pdProps: any = { sdk: { id: "sdk" }, processedDocument };
 
@@ -292,7 +297,7 @@ describe("ValidationStation", () => {
         );
         const el = await waitForWc(container);
 
-        const detail = { documentId: "trace-1", validatedData: { output: {} } };
+        const detail = { documentId: "run-1", validatedData: { output: {} } };
         el.dispatchEvent(new CustomEvent(event, { detail }));
 
         await waitFor(() => {

@@ -16,7 +16,12 @@ const mockSdk = {} as any;
 
 const processedDocument = {
   type: "Extraction",
-  metadata: { traceId: "trace-1", spanId: "span-1", folderKey: "f-1" },
+  metadata: {
+    pipelineRunId: "run-1",
+    traceId: "trace-1",
+    spanId: "span-1",
+    folderKey: "f-1",
+  },
 } as unknown as ProcessedDocument;
 
 const mockArtifacts = {
