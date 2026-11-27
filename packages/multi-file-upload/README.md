@@ -85,13 +85,14 @@ function App() {
 }
 ```
 
-> **Tip: Finding the bucket and folder IDs**
-> List the buckets you can reach with the Buckets service — the cross-folder `getAll()` response carries the bucket `id` alongside its `folderId`. See the [Bucket service reference](https://uipath.github.io/uipath-typescript/api/interfaces/BucketServiceModel/):
+> **Tip: Finding the bucket ID**
+> List the buckets in your folder and read the `id` of the one you want. See the [Bucket service reference](https://uipath.github.io/uipath-typescript/api/interfaces/BucketServiceModel/):
 >
 > ```ts
 > import { Buckets } from "@uipath/uipath-typescript/buckets";
 >
-> const buckets = await new Buckets(sdk).getAll();
+> const { items } = await new Buckets(sdk).getAll({ folderId: 456 });
+> const bucketId = items.find((b) => b.name === "MyBucket")?.id;
 > ```
 
 ## Props
